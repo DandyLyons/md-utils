@@ -9,45 +9,34 @@ import Foundation
 import Yams
 
 extension MarkdownDocument {
-  /// Lazily parsed frontmatter as a `Yams.Node.Mapping`.
-  ///
-  /// This property parses the `rawFrontMatter` string into a structured YAML mapping
-  /// only when accessed. If `rawFrontMatter` is empty or contains only whitespace,
-  /// this returns an empty mapping.
-  ///
-  /// - Throws: `YAMLConversionError.invalidYAML` if the YAML syntax is invalid,
-  ///           or `YAMLConversionError.notAMapping` if the root is not a mapping
-  public var frontMatter: Yams.Node.Mapping {
-    get throws {
-      try YAMLConversion.parse(rawFrontMatter)
-    }
-  }
-
   /// Check if the document has frontmatter.
   ///
-  /// Returns `true` if `rawFrontMatter` contains non-whitespace content.
+  /// Returns `true` if the frontmatter mapping is not empty.
   public var hasFrontMatter: Bool {
-    !rawFrontMatter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    !frontMatter.isEmpty
   }
 
   /// Reconstruct the full document from frontmatter and body.
   ///
   /// This method combines the frontmatter (with delimiters) and body back into
-  /// a single markdown document string. If there's no frontmatter (empty or whitespace-only),
+  /// a single markdown document string. If there's no frontmatter (empty mapping),
   /// it returns just the body.
   ///
   /// - Returns: The reconstructed markdown document
-  public func render() -> String {
+  /// - Throws: If YAML serialization fails
+  public func render() throws -> String {
     // Only add delimiters if there's actual frontmatter content
-    let trimmed = rawFrontMatter.trimmingCharacters(in: .whitespacesAndNewlines)
-    if trimmed.isEmpty {
+    if frontMatter.isEmpty {
       return body
     }
+
+    // Serialize frontmatter back to YAML
+    let yamlString = try YAMLConversion.serialize(frontMatter)
 
     // Add delimiters around frontmatter
     return """
     ---
-    \(rawFrontMatter)---
+    \(yamlString)---
     \(body)
     """
   }

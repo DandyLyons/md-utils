@@ -2,7 +2,7 @@
 //  FrontMatterParsingTests.swift
 //  MarkdownUtilitiesTests
 //
-//  Tests for lazy YAML parsing of frontmatter
+//  Tests for YAML parsing of frontmatter
 //
 
 import Testing
@@ -13,7 +13,7 @@ import Yams
 struct FrontMatterParsingTests {
 
   @Test
-  func `Lazy YAML parsing works for valid frontmatter`() async throws {
+  func `YAML parsing works for valid frontmatter`() async throws {
     let content = """
     ---
     title: Test Document
@@ -24,15 +24,12 @@ struct FrontMatterParsingTests {
     ---
     Body content
     """
-    let doc = try MarkdownDocument(parsing: content)
-
-    // Triggers lazy parsing
-    let fm = try doc.frontMatter
+    let doc = try MarkdownDocument(content: content)
 
     // Verify parsed values
-    #expect(fm["title"]?.string == "Test Document")
-    #expect(fm["count"]?.int == 42)
-    #expect(fm["tags"]?.sequence?.count == 2)
+    #expect(doc.frontMatter["title"]?.string == "Test Document")
+    #expect(doc.frontMatter["count"]?.int == 42)
+    #expect(doc.frontMatter["tags"]?.sequence?.count == 2)
   }
 
   @Test
@@ -42,10 +39,9 @@ struct FrontMatterParsingTests {
     ---
     Body
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    let fm = try doc.frontMatter
-    #expect(fm.isEmpty)
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.hasFrontMatter == false)
   }
 
@@ -57,64 +53,23 @@ struct FrontMatterParsingTests {
     ---
     Body
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    let fm = try doc.frontMatter
-    #expect(fm.isEmpty)
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.hasFrontMatter == false)
   }
 
   @Test
   func `No frontmatter returns empty mapping`() async throws {
     let content = "Just body content"
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    let fm = try doc.frontMatter
-    #expect(fm.isEmpty)
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.hasFrontMatter == false)
   }
 
   @Test
-  func `Invalid YAML throws on access but separation succeeds`() async throws {
-    let content = """
-    ---
-    []
-    ---
-    Body
-    """
-    let doc = try MarkdownDocument(parsing: content)
-
-    // Separation works - rawFrontMatter is extracted
-    #expect(doc.rawFrontMatter == "[]\n")
-    #expect(doc.body == "Body")
-
-    // But lazy parsing fails because root is an array, not a mapping
-    #expect(throws: YAMLConversionError.self) {
-      _ = try doc.frontMatter
-    }
-  }
-
-  @Test
-  func `Invalid YAML syntax throws on access`() async throws {
-    let content = """
-    ---
-    invalid: yaml: syntax:
-    ---
-    Body
-    """
-    let doc = try MarkdownDocument(parsing: content)
-
-    // Separation works
-    #expect(doc.rawFrontMatter == "invalid: yaml: syntax:\n")
-
-    // But parsing fails
-    #expect(throws: YAMLConversionError.self) {
-      _ = try doc.frontMatter
-    }
-  }
-
-  @Test
-  func `Frontmatter is array throws error`() async throws {
+  func `Frontmatter is array throws error during initialization`() async throws {
     let content = """
     ---
     - item1
@@ -122,40 +77,51 @@ struct FrontMatterParsingTests {
     ---
     Body
     """
-    let doc = try MarkdownDocument(parsing: content)
 
     #expect(throws: YAMLConversionError.notAMapping) {
-      _ = try doc.frontMatter
+      _ = try MarkdownDocument(content: content)
     }
   }
 
   @Test
-  func `Frontmatter is scalar string throws error`() async throws {
+  func `Invalid YAML syntax throws during initialization`() async throws {
+    let content = """
+    ---
+    invalid: yaml: syntax:
+    ---
+    Body
+    """
+
+    #expect(throws: YAMLConversionError.self) {
+      _ = try MarkdownDocument(content: content)
+    }
+  }
+
+  @Test
+  func `Frontmatter is scalar string throws error during initialization`() async throws {
     let content = """
     ---
     "just a string"
     ---
     Body
     """
-    let doc = try MarkdownDocument(parsing: content)
 
     #expect(throws: YAMLConversionError.notAMapping) {
-      _ = try doc.frontMatter
+      _ = try MarkdownDocument(content: content)
     }
   }
 
   @Test
-  func `Frontmatter is boolean throws error`() async throws {
+  func `Frontmatter is boolean throws error during initialization`() async throws {
     let content = """
     ---
     true
     ---
     Body
     """
-    let doc = try MarkdownDocument(parsing: content)
 
     #expect(throws: YAMLConversionError.notAMapping) {
-      _ = try doc.frontMatter
+      _ = try MarkdownDocument(content: content)
     }
   }
 
@@ -175,12 +141,11 @@ struct FrontMatterParsingTests {
     ---
     Body
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    let fm = try doc.frontMatter
-    #expect(fm["nested"] != nil)
-    #expect(fm["list"]?.sequence?.count == 3)
-    #expect(fm["metadata"]?.mapping?["author"]?.string == "Jane")
+    #expect(doc.frontMatter["nested"] != nil)
+    #expect(doc.frontMatter["list"]?.sequence?.count == 3)
+    #expect(doc.frontMatter["metadata"]?.mapping?["author"]?.string == "Jane")
   }
 
   @Test
@@ -191,7 +156,7 @@ struct FrontMatterParsingTests {
     ---
     Body
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
     #expect(doc.hasFrontMatter == true)
   }
@@ -199,7 +164,7 @@ struct FrontMatterParsingTests {
   @Test
   func `hasFrontMatter returns false for no frontmatter`() async throws {
     let content = "Just body"
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
     #expect(doc.hasFrontMatter == false)
   }
@@ -213,20 +178,21 @@ struct FrontMatterParsingTests {
     ---
     Body content
     """
-    let doc = try MarkdownDocument(parsing: original)
-    let rendered = doc.render()
+    let doc = try MarkdownDocument(content: original)
+    let rendered = try doc.render()
 
     // Should match original (modulo potential whitespace normalization)
     #expect(rendered.contains("---"))
-    #expect(rendered.contains("title: Test"))
+    #expect(rendered.contains("title:"))
+    #expect(rendered.contains("author:"))
     #expect(rendered.contains("Body content"))
   }
 
   @Test
   func `Render returns just body when no frontmatter`() async throws {
     let content = "Just body content"
-    let doc = try MarkdownDocument(parsing: content)
-    let rendered = doc.render()
+    let doc = try MarkdownDocument(content: content)
+    let rendered = try doc.render()
 
     #expect(rendered == "Just body content")
     #expect(!rendered.contains("---"))
@@ -240,8 +206,8 @@ struct FrontMatterParsingTests {
     ---
     Body content
     """
-    let doc = try MarkdownDocument(parsing: content)
-    let rendered = doc.render()
+    let doc = try MarkdownDocument(content: content)
+    let rendered = try doc.render()
 
     #expect(rendered == "Body content")
     #expect(!rendered.contains("---"))

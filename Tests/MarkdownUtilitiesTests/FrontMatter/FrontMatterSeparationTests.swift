@@ -20,18 +20,19 @@ struct FrontMatterSeparationTests {
     ---
     Body content here
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.rawFrontMatter == "title: Test\nauthor: Jane\n")
+    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["author"]?.string == "Jane")
     #expect(doc.body == "Body content here")
   }
 
   @Test
   func `Parse document without frontmatter`() async throws {
     let content = "Just body content"
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.rawFrontMatter == "")
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.body == "Just body content")
   }
 
@@ -42,9 +43,9 @@ struct FrontMatterSeparationTests {
     ---
     Body content
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.rawFrontMatter == "")
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.body == "Body content")
   }
 
@@ -58,9 +59,9 @@ struct FrontMatterSeparationTests {
     ---
     More text
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.rawFrontMatter == "title: Test\n")
+    #expect(doc.frontMatter["title"]?.string == "Test")
     #expect(doc.body == "Some text\n---\nMore text")
   }
 
@@ -70,9 +71,9 @@ struct FrontMatterSeparationTests {
     ---
     This should be treated as body text
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.rawFrontMatter == "")
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.body == "---\nThis should be treated as body text")
   }
 
@@ -85,18 +86,18 @@ struct FrontMatterSeparationTests {
     ---
     More text
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.rawFrontMatter == "")
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.body == "Some text\n---\ntitle: Test\n---\nMore text")
   }
 
   @Test
   func `Empty document works`() async throws {
     let content = ""
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.rawFrontMatter == "")
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.body == "")
   }
 
@@ -108,9 +109,10 @@ struct FrontMatterSeparationTests {
     author: John
     ---
     """
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.rawFrontMatter == "title: Test\nauthor: John\n")
+    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["author"]?.string == "John")
     #expect(doc.body == "")
   }
 
@@ -118,27 +120,10 @@ struct FrontMatterSeparationTests {
   func `Windows line endings are not supported`() async throws {
     // Windows line endings (\r\n) should not be recognized as frontmatter delimiters
     let content = "---\r\ntitle: Test\r\n---\r\nBody"
-    let doc = try MarkdownDocument(parsing: content)
+    let doc = try MarkdownDocument(content: content)
 
     // Should treat entire content as body since --- doesn't have Unix newline
-    #expect(doc.rawFrontMatter == "")
+    #expect(doc.frontMatter.isEmpty)
     #expect(doc.body == "---\r\ntitle: Test\r\n---\r\nBody")
-  }
-
-  @Test
-  func `Backward compatibility with init(content:)`() async throws {
-    // Old initializer should still work
-    let content = """
-    ---
-    title: Test
-    ---
-    Body
-    """
-    let doc = MarkdownDocument(content: content)
-
-    // Should not parse frontmatter, treat entire content as body
-    #expect(doc.content == content)
-    #expect(doc.rawFrontMatter == "")
-    #expect(doc.body == content)
   }
 }

@@ -6,17 +6,14 @@
 import Foundation
 import MarkdownSyntax
 import Parsing
+import Yams
 
 /// A representation of a Markdown document.
 public struct MarkdownDocument {
-  /// The raw markdown content (full document including frontmatter and body).
-  public var content: String
-
-  /// The raw frontmatter content (without delimiters).
+  /// The YAML frontmatter as a parsed mapping.
   ///
-  /// This is an empty string if the document has no frontmatter.
-  /// The frontmatter is the YAML content between `---` delimiters at the start of the document.
-  public var rawFrontMatter: String
+  /// This is an empty mapping if the document has no frontmatter.
+  public var frontMatter: Yams.Node.Mapping
 
   /// The body content of the document (everything after frontmatter, or entire document if no frontmatter).
   ///
@@ -24,32 +21,20 @@ public struct MarkdownDocument {
   /// otherwise it contains the entire document content.
   public var body: String
 
-  /// The root initializer for a markdown document.
-  ///
-  /// This is a simple initializer that does not parse frontmatter.
-  /// Use `init(parsing:)` to automatically separate frontmatter from body.
-  public init(content: String) {
-    self.content = content
-    // For backward compatibility, treat entire content as body with no frontmatter
-    self.rawFrontMatter = ""
-    self.body = content
-  }
-
   /// Initialize a markdown document by parsing the content to separate frontmatter from body.
   ///
   /// This initializer uses `FrontMatterParser` to detect and separate YAML frontmatter
-  /// delimited by `---` markers. The frontmatter is stored as a raw string (not parsed),
+  /// delimited by `---` markers. The frontmatter is immediately parsed into a `Yams.Node.Mapping`,
   /// and the body contains everything after the closing delimiter.
   ///
-  /// - Parameter parsing: The markdown content to parse
-  /// - Throws: Only throws if the parser encounters an unexpected error (normally this doesn't throw)
-  public init(parsing content: String) throws {
+  /// - Parameter content: The markdown content to parse
+  /// - Throws: `YAMLConversionError` if the frontmatter exists but is invalid YAML or not a mapping
+  public init(content: String) throws {
     let parser = FrontMatterParser()
     var input = Substring(content)
     let (rawFrontMatter, body) = try parser.parse(&input)
 
-    self.content = content
-    self.rawFrontMatter = rawFrontMatter
+    self.frontMatter = try YAMLConversion.parse(rawFrontMatter)
     self.body = body
   }
 }
