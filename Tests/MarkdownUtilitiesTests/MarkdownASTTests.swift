@@ -20,12 +20,11 @@ struct MarkdownASTTests {
     #expect(root.children.count == 2)
 
     // Verify first child is Heading
-    let heading = root.children[0] as? Heading
-    #expect(heading?.depth == .h1)
+    let heading = try #require(root.children[0] as? Heading)
+    #expect(heading.depth == .h1)
 
     // Verify second child is Paragraph
-    let paragraph = root.children[1] as? Paragraph
-    #expect(paragraph != nil)
+    #expect(root.children[1] is Paragraph)
   }
 
   @Test
@@ -77,14 +76,19 @@ struct MarkdownASTTests {
     #expect(root.children.count == 6)
 
     // Verify all are headings with correct depths
-    let headings = root.children.compactMap { $0 as? Heading }
-    #expect(headings.count == 6)
-    #expect(headings[0].depth == .h1)
-    #expect(headings[1].depth == .h2)
-    #expect(headings[2].depth == .h3)
-    #expect(headings[3].depth == .h4)
-    #expect(headings[4].depth == .h5)
-    #expect(headings[5].depth == .h6)
+    let h1 = try #require(root.children[0] as? Heading)
+    let h2 = try #require(root.children[1] as? Heading)
+    let h3 = try #require(root.children[2] as? Heading)
+    let h4 = try #require(root.children[3] as? Heading)
+    let h5 = try #require(root.children[4] as? Heading)
+    let h6 = try #require(root.children[5] as? Heading)
+
+    #expect(h1.depth == .h1)
+    #expect(h2.depth == .h2)
+    #expect(h3.depth == .h3)
+    #expect(h4.depth == .h4)
+    #expect(h5.depth == .h5)
+    #expect(h6.depth == .h6)
   }
 
   @Test
@@ -100,10 +104,9 @@ struct MarkdownASTTests {
 
     #expect(root.children.count == 1)
 
-    let list = root.children[0] as? List
-    #expect(list != nil)
-    #expect(list?.ordered == false)
-    #expect(list?.children.count == 3)
+    let list = try #require(root.children[0] as? List)
+    #expect(list.ordered == false)
+    #expect(list.children.count == 3)
   }
 
   @Test
@@ -119,10 +122,9 @@ struct MarkdownASTTests {
 
     #expect(root.children.count == 1)
 
-    let list = root.children[0] as? List
-    #expect(list != nil)
-    #expect(list?.ordered == true)
-    #expect(list?.children.count == 3)
+    let list = try #require(root.children[0] as? List)
+    #expect(list.ordered == true)
+    #expect(list.children.count == 3)
   }
 
   @Test
@@ -139,10 +141,9 @@ struct MarkdownASTTests {
 
     #expect(root.children.count == 1)
 
-    let code = root.children[0] as? Code
-    #expect(code != nil)
-    #expect(code?.language == "swift")
-    #expect((code?.value.contains("let x = 42")) == true)
+    let code = try #require(root.children[0] as? Code)
+    #expect(code.language == "swift")
+    #expect(code.value.contains("let x = 42"))
   }
 
   @Test
@@ -154,18 +155,13 @@ struct MarkdownASTTests {
 
     #expect(root.children.count == 1)
 
-    let paragraph = root.children[0] as? Paragraph
-    #expect(paragraph != nil)
-    #expect(paragraph?.children.count ?? 0 > 0)
+    let paragraph = try #require(root.children[0] as? Paragraph)
+    #expect(paragraph.children.count > 0)
 
     // Verify we have strong, emphasis, and inline code
-    let hasStrong = paragraph?.children.contains { $0 is Strong } ?? false
-    let hasEmphasis = paragraph?.children.contains { $0 is Emphasis } ?? false
-    let hasInlineCode = paragraph?.children.contains { $0 is InlineCode } ?? false
-
-    #expect(hasStrong)
-    #expect(hasEmphasis)
-    #expect(hasInlineCode)
+    #expect(paragraph.children.contains { $0 is Strong })
+    #expect(paragraph.children.contains { $0 is Emphasis })
+    #expect(paragraph.children.contains { $0 is InlineCode })
   }
 
   @Test
@@ -177,12 +173,9 @@ struct MarkdownASTTests {
 
     #expect(root.children.count == 1)
 
-    let paragraph = root.children[0] as? Paragraph
-    #expect(paragraph != nil)
-
-    let link = paragraph?.children.first as? Link
-    #expect(link != nil)
-    #expect(link?.url.absoluteString == "https://openai.com")
+    let paragraph = try #require(root.children[0] as? Paragraph)
+    let link = try #require(paragraph.children.first as? Link)
+    #expect(link.url.absoluteString == "https://openai.com")
   }
 
   @Test
@@ -207,20 +200,19 @@ struct MarkdownASTTests {
 
     #expect(root.children.count == 5)
 
-    let h1 = root.children[0] as? Heading
-    #expect(h1?.depth == .h1)
+    let h1 = try #require(root.children[0] as? Heading)
+    #expect(h1.depth == .h1)
 
-    let paragraph = root.children[1] as? Paragraph
-    #expect(paragraph != nil)
+    #expect(root.children[1] is Paragraph)
 
-    let h2 = root.children[2] as? Heading
-    #expect(h2?.depth == .h2)
+    let h2 = try #require(root.children[2] as? Heading)
+    #expect(h2.depth == .h2)
 
-    let list = root.children[3] as? List
-    #expect(list?.children.count == 2)
+    let list = try #require(root.children[3] as? List)
+    #expect(list.children.count == 2)
 
-    let code = root.children[4] as? Code
-    #expect(code?.language == "swift")
+    let code = try #require(root.children[4] as? Code)
+    #expect(code.language == "swift")
   }
 
   @Test
@@ -245,11 +237,10 @@ struct MarkdownASTTests {
     // AST should only contain body content (heading + paragraph)
     #expect(root.children.count == 2)
 
-    let heading = root.children[0] as? Heading
-    #expect(heading?.depth == .h1)
+    let heading = try #require(root.children[0] as? Heading)
+    #expect(heading.depth == .h1)
 
-    let paragraph = root.children[1] as? Paragraph
-    #expect(paragraph != nil)
+    #expect(root.children[1] is Paragraph)
   }
 
   @Test
@@ -288,8 +279,10 @@ struct MarkdownASTIntegrationTests {
 
     // Verify frontmatter parsed correctly
     #expect(!doc.frontMatter.isEmpty)
-    #expect(doc.frontMatter["title"]?.string == "My Document")
-    #expect(doc.frontMatter["author"]?.string == "Test User")
+    let title = try #require(doc.frontMatter["title"]?.string)
+    let author = try #require(doc.frontMatter["author"]?.string)
+    #expect(title == "My Document")
+    #expect(author == "Test User")
 
     // Verify body excludes frontmatter
     #expect(doc.body.contains("# Introduction"))
@@ -302,13 +295,13 @@ struct MarkdownASTIntegrationTests {
     // Should have: H1, paragraph, H2, list
     #expect(root.children.count == 4)
 
-    let h1 = root.children[0] as? Heading
-    #expect(h1?.depth == .h1)
+    let h1 = try #require(root.children[0] as? Heading)
+    #expect(h1.depth == .h1)
 
-    let h2 = root.children[2] as? Heading
-    #expect(h2?.depth == .h2)
+    let h2 = try #require(root.children[2] as? Heading)
+    #expect(h2.depth == .h2)
 
-    let list = root.children[3] as? List
-    #expect(list?.children.count == 2)
+    let list = try #require(root.children[3] as? List)
+    #expect(list.children.count == 2)
   }
 }

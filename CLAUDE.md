@@ -152,6 +152,25 @@ func initializeWithContent() async throws {
 - **Tests**: Use `@Test` with raw identifier function names
 - **Assertions**: Use `#expect()` macro (not XCTAssert)
 - **Async**: All tests are marked `async throws`
+- **Type Checking**: Use `is` keyword for type assertions only
+- **Unwrapping Optionals**: Use `try #require()` to unwrap optionals (replaces XCTest's `XCTUnwrap`)
+
+**Unwrapping with #require:**
+```swift
+// CORRECT - Use #require to unwrap optionals
+let heading = try #require(root.children[0] as? Heading)
+#expect(heading.depth == .h1)
+
+// WRONG - Don't use optional chaining
+let heading = root.children[0] as? Heading
+#expect(heading?.depth == .h1)
+```
+
+**Type Checking with `is`:**
+```swift
+// Use `is` when you only need to verify type, not access properties
+#expect(root.children[1] is Paragraph)
+```
 
 **Example:**
 ```swift
@@ -175,8 +194,8 @@ struct MarkdownDocumentTests {
     let root = try await doc.parseAST()
 
     #expect(root.children.count == 2)
-    let heading = root.children[0] as? Heading
-    #expect(heading?.depth == .h1)
+    let heading = try #require(root.children[0] as? Heading)
+    #expect(heading.depth == .h1)
   }
 }
 ```
