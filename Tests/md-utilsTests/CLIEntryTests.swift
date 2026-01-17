@@ -15,6 +15,10 @@ struct CLIEntryTests {
 
     #expect(config.commandName == "md-utils")
     #expect(config.version == "0.1.0-alpha")
-    #expect(config.subcommands.isEmpty)
+    #expect(config.subcommands.count == 1)
+
+    // Verify the first subcommand is GenerateTOC
+    let subcommand = config.subcommands[0]
+    #expect(subcommand is CLIEntry.GenerateTOC.Type)
   }
 }

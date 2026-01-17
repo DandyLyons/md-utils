@@ -80,30 +80,38 @@ if let heading = ast.children.first as? Heading {
 **Entry Point** (Sources/md-utils/CLIEntry.swift)
 - Uses swift-argument-parser
 - Main command: `md-utils`
-- Currently has no subcommands (scaffolding only)
-- Future subcommands will be added in Sources/md-utils/Commands/
+- Conforms to `AsyncParsableCommand` to support async subcommands
+- Subcommands defined in Sources/md-utils/Commands/
+
+**Current Subcommands:**
+- `toc` (GenerateTOC) - Generate table of contents for Markdown files
 
 **CLI Pattern** (Following FrontRange)
-- Each subcommand will be a struct conforming to `ParsableCommand`
-- Will use `@OptionGroup var options: GlobalOptions` pattern for shared options
-- GlobalOptions will handle common flags like `--path`, `--format`, etc.
+- Each subcommand is a struct conforming to `AsyncParsableCommand`
+- Uses `@OptionGroup var options: GlobalOptions` pattern for shared options
+- GlobalOptions handles common flags like `--recursive`, `--include-hidden`, `--extensions`
 
 ### Implemented Features
 
 1. **Front Matter Parsing** - YAML frontmatter separated and parsed into structured data
 2. **Markdown AST Parsing** - Body text parsed into Abstract Syntax Tree for programmatic manipulation
+3. **Table of Contents Generation** - Generate TOC for Markdown files with multiple output formats
+   - Library: `TOCGenerator`, `TOCRenderer`, `TOCEntry`, `TableOfContents`
+   - CLI: `md-utils toc` command
+   - Supports hierarchical and flat structures
+   - Multiple output formats: Markdown, JSON, plain text, HTML
+   - Configurable heading levels, slug generation
 
 ### Planned Features (from README)
 
 The following features are documented in README but **NOT YET IMPLEMENTED**:
 
-1. **Table of Contents Generation** - Generate TOC for Markdown files (AST foundation ready)
-2. **Heading Manipulation** - Promote/demote headings while maintaining structure (AST foundation ready)
-3. **Section Operations** - Reorder, extract, inject sections (AST foundation ready)
-4. **Content Selection** - Select by heading or line range (AST foundation ready)
-5. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
-6. **Format Conversion** - HTML, plain text, rich text, XML (AST foundation ready)
-7. **File Metadata** - Read/write file metadata
+1. **Heading Manipulation** - Promote/demote headings while maintaining structure (AST foundation ready)
+2. **Section Operations** - Reorder, extract, inject sections (AST foundation ready)
+3. **Content Selection** - Select by heading or line range (AST foundation ready)
+4. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
+5. **Format Conversion** - HTML, plain text, rich text, XML (AST foundation ready)
+6. **File Metadata** - Read/write file metadata
 
 ## Dependencies
 
@@ -224,20 +232,36 @@ md-utils/
 ├── Sources/
 │   ├── MarkdownUtilities/         # Core library
 │   │   ├── MarkdownDocument.swift
-│   │   └── FrontMatter/           # Frontmatter parsing
-│   │       ├── FrontMatterParser.swift
-│   │       ├── YAMLConversion.swift
-│   │       └── MarkdownDocument+FrontMatter.swift
+│   │   ├── FrontMatter/           # Frontmatter parsing
+│   │   │   ├── FrontMatterParser.swift
+│   │   │   ├── YAMLConversion.swift
+│   │   │   └── MarkdownDocument+FrontMatter.swift
+│   │   └── TOC/                   # Table of contents generation
+│   │       ├── TOCEntry.swift
+│   │       ├── TableOfContents.swift
+│   │       ├── HeadingTextExtractor.swift
+│   │       ├── TOCGenerator.swift
+│   │       ├── TOCRenderer.swift
+│   │       └── MarkdownDocument+TOC.swift
 │   └── md-utils/                  # CLI tool
-│       └── CLIEntry.swift
+│       ├── CLIEntry.swift
+│       ├── GlobalOptions.swift
+│       └── Commands/
+│           └── GenerateTOC.swift
 └── Tests/
     ├── MarkdownUtilitiesTests/    # Library tests
     │   ├── MarkdownDocumentTests.swift
     │   ├── MarkdownASTTests.swift
-    │   └── FrontMatter/           # Frontmatter tests
-    │       ├── FrontMatterParsingTests.swift
-    │       ├── FrontMatterSeparationTests.swift
-    │       └── FrontMatterEdgeCasesTests.swift
+    │   ├── FrontMatter/           # Frontmatter tests
+    │   │   ├── FrontMatterParsingTests.swift
+    │   │   ├── FrontMatterSeparationTests.swift
+    │   │   └── FrontMatterEdgeCasesTests.swift
+    │   └── TOC/                   # TOC tests
+    │       ├── TOCEntryTests.swift
+    │       ├── TableOfContentsTests.swift
+    │       ├── HeadingTextExtractorTests.swift
+    │       ├── TOCGeneratorTests.swift
+    │       └── TOCRendererTests.swift
     └── md-utilsTests/             # CLI tests
         └── CLIEntryTests.swift
 ```
