@@ -47,8 +47,33 @@ swift run md-utils --help
 
 **`MarkdownDocument`** (Sources/MarkdownUtilities/MarkdownDocument.swift)
 - Central data structure representing a Markdown document
-- Currently minimal: just stores `content: String`
-- Future: Will contain parsed AST, metadata extraction, and manipulation methods
+- Separates YAML frontmatter from body content
+- Frontmatter parsed into `Yams.Node.Mapping` for structured access
+- Body available as `String` for text processing
+- Supports parsing body into Markdown AST via `parseAST()` method
+- AST parsing uses MarkdownSyntax library returning `Root` structure
+
+**Frontmatter Handling:**
+- Uses `FrontMatterParser` to separate `---` delimited YAML frontmatter
+- Frontmatter parsed into `Yams.Node.Mapping` during initialization
+- Gracefully handles documents with no frontmatter (empty mapping)
+
+**Markdown AST Parsing:**
+MarkdownDocument supports parsing body text into a Markdown AST using the MarkdownSyntax library:
+- AST parsing via `parseAST()` method (async throws)
+- Returns `Root` structure containing parsed AST
+- Parses fresh each time - no caching
+- User can store returned AST if needed
+
+Example:
+```swift
+let doc = try MarkdownDocument(content: markdownText)
+let ast = try await doc.parseAST()
+
+if let heading = ast.children.first as? Heading {
+  print("First heading level: \(heading.depth)")
+}
+```
 
 ### CLI Tool (md-utils)
 
@@ -63,18 +88,22 @@ swift run md-utils --help
 - Will use `@OptionGroup var options: GlobalOptions` pattern for shared options
 - GlobalOptions will handle common flags like `--path`, `--format`, etc.
 
+### Implemented Features
+
+1. **Front Matter Parsing** - YAML frontmatter separated and parsed into structured data
+2. **Markdown AST Parsing** - Body text parsed into Abstract Syntax Tree for programmatic manipulation
+
 ### Planned Features (from README)
 
 The following features are documented in README but **NOT YET IMPLEMENTED**:
 
-1. **Table of Contents Generation** - Generate TOC for Markdown files
-2. **Heading Manipulation** - Promote/demote headings while maintaining structure
-3. **Section Operations** - Reorder, extract, inject sections
-4. **Content Selection** - Select by heading or line range
-5. **Validation** - Link validation, Markdown flavor compliance
-6. **Format Conversion** - HTML, plain text, rich text, XML
+1. **Table of Contents Generation** - Generate TOC for Markdown files (AST foundation ready)
+2. **Heading Manipulation** - Promote/demote headings while maintaining structure (AST foundation ready)
+3. **Section Operations** - Reorder, extract, inject sections (AST foundation ready)
+4. **Content Selection** - Select by heading or line range (AST foundation ready)
+5. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
+6. **Format Conversion** - HTML, plain text, rich text, XML (AST foundation ready)
 7. **File Metadata** - Read/write file metadata
-8. **Front Matter** - [PLANNED] Integration with FrontRange library
 
 ## Dependencies
 
@@ -123,6 +152,25 @@ func initializeWithContent() async throws {
 - **Tests**: Use `@Test` with raw identifier function names
 - **Assertions**: Use `#expect()` macro (not XCTAssert)
 - **Async**: All tests are marked `async throws`
+- **Type Checking**: Use `is` keyword for type assertions only
+- **Unwrapping Optionals**: Use `try #require()` to unwrap optionals (replaces XCTest's `XCTUnwrap`)
+
+**Unwrapping with #require:**
+```swift
+// CORRECT - Use #require to unwrap optionals
+let heading = try #require(root.children[0] as? Heading)
+#expect(heading.depth == .h1)
+
+// WRONG - Don't use optional chaining
+let heading = root.children[0] as? Heading
+#expect(heading?.depth == .h1)
+```
+
+**Type Checking with `is`:**
+```swift
+// Use `is` when you only need to verify type, not access properties
+#expect(root.children[1] is Paragraph)
+```
 
 **Example:**
 ```swift
@@ -131,10 +179,23 @@ struct MarkdownDocumentTests {
 
   @Test
   func `Initialize MarkdownDocument with content`() async throws {
-    let content = "# Hello World"
-    let doc = MarkdownDocument(content: content)
+    let content = "# Hello World\n\nThis is a test."
+    let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.content == content)
+    #expect(doc.body == content)
+    #expect(doc.frontMatter.isEmpty)
+  }
+
+  @Test
+  func `Parse markdown AST`() async throws {
+    let content = "# Hello\n\nParagraph text."
+    let doc = try MarkdownDocument(content: content)
+
+    let root = try await doc.parseAST()
+
+    #expect(root.children.count == 2)
+    let heading = try #require(root.children[0] as? Heading)
+    #expect(heading.depth == .h1)
   }
 }
 ```
@@ -162,12 +223,21 @@ md-utils/
 ├── CLAUDE.md                      # This file (SOP for Claude Code)
 ├── Sources/
 │   ├── MarkdownUtilities/         # Core library
-│   │   └── MarkdownDocument.swift
+│   │   ├── MarkdownDocument.swift
+│   │   └── FrontMatter/           # Frontmatter parsing
+│   │       ├── FrontMatterParser.swift
+│   │       ├── YAMLConversion.swift
+│   │       └── MarkdownDocument+FrontMatter.swift
 │   └── md-utils/                  # CLI tool
 │       └── CLIEntry.swift
 └── Tests/
     ├── MarkdownUtilitiesTests/    # Library tests
-    │   └── MarkdownDocumentTests.swift
+    │   ├── MarkdownDocumentTests.swift
+    │   ├── MarkdownASTTests.swift
+    │   └── FrontMatter/           # Frontmatter tests
+    │       ├── FrontMatterParsingTests.swift
+    │       ├── FrontMatterSeparationTests.swift
+    │       └── FrontMatterEdgeCasesTests.swift
     └── md-utilsTests/             # CLI tests
         └── CLIEntryTests.swift
 ```

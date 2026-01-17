@@ -37,4 +37,24 @@ public struct MarkdownDocument {
     self.frontMatter = try YAMLConversion.parse(rawFrontMatter)
     self.body = body
   }
+
+  /// Parse the body text into a Markdown AST.
+  ///
+  /// This method uses the MarkdownSyntax library to parse the body content into an Abstract Syntax Tree (AST).
+  /// The AST is returned as a `Root` structure containing the parsed markdown elements.
+  /// Each call parses fresh - there is no internal caching.
+  ///
+  /// - Returns: A `Root` structure containing the parsed AST
+  /// - Throws: If markdown parsing fails (rare - MarkdownSyntax is very permissive)
+  ///
+  /// ## Example
+  /// ```swift
+  /// let doc = try MarkdownDocument(content: "# Hello\n\nWorld")
+  /// let ast = try await doc.parseAST()
+  /// print(ast.children.count)  // 2 (heading + paragraph)
+  /// ```
+  public func parseAST() async throws -> Root {
+    let markdown = try await Markdown(text: body)
+    return await markdown.parse()
+  }
 }
