@@ -190,14 +190,13 @@ md-utils/
 ## Key Patterns and Conventions
 
 1. **Swift 6 Language Mode**: All code uses Swift 6 features and strict concurrency
-
 2. **Test Pattern**: Native Swift Testing with raw identifier function names
-
 3. **CLI Pattern**: SwiftArgumentParser with `ParsableCommand` protocol
-
 4. **Minimal Scaffolding**: Current implementation is intentionally minimal - just establishes architecture
-
 5. **Future-Ready**: Structure mirrors FrontRange for easy feature addition
+6. **Recursive File Processing By Default in `md-utils` CLI**: By default, CLI commands performed on a directory are: 
+   1. recursive by default: opt-out recursive processing with `--non-recursive` or `--nr` flag
+   2. ignores hidden files and directories (those starting with a dot) by default: opt-in to processing hidden files with `--include-hidden` or `--ih` flag
 
 ## Development Workflow
 
