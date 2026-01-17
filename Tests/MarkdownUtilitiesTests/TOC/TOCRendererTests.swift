@@ -9,20 +9,17 @@ import Testing
 @Suite("TOC Renderer Tests")
 struct TOCRendererTests {
 
-  // MARK: - Markdown Rendering Tests
+  // MARK: - Markdown Bullet Links Tests
 
   @Test
-  func `Render markdown with unordered links`() async throws {
+  func `Render md-bullet-links format`() async throws {
     let entries = [
       TOCEntry(level: 1, text: "Introduction", slug: "introduction"),
       TOCEntry(level: 2, text: "Getting Started", slug: "getting-started"),
     ]
     let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 2)
 
-    let rendered = TOCRenderer.render(
-      toc,
-      as: .markdown(style: .unorderedLinks)
-    )
+    let rendered = TOCRenderer.render(toc, as: .mdBulletLinks)
 
     let expected = """
       - [Introduction](#introduction)
@@ -33,70 +30,7 @@ struct TOCRendererTests {
   }
 
   @Test
-  func `Render markdown with ordered links`() async throws {
-    let entries = [
-      TOCEntry(level: 1, text: "Introduction", slug: "introduction"),
-      TOCEntry(level: 2, text: "Getting Started", slug: "getting-started"),
-    ]
-    let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 2)
-
-    let rendered = TOCRenderer.render(
-      toc,
-      as: .markdown(style: .orderedLinks)
-    )
-
-    let expected = """
-      1. [Introduction](#introduction)
-      1. [Getting Started](#getting-started)
-      """
-
-    #expect(rendered == expected)
-  }
-
-  @Test
-  func `Render markdown with unordered plain`() async throws {
-    let entries = [
-      TOCEntry(level: 1, text: "Introduction"),
-      TOCEntry(level: 2, text: "Getting Started"),
-    ]
-    let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 2)
-
-    let rendered = TOCRenderer.render(
-      toc,
-      as: .markdown(style: .unorderedPlain)
-    )
-
-    let expected = """
-      - Introduction
-      - Getting Started
-      """
-
-    #expect(rendered == expected)
-  }
-
-  @Test
-  func `Render markdown with ordered plain`() async throws {
-    let entries = [
-      TOCEntry(level: 1, text: "Introduction"),
-      TOCEntry(level: 2, text: "Getting Started"),
-    ]
-    let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 2)
-
-    let rendered = TOCRenderer.render(
-      toc,
-      as: .markdown(style: .orderedPlain)
-    )
-
-    let expected = """
-      1. Introduction
-      1. Getting Started
-      """
-
-    #expect(rendered == expected)
-  }
-
-  @Test
-  func `Render markdown with hierarchical structure`() async throws {
+  func `Render md-bullet-links with hierarchical structure`() async throws {
     let child = TOCEntry(level: 2, text: "Subsection", slug: "subsection")
     let parent = TOCEntry(
       level: 1,
@@ -107,10 +41,7 @@ struct TOCRendererTests {
 
     let toc = TableOfContents(entries: [parent], minLevel: 1, maxLevel: 2)
 
-    let rendered = TOCRenderer.render(
-      toc,
-      as: .markdown(style: .unorderedLinks)
-    )
+    let rendered = TOCRenderer.render(toc, as: .mdBulletLinks)
 
     let expected = """
       - [Section](#section)
@@ -120,19 +51,121 @@ struct TOCRendererTests {
     #expect(rendered == expected)
   }
 
-  // MARK: - Plain Text Rendering Tests
+  // MARK: - Markdown Only Headings Tests
 
   @Test
-  func `Render plain text indented`() async throws {
+  func `Render md-only-headings format`() async throws {
+    let entries = [
+      TOCEntry(level: 1, text: "Main Title"),
+      TOCEntry(level: 2, text: "Section One"),
+      TOCEntry(level: 3, text: "Subsection"),
+    ]
+    let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 3)
+
+    let rendered = TOCRenderer.render(toc, as: .mdOnlyHeadings)
+
+    let expected = """
+      # Main Title
+      ## Section One
+      ### Subsection
+      """
+
+    #expect(rendered == expected)
+  }
+
+  @Test
+  func `Render md-only-headings with hierarchical structure`() async throws {
+    let child = TOCEntry(level: 3, text: "Deep Section")
+    let parent = TOCEntry(
+      level: 2,
+      text: "Parent Section",
+      children: [child]
+    )
+
+    let toc = TableOfContents(entries: [parent], minLevel: 2, maxLevel: 3)
+
+    let rendered = TOCRenderer.render(toc, as: .mdOnlyHeadings)
+
+    let expected = """
+      ## Parent Section
+      ### Deep Section
+      """
+
+    #expect(rendered == expected)
+  }
+
+  // MARK: - Tree Format Tests
+
+  @Test
+  func `Render tree format with single level`() async throws {
+    let entries = [
+      TOCEntry(level: 1, text: "First"),
+      TOCEntry(level: 1, text: "Second"),
+    ]
+    let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 1)
+
+    let rendered = TOCRenderer.render(toc, as: .tree)
+
+    let expected = """
+      ├── First
+      └── Second
+      """
+
+    #expect(rendered == expected)
+  }
+
+  @Test
+  func `Render tree format with hierarchical structure`() async throws {
+    let child1 = TOCEntry(level: 2, text: "Child 1")
+    let child2 = TOCEntry(level: 2, text: "Child 2")
+    let parent = TOCEntry(
+      level: 1,
+      text: "Parent",
+      children: [child1, child2]
+    )
+
+    let toc = TableOfContents(entries: [parent], minLevel: 1, maxLevel: 2)
+
+    let rendered = TOCRenderer.render(toc, as: .tree)
+
+    let expected = """
+      └── Parent
+          ├── Child 1
+          └── Child 2
+      """
+
+    #expect(rendered == expected)
+  }
+
+  @Test
+  func `Render tree format with deep hierarchy`() async throws {
+    let grandchild = TOCEntry(level: 3, text: "Grandchild")
+    let child = TOCEntry(level: 2, text: "Child", children: [grandchild])
+    let parent = TOCEntry(level: 1, text: "Parent", children: [child])
+
+    let toc = TableOfContents(entries: [parent], minLevel: 1, maxLevel: 3)
+
+    let rendered = TOCRenderer.render(toc, as: .tree)
+
+    let expected = """
+      └── Parent
+          └── Child
+              └── Grandchild
+      """
+
+    #expect(rendered == expected)
+  }
+
+  // MARK: - Plain Text Tests
+
+  @Test
+  func `Render plain format with indentation`() async throws {
     let child = TOCEntry(level: 2, text: "Subsection")
     let parent = TOCEntry(level: 1, text: "Section", children: [child])
 
     let toc = TableOfContents(entries: [parent], minLevel: 1, maxLevel: 2)
 
-    let rendered = TOCRenderer.render(
-      toc,
-      as: .plainText(style: .indented)
-    )
+    let rendered = TOCRenderer.render(toc, as: .plain)
 
     let expected = """
       Section
@@ -142,39 +175,16 @@ struct TOCRendererTests {
     #expect(rendered == expected)
   }
 
-  @Test
-  func `Render plain text flat with levels`() async throws {
-    let entries = [
-      TOCEntry(level: 1, text: "Introduction"),
-      TOCEntry(level: 2, text: "Getting Started"),
-      TOCEntry(level: 3, text: "Installation"),
-    ]
-    let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 3)
-
-    let rendered = TOCRenderer.render(
-      toc,
-      as: .plainText(style: .flatWithLevels)
-    )
-
-    let expected = """
-      [1] Introduction
-      [2] Getting Started
-      [3] Installation
-      """
-
-    #expect(rendered == expected)
-  }
-
-  // MARK: - JSON Rendering Tests
+  // MARK: - JSON Tests
 
   @Test
-  func `Render JSON compact`() async throws {
+  func `Render json format compact`() async throws {
     let entries = [
       TOCEntry(level: 1, text: "Introduction", slug: "introduction")
     ]
     let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 1)
 
-    let rendered = TOCRenderer.render(toc, as: .json(pretty: false))
+    let rendered = TOCRenderer.render(toc, as: .json)
 
     // Compact JSON - just verify it's valid JSON and contains expected data
     #expect(rendered.contains("\"text\":\"Introduction\""))
@@ -183,13 +193,13 @@ struct TOCRendererTests {
   }
 
   @Test
-  func `Render JSON pretty`() async throws {
+  func `Render json-pretty format`() async throws {
     let entries = [
       TOCEntry(level: 1, text: "Introduction", slug: "introduction")
     ]
     let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 1)
 
-    let rendered = TOCRenderer.render(toc, as: .json(pretty: true))
+    let rendered = TOCRenderer.render(toc, as: .jsonPretty)
 
     // Pretty JSON should have newlines and indentation
     #expect(rendered.contains("\n"))
@@ -198,7 +208,7 @@ struct TOCRendererTests {
   }
 
   @Test
-  func `Render JSON with hierarchical structure`() async throws {
+  func `Render json with hierarchical structure`() async throws {
     let child = TOCEntry(level: 2, text: "Subsection", slug: "subsection")
     let parent = TOCEntry(
       level: 1,
@@ -209,17 +219,17 @@ struct TOCRendererTests {
 
     let toc = TableOfContents(entries: [parent], minLevel: 1, maxLevel: 2)
 
-    let rendered = TOCRenderer.render(toc, as: .json(pretty: true))
+    let rendered = TOCRenderer.render(toc, as: .jsonPretty)
 
     #expect(rendered.contains("\"text\" : \"Section\""))
     #expect(rendered.contains("\"text\" : \"Subsection\""))
     #expect(rendered.contains("\"children\""))
   }
 
-  // MARK: - HTML Rendering Tests
+  // MARK: - HTML Tests
 
   @Test
-  func `Render HTML with simple list`() async throws {
+  func `Render html format with simple list`() async throws {
     let entries = [
       TOCEntry(level: 1, text: "Introduction", slug: "introduction"),
       TOCEntry(level: 1, text: "Getting Started", slug: "getting-started"),
@@ -237,7 +247,7 @@ struct TOCRendererTests {
   }
 
   @Test
-  func `Render HTML with hierarchical structure`() async throws {
+  func `Render html with hierarchical structure`() async throws {
     let child = TOCEntry(level: 2, text: "Subsection", slug: "subsection")
     let parent = TOCEntry(
       level: 1,
@@ -258,7 +268,7 @@ struct TOCRendererTests {
   }
 
   @Test
-  func `Render HTML escapes special characters`() async throws {
+  func `Render html escapes special characters`() async throws {
     let entries = [
       TOCEntry(level: 1, text: "A & B < C > D", slug: "a-b-c-d")
     ]
@@ -270,7 +280,7 @@ struct TOCRendererTests {
   }
 
   @Test
-  func `Render HTML without slugs`() async throws {
+  func `Render html without slugs`() async throws {
     let entries = [TOCEntry(level: 1, text: "Introduction", slug: nil)]
     let toc = TableOfContents(entries: entries, minLevel: 1, maxLevel: 1)
 
@@ -283,19 +293,16 @@ struct TOCRendererTests {
   // MARK: - Empty TOC Tests
 
   @Test
-  func `Render empty TOC in markdown`() async throws {
+  func `Render empty TOC in md-bullet-links`() async throws {
     let toc = TableOfContents(entries: [], minLevel: 1, maxLevel: 6)
 
-    let rendered = TOCRenderer.render(
-      toc,
-      as: .markdown(style: .unorderedLinks)
-    )
+    let rendered = TOCRenderer.render(toc, as: .mdBulletLinks)
 
     #expect(rendered == "")
   }
 
   @Test
-  func `Render empty TOC in HTML`() async throws {
+  func `Render empty TOC in html`() async throws {
     let toc = TableOfContents(entries: [], minLevel: 1, maxLevel: 6)
 
     let rendered = TOCRenderer.render(toc, as: .html)

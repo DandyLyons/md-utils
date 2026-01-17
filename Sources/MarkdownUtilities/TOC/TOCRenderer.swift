@@ -10,41 +10,26 @@ public enum TOCRenderer {
 
   /// Output format for rendering.
   public enum Format: Equatable, Sendable {
-    /// Markdown format with specified style.
-    case markdown(style: MarkdownStyle)
+    /// Markdown unordered list with links (- [text](#slug)).
+    case mdBulletLinks
 
-    /// Plain text format with specified style.
-    case plainText(style: PlainTextStyle)
+    /// Markdown headings only (## heading).
+    case mdOnlyHeadings
 
-    /// JSON format.
-    case json(pretty: Bool)
+    /// Tree structure with box-drawing characters.
+    case tree
 
-    /// HTML format.
+    /// Compact JSON.
+    case json
+
+    /// Pretty-printed JSON.
+    case jsonPretty
+
+    /// Plain indented text.
+    case plain
+
+    /// HTML unordered list.
     case html
-  }
-
-  /// Style options for Markdown rendering.
-  public enum MarkdownStyle: Equatable, Sendable {
-    /// Unordered list with links (default).
-    case unorderedLinks
-
-    /// Unordered list without links.
-    case unorderedPlain
-
-    /// Ordered list with links.
-    case orderedLinks
-
-    /// Ordered list without links.
-    case orderedPlain
-  }
-
-  /// Style options for plain text rendering.
-  public enum PlainTextStyle: Equatable, Sendable {
-    /// Indented with spaces (2 spaces per level).
-    case indented
-
-    /// Flat list with level numbers.
-    case flatWithLevels
   }
 
   /// Render a table of contents to the specified format.
@@ -55,37 +40,38 @@ public enum TOCRenderer {
   /// - Returns: Rendered string
   public static func render(_ toc: TableOfContents, as format: Format) -> String {
     switch format {
-    case .markdown(let style):
-      return renderMarkdown(toc, style: style)
-    case .plainText(let style):
-      return renderPlainText(toc, style: style)
-    case .json(let pretty):
-      return renderJSON(toc, pretty: pretty)
+    case .mdBulletLinks:
+      return renderMdBulletLinks(toc)
+    case .mdOnlyHeadings:
+      return renderMdOnlyHeadings(toc)
+    case .tree:
+      return renderTree(toc)
+    case .json:
+      return renderJSON(toc, pretty: false)
+    case .jsonPretty:
+      return renderJSON(toc, pretty: true)
+    case .plain:
+      return renderPlainTextIndented(toc)
     case .html:
       return renderHTML(toc)
     }
   }
 
-  // MARK: - Markdown Rendering
+  // MARK: - Markdown Bullet Links Rendering
 
-  static func renderMarkdown(_ toc: TableOfContents, style: MarkdownStyle) -> String {
-    let useLinks = style == .unorderedLinks || style == .orderedLinks
-    let useOrdered = style == .orderedLinks || style == .orderedPlain
-
+  static func renderMdBulletLinks(_ toc: TableOfContents) -> String {
     var lines: [String] = []
 
     func renderEntry(_ entry: TOCEntry, depth: Int) {
       let indent = String(repeating: "  ", count: depth)
-      let marker = useOrdered ? "1." : "-"
-
       let text: String
-      if useLinks, let slug = entry.slug {
+      if let slug = entry.slug {
         text = "[\(entry.text)](#\(slug))"
       } else {
         text = entry.text
       }
 
-      lines.append("\(indent)\(marker) \(text)")
+      lines.append("\(indent)- \(text)")
 
       for child in entry.children {
         renderEntry(child, depth: depth + 1)
@@ -99,16 +85,52 @@ public enum TOCRenderer {
     return lines.joined(separator: "\n")
   }
 
-  // MARK: - Plain Text Rendering
+  // MARK: - Markdown Only Headings Rendering
 
-  static func renderPlainText(_ toc: TableOfContents, style: PlainTextStyle) -> String {
-    switch style {
-    case .indented:
-      return renderPlainTextIndented(toc)
-    case .flatWithLevels:
-      return renderPlainTextFlat(toc)
+  static func renderMdOnlyHeadings(_ toc: TableOfContents) -> String {
+    var lines: [String] = []
+
+    func renderEntry(_ entry: TOCEntry) {
+      let marker = String(repeating: "#", count: entry.level)
+      lines.append("\(marker) \(entry.text)")
+
+      for child in entry.children {
+        renderEntry(child)
+      }
     }
+
+    for entry in toc.entries {
+      renderEntry(entry)
+    }
+
+    return lines.joined(separator: "\n")
   }
+
+  // MARK: - Tree Rendering
+
+  static func renderTree(_ toc: TableOfContents) -> String {
+    var lines: [String] = []
+
+    func renderEntry(_ entry: TOCEntry, prefix: String, isLast: Bool) {
+      let connector = isLast ? "└── " : "├── "
+      lines.append("\(prefix)\(connector)\(entry.text)")
+
+      let childPrefix = prefix + (isLast ? "    " : "│   ")
+      for (index, child) in entry.children.enumerated() {
+        let isLastChild = index == entry.children.count - 1
+        renderEntry(child, prefix: childPrefix, isLast: isLastChild)
+      }
+    }
+
+    for (index, entry) in toc.entries.enumerated() {
+      let isLast = index == toc.entries.count - 1
+      renderEntry(entry, prefix: "", isLast: isLast)
+    }
+
+    return lines.joined(separator: "\n")
+  }
+
+  // MARK: - Plain Text Rendering
 
   static func renderPlainTextIndented(_ toc: TableOfContents) -> String {
     var lines: [String] = []
@@ -126,14 +148,6 @@ public enum TOCRenderer {
       renderEntry(entry, depth: 0)
     }
 
-    return lines.joined(separator: "\n")
-  }
-
-  static func renderPlainTextFlat(_ toc: TableOfContents) -> String {
-    let flatEntries = toc.flatEntries
-    let lines = flatEntries.map { entry in
-      "[\(entry.level)] \(entry.text)"
-    }
     return lines.joined(separator: "\n")
   }
 

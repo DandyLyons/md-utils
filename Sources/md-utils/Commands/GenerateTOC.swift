@@ -51,22 +51,9 @@ extension CLIEntry {
 
     @Option(
       name: .long,
-      help: "Output format: markdown, json, plain, html (default: markdown)"
+      help: "Output format: md-bullet-links, md-only-headings, tree, json, json-pretty, plain, html (default: md-only-headings)"
     )
-    var format: OutputFormat = .markdown
-
-    @Option(
-      name: .long,
-      help:
-        "Markdown style: unordered-links, unordered-plain, ordered-links, ordered-plain (default: unordered-links)"
-    )
-    var style: String = "unordered-links"
-
-    @Flag(
-      name: .long,
-      help: "Pretty-print JSON output (only applies to JSON format)"
-    )
-    var prettyJSON: Bool = false
+    var format: OutputFormat = .mdOnlyHeadings
 
     mutating func run() async throws {
       // Validate level range
@@ -112,7 +99,7 @@ extension CLIEntry {
       let toc = try await doc.generateTOC(options: tocOptions)
 
       // Render TOC
-      let renderFormat = try parseRenderFormat()
+      let renderFormat = parseRenderFormat()
       let rendered = TOCRenderer.render(toc, as: renderFormat)
 
       // Output
@@ -125,46 +112,33 @@ extension CLIEntry {
       }
     }
 
-    private func parseRenderFormat() throws -> TOCRenderer.Format {
+    private func parseRenderFormat() -> TOCRenderer.Format {
       switch format {
-      case .markdown:
-        let markdownStyle = try parseMarkdownStyle()
-        return .markdown(style: markdownStyle)
-
+      case .mdBulletLinks:
+        return .mdBulletLinks
+      case .mdOnlyHeadings:
+        return .mdOnlyHeadings
+      case .tree:
+        return .tree
       case .json:
-        return .json(pretty: prettyJSON)
-
+        return .json
+      case .jsonPretty:
+        return .jsonPretty
       case .plain:
-        // Default to indented plain text
-        return .plainText(style: .indented)
-
+        return .plain
       case .html:
         return .html
-      }
-    }
-
-    private func parseMarkdownStyle() throws -> TOCRenderer.MarkdownStyle {
-      switch style.lowercased() {
-      case "unordered-links":
-        return .unorderedLinks
-      case "unordered-plain":
-        return .unorderedPlain
-      case "ordered-links":
-        return .orderedLinks
-      case "ordered-plain":
-        return .orderedPlain
-      default:
-        throw ValidationError(
-          "Invalid style '\(style)'. Use: unordered-links, unordered-plain, ordered-links, or ordered-plain"
-        )
       }
     }
   }
 
   /// Output format for TOC rendering.
   enum OutputFormat: String, ExpressibleByArgument {
-    case markdown
+    case mdBulletLinks = "md-bullet-links"
+    case mdOnlyHeadings = "md-only-headings"
+    case tree
     case json
+    case jsonPretty = "json-pretty"
     case plain
     case html
   }
