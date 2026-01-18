@@ -17,6 +17,8 @@ public struct CLIEntry: AsyncParsableCommand {
     version: "0.1.0-alpha",
     subcommands: [
       GenerateTOC.self,
+      PromoteHeading.self,
+      DemoteHeading.self,
     ],
     helpNames: [.long, .short]
   )
