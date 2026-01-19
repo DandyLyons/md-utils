@@ -19,6 +19,14 @@ public enum SectionExtractorError: Error, Equatable, Sendable {
 
   /// The document is empty (no content).
   case emptyDocument
+
+  /// The requested heading name was not found.
+  ///
+  /// - Parameters:
+  ///   - name: The heading name that was searched for
+  ///   - caseSensitive: Whether the search was case-sensitive
+  ///   - availableHeadings: List of available heading texts in the document
+  case headingNotFound(name: String, caseSensitive: Bool, availableHeadings: [String])
 }
 
 extension SectionExtractorError: CustomStringConvertible {
@@ -30,6 +38,21 @@ extension SectionExtractorError: CustomStringConvertible {
       return "Cannot extract section: document contains no headings."
     case .emptyDocument:
       return "Cannot extract section: document is empty."
+    case .headingNotFound(let name, let caseSensitive, let availableHeadings):
+      let sensitivity = caseSensitive ? "case-sensitive" : "case-insensitive"
+      var message = "Heading '\(name)' not found (\(sensitivity))."
+
+      if !availableHeadings.isEmpty {
+        let headingsToShow = availableHeadings.prefix(10)
+        let headingsList = headingsToShow.map { "  - \($0)" }.joined(separator: "\n")
+        message += "\nAvailable headings:\n\(headingsList)"
+
+        if availableHeadings.count > 10 {
+          message += "\n  ... and \(availableHeadings.count - 10) more"
+        }
+      }
+
+      return message
     }
   }
 }

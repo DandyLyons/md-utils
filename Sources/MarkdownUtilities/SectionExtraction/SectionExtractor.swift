@@ -13,14 +13,32 @@ import MarkdownSyntax
 public enum SectionExtractor {
   /// Options for section extraction.
   public struct Options: Sendable {
-    /// The 0-based index of the heading to extract.
-    public let targetIndex: Int
+    /// Criteria for matching the target heading.
+    public enum MatchCriteria: Sendable {
+      /// Match by 0-based heading index.
+      case index(Int)
+
+      /// Match by heading text name.
+      /// - Parameters:
+      ///   - name: The heading text to search for
+      ///   - caseSensitive: Whether matching should be case-sensitive
+      case name(String, caseSensitive: Bool)
+    }
+
+    /// The criteria for identifying which heading to extract.
+    public let matchCriteria: MatchCriteria
 
     /// Whether to remove the section from the original content.
     public let removeFromOriginal: Bool
 
+    public init(matchCriteria: MatchCriteria, removeFromOriginal: Bool = false) {
+      self.matchCriteria = matchCriteria
+      self.removeFromOriginal = removeFromOriginal
+    }
+
+    /// Convenience initializer for index-based extraction.
     public init(targetIndex: Int, removeFromOriginal: Bool = false) {
-      self.targetIndex = targetIndex
+      self.matchCriteria = .index(targetIndex)
       self.removeFromOriginal = removeFromOriginal
     }
   }
@@ -37,6 +55,41 @@ public enum SectionExtractor {
       self.section = section
       self.remainingContent = remainingContent
     }
+  }
+
+  /// Finds the index of a heading by name.
+  ///
+  /// - Parameters:
+  ///   - headings: Array of headings to search
+  ///   - name: The heading name to search for
+  ///   - caseSensitive: Whether to use case-sensitive matching
+  /// - Returns: The 0-based index of the first matching heading
+  /// - Throws: `SectionExtractorError.headingNotFound` if no match is found
+  private static func findHeadingIndex(
+    headings: [Heading],
+    name: String,
+    caseSensitive: Bool
+  ) throws -> Int {
+    // Extract text from all headings
+    let headingTexts = headings.map { HeadingTextExtractor.extractText(from: $0) }
+
+    // Search for matching heading
+    let foundIndex: Int?
+    if caseSensitive {
+      foundIndex = headingTexts.firstIndex(of: name)
+    } else {
+      foundIndex = headingTexts.firstIndex { $0.lowercased() == name.lowercased() }
+    }
+
+    guard let index = foundIndex else {
+      throw SectionExtractorError.headingNotFound(
+        name: name,
+        caseSensitive: caseSensitive,
+        availableHeadings: headingTexts
+      )
+    }
+
+    return index
   }
 
   /// Extracts a section from a Markdown document.
@@ -64,11 +117,25 @@ public enum SectionExtractor {
       throw SectionExtractorError.noHeadingsInDocument
     }
 
-    // Validate target index
-    guard options.targetIndex >= 0 && options.targetIndex < headings.count else {
-      throw SectionExtractorError.invalidTargetIndex(
-        requested: options.targetIndex + 1,  // Convert to 1-based for error message
-        totalHeadings: headings.count
+    // Resolve target index based on match criteria
+    let targetIndex: Int
+    switch options.matchCriteria {
+    case .index(let index):
+      // Validate target index
+      guard index >= 0 && index < headings.count else {
+        throw SectionExtractorError.invalidTargetIndex(
+          requested: index + 1,  // Convert to 1-based for error message
+          totalHeadings: headings.count
+        )
+      }
+      targetIndex = index
+
+    case .name(let name, let caseSensitive):
+      // Find heading by name
+      targetIndex = try findHeadingIndex(
+        headings: headings,
+        name: name,
+        caseSensitive: caseSensitive
       )
     }
 
@@ -79,7 +146,7 @@ public enum SectionExtractor {
     // Detect section boundaries
     let boundary = SectionBoundaryDetector.detect(
       headings: headings,
-      targetIndex: options.targetIndex,
+      targetIndex: targetIndex,
       documentLineCount: documentLineCount
     )
 
@@ -89,7 +156,7 @@ public enum SectionExtractor {
 
     guard startIndex >= 0 && endIndex < lines.count else {
       throw SectionExtractorError.invalidTargetIndex(
-        requested: options.targetIndex + 1,
+        requested: targetIndex + 1,
         totalHeadings: headings.count
       )
     }
@@ -100,7 +167,7 @@ public enum SectionExtractor {
     // Create section content
     let section = SectionContent(
       text: sectionText,
-      heading: headings[options.targetIndex],
+      heading: headings[targetIndex],
       lineRange: boundary.lineRange,
       childHeadingCount: boundary.childIndices.count
     )

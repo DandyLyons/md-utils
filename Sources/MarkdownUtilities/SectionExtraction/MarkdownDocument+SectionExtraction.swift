@@ -85,6 +85,82 @@ extension MarkdownDocument {
     return (extracted: extractedDoc, updated: updatedDoc)
   }
 
+  /// Extracts a section from the document by heading name.
+  ///
+  /// A section consists of a heading and all content nested under it until the next
+  /// same-level or higher heading. This method searches for the first heading that matches
+  /// the given name.
+  ///
+  /// - Parameters:
+  ///   - name: The text of the heading to extract
+  ///   - caseSensitive: Whether to use case-sensitive matching (default: false)
+  ///   - removeFromOriginal: Whether to remove the section from the original document
+  /// - Returns: A tuple containing:
+  ///   - extracted: A new MarkdownDocument containing only the extracted section (no frontmatter)
+  ///   - updated: A new MarkdownDocument with the section removed (preserves frontmatter), or nil if removeFromOriginal is false
+  /// - Throws: `SectionExtractorError` if extraction fails or heading not found
+  ///
+  /// ## Example
+  /// ```swift
+  /// let doc = try MarkdownDocument(content: """
+  ///   # Introduction
+  ///   Welcome text.
+  ///   # Contributing
+  ///   How to contribute.
+  ///   # License
+  ///   MIT License.
+  ///   """)
+  ///
+  /// // Extract by heading name (case-insensitive)
+  /// let (extracted, _) = try await doc.extractSection(byName: "contributing")
+  /// // extracted.body contains the Contributing section
+  ///
+  /// // Extract and remove (case-sensitive)
+  /// let (extracted, updated) = try await doc.extractSection(
+  ///   byName: "License",
+  ///   caseSensitive: true,
+  ///   removeFromOriginal: true
+  /// )
+  /// ```
+  public func extractSection(
+    byName name: String,
+    caseSensitive: Bool = false,
+    removeFromOriginal: Bool = false
+  ) async throws -> (extracted: MarkdownDocument, updated: MarkdownDocument?) {
+    // Parse the body to AST
+    let root = try await parseAST()
+
+    // Perform extraction with name-based matching
+    let options = SectionExtractor.Options(
+      matchCriteria: .name(name, caseSensitive: caseSensitive),
+      removeFromOriginal: removeFromOriginal
+    )
+
+    let result = try await SectionExtractor.extract(
+      root: root,
+      originalContent: body,
+      options: options
+    )
+
+    // Create extracted document (no frontmatter - sections are content fragments)
+    let extractedDoc = try MarkdownDocument(content: result.section.text)
+
+    // Create updated document if removal was requested
+    let updatedDoc: MarkdownDocument?
+    if let remainingContent = result.remainingContent {
+      // Reconstruct the full document with frontmatter
+      let fullContent = try reconstructFullDocument(
+        frontMatter: frontMatter,
+        body: remainingContent
+      )
+      updatedDoc = try MarkdownDocument(content: fullContent)
+    } else {
+      updatedDoc = nil
+    }
+
+    return (extracted: extractedDoc, updated: updatedDoc)
+  }
+
   /// Reconstructs the full markdown document with frontmatter and body.
   ///
   /// - Parameters:

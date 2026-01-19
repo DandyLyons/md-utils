@@ -231,4 +231,218 @@ struct MarkdownDocumentSectionExtractionTests {
       """
     #expect(extracted.body == expectedExtracted)
   }
+
+  // MARK: - Name-Based Extraction Tests
+
+  @Test
+  func `Extract section by name (case-insensitive)`() async throws {
+    let content = """
+      # Introduction
+      Intro text.
+      # Contributing
+      How to contribute.
+      # License
+      MIT License.
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let (extracted, updated) = try await doc.extractSection(
+      byName: "contributing",
+      caseSensitive: false,
+      removeFromOriginal: false
+    )
+
+    let expectedExtracted = """
+      # Contributing
+      How to contribute.
+      """
+    #expect(extracted.body == expectedExtracted)
+    #expect(extracted.frontMatter.isEmpty)
+    #expect(updated == nil)
+  }
+
+  @Test
+  func `Extract section by name (case-sensitive)`() async throws {
+    let content = """
+      # Introduction
+      # API Reference
+      # license
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let (extracted, _) = try await doc.extractSection(
+      byName: "license",
+      caseSensitive: true,
+      removeFromOriginal: false
+    )
+
+    let expectedExtracted = """
+      # license
+      """
+    #expect(extracted.body == expectedExtracted)
+  }
+
+  @Test
+  func `Extract and remove by name preserves frontmatter`() async throws {
+    let content = """
+      ---
+      title: Test Document
+      version: 1.0
+      ---
+      # Section A
+      Content A.
+      # Section B
+      Content B.
+      # Section C
+      Content C.
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let (extracted, updated) = try await doc.extractSection(
+      byName: "Section B",
+      caseSensitive: false,
+      removeFromOriginal: true
+    )
+
+    // Extracted section has no frontmatter
+    #expect(extracted.frontMatter.isEmpty)
+    let expectedExtracted = """
+      # Section B
+      Content B.
+      """
+    #expect(extracted.body == expectedExtracted)
+
+    // Updated document preserves frontmatter
+    let updatedDoc = try #require(updated)
+    #expect(!updatedDoc.frontMatter.isEmpty)
+
+    let expectedRemaining = """
+      # Section A
+      Content A.
+      # Section C
+      Content C.
+      """
+    #expect(updatedDoc.body == expectedRemaining)
+  }
+
+  @Test
+  func `Error message lists available headings`() async throws {
+    let content = """
+      # Introduction
+      # Installation
+      # Usage
+      # Contributing
+      # License
+      """
+
+    let doc = try MarkdownDocument(content: content)
+
+    do {
+      _ = try await doc.extractSection(byName: "Nonexistent", caseSensitive: false)
+      Issue.record("Expected headingNotFound error")
+    } catch let error as SectionExtractorError {
+      let description = error.description
+      #expect(description.contains("Nonexistent"))
+      #expect(description.contains("case-insensitive"))
+      #expect(description.contains("Available headings:"))
+      #expect(description.contains("Introduction"))
+      #expect(description.contains("License"))
+    }
+  }
+
+  @Test
+  func `Extract by name with nested content`() async throws {
+    let content = """
+      # Overview
+      # Getting Started
+      ## Installation
+      ### Via Package Manager
+      Instructions here.
+      ## Configuration
+      Config details.
+      # Advanced
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let (extracted, _) = try await doc.extractSection(
+      byName: "Getting Started",
+      caseSensitive: false,
+      removeFromOriginal: false
+    )
+
+    let expectedExtracted = """
+      # Getting Started
+      ## Installation
+      ### Via Package Manager
+      Instructions here.
+      ## Configuration
+      Config details.
+      """
+    #expect(extracted.body == expectedExtracted)
+  }
+
+  @Test
+  func `Extract matches first occurrence when duplicates exist`() async throws {
+    let content = """
+      # Examples
+      First example section.
+      # Usage
+      Usage details.
+      # Examples
+      More examples here.
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let (extracted, _) = try await doc.extractSection(
+      byName: "Examples",
+      caseSensitive: false,
+      removeFromOriginal: false
+    )
+
+    let expectedExtracted = """
+      # Examples
+      First example section.
+      """
+    #expect(extracted.body == expectedExtracted)
+  }
+
+  @Test
+  func `Case-sensitive match fails when case differs`() async throws {
+    let content = """
+      # Introduction
+      # CONTRIBUTING
+      # License
+      """
+
+    let doc = try MarkdownDocument(content: content)
+
+    await #expect(throws: SectionExtractorError.self) {
+      _ = try await doc.extractSection(
+        byName: "contributing",
+        caseSensitive: true,
+        removeFromOriginal: false
+      )
+    }
+  }
+
+  @Test
+  func `Case-insensitive match succeeds when case differs`() async throws {
+    let content = """
+      # Introduction
+      # CONTRIBUTING
+      # License
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let (extracted, _) = try await doc.extractSection(
+      byName: "contributing",
+      caseSensitive: false,
+      removeFromOriginal: false
+    )
+
+    let expectedExtracted = """
+      # CONTRIBUTING
+      """
+    #expect(extracted.body == expectedExtracted)
+  }
 }

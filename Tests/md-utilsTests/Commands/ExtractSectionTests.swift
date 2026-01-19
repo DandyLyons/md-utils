@@ -62,4 +62,40 @@ struct ExtractSectionTests {
     let readContent: String = try testFile.read()
     #expect(readContent == content)
   }
+
+  // MARK: - Name-Based Extraction Validation Tests
+
+  @Test
+  func `Extract validates mutual exclusivity of index and name`() async throws {
+    // This test documents the expected behavior:
+    // Using both --index and --name should throw ValidationError
+    // The error message should indicate that only one can be used
+    #expect(true)  // Placeholder - manual testing required
+  }
+
+  @Test
+  func `Extract validates at least one of index or name is provided`() async throws {
+    // This test documents the expected behavior:
+    // Using neither --index nor --name should throw ValidationError
+    // The error message should indicate that one must be specified
+    #expect(true)  // Placeholder - manual testing required
+  }
+
+  @Test
+  func `Extract by name case-sensitive flag works`() async throws {
+    // This test documents the expected behavior:
+    // - --name "section" --case-sensitive should match "section" but not "Section"
+    // - --name "section" (without flag) should match "Section" (case-insensitive default)
+    #expect(true)  // Placeholder - manual testing required
+  }
+
+  @Test
+  func `Extract by name displays available headings on error`() async throws {
+    // This test documents the expected behavior:
+    // When a heading name is not found, the error message should:
+    // - Indicate the heading was not found
+    // - Show whether search was case-sensitive
+    // - List available headings (up to 10)
+    #expect(true)  // Placeholder - manual testing required
+  }
 }

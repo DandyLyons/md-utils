@@ -21,10 +21,29 @@ extension CLIEntry {
         A section consists of a heading and all content under it until the next
         same-level or higher heading.
 
-        Use --index to specify which heading to extract (1-based: 1 = first heading).
-        Use --output to save extracted section to a file (default: stdout).
-        Use --remove to remove the section from the source.
-        Use --in-place to save changes to the source file (requires --remove).
+        IDENTIFICATION:
+          Use --index to specify which heading to extract (1-based: 1 = first heading).
+          Use --name to extract by heading text (case-insensitive by default).
+          Use --case-sensitive for case-sensitive name matching.
+          Exactly one of --index or --name must be specified.
+
+        OUTPUT:
+          Use --output to save extracted section to a file (default: stdout).
+          Use --remove to remove the section from the source.
+          Use --in-place to save changes to the source file (requires --remove).
+
+        EXAMPLES:
+          # Extract by index
+          md-utils extract --index 2 document.md
+
+          # Extract by name (case-insensitive)
+          md-utils extract --name "Contributing" document.md
+
+          # Extract by name (case-sensitive)
+          md-utils extract --name "API Reference" --case-sensitive document.md
+
+          # Extract and remove
+          md-utils extract --name "Old Section" --remove --in-place document.md
 
         Note: Only single file operations are supported. Batch operations are not yet implemented.
         """
@@ -36,7 +55,19 @@ extension CLIEntry {
       name: .long,
       help: "Index of the heading to extract (1-based: 1 = first heading)"
     )
-    var index: Int
+    var index: Int?
+
+    @Option(
+      name: .long,
+      help: "Name of the heading to extract"
+    )
+    var name: String?
+
+    @Flag(
+      name: .long,
+      help: "Use case-sensitive matching for --name (default: case-insensitive)"
+    )
+    var caseSensitive: Bool = false
 
     @Option(
       name: [.short, .long],
@@ -57,9 +88,23 @@ extension CLIEntry {
     var inPlace: Bool = false
 
     mutating func run() async throws {
-      // Validate index
-      guard index >= 1 else {
-        throw ValidationError("Index must be positive (1-based indexing: 1 = first heading)")
+      // Validate exactly one of --index or --name is specified
+      let hasIndex = index != nil
+      let hasName = name != nil
+
+      guard hasIndex != hasName else {
+        if hasIndex && hasName {
+          throw ValidationError("Cannot specify both --index and --name. Use one or the other.")
+        } else {
+          throw ValidationError("Must specify either --index or --name to identify which section to extract.")
+        }
+      }
+
+      // Validate index if provided
+      if let idx = index {
+        guard idx >= 1 else {
+          throw ValidationError("Index must be positive (1-based indexing: 1 = first heading)")
+        }
       }
 
       // Validate --in-place requires --remove
@@ -93,7 +138,20 @@ extension CLIEntry {
       // Extract section
       let (extracted, updated): (MarkdownDocument, MarkdownDocument?)
       do {
-        (extracted, updated) = try await doc.extractSection(at: index, removeFromOriginal: remove)
+        if let idx = index {
+          // Extract by index
+          (extracted, updated) = try await doc.extractSection(at: idx, removeFromOriginal: remove)
+        } else if let headingName = name {
+          // Extract by name
+          (extracted, updated) = try await doc.extractSection(
+            byName: headingName,
+            caseSensitive: caseSensitive,
+            removeFromOriginal: remove
+          )
+        } else {
+          // Should never reach here due to validation in run()
+          throw ValidationError("Must specify either --index or --name")
+        }
       } catch let error as SectionExtractorError {
         throw ValidationError(error.description)
       }

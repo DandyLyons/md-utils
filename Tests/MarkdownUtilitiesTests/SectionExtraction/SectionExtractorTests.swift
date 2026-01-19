@@ -280,4 +280,263 @@ struct SectionExtractorTests {
     #expect(result.section.text == expectedSection)
     #expect(result.section.childHeadingCount == 4)
   }
+
+  // MARK: - Name-Based Extraction Tests
+
+  @Test
+  func `Extract by exact name match (case-insensitive)`() async throws {
+    let content = """
+      # Introduction
+      Intro content.
+      # Contributing
+      How to contribute.
+      # License
+      MIT License.
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let root = try await doc.parseAST()
+
+    let options = SectionExtractor.Options(
+      matchCriteria: .name("contributing", caseSensitive: false),
+      removeFromOriginal: false
+    )
+    let result = try await SectionExtractor.extract(
+      root: root,
+      originalContent: content,
+      options: options
+    )
+
+    let expectedSection = """
+      # Contributing
+      How to contribute.
+      """
+    #expect(result.section.text == expectedSection)
+    #expect(result.section.lineRange == 3...4)
+  }
+
+  @Test
+  func `Extract by exact name match (case-sensitive)`() async throws {
+    let content = """
+      # Introduction
+      # API Reference
+      # license
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let root = try await doc.parseAST()
+
+    let options = SectionExtractor.Options(
+      matchCriteria: .name("license", caseSensitive: true),
+      removeFromOriginal: false
+    )
+    let result = try await SectionExtractor.extract(
+      root: root,
+      originalContent: content,
+      options: options
+    )
+
+    let expectedSection = """
+      # license
+      """
+    #expect(result.section.text == expectedSection)
+    #expect(result.section.lineRange == 3...3)
+  }
+
+  @Test
+  func `Error when heading not found (case-insensitive)`() async throws {
+    let content = """
+      # Introduction
+      # Contributing
+      # License
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let root = try await doc.parseAST()
+
+    let options = SectionExtractor.Options(
+      matchCriteria: .name("Nonexistent", caseSensitive: false),
+      removeFromOriginal: false
+    )
+
+    do {
+      _ = try await SectionExtractor.extract(
+        root: root,
+        originalContent: content,
+        options: options
+      )
+      Issue.record("Expected headingNotFound error")
+    } catch let error as SectionExtractorError {
+      guard case .headingNotFound(let name, let caseSensitive, let available) = error else {
+        Issue.record("Expected headingNotFound error, got: \(error)")
+        return
+      }
+      #expect(name == "Nonexistent")
+      #expect(caseSensitive == false)
+      #expect(available == ["Introduction", "Contributing", "License"])
+    }
+  }
+
+  @Test
+  func `Error when heading not found (case-sensitive)`() async throws {
+    let content = """
+      # Introduction
+      # Contributing
+      # License
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let root = try await doc.parseAST()
+
+    let options = SectionExtractor.Options(
+      matchCriteria: .name("INTRODUCTION", caseSensitive: true),
+      removeFromOriginal: false
+    )
+
+    do {
+      _ = try await SectionExtractor.extract(
+        root: root,
+        originalContent: content,
+        options: options
+      )
+      Issue.record("Expected headingNotFound error")
+    } catch let error as SectionExtractorError {
+      guard case .headingNotFound(let name, let caseSensitive, let available) = error else {
+        Issue.record("Expected headingNotFound error, got: \(error)")
+        return
+      }
+      #expect(name == "INTRODUCTION")
+      #expect(caseSensitive == true)
+      #expect(available == ["Introduction", "Contributing", "License"])
+    }
+  }
+
+  @Test
+  func `Extract first match when multiple headings have same text`() async throws {
+    let content = """
+      # Section
+      First occurrence.
+      # Section
+      Second occurrence.
+      # Different
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let root = try await doc.parseAST()
+
+    let options = SectionExtractor.Options(
+      matchCriteria: .name("Section", caseSensitive: false),
+      removeFromOriginal: false
+    )
+    let result = try await SectionExtractor.extract(
+      root: root,
+      originalContent: content,
+      options: options
+    )
+
+    let expectedSection = """
+      # Section
+      First occurrence.
+      """
+    #expect(result.section.text == expectedSection)
+    #expect(result.section.lineRange == 1...2)
+  }
+
+  @Test
+  func `Match heading with special characters`() async throws {
+    let content = """
+      # Getting Started
+      # API & SDK
+      # Q&A (FAQ)
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let root = try await doc.parseAST()
+
+    let options = SectionExtractor.Options(
+      matchCriteria: .name("API & SDK", caseSensitive: false),
+      removeFromOriginal: false
+    )
+    let result = try await SectionExtractor.extract(
+      root: root,
+      originalContent: content,
+      options: options
+    )
+
+    let expectedSection = """
+      # API & SDK
+      """
+    #expect(result.section.text == expectedSection)
+    #expect(result.section.lineRange == 2...2)
+  }
+
+  @Test
+  func `Match heading with formatting (bold, italic, code)`() async throws {
+    let content = """
+      # Introduction
+      # **Bold** _Italic_ `Code`
+      Content here.
+      # Next
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let root = try await doc.parseAST()
+
+    // HeadingTextExtractor strips formatting, so we match "Bold Italic Code"
+    let options = SectionExtractor.Options(
+      matchCriteria: .name("Bold Italic Code", caseSensitive: false),
+      removeFromOriginal: false
+    )
+    let result = try await SectionExtractor.extract(
+      root: root,
+      originalContent: content,
+      options: options
+    )
+
+    let expectedSection = """
+      # **Bold** _Italic_ `Code`
+      Content here.
+      """
+    #expect(result.section.text == expectedSection)
+    #expect(result.section.lineRange == 2...3)
+  }
+
+  @Test
+  func `Extract by name with removal`() async throws {
+    let content = """
+      # First
+      Content 1.
+      # Target
+      Target content.
+      # Third
+      Content 3.
+      """
+
+    let doc = try MarkdownDocument(content: content)
+    let root = try await doc.parseAST()
+
+    let options = SectionExtractor.Options(
+      matchCriteria: .name("Target", caseSensitive: false),
+      removeFromOriginal: true
+    )
+    let result = try await SectionExtractor.extract(
+      root: root,
+      originalContent: content,
+      options: options
+    )
+
+    let expectedSection = """
+      # Target
+      Target content.
+      """
+    #expect(result.section.text == expectedSection)
+
+    let expectedRemaining = """
+      # First
+      Content 1.
+      # Third
+      Content 3.
+      """
+    #expect(result.remainingContent == expectedRemaining)
+  }
 }
