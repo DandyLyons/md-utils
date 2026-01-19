@@ -138,6 +138,7 @@ if let heading = ast.children.first as? Heading {
    - **CLI**: `md-utils meta read` command
      - Multiple output formats: `json-pretty` (default), `json`, `md-table`, `csv`
      - Extended attributes included by default, opt-out with `--exclude-xattr`
+     - Extended attribute errors reported to user with `--ignore-xattr-errors` flag to continue processing
      - Batch processing with recursive directory support
      - CSV format with proper RFC 4180 escaping
    - **Metadata Available**:

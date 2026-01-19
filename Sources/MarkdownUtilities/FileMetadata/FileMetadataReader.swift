@@ -65,15 +65,13 @@ public struct FileMetadataReader: Sendable {
     let isSymbolicLink = (attributes[.type] as? FileAttributeType) == .typeSymbolicLink
 
     // Read extended attributes if requested
-    var extendedAttributes: [String: Data] = [:]
+    let extendedAttributes: [String: Data]
     if includeExtendedAttributes {
-      do {
-        extendedAttributes = try readExtendedAttributes(at: expandedPath)
-      } catch {
-        // If xattr reading fails, continue without extended attributes
-        // This allows graceful degradation on platforms or file systems that don't support xattr
-        extendedAttributes = [:]
-      }
+      // Let xattr errors propagate so callers can handle them appropriately
+      // Non-Darwin platforms return empty dict without error
+      extendedAttributes = try readExtendedAttributes(at: expandedPath)
+    } else {
+      extendedAttributes = [:]
     }
 
     return FileMetadata(

@@ -44,6 +44,12 @@ extension CLIEntry.FileMetadataCommands {
     )
     var excludeXattr: Bool = false
 
+    @Flag(
+      name: .long,
+      help: "Ignore errors when reading extended attributes and continue processing"
+    )
+    var ignoreXattrErrors: Bool = false
+
     enum OutputFormat: String, ExpressibleByArgument {
       case mdTable = "md-table"
       case csv
@@ -69,7 +75,40 @@ extension CLIEntry.FileMetadataCommands {
             includeExtendedAttributes: !excludeXattr
           )
           metadata.append(fileMeta)
+        } catch let error as FileMetadataError {
+          // Check if this is an xattr-related error
+          let isXattrError: Bool
+          switch error {
+          case .xattrReadFailed, .xattrUnsupported:
+            isXattrError = true
+          default:
+            isXattrError = false
+          }
+
+          if isXattrError && ignoreXattrErrors && !excludeXattr {
+            // Show warning and retry without xattr
+            FileHandle.standardError.write(
+              "Warning: Failed to read extended attributes for \(file): \(error)\n")
+            FileHandle.standardError.write("         Continuing without extended attributes...\n")
+
+            do {
+              let fileMeta = try reader.readMetadata(
+                at: file.string,
+                includeExtendedAttributes: false
+              )
+              metadata.append(fileMeta)
+            } catch {
+              // If it fails again without xattr, show error and mark as failed
+              FileHandle.standardError.write("Error reading \(file): \(error)\n")
+              hasErrors = true
+            }
+          } else {
+            // Show error for non-xattr errors or when flag not set
+            FileHandle.standardError.write("Error reading \(file): \(error)\n")
+            hasErrors = true
+          }
         } catch {
+          // Handle non-FileMetadataError errors
           FileHandle.standardError.write("Error reading \(file): \(error)\n")
           hasErrors = true
         }

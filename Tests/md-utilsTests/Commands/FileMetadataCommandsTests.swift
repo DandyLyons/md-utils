@@ -143,6 +143,23 @@ struct FileMetadataCommandsTests {
   }
 
   @Test
+  func `Ignore xattr errors flag`() async throws {
+    let tempFile = try createTempFile(content: "Test", name: "test.md")
+    defer { try? tempFile.delete() }
+
+    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+      "--ignore-xattr-errors",
+      tempFile.string,
+    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+
+    // Verify flag is set correctly
+    #expect(command.ignoreXattrErrors == true)
+
+    // Should not throw
+    try await command.run()
+  }
+
+  @Test
   func `Recursive directory processing`() async throws {
     let tempDir = try createTempDirectory()
     defer { try? tempDir.delete() }
