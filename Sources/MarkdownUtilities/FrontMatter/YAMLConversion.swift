@@ -17,14 +17,14 @@ public enum YAMLConversionError: Error {
 }
 
 /// Utilities for converting between raw YAML strings and `Yams.Node.Mapping`.
-enum YAMLConversion {
+public enum YAMLConversion {
   /// Convert a raw YAML string to a `Yams.Node.Mapping`.
   ///
   /// - Parameter yamlString: The YAML content to parse
   /// - Returns: A `Yams.Node.Mapping` representing the parsed YAML
   /// - Throws: `YAMLConversionError.invalidYAML` if the YAML syntax is invalid,
   ///           or `YAMLConversionError.notAMapping` if the root is not a mapping
-  static func parse(_ yamlString: String) throws -> Yams.Node.Mapping {
+  public static func parse(_ yamlString: String) throws -> Yams.Node.Mapping {
     // Handle empty or whitespace-only input as valid empty frontmatter
     let trimmed = yamlString.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.isEmpty {
@@ -49,7 +49,7 @@ enum YAMLConversion {
   /// - Parameter mapping: The mapping to serialize
   /// - Returns: A YAML string representation
   /// - Throws: If serialization fails
-  static func serialize(_ mapping: Yams.Node.Mapping) throws -> String {
+  public static func serialize(_ mapping: Yams.Node.Mapping) throws -> String {
     try Yams.serialize(node: .mapping(mapping))
   }
 }
