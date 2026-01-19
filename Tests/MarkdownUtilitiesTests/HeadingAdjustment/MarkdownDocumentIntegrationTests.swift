@@ -13,7 +13,7 @@ struct MarkdownDocumentIntegrationTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 1)
+    let promoted = try await doc.promoteHeading(at: 2)  // 2nd heading
 
     let expected = """
       # Main
@@ -32,7 +32,7 @@ struct MarkdownDocumentIntegrationTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let demoted = try await doc.demoteHeading(at: 0)
+    let demoted = try await doc.demoteHeading(at: 1)  // 1st heading
 
     let expected = """
       ## Main
@@ -49,7 +49,7 @@ struct MarkdownDocumentIntegrationTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let adjusted = try await doc.adjustHeading(at: 0, by: -2)
+    let adjusted = try await doc.adjustHeading(at: 1, by: -2)  // 1st heading
 
     let expected = """
       # H3
@@ -64,7 +64,7 @@ struct MarkdownDocumentIntegrationTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let adjusted = try await doc.adjustHeading(at: 0, by: 3)
+    let adjusted = try await doc.adjustHeading(at: 1, by: 3)  // 1st heading
 
     let expected = """
       #### H1
@@ -81,7 +81,7 @@ struct MarkdownDocumentIntegrationTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 1, includeChildren: false)
+    let promoted = try await doc.promoteHeading(at: 2, includeChildren: false)  // 2nd heading
 
     let expected = """
       # Main
@@ -100,7 +100,7 @@ struct MarkdownDocumentIntegrationTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let demoted = try await doc.demoteHeading(at: 0, includeChildren: false)
+    let demoted = try await doc.demoteHeading(at: 1, includeChildren: false)  // 1st heading
 
     let expected = """
       ## Main
@@ -123,8 +123,8 @@ struct MarkdownDocumentIntegrationTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let adjusted = try await doc.demoteHeading(at: 0)
-    let backAgain = try await adjusted.promoteHeading(at: 0)
+    let adjusted = try await doc.demoteHeading(at: 1)  // 1st heading
+    let backAgain = try await adjusted.promoteHeading(at: 1)  // 1st heading
 
     #expect(backAgain.body == content)
   }
@@ -138,8 +138,8 @@ struct MarkdownDocumentIntegrationTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let step1 = try await doc.demoteHeading(at: 0)  // All become H2, H3, H4
-    let step2 = try await step1.promoteHeading(at: 1)  // Second heading and child H3, H2
+    let step1 = try await doc.demoteHeading(at: 1)  // 1st heading: All become H2, H3, H4
+    let step2 = try await step1.promoteHeading(at: 2)  // 2nd heading and child: H3→H2, H4→H3
 
     let expected = """
       ## H1

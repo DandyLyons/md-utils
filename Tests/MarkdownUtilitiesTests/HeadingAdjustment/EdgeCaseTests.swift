@@ -19,7 +19,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 1)
+    let promoted = try await doc.promoteHeading(at: 2)  // 2nd heading
 
     // Check frontmatter is preserved
     #expect(!promoted.frontMatter.isEmpty)
@@ -44,7 +44,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 0)
+    let promoted = try await doc.promoteHeading(at: 1)  // 1st heading
 
     #expect(promoted.frontMatter.isEmpty)
 
@@ -64,7 +64,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let demoted = try await doc.demoteHeading(at: 0)
+    let demoted = try await doc.demoteHeading(at: 1)  // 1st heading
 
     let expected = """
       ## Main **bold** heading
@@ -102,7 +102,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 1)
+    let promoted = try await doc.promoteHeading(at: 2)  // 2nd heading
 
     // Verify headings adjusted but content preserved
     #expect(promoted.body.contains("# Section"))
@@ -120,7 +120,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 0)
+    let promoted = try await doc.promoteHeading(at: 1)  // 1st heading
 
     let expected = """
       # Only Heading
@@ -136,7 +136,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 1)
+    let promoted = try await doc.promoteHeading(at: 2)  // 2nd heading
 
     // Should preserve essential structure even if whitespace varies slightly
     #expect(promoted.body.contains("# Main"))
@@ -151,7 +151,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 1)
+    let promoted = try await doc.promoteHeading(at: 2)  // 2nd heading
 
     #expect(promoted.body.contains("# Section"))
   }
@@ -165,7 +165,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let demoted = try await doc.demoteHeading(at: 0)
+    let demoted = try await doc.demoteHeading(at: 1)  // 1st heading
 
     #expect(demoted.body.hasPrefix("## "))
     #expect(demoted.body.contains(longText))
@@ -183,7 +183,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 0)
+    let promoted = try await doc.promoteHeading(at: 1)  // 1st heading
 
     let expected = """
       # H1
@@ -205,7 +205,7 @@ struct EdgeCaseTests {
       """
 
     let doc = try MarkdownDocument(content: content)
-    let promoted = try await doc.promoteHeading(at: 1)
+    let promoted = try await doc.promoteHeading(at: 2)  // 2nd heading
 
     #expect(promoted.body.contains("# Émojis and 日本語"))
     #expect(promoted.body.contains("## Ñoño с кириллицей"))
@@ -228,7 +228,7 @@ struct EdgeCaseTests {
 
     // The behavior here depends on how MarkdownSyntax handles blockquote headings
     // We just verify it doesn't crash and produces valid output
-    let demoted = try await doc.demoteHeading(at: 0)
+    let demoted = try await doc.demoteHeading(at: 1)  // 1st heading
     #expect(demoted.body.contains("## Main"))
   }
 
@@ -264,7 +264,7 @@ struct EdgeCaseTests {
     let doc = try MarkdownDocument(content: content)
 
     await #expect(throws: HeadingAdjusterError.self) {
-      try await doc.promoteHeading(at: 0)
+      try await doc.promoteHeading(at: 1)  // 1st heading, but there are no headings
     }
   }
 
@@ -278,11 +278,11 @@ struct EdgeCaseTests {
     let doc = try MarkdownDocument(content: content)
 
     // Try to promote H1 (should clamp)
-    let promoted = try await doc.promoteHeading(at: 0, includeChildren: false)
+    let promoted = try await doc.promoteHeading(at: 1, includeChildren: false)  // 1st heading
     #expect(promoted.body.hasPrefix("# H1"))
 
     // Try to demote H6 (should clamp)
-    let demoted = try await doc.demoteHeading(at: 1, includeChildren: false)
+    let demoted = try await doc.demoteHeading(at: 2, includeChildren: false)  // 2nd heading
     #expect(demoted.body.contains("###### H6"))
   }
 
@@ -297,7 +297,7 @@ struct EdgeCaseTests {
     let doc = try MarkdownDocument(content: content)
 
     await #expect(throws: HeadingAdjusterError.self) {
-      try await doc.promoteHeading(at: 0)
+      try await doc.promoteHeading(at: 1)  // 1st heading, but there are no headings
     }
   }
 }
