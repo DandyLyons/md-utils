@@ -85,6 +85,11 @@ if let heading = ast.children.first as? Heading {
 
 **Current Subcommands:**
 - `toc` (GenerateTOC) - Generate table of contents for Markdown files
+- `fm` (FrontMatterCommands) - Manipulate YAML frontmatter with CRUD operations
+  - `fm get` - Retrieve frontmatter value by key
+  - `fm set` - Set/update frontmatter value by key
+  - `fm has` - Check if frontmatter key exists
+  - `fm remove` - Delete frontmatter key
 
 **CLI Pattern** (Following FrontRange)
 - Each subcommand is a struct conforming to `AsyncParsableCommand`
@@ -101,6 +106,13 @@ if let heading = ast.children.first as? Heading {
    - Supports hierarchical and flat structures
    - Multiple output formats: Markdown, JSON, plain text, HTML
    - Configurable heading levels, slug generation
+4. **Frontmatter Manipulation** - Complete CRUD operations for YAML frontmatter
+   - Library: `MarkdownDocument+FrontMatterMutation` extension with `getValue`, `setValue`, `hasKey`, `removeValue`
+   - CLI: `md-utils fm` command with subcommands `get`, `set`, `has`, `remove`
+   - Works on single files or batch operations across directories
+   - Preserves body content and existing frontmatter structure
+   - Idempotent operations (remove non-existent key is safe)
+   - Recursive directory processing by default
 
 ### Planned Features (from README)
 
@@ -232,10 +244,11 @@ md-utils/
 ├── Sources/
 │   ├── MarkdownUtilities/         # Core library
 │   │   ├── MarkdownDocument.swift
-│   │   ├── FrontMatter/           # Frontmatter parsing
+│   │   ├── FrontMatter/           # Frontmatter parsing and manipulation
 │   │   │   ├── FrontMatterParser.swift
 │   │   │   ├── YAMLConversion.swift
-│   │   │   └── MarkdownDocument+FrontMatter.swift
+│   │   │   ├── MarkdownDocument+FrontMatter.swift
+│   │   │   └── MarkdownDocument+FrontMatterMutation.swift
 │   │   └── TOC/                   # Table of contents generation
 │   │       ├── TOCEntry.swift
 │   │       ├── TableOfContents.swift
@@ -246,8 +259,14 @@ md-utils/
 │   └── md-utils/                  # CLI tool
 │       ├── CLIEntry.swift
 │       ├── GlobalOptions.swift
-│       └── Commands/
-│           └── GenerateTOC.swift
+│       ├── Commands/
+│       │   └── GenerateTOC.swift
+│       └── FrontMatterCommands/   # Frontmatter subcommands
+│           ├── FrontMatterCommands.swift
+│           ├── Get.swift
+│           ├── Set.swift
+│           ├── Has.swift
+│           └── Remove.swift
 └── Tests/
     ├── MarkdownUtilitiesTests/    # Library tests
     │   ├── MarkdownDocumentTests.swift
@@ -255,7 +274,8 @@ md-utils/
     │   ├── FrontMatter/           # Frontmatter tests
     │   │   ├── FrontMatterParsingTests.swift
     │   │   ├── FrontMatterSeparationTests.swift
-    │   │   └── FrontMatterEdgeCasesTests.swift
+    │   │   ├── FrontMatterEdgeCasesTests.swift
+    │   │   └── FrontMatterMutationTests.swift
     │   └── TOC/                   # TOC tests
     │       ├── TOCEntryTests.swift
     │       ├── TableOfContentsTests.swift
@@ -263,7 +283,9 @@ md-utils/
     │       ├── TOCGeneratorTests.swift
     │       └── TOCRendererTests.swift
     └── md-utilsTests/             # CLI tests
-        └── CLIEntryTests.swift
+        ├── CLIEntryTests.swift
+        └── Commands/
+            └── FrontMatterCommandsTests.swift
 ```
 
 ## Naming Conventions
