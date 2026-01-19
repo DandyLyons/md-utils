@@ -113,6 +113,18 @@ if let heading = ast.children.first as? Heading {
    - Preserves body content and existing frontmatter structure
    - Idempotent operations (remove non-existent key is safe)
    - Recursive directory processing by default
+5. **Format Conversion** - Convert Markdown to other formats with extensible protocol-based architecture
+   - **Plain Text Conversion**: Strip all formatting while preserving content and readability
+     - Library: `PlainTextConverter`, `PlainTextOptions`, `PhrasingContentTextExtractor`, `BlockContentTextExtractor`
+     - API: `MarkdownDocument.toPlainText(options:)` method
+     - CLI: `md-utils convert to-text` command
+     - Configurable block spacing, list indentation, code block preservation
+     - Optional frontmatter inclusion
+     - Batch processing with recursive directory support
+   - **Extensible Infrastructure**: Protocol-based design for future formats
+     - Core protocols: `MarkdownConverter`, `MarkdownGenerator`, `ConversionOptions`
+     - Reusable text extraction utilities for phrasing and block content
+     - Ready for HTML, RTF, XML converters
 
 ### Planned Features (from README)
 
@@ -122,7 +134,7 @@ The following features are documented in README but **NOT YET IMPLEMENTED**:
 2. **Section Operations** - Reorder, extract, inject sections (AST foundation ready)
 3. **Content Selection** - Select by heading or line range (AST foundation ready)
 4. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
-5. **Format Conversion** - HTML, plain text, rich text, XML (AST foundation ready)
+5. **Additional Format Conversions** - HTML, RTF, XML (infrastructure ready, plain text implemented)
 6. **File Metadata** - Read/write file metadata
 
 ## Dependencies
@@ -249,24 +261,38 @@ md-utils/
 │   │   │   ├── YAMLConversion.swift
 │   │   │   ├── MarkdownDocument+FrontMatter.swift
 │   │   │   └── MarkdownDocument+FrontMatterMutation.swift
-│   │   └── TOC/                   # Table of contents generation
-│   │       ├── TOCEntry.swift
-│   │       ├── TableOfContents.swift
-│   │       ├── HeadingTextExtractor.swift
-│   │       ├── TOCGenerator.swift
-│   │       ├── TOCRenderer.swift
-│   │       └── MarkdownDocument+TOC.swift
+│   │   ├── TOC/                   # Table of contents generation
+│   │   │   ├── TOCEntry.swift
+│   │   │   ├── TableOfContents.swift
+│   │   │   ├── HeadingTextExtractor.swift
+│   │   │   ├── TOCGenerator.swift
+│   │   │   ├── TOCRenderer.swift
+│   │   │   └── MarkdownDocument+TOC.swift
+│   │   └── FormatConversion/      # Format conversion (MD to other formats)
+│   │       ├── Protocols/
+│   │       │   ├── FormatConverter.swift
+│   │       │   └── ConversionOptions.swift
+│   │       ├── Shared/            # Reusable text extraction utilities
+│   │       │   ├── PhrasingContentTextExtractor.swift
+│   │       │   └── BlockContentTextExtractor.swift
+│   │       ├── PlainText/         # Markdown to plain text
+│   │       │   ├── PlainTextOptions.swift
+│   │       │   └── PlainTextConverter.swift
+│   │       └── MarkdownDocument+FormatConversion.swift
 │   └── md-utils/                  # CLI tool
 │       ├── CLIEntry.swift
 │       ├── GlobalOptions.swift
 │       ├── Commands/
 │       │   └── GenerateTOC.swift
-│       └── FrontMatterCommands/   # Frontmatter subcommands
-│           ├── FrontMatterCommands.swift
-│           ├── Get.swift
-│           ├── Set.swift
-│           ├── Has.swift
-│           └── Remove.swift
+│       ├── FrontMatterCommands/   # Frontmatter subcommands
+│       │   ├── FrontMatterCommands.swift
+│       │   ├── Get.swift
+│       │   ├── Set.swift
+│       │   ├── Has.swift
+│       │   └── Remove.swift
+│       └── ConvertCommands/       # Format conversion subcommands
+│           ├── ConvertCommands.swift
+│           └── ToText.swift
 └── Tests/
     ├── MarkdownUtilitiesTests/    # Library tests
     │   ├── MarkdownDocumentTests.swift
@@ -276,12 +302,18 @@ md-utils/
     │   │   ├── FrontMatterSeparationTests.swift
     │   │   ├── FrontMatterEdgeCasesTests.swift
     │   │   └── FrontMatterMutationTests.swift
-    │   └── TOC/                   # TOC tests
-    │       ├── TOCEntryTests.swift
-    │       ├── TableOfContentsTests.swift
-    │       ├── HeadingTextExtractorTests.swift
-    │       ├── TOCGeneratorTests.swift
-    │       └── TOCRendererTests.swift
+    │   ├── TOC/                   # TOC tests
+    │   │   ├── TOCEntryTests.swift
+    │   │   ├── TableOfContentsTests.swift
+    │   │   ├── HeadingTextExtractorTests.swift
+    │   │   ├── TOCGeneratorTests.swift
+    │   │   └── TOCRendererTests.swift
+    │   └── FormatConversion/      # Format conversion tests
+    │       ├── Shared/
+    │       │   ├── PhrasingContentTextExtractorTests.swift
+    │       │   └── BlockContentTextExtractorTests.swift
+    │       └── PlainText/
+    │           └── PlainTextConverterTests.swift
     └── md-utilsTests/             # CLI tests
         ├── CLIEntryTests.swift
         └── Commands/
