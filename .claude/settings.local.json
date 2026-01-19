@@ -10,7 +10,8 @@
       "Bash(swift package:*)",
       "Bash(find:*)",
       "Bash(grep:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(echo:*)"
     ]
   }
 }

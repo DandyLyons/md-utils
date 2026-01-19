@@ -18,27 +18,35 @@ extension CLIEntry.ConvertCommands {
         Converts Markdown files to plain text by stripping all formatting
         while preserving content and readability.
 
-        Examples:
-          # Convert single file (creates file.txt next to file.md)
-          md-utils convert to-text file.md
+        EXAMPLES:
+          # Single file to stdout
+          md-utils convert to-text README.md
+          md-utils convert to-text README.md | less
 
-          # Convert entire directory recursively
-          md-utils convert to-text docs/
+          # Single file to specific file
+          md-utils convert to-text README.md -o output.txt
 
-          # Convert with custom output directory
-          md-utils convert to-text docs/ --output output/
+          # Single file to directory
+          md-utils convert to-text src/README.md -o output/
 
-          # Include frontmatter in output
+          # Batch conversion
+          md-utils convert to-text docs/ -o output/
+          md-utils convert to-text *.md -o output/
+
+          # In-place conversion (.md → .txt)
+          md-utils convert to-text docs/ --in-place
+          md-utils convert to-text file.md --in-place
+
+          # From stdin
+          cat README.md | md-utils convert to-text
+          cat README.md | md-utils convert to-text -o output.txt
+
+          # With conversion options
           md-utils convert to-text file.md --include-frontmatter
-
-          # Use single-spacing between blocks
-          md-utils convert to-text file.md --block-separator 1
-
-          # Disable list indentation
-          md-utils convert to-text file.md --no-indent-lists
+          md-utils convert to-text docs/ -o out/ --block-separator 1
 
         By default:
-        - Processes directories recursively
+        - Single file outputs to stdout
         - Excludes frontmatter from output
         - Uses double-spacing between blocks
         - Indents nested lists
@@ -49,12 +57,26 @@ extension CLIEntry.ConvertCommands {
     @OptionGroup var options: GlobalOptions
 
     @Option(
-      name: .long,
-      help: "Output directory for converted files (default: same directory as source)",
-      completion: .directory,
+      name: [.short, .long],
+      help: """
+        Output file or directory. For single file: writes to this file or \
+        dir/basename.txt. For multiple files: must be a directory. \
+        If not specified, writes to stdout (single file) or requires \
+        --in-place (batch).
+        """,
+      completion: .file(),
       transform: { Path($0) }
     )
     var output: Path?
+
+    @Flag(
+      name: .long,
+      help: """
+        Convert .md files to .txt in their original locations. \
+        Cannot be used with --output.
+        """
+    )
+    var inPlace: Bool = false
 
     @Flag(
       name: .long,
@@ -89,20 +111,11 @@ extension CLIEntry.ConvertCommands {
     var preserveCode: Bool = true
 
     mutating func run() async throws {
-      let files = try options.resolvedPaths()
+      // Validate flags
+      try validateFlags()
 
-      guard !files.isEmpty else {
-        throw ValidationError("No Markdown files found to process")
-      }
-
-      // Validate output directory if specified
-      if let outputDir = output {
-        if !outputDir.exists {
-          try outputDir.mkpath()
-        } else if !outputDir.isDirectory {
-          throw ValidationError("Output path exists but is not a directory: \(outputDir)")
-        }
-      }
+      // Determine input source
+      let inputMode = try determineInputMode()
 
       // Create conversion options
       let conversionOptions = PlainTextOptions(
@@ -115,6 +128,131 @@ extension CLIEntry.ConvertCommands {
         preserveCodeBlocks: preserveCode
       )
 
+      // Process based on input mode
+      switch inputMode {
+      case .stdin:
+        try await processStdin(options: conversionOptions)
+
+      case .singleFile(let file):
+        try await processSingleFile(file, options: conversionOptions)
+
+      case .multipleFiles(let files):
+        try await processMultipleFiles(files, options: conversionOptions)
+      }
+    }
+
+    // MARK: - Input Mode Detection
+
+    enum InputMode {
+      case stdin
+      case singleFile(Path)
+      case multipleFiles([Path])
+    }
+
+    func determineInputMode() throws -> InputMode {
+      // Check for stdin BEFORE resolving paths (stdin detection when no paths provided)
+      if options.paths.isEmpty {
+        // Check if stdin has data
+        if isatty(STDIN_FILENO) == 0 {
+          return .stdin
+        } else {
+          throw ValidationError("No input specified. Provide file paths or pipe input to stdin.")
+        }
+      }
+
+      // Resolve paths for file inputs
+      let files = try options.resolvedPaths()
+
+      if files.isEmpty {
+        throw ValidationError("No Markdown files found to process")
+      }
+
+      // Single file or multiple files
+      if files.count == 1 {
+        return .singleFile(files[0])
+      } else {
+        return .multipleFiles(files)
+      }
+    }
+
+    // MARK: - Validation
+
+    func validateFlags() throws {
+      // Cannot use both --output and --in-place
+      if output != nil && inPlace {
+        throw ValidationError("Cannot use both --output and --in-place")
+      }
+    }
+
+    // MARK: - Processing Methods
+
+    func processStdin(options conversionOptions: PlainTextOptions) async throws {
+      // Read from stdin
+      var stdinContent = ""
+      while let line = readLine(strippingNewline: false) {
+        stdinContent += line
+      }
+
+      guard !stdinContent.isEmpty else {
+        throw ValidationError("No input received from stdin")
+      }
+
+      // Convert
+      let doc = try MarkdownDocument(content: stdinContent)
+      let plainText = try await doc.toPlainText(options: conversionOptions)
+
+      // Output
+      if let outputPath = output {
+        // Write to file
+        try outputPath.write(plainText)
+      } else {
+        // Write to stdout
+        print(plainText, terminator: "")
+      }
+    }
+
+    func processSingleFile(_ file: Path, options conversionOptions: PlainTextOptions) async throws {
+      // Read and convert
+      let content: String = try file.read()
+      let doc = try MarkdownDocument(content: content)
+      let plainText = try await doc.toPlainText(options: conversionOptions)
+
+      // Determine output destination
+      if let outputPath = output {
+        // Output to file or directory
+        let finalPath = resolveOutputPath(outputPath, for: file)
+        try finalPath.write(plainText)
+      } else if inPlace {
+        // Replace .md with .txt in same location
+        let txtPath = file.parent() + "\(file.lastComponentWithoutExtension).txt"
+        try txtPath.write(plainText)
+      } else {
+        // Default: write to stdout
+        print(plainText, terminator: "")
+      }
+    }
+
+    func processMultipleFiles(_ files: [Path], options conversionOptions: PlainTextOptions) async throws {
+      // Validate: must have --output DIR or --in-place
+      if output == nil && !inPlace {
+        throw ValidationError(
+          "Multiple input files require --output <directory> or --in-place"
+        )
+      }
+
+      // If using --output, ensure it's a directory
+      if let outputPath = output {
+        if outputPath.exists && !outputPath.isDirectory {
+          throw ValidationError(
+            "Batch conversion requires output directory, not file: \(outputPath)"
+          )
+        }
+        // Create directory if it doesn't exist
+        if !outputPath.exists {
+          try outputPath.mkpath()
+        }
+      }
+
       // Process each file
       var successCount = 0
       var errorCount = 0
@@ -126,43 +264,62 @@ extension CLIEntry.ConvertCommands {
           let plainText = try await doc.toPlainText(options: conversionOptions)
 
           // Determine output path
-          let outputPath = determineOutputPath(for: file)
+          let finalPath: Path
+          if inPlace {
+            finalPath = file.parent() + "\(file.lastComponentWithoutExtension).txt"
+          } else if let outputDir = output {
+            // Preserve directory structure relative to base
+            finalPath = outputDir + "\(file.lastComponentWithoutExtension).txt"
+          } else {
+            fatalError("Unreachable: validation should have caught this")
+          }
 
-          // Write the output
-          try outputPath.write(plainText)
+          // Ensure parent directory exists
+          if !finalPath.parent().exists {
+            try finalPath.parent().mkpath()
+          }
 
-          print("✓ Converted: \(file) → \(outputPath)")
+          // Write output
+          try finalPath.write(plainText)
+
+          FileHandle.standardError.write("✓ Converted: \(file) → \(finalPath)\n".data(using: .utf8)!)
           successCount += 1
         } catch {
-          print("✗ Error converting \(file): \(error.localizedDescription)")
+          FileHandle.standardError.write("✗ Error converting \(file): \(error.localizedDescription)\n".data(using: .utf8)!)
           errorCount += 1
         }
       }
 
-      // Print summary
-      print("\nConversion complete:")
-      print("  Success: \(successCount)")
+      // Print summary to stderr
+      FileHandle.standardError.write("\nConversion complete:\n".data(using: .utf8)!)
+      FileHandle.standardError.write("  Success: \(successCount)\n".data(using: .utf8)!)
       if errorCount > 0 {
-        print("  Errors: \(errorCount)")
+        FileHandle.standardError.write("  Errors: \(errorCount)\n".data(using: .utf8)!)
         throw ExitCode.failure
       }
     }
 
-    /// Determines the output path for a converted file.
-    ///
-    /// - Parameter inputPath: The path to the source Markdown file
-    /// - Returns: The path where the converted text file should be written
-    private func determineOutputPath(for inputPath: Path) -> Path {
-      // Get the filename without extension
-      let basename = inputPath.lastComponentWithoutExtension
+    // MARK: - Helper Methods
 
-      if let outputDir = output {
-        // Output to specified directory
-        return outputDir + "\(basename).txt"
-      } else {
-        // Output to same directory as input
-        return inputPath.parent() + "\(basename).txt"
+    /// Resolves the output path for a single file.
+    ///
+    /// If outputPath is a directory (or ends with /), returns outputPath/basename.txt.
+    /// Otherwise, returns outputPath as-is (treat as file).
+    func resolveOutputPath(_ outputPath: Path, for inputFile: Path) -> Path {
+      // Check if it's a directory
+      if outputPath.isDirectory {
+        return outputPath + "\(inputFile.lastComponentWithoutExtension).txt"
       }
+
+      // Check if it ends with / (treat as directory even if it doesn't exist yet)
+      if outputPath.string.hasSuffix("/") {
+        // Create directory if needed
+        let dirPath = Path(String(outputPath.string.dropLast()))
+        return dirPath + "\(inputFile.lastComponentWithoutExtension).txt"
+      }
+
+      // Otherwise, treat as file
+      return outputPath
     }
   }
 }
