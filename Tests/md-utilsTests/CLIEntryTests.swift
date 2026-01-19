@@ -15,13 +15,14 @@ struct CLIEntryTests {
 
     #expect(config.commandName == "md-utils")
     #expect(config.version == "0.1.0-alpha")
-    #expect(config.subcommands.count == 5)
+    #expect(config.subcommands.count == 6)
 
     // Verify the subcommands are registered
     #expect(config.subcommands[0] is CLIEntry.GenerateTOC.Type)
     #expect(config.subcommands[1] is CLIEntry.FrontMatterCommands.Type)
-    #expect(config.subcommands[2] is CLIEntry.PromoteHeading.Type)
-    #expect(config.subcommands[3] is CLIEntry.DemoteHeading.Type)
-    #expect(config.subcommands[4] is CLIEntry.ExtractSection.Type)
+    #expect(config.subcommands[2] is CLIEntry.ConvertCommands.Type)
+    #expect(config.subcommands[3] is CLIEntry.PromoteHeading.Type)
+    #expect(config.subcommands[4] is CLIEntry.DemoteHeading.Type)
+    #expect(config.subcommands[5] is CLIEntry.ExtractSection.Type)
   }
 }
