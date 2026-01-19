@@ -9,7 +9,7 @@ import Parsing
 import Yams
 
 /// A representation of a Markdown document.
-public struct MarkdownDocument {
+public struct MarkdownDocument: @unchecked Sendable {
   /// The YAML frontmatter as a parsed mapping.
   ///
   /// This is an empty mapping if the document has no frontmatter.
