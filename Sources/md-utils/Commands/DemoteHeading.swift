@@ -21,7 +21,7 @@ extension CLIEntry {
 
         Headings at H6 cannot be demoted further and will remain at H6.
 
-        Use --index to specify which heading to demote (0-based index).
+        Use --index to specify which heading to demote (1-based: 1 = first heading).
         Use --target-only to demote only the specified heading without children.
         Use --in-place to modify files directly instead of outputting to stdout.
         """
@@ -31,7 +31,7 @@ extension CLIEntry {
 
     @Option(
       name: .long,
-      help: "Index of the heading to demote (0-based, required)"
+      help: "Index of the heading to demote (1-based: 1 = first heading)"
     )
     var index: Int
 
@@ -49,8 +49,8 @@ extension CLIEntry {
 
     mutating func run() async throws {
       // Validate index
-      guard index >= 0 else {
-        throw ValidationError("Index must be non-negative")
+      guard index >= 1 else {
+        throw ValidationError("Index must be positive (1-based indexing: 1 = first heading)")
       }
 
       // Resolve paths
