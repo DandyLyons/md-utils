@@ -90,6 +90,10 @@ if let heading = ast.children.first as? Heading {
   - `fm set` - Set/update frontmatter value by key
   - `fm has` - Check if frontmatter key exists
   - `fm remove` - Delete frontmatter key
+- `meta` (FileMetadataCommands) - Read file metadata including standard and extended attributes
+  - `meta read` - Read metadata from files with multiple output formats
+- `convert` (ConvertCommands) - Convert Markdown to other formats
+  - `convert to-text` - Convert Markdown to plain text
 
 **CLI Pattern** (Following FrontRange)
 - Each subcommand is a struct conforming to `AsyncParsableCommand`
@@ -125,6 +129,21 @@ if let heading = ast.children.first as? Heading {
      - Core protocols: `MarkdownConverter`, `MarkdownGenerator`, `ConversionOptions`
      - Reusable text extraction utilities for phrasing and block content
      - Ready for HTML, RTF, XML converters
+6. **File Metadata Reading** - Read file metadata including standard attributes and extended attributes
+   - **Library**: `FileMetadataReader`, `FileMetadata`, `ExtendedAttributes`, `FileMetadataError`
+     - `FileMetadataReader.readMetadata(at:includeExtendedAttributes:)` - Read all metadata from a file
+     - `FileMetadata` - Sendable, Codable struct containing file information
+     - Platform-specific extended attributes support (Darwin/macOS via `listxattr`/`getxattr`)
+     - Graceful degradation on platforms without xattr support
+   - **CLI**: `md-utils meta read` command
+     - Multiple output formats: `json-pretty` (default), `json`, `md-table`, `csv`
+     - Extended attributes included by default, opt-out with `--exclude-xattr`
+     - Batch processing with recursive directory support
+     - CSV format with proper RFC 4180 escaping
+   - **Metadata Available**:
+     - Standard: size, creation/modification/access dates, POSIX permissions, owner/group accounts
+     - Extended attributes (xattr) on supported platforms
+     - File type detection (regular file, directory, symbolic link)
 
 ### Planned Features (from README)
 
@@ -135,7 +154,7 @@ The following features are documented in README but **NOT YET IMPLEMENTED**:
 3. **Content Selection** - Select by heading or line range (AST foundation ready)
 4. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
 5. **Additional Format Conversions** - HTML, RTF, XML (infrastructure ready, plain text implemented)
-6. **File Metadata** - Read/write file metadata
+6. **File Metadata Writing** - Write/update file metadata (read operations implemented)
 
 ## Dependencies
 
@@ -268,17 +287,22 @@ md-utils/
 │   │   │   ├── TOCGenerator.swift
 │   │   │   ├── TOCRenderer.swift
 │   │   │   └── MarkdownDocument+TOC.swift
-│   │   └── FormatConversion/      # Format conversion (MD to other formats)
-│   │       ├── Protocols/
-│   │       │   ├── FormatConverter.swift
-│   │       │   └── ConversionOptions.swift
-│   │       ├── Shared/            # Reusable text extraction utilities
-│   │       │   ├── PhrasingContentTextExtractor.swift
-│   │       │   └── BlockContentTextExtractor.swift
-│   │       ├── PlainText/         # Markdown to plain text
-│   │       │   ├── PlainTextOptions.swift
-│   │       │   └── PlainTextConverter.swift
-│   │       └── MarkdownDocument+FormatConversion.swift
+│   │   ├── FormatConversion/      # Format conversion (MD to other formats)
+│   │   │   ├── Protocols/
+│   │   │   │   ├── FormatConverter.swift
+│   │   │   │   └── ConversionOptions.swift
+│   │   │   ├── Shared/            # Reusable text extraction utilities
+│   │   │   │   ├── PhrasingContentTextExtractor.swift
+│   │   │   │   └── BlockContentTextExtractor.swift
+│   │   │   ├── PlainText/         # Markdown to plain text
+│   │   │   │   ├── PlainTextOptions.swift
+│   │   │   │   └── PlainTextConverter.swift
+│   │   │   └── MarkdownDocument+FormatConversion.swift
+│   │   └── FileMetadata/          # File metadata reading
+│   │       ├── FileMetadata.swift
+│   │       ├── FileMetadataReader.swift
+│   │       ├── FileMetadataError.swift
+│   │       └── ExtendedAttributes.swift
 │   └── md-utils/                  # CLI tool
 │       ├── CLIEntry.swift
 │       ├── GlobalOptions.swift
@@ -290,9 +314,12 @@ md-utils/
 │       │   ├── Set.swift
 │       │   ├── Has.swift
 │       │   └── Remove.swift
-│       └── ConvertCommands/       # Format conversion subcommands
-│           ├── ConvertCommands.swift
-│           └── ToText.swift
+│       ├── ConvertCommands/       # Format conversion subcommands
+│       │   ├── ConvertCommands.swift
+│       │   └── ToText.swift
+│       └── FileMetadataCommands/  # File metadata subcommands
+│           ├── FileMetadataCommands.swift
+│           └── ReadMetadata.swift
 └── Tests/
     ├── MarkdownUtilitiesTests/    # Library tests
     │   ├── MarkdownDocumentTests.swift
@@ -308,16 +335,21 @@ md-utils/
     │   │   ├── HeadingTextExtractorTests.swift
     │   │   ├── TOCGeneratorTests.swift
     │   │   └── TOCRendererTests.swift
-    │   └── FormatConversion/      # Format conversion tests
-    │       ├── Shared/
-    │       │   ├── PhrasingContentTextExtractorTests.swift
-    │       │   └── BlockContentTextExtractorTests.swift
-    │       └── PlainText/
-    │           └── PlainTextConverterTests.swift
+    │   ├── FormatConversion/      # Format conversion tests
+    │   │   ├── Shared/
+    │   │   │   ├── PhrasingContentTextExtractorTests.swift
+    │   │   │   └── BlockContentTextExtractorTests.swift
+    │   │   └── PlainText/
+    │   │       └── PlainTextConverterTests.swift
+    │   └── FileMetadata/          # File metadata tests
+    │       ├── FileMetadataTests.swift
+    │       ├── FileMetadataReaderTests.swift
+    │       └── ExtendedAttributesTests.swift
     └── md-utilsTests/             # CLI tests
         ├── CLIEntryTests.swift
         └── Commands/
-            └── FrontMatterCommandsTests.swift
+            ├── FrontMatterCommandsTests.swift
+            └── FileMetadataCommandsTests.swift
 ```
 
 ## Naming Conventions
