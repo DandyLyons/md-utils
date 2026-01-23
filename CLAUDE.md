@@ -389,9 +389,45 @@ md-utils/
 3. **CLI Pattern**: SwiftArgumentParser with `ParsableCommand` protocol
 4. **Minimal Scaffolding**: Current implementation is intentionally minimal - just establishes architecture
 5. **Future-Ready**: Structure mirrors FrontRange for easy feature addition
-6. **Recursive File Processing By Default in `md-utils` CLI**: By default, CLI commands performed on a directory are: 
+6. **Recursive File Processing By Default in `md-utils` CLI**: By default, CLI commands performed on a directory are:
    1. recursive by default: opt-out recursive processing with `--non-recursive` or `--nr` flag
    2. ignores hidden files and directories (those starting with a dot) by default: opt-in to processing hidden files with `--include-hidden` or `--ih` flag
+
+### Swift Coding Standards
+
+**STRICTLY FORBIDDEN: Force Unwrapping with `!`**
+
+Force unwrapping optionals with `!` is **absolutely prohibited** in this codebase. This prevents runtime crashes and enforces safe optional handling.
+
+**NEVER do this:**
+```swift
+// WRONG - FORBIDDEN
+let value = dictionary["key"]!
+let item = array.first!
+let result = someOptional!
+```
+
+**Always use safe alternatives:**
+```swift
+// CORRECT - Use optional binding
+if let value = dictionary["key"] {
+  // Use value safely
+}
+
+// CORRECT - Use guard for early exit
+guard let value = dictionary["key"] else {
+  throw MyError.missingKey
+}
+
+// CORRECT - Use try #require() in tests
+let value = try #require(dictionary["key"])
+
+// CORRECT - Use nil coalescing when appropriate
+let value = dictionary["key"] ?? defaultValue
+
+// CORRECT - Use optional chaining
+someOptional?.doSomething()
+```
 
 ## Development Workflow
 
