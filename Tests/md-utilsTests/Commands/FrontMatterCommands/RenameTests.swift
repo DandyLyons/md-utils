@@ -26,11 +26,12 @@ struct RenameTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "date",
       "--new-key", "created",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     try await command.run()
 
@@ -59,11 +60,12 @@ struct RenameTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "-k", "status",
       "--new-key", "publish_status",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     try await command.run()
 
@@ -88,11 +90,12 @@ struct RenameTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "nonexistent",
       "--new-key", "newkey",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     // Should throw an error
     await #expect(throws: Error.self) {
@@ -119,11 +122,12 @@ struct RenameTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "title",
       "--new-key", "author",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     // Should throw an error
     await #expect(throws: Error.self) {
@@ -150,11 +154,12 @@ struct RenameTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "title",
       "--new-key", "heading",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     try await command.run()
 
@@ -183,11 +188,12 @@ struct RenameTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "tags",
       "--new-key", "categories",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     try await command.run()
 
@@ -231,12 +237,13 @@ struct RenameTests {
       try? file2.delete()
     }
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "old_key",
       "--new-key", "new_key",
       file1.string,
       file2.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     try await command.run()
 
@@ -274,11 +281,12 @@ struct RenameTests {
     try file1.write(content)
     try file2.write(content)
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "old_name",
       "--new-key", "new_name",
       tempDir.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     try await command.run()
 
@@ -311,11 +319,12 @@ struct RenameTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "count",
       "--new-key", "total",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     try await command.run()
 
@@ -341,11 +350,12 @@ struct RenameTests {
     defer { try? tempFile.delete() }
 
     // Use the 'rn' alias
-    var command = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Rename.parseAsRoot([
       "--key", "before",
       "--new-key", "after",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Rename
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Rename)
 
     try await command.run()
 

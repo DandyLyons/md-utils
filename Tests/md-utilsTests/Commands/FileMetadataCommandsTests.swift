@@ -18,9 +18,10 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       tempFile.string
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Should not throw
     try await command.run()
@@ -35,10 +36,11 @@ struct FileMetadataCommandsTests {
       try? file2.delete()
     }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       file1.string,
       file2.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Should not throw
     try await command.run()
@@ -49,10 +51,11 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: "Test", name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--format", "json-pretty",
       tempFile.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Verify format is set correctly
     #expect(command.format == .jsonPretty)
@@ -66,10 +69,11 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: "Test", name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--format", "json",
       tempFile.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Verify format is set correctly
     #expect(command.format == .json)
@@ -83,10 +87,11 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: "Test", name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--format", "md-table",
       tempFile.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Verify format is set correctly
     #expect(command.format == .mdTable)
@@ -100,10 +105,11 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: "Test", name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--format", "csv",
       tempFile.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Verify format is set correctly
     #expect(command.format == .csv)
@@ -117,10 +123,11 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: "Test", name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--exclude-xattr",
       tempFile.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Verify flag is set correctly
     #expect(command.excludeXattr == true)
@@ -134,9 +141,10 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: "Test", name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       tempFile.string
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Verify xattr is included by default
     #expect(command.excludeXattr == false)
@@ -147,10 +155,11 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: "Test", name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--ignore-xattr-errors",
       tempFile.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Verify flag is set correctly
     #expect(command.ignoreXattrErrors == true)
@@ -174,9 +183,10 @@ struct FileMetadataCommandsTests {
     let file2 = subdir + "file2.md"
     try file2.write("Content 2")
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       tempDir.string
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Should process both files recursively
     try await command.run()
@@ -186,9 +196,10 @@ struct FileMetadataCommandsTests {
   func `Error handling for missing files`() async throws {
     let nonexistentPath = "/tmp/nonexistent-\(UUID()).md"
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       nonexistentPath
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Should throw because path doesn't exist
     await #expect(throws: Error.self) {
@@ -205,10 +216,11 @@ struct FileMetadataCommandsTests {
     let fileWithComma = tempDir + "file,with,commas.md"
     try fileWithComma.write("Test")
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--format", "csv",
       fileWithComma.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Should not throw and should properly escape commas
     try await command.run()
@@ -220,10 +232,11 @@ struct FileMetadataCommandsTests {
     let tempFile = try createTempFile(content: "Test", name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--format", "csv",
       tempFile.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Should not throw
     try await command.run()
@@ -243,10 +256,11 @@ struct FileMetadataCommandsTests {
     let file2 = subdir + "file2.md"
     try file2.write("Content 2")
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--no-recursive",
       tempDir.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Should only process top-level file
     try await command.run()
@@ -261,10 +275,11 @@ struct FileMetadataCommandsTests {
     let hiddenFile = tempDir + ".hidden.md"
     try hiddenFile.write("Hidden content")
 
-    var command = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
+    let command_ = try CLIEntry.FileMetadataCommands.ReadMetadata.parseAsRoot([
       "--include-hidden",
       tempDir.string,
-    ]) as! CLIEntry.FileMetadataCommands.ReadMetadata
+    ])
+    var command = try #require(command_ as? CLIEntry.FileMetadataCommands.ReadMetadata)
 
     // Should process hidden file
     try await command.run()

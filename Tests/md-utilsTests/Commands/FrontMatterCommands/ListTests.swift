@@ -29,9 +29,10 @@ struct ListTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.List
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.List)
 
     // Should not throw
     try await command.run()
@@ -44,9 +45,10 @@ struct ListTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.List
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.List)
 
     // Should not throw, but prints empty result
     try await command.run()
@@ -63,9 +65,10 @@ struct ListTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.List
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.List)
 
     // Should not throw
     try await command.run()
@@ -98,10 +101,11 @@ struct ListTests {
       try? file2.delete()
     }
 
-    var command = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
       file1.string,
       file2.string
-    ]) as! CLIEntry.FrontMatterCommands.List
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.List)
 
     // Should not throw and process both files
     try await command.run()
@@ -140,9 +144,10 @@ struct ListTests {
       try? tempDir.delete()
     }
 
-    var command = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
       tempDir.string
-    ]) as! CLIEntry.FrontMatterCommands.List
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.List)
 
     // Should not throw and find both files recursively
     try await command.run()
@@ -167,10 +172,11 @@ struct ListTests {
       try? file2.delete()
     }
 
-    var command = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
       file1.string,
       file2.string
-    ]) as! CLIEntry.FrontMatterCommands.List
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.List)
 
     // Should not throw and handle both cases gracefully
     try await command.run()
@@ -189,9 +195,10 @@ struct ListTests {
     defer { try? tempFile.delete() }
 
     // Parse using the 'ls' alias
-    var command = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.List.parseAsRoot([
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.List
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.List)
 
     // Should parse successfully and work the same as 'list'
     try await command.run()

@@ -25,10 +25,11 @@ struct HasTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Has.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Has.parseAsRoot([
       "--key", "title",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Has
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Has)
 
     // Should not throw
     try await command.run()
@@ -46,10 +47,11 @@ struct HasTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Has.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Has.parseAsRoot([
       "--key", "nonexistent",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Has
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Has)
 
     // Should not throw (has always succeeds)
     try await command.run()
@@ -62,10 +64,11 @@ struct HasTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Has.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Has.parseAsRoot([
       "--key", "title",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Has
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Has)
 
     // Should not throw (has always succeeds)
     try await command.run()

@@ -25,10 +25,11 @@ struct GetTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Get.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Get.parseAsRoot([
       "--key", "title",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Get
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Get)
 
     // Verify it doesn't throw
     try await command.run()
@@ -46,10 +47,11 @@ struct GetTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Get.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Get.parseAsRoot([
       "--key", "nonexistent",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Get
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Get)
 
     // Should throw because key doesn't exist
     await #expect(throws: Error.self) {
@@ -64,10 +66,11 @@ struct GetTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Get.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Get.parseAsRoot([
       "--key", "title",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Get
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Get)
 
     // Should throw because there's no frontmatter
     await #expect(throws: Error.self) {

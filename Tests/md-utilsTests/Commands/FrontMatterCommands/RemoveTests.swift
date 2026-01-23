@@ -26,10 +26,11 @@ struct RemoveTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Remove.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Remove.parseAsRoot([
       "--key", "author",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Remove
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Remove)
 
     try await command.run()
 
@@ -54,10 +55,11 @@ struct RemoveTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Remove.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Remove.parseAsRoot([
       "--key", "nonexistent",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Remove
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Remove)
 
     // Should not throw (remove is idempotent)
     try await command.run()
@@ -81,10 +83,11 @@ struct RemoveTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Remove.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Remove.parseAsRoot([
       "--key", "title",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Remove
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Remove)
 
     try await command.run()
 
@@ -109,10 +112,11 @@ struct RemoveTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Remove.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Remove.parseAsRoot([
       "--key", "author",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Remove
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Remove)
 
     try await command.run()
 

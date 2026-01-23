@@ -19,11 +19,12 @@ struct SetTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
       "--key", "title",
       "--value", "Test Title",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Set
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Set)
 
     try await command.run()
 
@@ -47,11 +48,12 @@ struct SetTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
       "--key", "title",
       "--value", "Updated Title",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Set
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Set)
 
     try await command.run()
 
@@ -76,11 +78,12 @@ struct SetTests {
     let tempFile = try createTempFile(content: testContent, name: "test.md")
     defer { try? tempFile.delete() }
 
-    var command = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
       "--key", "author",
       "--value", "Jane",
       tempFile.string
-    ]) as! CLIEntry.FrontMatterCommands.Set
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Set)
 
     try await command.run()
 
@@ -114,12 +117,13 @@ struct SetTests {
       try? file2.delete()
     }
 
-    var command = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
+    let command_ = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
       "--key", "category",
       "--value", "Tutorial",
       file1.string,
       file2.string
-    ]) as! CLIEntry.FrontMatterCommands.Set
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Set)
 
     try await command.run()
 
