@@ -90,6 +90,9 @@ if let heading = ast.children.first as? Heading {
   - `fm set` - Set/update frontmatter value by key
   - `fm has` - Check if frontmatter key exists
   - `fm remove` - Delete frontmatter key
+  - `fm rename` - Rename frontmatter key
+  - `fm list` - List all frontmatter keys
+  - `fm dump` - Dump entire frontmatter in specified format (JSON, YAML, raw, plist)
 - `meta` (FileMetadataCommands) - Read file metadata including standard and extended attributes
   - `meta read` - Read metadata from files with multiple output formats
 - `convert` (ConvertCommands) - Convert Markdown to other formats
@@ -112,7 +115,14 @@ if let heading = ast.children.first as? Heading {
    - Configurable heading levels, slug generation
 4. **Frontmatter Manipulation** - Complete CRUD operations for YAML frontmatter
    - Library: `MarkdownDocument+FrontMatterMutation` extension with `getValue`, `setValue`, `hasKey`, `removeValue`
-   - CLI: `md-utils fm` command with subcommands `get`, `set`, `has`, `remove`
+   - Format conversion: `YAMLConversion` utilities for JSON, YAML, and PropertyList output
+   - CLI: `md-utils fm` command with subcommands `get`, `set`, `has`, `remove`, `rename`, `list`, `dump`
+   - **Dump Feature**: Output entire frontmatter in multiple formats
+     - Formats: JSON (default), YAML, raw, PropertyList (XML)
+     - Single file: direct output without wrapper
+     - Multiple files: cat-style headers (==> path <==) with separation
+     - Optional YAML delimiters (---) via `--include-delimiters`
+     - Alias: `fm d` for quick access
    - Works on single files or batch operations across directories
    - Preserves body content and existing frontmatter structure
    - Idempotent operations (remove non-existent key is safe)
@@ -307,6 +317,7 @@ md-utils/
 │   └── md-utils/                  # CLI tool
 │       ├── CLIEntry.swift
 │       ├── GlobalOptions.swift
+│       ├── OutputFormat.swift     # Output format helpers (JSON, YAML, plist)
 │       ├── Commands/
 │       │   └── GenerateTOC.swift
 │       ├── FrontMatterCommands/   # Frontmatter subcommands
@@ -314,7 +325,10 @@ md-utils/
 │       │   ├── Get.swift
 │       │   ├── Set.swift
 │       │   ├── Has.swift
-│       │   └── Remove.swift
+│       │   ├── Remove.swift
+│       │   ├── Rename.swift
+│       │   ├── List.swift
+│       │   └── Dump.swift
 │       ├── ConvertCommands/       # Format conversion subcommands
 │       │   ├── ConvertCommands.swift
 │       │   └── ToText.swift
