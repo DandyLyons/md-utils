@@ -23,6 +23,7 @@ public struct CLIEntry: AsyncParsableCommand {
       PromoteHeading.self,
       DemoteHeading.self,
       ExtractSection.self,
+      Lines.self,
     ],
     helpNames: [.long, .short]
   )
