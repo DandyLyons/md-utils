@@ -272,4 +272,123 @@ struct FrontMatterMutationTests {
     #expect(reparsed.getValue(forKey: "author")?.string == "Jane")
     #expect(reparsed.body == "Original body")
   }
+
+  // MARK: - renameKey Tests
+
+  @Test
+  func `renameKey successfully renames existing key`() async throws {
+    let content = """
+    ---
+    title: Test Document
+    author: Jane Doe
+    count: 42
+    ---
+    Body content
+    """
+    var doc = try MarkdownDocument(content: content)
+    try doc.renameKey(from: "author", to: "creator")
+
+    #expect(doc.hasKey("author") == false)
+    #expect(doc.hasKey("creator") == true)
+    #expect(doc.getValue(forKey: "creator")?.string == "Jane Doe")
+    // Other keys should remain unchanged
+    #expect(doc.getValue(forKey: "title")?.string == "Test Document")
+    #expect(doc.getValue(forKey: "count")?.int == 42)
+  }
+
+  @Test
+  func `renameKey throws when old key does not exist`() async throws {
+    let content = """
+    ---
+    title: Test
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+
+    #expect(throws: Error.self) {
+      try doc.renameKey(from: "nonexistent", to: "newkey")
+    }
+  }
+
+  @Test
+  func `renameKey throws when new key already exists`() async throws {
+    let content = """
+    ---
+    title: Test
+    author: Jane
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+
+    #expect(throws: Error.self) {
+      try doc.renameKey(from: "title", to: "author")
+    }
+  }
+
+  @Test
+  func `renameKey preserves body content`() async throws {
+    let content = """
+    ---
+    title: Test
+    ---
+    # Heading
+
+    Body content here.
+
+    """
+    var doc = try MarkdownDocument(content: content)
+    try doc.renameKey(from: "title", to: "heading")
+
+    #expect(doc.body == "# Heading\n\nBody content here.\n")
+  }
+
+  @Test
+  func `renameKey preserves complex values`() async throws {
+    let content = """
+    ---
+    tags:
+      - swift
+      - markdown
+      - cli
+    metadata:
+      created: 2024-01-01
+      updated: 2024-01-15
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    try doc.renameKey(from: "tags", to: "categories")
+
+    #expect(doc.hasKey("tags") == false)
+    #expect(doc.hasKey("categories") == true)
+
+    let categories = doc.getValue(forKey: "categories")
+    #expect(categories != nil)
+    // Verify the metadata key is still intact
+    #expect(doc.hasKey("metadata") == true)
+  }
+
+  @Test
+  func `renameKey roundtrips through render`() async throws {
+    let content = """
+    ---
+    old_key: Some Value
+    other: Another Value
+    ---
+    Body content
+    """
+    var doc = try MarkdownDocument(content: content)
+    try doc.renameKey(from: "old_key", to: "new_key")
+
+    let rendered = try doc.render()
+    let reparsed = try MarkdownDocument(content: rendered)
+
+    #expect(reparsed.hasKey("old_key") == false)
+    #expect(reparsed.hasKey("new_key") == true)
+    #expect(reparsed.getValue(forKey: "new_key")?.string == "Some Value")
+    #expect(reparsed.getValue(forKey: "other")?.string == "Another Value")
+    #expect(reparsed.body == "Body content")
+  }
 }

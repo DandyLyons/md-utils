@@ -38,4 +38,40 @@ extension MarkdownDocument {
   public mutating func removeValue(forKey key: String) {
     frontMatter[key] = nil
   }
+
+  /// Rename a key in frontmatter
+  ///
+  /// Renames an existing frontmatter key to a new name, preserving the value.
+  /// If the old key doesn't exist, throws an error.
+  /// If the new key already exists, throws an error to avoid overwriting.
+  ///
+  /// - Parameters:
+  ///   - oldKey: The current key name to rename
+  ///   - newKey: The new key name
+  /// - Throws: `RenameKeyError.oldKeyNotFound` if oldKey doesn't exist,
+  ///           `RenameKeyError.newKeyAlreadyExists` if newKey already exists
+  public mutating func renameKey(from oldKey: String, to newKey: String) throws {
+    enum RenameKeyError: Error, LocalizedError {
+      case oldKeyNotFound
+      case newKeyAlreadyExists
+
+      var errorDescription: String? {
+        switch self {
+        case .oldKeyNotFound:
+          return "Old key not found in frontmatter"
+        case .newKeyAlreadyExists:
+          return "New key already exists in frontmatter"
+        }
+      }
+    }
+
+    guard let value = getValue(forKey: oldKey) else {
+      throw RenameKeyError.oldKeyNotFound
+    }
+    guard !hasKey(newKey) else {
+      throw RenameKeyError.newKeyAlreadyExists
+    }
+    removeValue(forKey: oldKey)
+    frontMatter[newKey] = value
+  }
 }

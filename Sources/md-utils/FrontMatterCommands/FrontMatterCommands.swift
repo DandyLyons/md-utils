@@ -19,6 +19,7 @@ extension CLIEntry {
         - set: Set or update a frontmatter value
         - has: Check if a frontmatter key exists
         - remove: Delete a frontmatter key
+        - rename: Rename a frontmatter key
         - list: List all frontmatter keys
 
         By default, processes directories recursively.
@@ -28,6 +29,7 @@ extension CLIEntry {
         Set.self,
         Has.self,
         Remove.self,
+        Rename.self,
         List.self,
       ]
     )
