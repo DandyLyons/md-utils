@@ -23,6 +23,7 @@ extension CLIEntry {
         - list: List all frontmatter keys
         - dump: Dump entire frontmatter in specified format
         - replace: Replace entire frontmatter with new data
+        - sort-keys: Sort frontmatter keys alphabetically or by length
         - array: Manipulate array values (append, prepend, remove, contains)
 
         By default, processes directories recursively.
@@ -36,6 +37,7 @@ extension CLIEntry {
         List.self,
         Dump.self,
         Replace.self,
+        SortKeys.self,
         ArrayCommands.self,
       ]
     )

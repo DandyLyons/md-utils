@@ -391,4 +391,194 @@ struct FrontMatterMutationTests {
     #expect(reparsed.getValue(forKey: "other")?.string == "Another Value")
     #expect(reparsed.body == "Body content")
   }
+
+  // MARK: - sortKeys Tests
+
+  @Test
+  func `sortKeys sorts alphabetically by default`() async throws {
+    let content = """
+    ---
+    zebra: last
+    title: middle
+    author: first
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys()
+
+    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    #expect(keys == ["author", "title", "zebra"])
+
+    // Verify values are preserved
+    #expect(doc.getValue(forKey: "zebra")?.string == "last")
+    #expect(doc.getValue(forKey: "title")?.string == "middle")
+    #expect(doc.getValue(forKey: "author")?.string == "first")
+  }
+
+  @Test
+  func `sortKeys alphabetical with reverse`() async throws {
+    let content = """
+    ---
+    author: first
+    title: middle
+    zebra: last
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys(by: .alphabetical, reverse: true)
+
+    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    #expect(keys == ["zebra", "title", "author"])
+  }
+
+  @Test
+  func `sortKeys by length`() async throws {
+    let content = """
+    ---
+    very_long_key_name: value1
+    short: value2
+    mid: value3
+    a: value4
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys(by: .length)
+
+    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    #expect(keys == ["a", "mid", "short", "very_long_key_name"])
+
+    // Verify values are preserved
+    #expect(doc.getValue(forKey: "very_long_key_name")?.string == "value1")
+    #expect(doc.getValue(forKey: "short")?.string == "value2")
+    #expect(doc.getValue(forKey: "mid")?.string == "value3")
+    #expect(doc.getValue(forKey: "a")?.string == "value4")
+  }
+
+  @Test
+  func `sortKeys by length with reverse`() async throws {
+    let content = """
+    ---
+    a: value1
+    abc: value2
+    ab: value3
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys(by: .length, reverse: true)
+
+    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    #expect(keys == ["abc", "ab", "a"])
+  }
+
+  @Test
+  func `sortKeys preserves complex values`() async throws {
+    let content = """
+    ---
+    zebra:
+      - item1
+      - item2
+    metadata:
+      created: 2024-01-01
+      updated: 2024-01-15
+    author: Jane Doe
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys()
+
+    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    #expect(keys == ["author", "metadata", "zebra"])
+
+    // Verify array was preserved
+    let zebraArray = doc.getValue(forKey: "zebra")
+    #expect(zebraArray?.sequence?.count == 2)
+
+    // Verify mapping was preserved
+    let metadata = doc.getValue(forKey: "metadata")
+    #expect(metadata?.mapping != nil)
+  }
+
+  @Test
+  func `sortKeys preserves body content`() async throws {
+    let content = """
+    ---
+    z: last
+    a: first
+    ---
+    # Important Heading
+
+    Critical content.
+
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys()
+
+    #expect(doc.body == "# Important Heading\n\nCritical content.\n")
+  }
+
+  @Test
+  func `sortKeys handles empty frontmatter`() async throws {
+    let content = """
+    ---
+    ---
+    Body only
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys()
+
+    #expect(doc.frontMatter.isEmpty)
+    #expect(doc.body == "Body only")
+  }
+
+  @Test
+  func `sortKeys handles numeric and boolean values`() async throws {
+    let content = """
+    ---
+    count: 42
+    price: 19.99
+    active: true
+    disabled: false
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys()
+
+    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    #expect(keys == ["active", "count", "disabled", "price"])
+
+    #expect(doc.getValue(forKey: "count")?.int == 42)
+    #expect(doc.getValue(forKey: "price")?.float == 19.99)
+    #expect(doc.getValue(forKey: "active")?.bool == true)
+    #expect(doc.getValue(forKey: "disabled")?.bool == false)
+  }
+
+  @Test
+  func `sortKeys roundtrips through render`() async throws {
+    let content = """
+    ---
+    z: last
+    m: middle
+    a: first
+    ---
+    Body content
+    """
+    var doc = try MarkdownDocument(content: content)
+    doc.sortKeys()
+
+    let rendered = try doc.render()
+    let reparsed = try MarkdownDocument(content: rendered)
+
+    let keys = Array(reparsed.frontMatter.keys).compactMap { $0.string }
+    #expect(keys == ["a", "m", "z"])
+    #expect(reparsed.getValue(forKey: "a")?.string == "first")
+    #expect(reparsed.getValue(forKey: "m")?.string == "middle")
+    #expect(reparsed.getValue(forKey: "z")?.string == "last")
+    #expect(reparsed.body == "Body content")
+  }
 }
