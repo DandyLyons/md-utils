@@ -44,3 +44,4 @@ Detailed guidance organized by topic:
 ## Status
 
 This project is in **early development**. Many features are work in progress or planned.
+This project is based on an earlier project [FrontRange](https://github.com/DandyLyons/FrontRange) which provides CRUD operations for Markdown files. You can find it at `~/Developer/MySwiftPackages/FrontRange/`. We are currently in the process of porting features from FrontRange into md-utils.
