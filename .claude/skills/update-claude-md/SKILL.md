@@ -5,6 +5,11 @@ description: Update the Claude.md file. Uses best practices for CLAUDE.md files 
 
 I want you to refactor my AGENTS.md file (which should be symlinked to the CLAUDE.md file) to follow progressive disclosure principles.
 
+## When to use this skill
+- Use this skill when the user asks you to update AGENTS.md or CLAUDE.md. 
+- Offer to use this skill when the SOPs have significantly changed. 
+
+## Procedure
 Follow these steps:
 
 1. **Find contradictions**: Identify any instructions that conflict with each other. For each contradiction, ask me which version I want to keep.
