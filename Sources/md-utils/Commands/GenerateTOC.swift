@@ -12,7 +12,7 @@ extension CLIEntry {
   /// Generate a table of contents for Markdown files.
   struct GenerateTOC: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      commandName: "toc",
+      commandName: "table-of-contents",
       abstract: "Generate a table of contents for Markdown files",
       discussion: """
         Generates a table of contents by extracting headings from Markdown files.
@@ -20,7 +20,8 @@ extension CLIEntry {
 
         By default, processes directories recursively and generates Markdown output
         with unordered links.
-        """
+        """,
+      aliases: ["toc"]
     )
 
     @OptionGroup var options: GlobalOptions
