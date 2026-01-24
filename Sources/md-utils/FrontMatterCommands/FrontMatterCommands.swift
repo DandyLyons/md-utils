@@ -22,6 +22,7 @@ extension CLIEntry {
         - rename: Rename a frontmatter key
         - list: List all frontmatter keys
         - dump: Dump entire frontmatter in specified format
+        - array: Manipulate array values (append, prepend, remove, contains)
 
         By default, processes directories recursively.
         """,
@@ -33,6 +34,7 @@ extension CLIEntry {
         Rename.self,
         List.self,
         Dump.self,
+        ArrayCommands.self,
       ]
     )
   }
