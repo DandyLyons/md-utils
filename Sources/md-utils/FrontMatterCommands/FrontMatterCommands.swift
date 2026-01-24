@@ -24,6 +24,7 @@ extension CLIEntry {
         - dump: Dump entire frontmatter in specified format
         - replace: Replace entire frontmatter with new data
         - sort-keys: Sort frontmatter keys alphabetically or by length
+        - touch: Add frontmatter keys without values
         - array: Manipulate array values (append, prepend, remove, contains)
         - search: Search for files matching a JMESPath query
 
@@ -39,6 +40,7 @@ extension CLIEntry {
         Dump.self,
         Replace.self,
         SortKeys.self,
+        Touch.self,
         ArrayCommands.self,
         Search.self,
       ]

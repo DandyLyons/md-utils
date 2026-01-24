@@ -21,6 +21,28 @@ extension MarkdownDocument {
   public mutating func setValue(_ value: String, forKey key: String) {
     frontMatter[key] = Yams.Node.scalar(.init(value))
   }
+  
+  public enum CreateKeyError: Error, LocalizedError {
+    case keyAlreadyExists
+
+    public var errorDescription: String? {
+      switch self {
+      case .keyAlreadyExists:
+        return "The specified key already exists in frontmatter"
+      }
+    }
+  }
+
+  /// Create a new key with null value in frontmatter, throwing an error if the key already exists
+  ///
+  /// - Parameter key: The frontmatter key to create
+  /// - Throws: `CreateKeyError.keyAlreadyExists` if the key already exists
+  public mutating func createNewKeyWithNullValue(_ key: String) throws(CreateKeyError) {
+    guard !hasKey(key) else {
+      throw CreateKeyError.keyAlreadyExists
+    }
+    frontMatter[key] = Yams.Node("", Tag(.null))
+  }
 
   /// Check if key exists in frontmatter
   ///

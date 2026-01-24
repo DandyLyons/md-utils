@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Yams
 @testable import MarkdownUtilities
 
 @Suite("FrontMatter Mutation Tests")
@@ -118,6 +119,81 @@ struct FrontMatterMutationTests {
     doc.setValue("Updated", forKey: "title")
 
     #expect(doc.body == "# Heading\n\nBody content here.\n")
+  }
+
+  // MARK: - setNullValue Tests
+
+  @Test
+  func `setNullValue creates new key with empty value`() async throws {
+    var doc = try MarkdownDocument(content: "Just body")
+    try doc.createNewKeyWithNullValue("title")
+
+    #expect(doc.hasKey("title") == true)
+    #expect(doc.frontMatter["title"] == Yams.Node("", Tag(.null)))
+  }
+
+  @Test
+  func `setNullValue creates key in existing frontmatter`() async throws {
+    let content = """
+    ---
+    existing: value
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    try doc.createNewKeyWithNullValue("newkey")
+
+    #expect(doc.hasKey("newkey") == true)
+    #expect(doc.hasKey("existing") == true)
+    #expect(doc.frontMatter["existing"]?.string == "value")
+  }
+
+  @Test
+  func `setNullValue does not overwrite existing value`() async throws {
+    let content = """
+    ---
+    title: Original Value
+    ---
+    Body
+    """
+    var doc = try MarkdownDocument(content: content)
+    #expect(throws: MarkdownDocument.CreateKeyError.keyAlreadyExists) {
+      try doc.createNewKeyWithNullValue("title")
+    }
+  }
+
+  @Test
+  func `setNullValue preserves body content`() async throws {
+    let content = """
+    ---
+    existing: value
+    ---
+    # Important Heading
+
+    Critical content.
+
+    """
+    var doc = try MarkdownDocument(content: content)
+    try doc.createNewKeyWithNullValue("newkey")
+
+    #expect(doc.body == "# Important Heading\n\nCritical content.\n")
+  }
+
+  @Test
+  func `setNullValue roundtrips through render`() async throws {
+    var doc = try MarkdownDocument(content: "Original body")
+    try doc.createNewKeyWithNullValue("title")
+    try doc.createNewKeyWithNullValue("author")
+    let rendered = try doc.render()
+    let reparsed = try MarkdownDocument(content: rendered)
+
+    #expect(reparsed.hasKey("title") == true)
+    #expect(reparsed.frontMatter["title"] == Yams.Node("", Tag(.null)))
+    #expect(reparsed.hasKey("author") == true)
+    #expect(reparsed.frontMatter["author"] == Yams.Node("", Tag(.null)))
+    #expect(reparsed.body == "Original body")
+    let rerendered = try reparsed.render()
+    #expect(rerendered == rendered)
   }
 
   // MARK: - hasKey Tests
