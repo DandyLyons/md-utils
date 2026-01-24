@@ -25,6 +25,7 @@ extension CLIEntry {
         - replace: Replace entire frontmatter with new data
         - sort-keys: Sort frontmatter keys alphabetically or by length
         - array: Manipulate array values (append, prepend, remove, contains)
+        - search: Search for files matching a JMESPath query
 
         By default, processes directories recursively.
         """,
@@ -39,6 +40,7 @@ extension CLIEntry {
         Replace.self,
         SortKeys.self,
         ArrayCommands.self,
+        Search.self,
       ]
     )
   }

@@ -1,6 +1,15 @@
 {
-  "originHash" : "9ab6fcb5e9655abd619134729b5b03ef3336753384915429e9cba1163000b767",
+  "originHash" : "735626bbee1c38fc7d9f3f7cdc6ec8680fd98d0ca2f862df874e896733c8d96b",
   "pins" : [
+    {
+      "identity" : "jmespath.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/adam-fowler/jmespath.swift.git",
+      "state" : {
+        "revision" : "3877a5060e85ae33e3b9fe51ab581784f65ec80e",
+        "version" : "1.0.3"
+      }
+    },
     {
       "identity" : "markdownsyntax",
       "kind" : "remoteSourceControl",
