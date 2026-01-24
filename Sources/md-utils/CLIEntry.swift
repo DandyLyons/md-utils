@@ -16,14 +16,14 @@ public struct CLIEntry: AsyncParsableCommand {
     abstract: "A utility for working with Markdown files.",
     version: "0.1.0-alpha",
     subcommands: [
-      GenerateTOC.self,
-      FrontMatterCommands.self,
       ConvertCommands.self,
-      FileMetadataCommands.self,
-      PromoteHeading.self,
       DemoteHeading.self,
       ExtractSection.self,
+      FileMetadataCommands.self,
+      FrontMatterCommands.self,
+      GenerateTOC.self,
       Lines.self,
+      PromoteHeading.self,
     ],
     helpNames: [.long, .short]
   )

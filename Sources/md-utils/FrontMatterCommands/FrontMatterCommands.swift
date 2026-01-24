@@ -14,35 +14,21 @@ extension CLIEntry {
       discussion: """
         Provides CRUD operations for YAML frontmatter in Markdown files.
 
-        Available commands:
-        - get: Retrieve a frontmatter value by key
-        - set: Set or update a frontmatter value
-        - has: Check if a frontmatter key exists
-        - remove: Delete a frontmatter key
-        - rename: Rename a frontmatter key
-        - list: List all frontmatter keys
-        - dump: Dump entire frontmatter in specified format
-        - replace: Replace entire frontmatter with new data
-        - sort-keys: Sort frontmatter keys alphabetically or by length
-        - touch: Add frontmatter keys without values
-        - array: Manipulate array values (append, prepend, remove, contains)
-        - search: Search for files matching a JMESPath query
-
         By default, processes directories recursively.
         """,
       subcommands: [
+        ArrayCommands.self,
+        Dump.self,
         Get.self,
-        Set.self,
         Has.self,
+        List.self,
         Remove.self,
         Rename.self,
-        List.self,
-        Dump.self,
         Replace.self,
+        Search.self,
+        Set.self,
         SortKeys.self,
         Touch.self,
-        ArrayCommands.self,
-        Search.self,
       ]
     )
   }

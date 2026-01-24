@@ -19,7 +19,8 @@ extension CLIEntry.FrontMatterCommands {
 
         The operation is idempotent - removing a non-existent key is a no-op.
         The operation is silent on success (no output).
-        """
+        """,
+      aliases: ["rm"]
     )
 
     @OptionGroup var options: GlobalOptions
