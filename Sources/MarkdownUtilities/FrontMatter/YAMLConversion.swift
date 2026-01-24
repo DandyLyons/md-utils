@@ -18,6 +18,31 @@ public enum YAMLConversionError: Error {
   case jsonConversionFailed
   /// Failed to convert to PropertyList format
   case plistConversionFailed
+  /// Failed to parse JSON input
+  case jsonParsingFailed(underlyingError: Error)
+  /// Failed to parse plist input
+  case plistParsingFailed(underlyingError: Error)
+}
+
+extension YAMLConversionError: Equatable {
+  public static func == (lhs: YAMLConversionError, rhs: YAMLConversionError) -> Bool {
+    switch (lhs, rhs) {
+      case (.invalidYAML, .invalidYAML):
+        return true
+      case (.notAMapping, .notAMapping):
+        return true
+      case (.jsonConversionFailed, .jsonConversionFailed):
+        return true
+      case (.plistConversionFailed, .plistConversionFailed):
+        return true
+      case (.jsonParsingFailed, .jsonParsingFailed):
+        return true
+      case (.plistParsingFailed, .plistParsingFailed):
+        return true
+      default:
+        return false
+    }
+  }
 }
 
 /// Utilities for converting between raw YAML strings and `Yams.Node.Mapping`.
@@ -163,6 +188,109 @@ public enum YAMLConversion {
       throw YAMLConversionError.plistConversionFailed
     }
     return plistString
+  }
+
+  /// Parse a JSON string to a Yams.Node.Mapping.
+  ///
+  /// - Parameter jsonString: The JSON string to parse
+  /// - Returns: A Yams.Node.Mapping representing the parsed JSON
+  /// - Throws: `YAMLConversionError.jsonParsingFailed` if the JSON is invalid,
+  ///           or `YAMLConversionError.notAMapping` if the root is not a dictionary
+  public static func parseJSON(_ jsonString: String) throws -> Yams.Node.Mapping {
+    guard let data = jsonString.data(using: .utf8) else {
+      throw YAMLConversionError.jsonParsingFailed(
+        underlyingError: NSError(
+          domain: "MarkdownUtilities",
+          code: 1,
+          userInfo: [NSLocalizedDescriptionKey: "Failed to convert string to UTF-8 data"]
+        )
+      )
+    }
+
+    let obj: Any
+    do {
+      obj = try JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)
+    } catch {
+      throw YAMLConversionError.jsonParsingFailed(underlyingError: error)
+    }
+
+    let node = nodeFromAny(obj)
+
+    guard let mapping = node.mapping else {
+      throw YAMLConversionError.notAMapping
+    }
+
+    return mapping
+  }
+
+  /// Parse a PropertyList XML string to a Yams.Node.Mapping.
+  ///
+  /// - Parameter plistString: The PropertyList XML string to parse
+  /// - Returns: A Yams.Node.Mapping representing the parsed plist
+  /// - Throws: `YAMLConversionError.plistParsingFailed` if the plist is invalid,
+  ///           or `YAMLConversionError.notAMapping` if the root is not a dictionary
+  public static func parsePlist(_ plistString: String) throws -> Yams.Node.Mapping {
+    guard let data = plistString.data(using: .utf8) else {
+      throw YAMLConversionError.plistParsingFailed(
+        underlyingError: NSError(
+          domain: "MarkdownUtilities",
+          code: 2,
+          userInfo: [NSLocalizedDescriptionKey: "Failed to convert string to UTF-8 data"]
+        )
+      )
+    }
+
+    let obj: Any
+    do {
+      obj = try PropertyListSerialization.propertyList(from: data, format: nil)
+    } catch {
+      throw YAMLConversionError.plistParsingFailed(underlyingError: error)
+    }
+
+    let node = nodeFromAny(obj)
+
+    guard let mapping = node.mapping else {
+      throw YAMLConversionError.notAMapping
+    }
+
+    return mapping
+  }
+
+  /// Convert a Swift value to a Yams.Node.
+  ///
+  /// - Parameter any: The value to convert
+  /// - Returns: A Yams.Node representation
+  private static func nodeFromAny(_ any: Any) -> Yams.Node {
+    if let dict = any as? [String: Any] {
+      var pairs: [(Yams.Node, Yams.Node)] = []
+      for (key, value) in dict {
+        pairs.append((.scalar(.init(key)), nodeFromAny(value)))
+      }
+      return .mapping(.init(pairs))
+    } else if let dict = any as? [AnyHashable: Any] {
+      // Handle AnyHashable keys from PropertyListSerialization
+      var pairs: [(Yams.Node, Yams.Node)] = []
+      for (key, value) in dict {
+        pairs.append((.scalar(.init(String(describing: key))), nodeFromAny(value)))
+      }
+      return .mapping(.init(pairs))
+    } else if let array = any as? [Any] {
+      return .sequence(.init(array.map(nodeFromAny)))
+    } else if let string = any as? String {
+      return .scalar(.init(string))
+    } else if let number = any as? NSNumber {
+      // Distinguish bool from number
+      if CFGetTypeID(number) == CFBooleanGetTypeID() {
+        return .scalar(.init(number.boolValue ? "true" : "false"))
+      } else {
+        return .scalar(.init(number.description))
+      }
+    } else if let date = any as? Date {
+      let formatter = ISO8601DateFormatter()
+      return .scalar(.init(formatter.string(from: date)))
+    } else {
+      return .scalar(.init(String(describing: any)))
+    }
   }
 }
 
