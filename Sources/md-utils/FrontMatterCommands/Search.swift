@@ -24,6 +24,9 @@ extension CLIEntry.FrontMatterCommands {
 
         Directories are searched recursively.
 
+        TIP: 
+          To search for files where a value is present in an array, it is easier/more reliable to use `md-utils fm array contains`. 
+
         EXAMPLES:
           # Find all draft files
           md-utils fm search 'draft == `true`' .
@@ -192,7 +195,8 @@ extension CLIEntry.FrontMatterCommands {
         }
       }
 
-      return allPaths
+      // Sort alphabetically for consistent output
+      return allPaths.sorted { $0.string < $1.string }
     }
 
     /// Process file paths in batches to avoid memory pressure and provide progress feedback

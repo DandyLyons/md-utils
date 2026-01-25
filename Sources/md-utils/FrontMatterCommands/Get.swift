@@ -28,6 +28,15 @@ extension CLIEntry.FrontMatterCommands {
     @Option(name: .long, help: "The frontmatter key to retrieve")
     var key: String
 
+    @Option(name: .long, help: "Output format for array values (inline, bullets, numbered-list)")
+    var format: OutputFormat = .inline
+
+    enum OutputFormat: String, ExpressibleByArgument {
+      case inline
+      case bullets
+      case numberedList = "numbered-list"
+    }
+
     mutating func run() async throws {
       let files = try options.resolvedPaths()
 
@@ -50,7 +59,7 @@ extension CLIEntry.FrontMatterCommands {
         }
 
         // Print value (use .string for scalars, format for complex types)
-        let stringValue = formatNodeValue(value)
+        let stringValue = formatNodeValue(value, format: format)
         if files.count > 1 {
           print("\(file): \(stringValue)")
         } else {
@@ -65,7 +74,7 @@ extension CLIEntry.FrontMatterCommands {
     }
 
     /// Format a Yams.Node value for display
-    private func formatNodeValue(_ node: Yams.Node) -> String {
+    private func formatNodeValue(_ node: Yams.Node, format: OutputFormat) -> String {
       // Handle scalar values
       if let string = node.string {
         return string
@@ -87,14 +96,24 @@ extension CLIEntry.FrontMatterCommands {
 
       // Handle arrays
       if let sequence = node.sequence {
-        let items = sequence.map { formatNodeValue($0) }
-        return "[\(items.joined(separator: ", "))]"
+        let items = sequence.map { formatNodeValue($0, format: .inline) }
+
+        switch format {
+        case .inline:
+          return "[\(items.joined(separator: ", "))]"
+        case .bullets:
+          return items.map { "- \($0)" }.joined(separator: "\n")
+        case .numberedList:
+          return items.enumerated().map { index, item in
+            "\(index + 1). \(item)"
+          }.joined(separator: "\n")
+        }
       }
 
       // Handle mappings/objects
       if let mapping = node.mapping {
         let pairs = mapping.map { key, value in
-          "\(formatNodeValue(key)): \(formatNodeValue(value))"
+          "\(formatNodeValue(key, format: .inline)): \(formatNodeValue(value, format: .inline))"
         }
         return "{\(pairs.joined(separator: ", "))}"
       }

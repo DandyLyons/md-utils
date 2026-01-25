@@ -39,6 +39,13 @@ struct GlobalOptions: ParsableArguments {
   )
   var extensions: String = "md,markdown"
 
+  /// Disable alphabetical sorting of file paths.
+  @Flag(
+    name: .customLong("no-sort"),
+    help: "Disable alphabetical sorting of file paths"
+  )
+  var noSort: Bool = false
+
   /// Resolve paths to actual Markdown files to process.
   ///
   /// Expands directories to their children, applies recursion and hidden file filters,
@@ -73,6 +80,11 @@ struct GlobalOptions: ParsableArguments {
           resolvedFiles.append(path)
         }
       }
+    }
+
+    // Sort alphabetically by full path (unless disabled)
+    if !noSort {
+      resolvedFiles.sort { $0.string < $1.string }
     }
 
     return resolvedFiles
