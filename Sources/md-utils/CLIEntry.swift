@@ -18,13 +18,12 @@ public struct CLIEntry: AsyncParsableCommand {
     subcommands: [
       Body.self,
       ConvertCommands.self,
-      DemoteHeading.self,
       ExtractSection.self,
       FileMetadataCommands.self,
       FrontMatterCommands.self,
       GenerateTOC.self,
+      HeadingCommands.self,
       Lines.self,
-      PromoteHeading.self,
     ],
     helpNames: [.long, .short]
   )
