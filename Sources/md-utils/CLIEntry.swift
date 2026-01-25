@@ -16,6 +16,7 @@ public struct CLIEntry: AsyncParsableCommand {
     abstract: "A utility for working with Markdown files.",
     version: "0.1.0-alpha",
     subcommands: [
+      Body.self,
       ConvertCommands.self,
       DemoteHeading.self,
       ExtractSection.self,
