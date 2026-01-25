@@ -12,7 +12,9 @@
       "Bash(grep:*)",
       "Bash(git commit:*)",
       "Bash(echo:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(xcodebuild docbuild:*)"
     ]
   }
 }
