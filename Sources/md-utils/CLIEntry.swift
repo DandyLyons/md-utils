@@ -24,6 +24,7 @@ public struct CLIEntry: AsyncParsableCommand {
       GenerateTOC.self,
       HeadingCommands.self,
       Lines.self,
+      SectionCommands.self,
     ],
     helpNames: [.long, .short]
   )
