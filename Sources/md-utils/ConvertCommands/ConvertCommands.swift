@@ -26,6 +26,7 @@ extension CLIEntry {
         """,
       subcommands: [
         ToText.self,
+        ToCSV.self,
       ]
     )
   }
