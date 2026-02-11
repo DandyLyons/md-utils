@@ -60,6 +60,10 @@ if let heading = ast.children.first as? Heading {
   - `meta read` - Read metadata from files with multiple output formats
 - `convert` (ConvertCommands) - Convert Markdown to other formats
   - `convert to-text` - Convert Markdown to plain text
+- `links` / `ln` (LinkCommands) - Analyze wikilinks in Markdown files
+  - `links list` / `ls` - List wikilinks with resolution status
+  - `links check` - Check for broken or ambiguous wikilinks (exits with failure if any found)
+  - `links backlinks` / `bl` - Find files that link to a given target
 
 ### CLI Default Behavior
 
@@ -145,6 +149,26 @@ Read file metadata including standard attributes and extended attributes.
 - Extended attributes (xattr) on supported platforms
 - File type detection (regular file, directory, symbolic link)
 
+### 7. Wikilink Parsing & Resolution ✅
+
+Parse and resolve Obsidian-flavored wikilinks.
+
+**Parsing (Library)**: `Wikilink`, `WikilinkScanner`, `WikilinkParser`, `WikilinkAnchor`
+- `WikilinkScanner.scan(_:)` - Scan text for all wikilinks
+- `MarkdownDocument.wikilinks()` - Scan both frontmatter and body
+- Supports targets, display text, heading/block anchors, embeds
+
+**Resolution (Library)**: `WikilinkResolver`, `WikilinkResolution`, `ResolvedWikilink`
+- `WikilinkResolver(root:)` - Builds a file index from a vault root directory
+- Resolution priority: filename match → relative path → absolute path from root
+- No-extension targets match only `.md`/`.markdown`; explicit extensions match exactly
+- Detects ambiguous matches (multiple files with same stem)
+
+**CLI**: `md-utils links` command group
+- `links list` - List all wikilinks with resolution status (plain text or JSON)
+- `links check` - Report broken/ambiguous links, exit with failure if any found
+- `links backlinks` - Find files that link to given targets
+
 ## Planned Features
 
 The following features are documented in README but **NOT YET IMPLEMENTED**:
@@ -212,11 +236,19 @@ md-utils/
 │   │   │   │   ├── PlainTextOptions.swift
 │   │   │   │   └── PlainTextConverter.swift
 │   │   │   └── MarkdownDocument+FormatConversion.swift
-│   │   └── FileMetadata/
-│   │       ├── FileMetadata.swift
-│   │       ├── FileMetadataReader.swift
-│   │       ├── FileMetadataError.swift
-│   │       └── ExtendedAttributes.swift
+│   │   ├── FileMetadata/
+│   │   │   ├── FileMetadata.swift
+│   │   │   ├── FileMetadataReader.swift
+│   │   │   ├── FileMetadataError.swift
+│   │   │   └── ExtendedAttributes.swift
+│   │   └── Wikilink/
+│   │       ├── Wikilink.swift
+│   │       ├── WikilinkAnchor.swift
+│   │       ├── WikilinkScanner.swift
+│   │       ├── WikilinkParser.swift
+│   │       ├── MarkdownDocument+Wikilink.swift
+│   │       ├── WikilinkResolver.swift
+│   │       └── ResolvedWikilink.swift
 │   └── md-utils/                  # CLI tool
 │       ├── CLIEntry.swift
 │       ├── GlobalOptions.swift
@@ -235,9 +267,14 @@ md-utils/
 │       ├── ConvertCommands/
 │       │   ├── ConvertCommands.swift
 │       │   └── ToText.swift
-│       └── FileMetadataCommands/
-│           ├── FileMetadataCommands.swift
-│           └── ReadMetadata.swift
+│       ├── FileMetadataCommands/
+│       │   ├── FileMetadataCommands.swift
+│       │   └── ReadMetadata.swift
+│       └── LinkCommands/
+│           ├── LinkCommands.swift
+│           ├── ListLinks.swift
+│           ├── Check.swift
+│           └── Backlinks.swift
 └── Tests/
     ├── MarkdownUtilitiesTests/
     │   ├── MarkdownDocumentTests.swift
@@ -267,7 +304,8 @@ md-utils/
         ├── CLIEntryTests.swift
         └── Commands/
             ├── FrontMatterCommandsTests.swift
-            └── FileMetadataCommandsTests.swift
+            ├── FileMetadataCommandsTests.swift
+            └── LinkCommandsTests.swift
 ```
 
 ## Naming Conventions
