@@ -23,6 +23,7 @@ public struct CLIEntry: AsyncParsableCommand {
       FrontMatterCommands.self,
       GenerateTOC.self,
       HeadingCommands.self,
+      LinkCommands.self,
       Lines.self,
       SectionCommands.self,
     ],

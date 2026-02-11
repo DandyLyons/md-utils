@@ -14,7 +14,7 @@
 /// - `[[My Page#Introduction]]` — heading anchor
 /// - `[[My Page#^abc123]]` — block ID anchor
 /// - `![[Image.png]]` — embedded file
-public struct Wikilink: Sendable, Equatable, Hashable {
+public struct Wikilink: Sendable, Equatable, Hashable, Codable {
   /// The full source text including brackets (and `!` prefix for embeds).
   public let rawValue: String
 

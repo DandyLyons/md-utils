@@ -8,7 +8,7 @@
 /// Obsidian supports two types of anchors:
 /// - Heading anchors: `[[Page#Introduction]]` links to the "Introduction" heading
 /// - Block ID anchors: `[[Page#^abc123]]` links to a specific block
-public enum WikilinkAnchor: Sendable, Equatable, Hashable {
+public enum WikilinkAnchor: Sendable, Equatable, Hashable, Codable {
   /// A heading anchor, e.g. `#Introduction` in `[[Page#Introduction]]`.
   case heading(String)
 
