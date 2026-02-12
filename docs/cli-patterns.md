@@ -43,13 +43,31 @@ Shared options across commands:
 
 ```swift
 struct GlobalOptions: ParsableArguments {
-  @Flag(name: [.short, .long], help: "Process directories recursively")
+  @Argument(help: "Paths to Markdown files or directories to process",
+            completion: .file(), transform: { Path($0) })
+  var paths: [Path] = []
+
+  @Flag(name: [.customLong("recursive"), .customShort("r")],
+        inversion: .prefixedNo,
+        help: "Process directories recursively (use --no-recursive to disable)")
   var recursive: Bool = true
 
-  @Flag(name: .customShort("i"), help: "Include hidden files")
+  @Flag(name: [.customLong("include-hidden"), .customShort("i")],
+        help: "Include hidden files and directories (starting with '.')")
   var includeHidden: Bool = false
 
-  @Option(help: "File extensions to process")
-  var extensions: [String] = [".md"]
+  @Option(name: .long,
+          help: "File extensions to process (comma-separated, default: md,markdown)")
+  var extensions: String = "md,markdown"
+
+  @Flag(name: .customLong("no-sort"),
+        help: "Disable alphabetical sorting of file paths")
+  var noSort: Bool = false
 }
 ```
+
+Key details:
+- `paths` defaults to current directory when empty
+- `extensions` is a comma-separated string (not an array)
+- `recursive` supports `--no-recursive` via `inversion: .prefixedNo`
+- Use `resolvedPaths()` to expand directories and apply filters

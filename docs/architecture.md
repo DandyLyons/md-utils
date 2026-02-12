@@ -47,23 +47,43 @@ if let heading = ast.children.first as? Heading {
 
 ### Current Subcommands
 
-- `toc` (GenerateTOC) - Generate table of contents for Markdown files
-- `fm` (FrontMatterCommands) - Manipulate YAML frontmatter with CRUD operations
+- `body` / `b` (Body) - Extract body content without frontmatter
+- `convert` (ConvertCommands) - Convert Markdown to other formats
+  - `convert to-text` - Convert Markdown to plain text
+  - `convert to-csv` - Convert Markdown to CSV
+- `extract` (ExtractSection) - Extract a section from Markdown files by name or index
+- `frontmatter` / `fm` (FrontMatterCommands) - Manipulate YAML frontmatter
   - `fm get` - Retrieve frontmatter value by key
   - `fm set` - Set/update frontmatter value by key
   - `fm has` - Check if frontmatter key exists
   - `fm remove` - Delete frontmatter key
   - `fm rename` - Rename frontmatter key
+  - `fm replace` / `fm r` - Replace entire frontmatter with new data
   - `fm list` - List all frontmatter keys
   - `fm dump` - Dump entire frontmatter in specified format (JSON, YAML, raw, plist)
-- `meta` (FileMetadataCommands) - Read file metadata including standard and extended attributes
-  - `meta read` - Read metadata from files with multiple output formats
-- `convert` (ConvertCommands) - Convert Markdown to other formats
-  - `convert to-text` - Convert Markdown to plain text
+  - `fm search` - Search for files matching a JMESPath query
+  - `fm sort-keys` / `fm sk` - Sort frontmatter keys
+  - `fm touch` - Add frontmatter keys without values
+  - `fm array` - Array manipulation commands:
+    - `fm array append` - Append value to array
+    - `fm array contains` - Check if array contains value
+    - `fm array prepend` - Prepend value to array
+    - `fm array remove` - Remove value from array
+- `headings` (HeadingCommands) - Manipulate heading levels
+  - `headings promote` - Promote heading levels (e.g. h2 → h1)
+  - `headings demote` - Demote heading levels (e.g. h1 → h2)
+- `lines` / `l` (Lines) - Extract a range of lines from a file
 - `links` / `ln` (LinkCommands) - Analyze wikilinks in Markdown files
   - `links list` / `ls` - List wikilinks with resolution status
   - `links check` - Check for broken or ambiguous wikilinks (exits with failure if any found)
   - `links backlinks` / `bl` - Find files that link to a given target
+- `meta` (FileMetadataCommands) - Read file metadata including standard and extended attributes
+  - `meta read` - Read metadata from files with multiple output formats
+- `section` / `sect` (SectionCommands) - Manipulate sections in Markdown documents
+  - `section move-up` - Move a section up among siblings
+  - `section move-down` - Move a section down among siblings
+  - `section move-to` - Move a section to a specific position
+- `table-of-contents` / `toc` (GenerateTOC) - Generate table of contents for Markdown files
 
 ### CLI Default Behavior
 
@@ -89,13 +109,16 @@ Body text parsed into Abstract Syntax Tree for programmatic manipulation.
 - Multiple output formats: Markdown, JSON, plain text, HTML
 - Configurable heading levels, slug generation
 
-### 4. Frontmatter Manipulation ⚠️ (Work in Progress)
+### 4. Frontmatter Manipulation ✅
 
-Basic CRUD operations implemented, advanced features in progress:
+Full CRUD operations plus advanced features:
 
 - **Library**: `MarkdownDocument+FrontMatterMutation` extension with `getValue`, `setValue`, `hasKey`, `removeValue`
 - **Format conversion**: `YAMLConversion` utilities for JSON, YAML, and PropertyList output
-- **CLI**: `md-utils fm` command with subcommands `get`, `set`, `has`, `remove`, `rename`, `list`, `dump`
+- **CLI**: `md-utils frontmatter` (alias `fm`) with subcommands:
+  - Basic CRUD: `get`, `set`, `has`, `remove`, `rename`, `list`, `dump`
+  - Advanced: `replace`, `search` (JMESPath queries), `sort-keys`, `touch`
+  - Array operations: `array append`, `array contains`, `array prepend`, `array remove`
 - **Dump Feature**: Output entire frontmatter in multiple formats
   - Formats: JSON (default), YAML, raw, PropertyList (XML)
   - Single file: direct output without wrapper
@@ -105,10 +128,6 @@ Basic CRUD operations implemented, advanced features in progress:
 - Works on single files or batch operations across directories
 - Preserves body content and existing frontmatter structure
 - Idempotent operations (remove non-existent key is safe)
-
-**Planned enhancements from FrontRange:**
-- More advanced batch operations
-- Additional structured data extraction capabilities
 
 ### 5. Format Conversion ✅
 
@@ -121,6 +140,10 @@ Convert Markdown to other formats with extensible protocol-based architecture.
 - Configurable block spacing, list indentation, code block preservation
 - Optional frontmatter inclusion
 - Batch processing with recursive directory support
+
+**CSV Conversion:**
+- **Library**: `CSVConverter`, `CSVOptions`
+- **CLI**: `md-utils convert to-csv` command
 
 **Extensible Infrastructure:**
 - Core protocols: `MarkdownConverter`, `MarkdownGenerator`, `ConversionOptions`
@@ -169,16 +192,34 @@ Parse and resolve Obsidian-flavored wikilinks.
 - `links check` - Report broken/ambiguous links, exit with failure if any found
 - `links backlinks` - Find files that link to given targets
 
+### 8. Heading Manipulation ✅
+
+Promote and demote headings while maintaining document structure.
+
+- **Library**: `HeadingAdjuster`, `HeadingAdjusterError`, `HeadingReconstructor`, `HeadingScope`, `MarkdownDocument+HeadingAdjustment`
+- **CLI**: `md-utils headings promote` and `md-utils headings demote`
+
+### 9. Section Operations ✅
+
+Extract and reorder sections in Markdown documents.
+
+- **Extraction Library**: `SectionExtractor`, `SectionBoundaryDetector`, `SectionContent`, `SectionExtractorError`, `MarkdownDocument+SectionExtraction`
+- **Reordering Library**: `SectionReorderer`, `SectionReordererError`, `SectionSiblingFinder`, `MarkdownDocument+SectionReordering`
+- **CLI**: `md-utils extract` (extract sections), `md-utils section move-up/move-down/move-to` (reorder sections)
+
+### 10. Content Selection ✅
+
+Select content by heading or line range.
+
+- **CLI**: `md-utils body` (extract body without frontmatter), `md-utils lines` (extract line ranges), `md-utils extract` (extract by section)
+
 ## Planned Features
 
-The following features are documented in README but **NOT YET IMPLEMENTED**:
+The following features are **NOT YET IMPLEMENTED**:
 
-1. **Heading Manipulation** - Promote/demote headings while maintaining structure (AST foundation ready)
-2. **Section Operations** - Reorder, extract, inject sections (AST foundation ready)
-3. **Content Selection** - Select by heading or line range (AST foundation ready)
-4. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
-5. **Additional Format Conversions** - HTML, RTF, XML (infrastructure ready, plain text implemented)
-6. **File Metadata Writing** - Write/update file metadata (read operations implemented)
+1. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
+2. **Additional Format Conversions** - HTML, RTF, XML (infrastructure ready, plain text and CSV implemented)
+3. **File Metadata Writing** - Write/update file metadata (read operations implemented)
 
 ## Dependencies
 
@@ -189,6 +230,7 @@ The following features are documented in README but **NOT YET IMPLEMENTED**:
 - **swift-argument-parser** (1.6.1+) - CLI argument parsing
 - **PathKit** (1.0.1+) - File path handling
 - **Yams** (6.1.0+) - YAML parsing and serialization
+- **jmespath.swift** (1.0.3+) - JMESPath query language for JSON (used by `fm search`)
 
 ### Transitive Dependencies
 
@@ -200,15 +242,14 @@ The following features are documented in README but **NOT YET IMPLEMENTED**:
 
 ```
 md-utils/
-├── .gitignore
 ├── Package.swift
-├── README
 ├── CLAUDE.md
 ├── docs/                          # Documentation
 │   ├── architecture.md
 │   ├── testing-standards.md
 │   ├── swift-coding-standards.md
 │   ├── cli-patterns.md
+│   ├── common-use-cases.md
 │   └── development-workflow.md
 ├── Sources/
 │   ├── MarkdownUtilities/         # Core library
@@ -235,7 +276,29 @@ md-utils/
 │   │   │   ├── PlainText/
 │   │   │   │   ├── PlainTextOptions.swift
 │   │   │   │   └── PlainTextConverter.swift
+│   │   │   ├── CSV/
+│   │   │   │   ├── CSVConverter.swift
+│   │   │   │   └── CSVOptions.swift
 │   │   │   └── MarkdownDocument+FormatConversion.swift
+│   │   ├── HeadingAdjustment/
+│   │   │   ├── HeadingAdjuster.swift
+│   │   │   ├── HeadingAdjusterError.swift
+│   │   │   ├── HeadingReconstructor.swift
+│   │   │   ├── HeadingScope.swift
+│   │   │   └── MarkdownDocument+HeadingAdjustment.swift
+│   │   ├── SectionExtraction/
+│   │   │   ├── SectionExtractor.swift
+│   │   │   ├── SectionBoundaryDetector.swift
+│   │   │   ├── SectionContent.swift
+│   │   │   ├── SectionExtractorError.swift
+│   │   │   └── MarkdownDocument+SectionExtraction.swift
+│   │   ├── SectionReordering/
+│   │   │   ├── SectionReorderer.swift
+│   │   │   ├── SectionReordererError.swift
+│   │   │   ├── SectionSiblingFinder.swift
+│   │   │   └── MarkdownDocument+SectionReordering.swift
+│   │   ├── Helpers/
+│   │   │   └── LineNumbers.swift
 │   │   ├── FileMetadata/
 │   │   │   ├── FileMetadata.swift
 │   │   │   ├── FileMetadataReader.swift
@@ -254,7 +317,10 @@ md-utils/
 │       ├── GlobalOptions.swift
 │       ├── OutputFormat.swift
 │       ├── Commands/
-│       │   └── GenerateTOC.swift
+│       │   ├── Body.swift
+│       │   ├── ExtractSection.swift
+│       │   ├── GenerateTOC.swift
+│       │   └── Lines.swift
 │       ├── FrontMatterCommands/
 │       │   ├── FrontMatterCommands.swift
 │       │   ├── Get.swift
@@ -262,11 +328,31 @@ md-utils/
 │       │   ├── Has.swift
 │       │   ├── Remove.swift
 │       │   ├── Rename.swift
+│       │   ├── Replace.swift
 │       │   ├── List.swift
-│       │   └── Dump.swift
+│       │   ├── Dump.swift
+│       │   ├── Search.swift
+│       │   ├── SortKeys.swift
+│       │   ├── Touch.swift
+│       │   ├── ArrayCommands.swift
+│       │   ├── ArrayAppend.swift
+│       │   ├── ArrayContains.swift
+│       │   ├── ArrayPrepend.swift
+│       │   ├── ArrayRemove.swift
+│       │   └── ArrayHelpers.swift
+│       ├── HeadingCommands/
+│       │   ├── HeadingCommands.swift
+│       │   ├── PromoteHeading.swift
+│       │   └── DemoteHeading.swift
+│       ├── SectionCommands/
+│       │   ├── SectionCommands.swift
+│       │   ├── MoveSectionUp.swift
+│       │   ├── MoveSectionDown.swift
+│       │   └── MoveSectionTo.swift
 │       ├── ConvertCommands/
 │       │   ├── ConvertCommands.swift
-│       │   └── ToText.swift
+│       │   ├── ToText.swift
+│       │   └── ToCSV.swift
 │       ├── FileMetadataCommands/
 │       │   ├── FileMetadataCommands.swift
 │       │   └── ReadMetadata.swift
@@ -294,18 +380,61 @@ md-utils/
     │   │   ├── Shared/
     │   │   │   ├── PhrasingContentTextExtractorTests.swift
     │   │   │   └── BlockContentTextExtractorTests.swift
-    │   │   └── PlainText/
-    │   │       └── PlainTextConverterTests.swift
-    │   └── FileMetadata/
-    │       ├── FileMetadataTests.swift
-    │       ├── FileMetadataReaderTests.swift
-    │       └── ExtendedAttributesTests.swift
+    │   │   ├── PlainText/
+    │   │   │   └── PlainTextConverterTests.swift
+    │   │   └── CSV/
+    │   │       └── CSVConverterTests.swift
+    │   ├── HeadingAdjustment/
+    │   │   ├── HeadingAdjusterTests.swift
+    │   │   ├── HeadingReconstructorTests.swift
+    │   │   ├── HeadingScopeTests.swift
+    │   │   ├── EdgeCaseTests.swift
+    │   │   └── MarkdownDocumentIntegrationTests.swift
+    │   ├── SectionExtraction/
+    │   │   ├── SectionExtractorTests.swift
+    │   │   ├── SectionBoundaryDetectorTests.swift
+    │   │   └── MarkdownDocumentSectionExtractionTests.swift
+    │   ├── SectionReordering/
+    │   │   ├── SectionReordererTests.swift
+    │   │   ├── SectionSiblingFinderTests.swift
+    │   │   └── MarkdownDocumentSectionReorderingTests.swift
+    │   ├── Helpers/
+    │   │   └── LineNumbersTests.swift
+    │   ├── FileMetadata/
+    │   │   ├── FileMetadataTests.swift
+    │   │   ├── FileMetadataReaderTests.swift
+    │   │   └── ExtendedAttributesTests.swift
+    │   └── Wikilink/
+    │       ├── WikilinkScannerTests.swift
+    │       ├── WikilinkParserTests.swift
+    │       ├── WikilinkResolverTests.swift
+    │       ├── ResolvedWikilinkTests.swift
+    │       └── MarkdownDocumentWikilinkTests.swift
     └── md-utilsTests/
         ├── CLIEntryTests.swift
+        ├── GlobalOptionsTests.swift
         └── Commands/
-            ├── FrontMatterCommandsTests.swift
+            ├── BodyTests.swift
+            ├── ExtractSectionTests.swift
+            ├── LinesTests.swift
+            ├── SectionCommandsTests.swift
+            ├── ToCSVTests.swift
             ├── FileMetadataCommandsTests.swift
-            └── LinkCommandsTests.swift
+            ├── LinkCommandsTests.swift
+            └── FrontMatterCommands/
+                ├── GetTests.swift
+                ├── HasTests.swift
+                ├── SetTests.swift
+                ├── RemoveTests.swift
+                ├── RenameTests.swift
+                ├── ReplaceTests.swift
+                ├── ListTests.swift
+                ├── SearchTests.swift
+                ├── SortKeysTests.swift
+                ├── ArrayAppendTests.swift
+                ├── ArrayContainsTests.swift
+                ├── ArrayPrependTests.swift
+                └── ArrayRemoveTests.swift
 ```
 
 ## Naming Conventions

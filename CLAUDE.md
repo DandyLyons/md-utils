@@ -40,6 +40,7 @@ Detailed guidance organized by topic:
 - **[Swift Coding Standards](docs/swift-coding-standards.md)** - Language-specific rules and safe practices
 - **[CLI Patterns](docs/cli-patterns.md)** - Command structure and argument parsing
 - **[Development Workflow](docs/development-workflow.md)** - Feature addition process and commit checklist
+- **[Common Use Cases](docs/common-use-cases.md)** - CLI usage examples and recipes
 
 ## Status
 

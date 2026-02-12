@@ -86,10 +86,11 @@ struct MarkdownDocumentTests {
 
 ## CLI Testing
 
-When CLI functionality is implemented:
-- Will likely follow FrontRange pattern using Command library
-- Test helpers will go in Tests/md-utilsTests/CLI Test Helpers.swift
-- Temporary file creation utilities for integration tests
+CLI commands are tested in `Tests/md-utilsTests/Commands/`:
+- Each command group has its own test file (e.g., `BodyTests.swift`, `LinesTests.swift`)
+- FrontMatter subcommands have individual test files under `Commands/FrontMatterCommands/`
+- Tests use temporary files and directories for integration testing
+- Follow the same Swift Testing conventions (backtick naming, `#expect`, `try #require`)
 
 ## Test Files
 
