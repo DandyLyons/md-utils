@@ -6,6 +6,37 @@ A collection of utilities for working with Markdown files.
 2. **`md-utils`** — A command-line tool, built on top of `MarkdownUtilities`, for performing various operations on Markdown files.
 3. **`markdown-utilities`** — An Agent Skill for LLMs (planned, not yet implemented).
 
+## Installation
+
+### Using [Mint](https://github.com/yonaskolb/Mint)
+
+```bash
+# Install
+mint install DandyLyons/md-utils
+
+# Run without installing
+mint run DandyLyons/md-utils <command>
+```
+
+### From Source
+
+```bash
+git clone https://github.com/DandyLyons/md-utils.git
+cd md-utils
+swift build -c release
+# Binary will be at .build/release/md-utils
+```
+
+### As a Swift Package Dependency
+
+Add to your `Package.swift`:
+
+```swift
+.package(url: "https://github.com/DandyLyons/md-utils.git", from: "0.1.0")
+```
+
+Then add `"MarkdownUtilities"` to your target's dependencies.
+
 ## Status
 
 This project is currently in early development. Features and APIs may change.
