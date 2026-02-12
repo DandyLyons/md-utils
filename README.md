@@ -11,6 +11,9 @@ A collection of utilities for working with Markdown files.
 ### Using [Mint](https://github.com/yonaskolb/Mint)
 
 ```bash
+# Install mint (if you haven't done so already)
+brew install mint
+
 # Install
 mint install DandyLyons/md-utils
 
