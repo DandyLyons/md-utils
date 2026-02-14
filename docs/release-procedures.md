@@ -16,6 +16,8 @@ Before releasing, complete every item:
 - [ ] `CLAUDE.md` and docs are up to date with any new commands or features
 - [ ] You are on the `main` branch with a clean working tree (`git status` shows nothing)
 - [ ] `main` is up to date with the remote (`git pull`)
+- [ ] `README.md` is updated with any new features or usage instructions
+- [ ] Each help page in the `md-utils` is up to date (`abstract` and `discussion` properties in `Command` conformances are updated)
 
 ## Deciding the Version Number
 
