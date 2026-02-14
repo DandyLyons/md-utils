@@ -156,6 +156,16 @@ Run `swift run md-utils --help` or `swift run md-utils <command> --help` for ful
 - [Yams](https://github.com/jpsim/Yams) — YAML parsing and serialization
 - [jmespath.swift](https://github.com/nicktmro/jmespath.swift) — JMESPath query language for JSON
 
+## Platform Compatibility
+
+**macOS** is the primary development and testing platform. All features are fully supported on macOS.
+
+**Linux**: All dependencies are reported as buildable on Linux ([Swift Package Index](https://swiftpackageindex.com)). The code avoids Apple-only frameworks and the one Darwin-specific feature (extended attributes) is cleanly stubbed out on non-Darwin platforms via `#if canImport(Darwin)`. Some `FileMetadata` fields (e.g. creation date, access date, owner) may return `nil` on Linux due to differences in `swift-corelibs-foundation`. The project has **not been tested on Linux**.
+
+**Windows**: Not currently tested or verified. Compatibility is unknown.
+
+I don't have a Linux or Windows machine to test on, but I'm happy to accept PRs that improve compatibility on other platforms.
+
 ## Contributing
 
 The project is still in its early stages and is not yet open for contributions. If you have a suggestion, please open an issue to discuss it.
