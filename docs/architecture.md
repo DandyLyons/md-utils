@@ -447,10 +447,3 @@ md-utils/
 - Match the file they're testing with "Tests" suffix
 - Example: `MarkdownDocument.swift` → `MarkdownDocumentTests.swift`
 
-## Related Projects
-
-**FrontRange** - Sister project for YAML front matter operations
-- Repository: https://github.com/DandyLyons/FrontRange
-- Local: /Users/daniellyons/Developer/MySwiftPackages/FrontRange
-- md-utils will eventually incorporate FrontRange functionality
-- FrontRange will eventually be obsoleted by this project

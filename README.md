@@ -44,7 +44,7 @@ Then add `"MarkdownUtilities"` to your target's dependencies.
 
 ## Status
 
-This project is currently in early development. Features and APIs may change.
+This project is on a `0.x.x` release and is **not yet API stable**. The API and CLI may change between releases. Breaking changes will be documented in release notes.
 
 ## Features
 

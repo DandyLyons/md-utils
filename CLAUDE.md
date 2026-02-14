@@ -41,8 +41,8 @@ Detailed guidance organized by topic:
 - **[CLI Patterns](docs/cli-patterns.md)** - Command structure and argument parsing
 - **[Development Workflow](docs/development-workflow.md)** - Feature addition process and commit checklist
 - **[Common Use Cases](docs/common-use-cases.md)** - CLI usage examples and recipes
+- **[Release Procedures](docs/release-procedures.md)** - Versioning and release process
 
 ## Status
 
-This project is in **early development**. Many features are work in progress or planned.
-This project is based on an earlier project [FrontRange](https://github.com/DandyLyons/FrontRange) which provides CRUD operations for Markdown files. You can find it at `~/Developer/MySwiftPackages/FrontRange/`. We are currently in the process of porting features from FrontRange into md-utils.
+This project is on a `0.x.x` release and is not yet API stable. Breaking changes will be documented in release notes.

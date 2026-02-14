@@ -2,8 +2,6 @@
 //  FrontMatterEdgeCasesTests.swift
 //  MarkdownUtilitiesTests
 //
-//  Additional edge case tests ported from FrontRange
-//
 
 import Testing
 @testable import MarkdownUtilities

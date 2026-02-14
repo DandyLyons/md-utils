@@ -1,6 +1,6 @@
 # CLI Patterns
 
-## CLI Pattern (Following FrontRange)
+## CLI Pattern
 
 - Each subcommand is a struct conforming to `AsyncParsableCommand`
 - Uses `@OptionGroup var options: GlobalOptions` pattern for shared options
@@ -8,7 +8,7 @@
 
 ## Adding CLI Commands
 
-Pattern to follow (based on FrontRange):
+Pattern to follow:
 
 1. Create Sources/md-utils/Commands/ directory (when needed)
 2. Each command is a struct conforming to `ParsableCommand`
