@@ -1,4 +1,6 @@
 # md-utils
+[![Certified Shovelware](https://justin.searls.co/img/shovelware.svg)](https://justin.searls.co/shovelware/)
+
 
 A collection of utilities for working with Markdown files.
 
