@@ -51,6 +51,31 @@ extension MarkdownDocument {
         return bodyText
     }
 
+    // MARK: - RTF Conversion
+
+    /// Converts the Markdown document to RTF data.
+    ///
+    /// - Parameter options: Configuration options for the conversion (default: .default)
+    /// - Returns: The RTF data representation of the document
+    /// - Throws: Conversion errors if the operation fails
+    public func toRTF(options: RTFOptions = .default) async throws -> Data {
+        let root = try await parseAST()
+        let converter = RTFConverter()
+        return try await converter.convert(from: root, options: options)
+    }
+
+    /// Generates Markdown content from RTF data.
+    ///
+    /// - Parameters:
+    ///   - data: The RTF data to convert
+    ///   - options: Configuration options for the generation (default: .default)
+    /// - Returns: The generated Markdown content
+    /// - Throws: Generation errors if the operation fails
+    public static func fromRTF(data: Data, options: RTFGeneratorOptions = .default) async throws -> String {
+        let generator = RTFGenerator()
+        return try await generator.generate(from: data, options: options)
+    }
+
     // MARK: - Private Helpers
 
     /// Serializes the frontmatter mapping back to YAML format.
@@ -72,14 +97,5 @@ extension MarkdownDocument {
     // /// - Throws: Conversion errors if the operation fails
     // public func toHTML(options: HTMLOptions = .default) async throws -> String {
     //     fatalError("HTML conversion not yet implemented")
-    // }
-
-    // /// Converts the Markdown document to RTF.
-    // ///
-    // /// - Parameter options: Configuration options for RTF conversion
-    // /// - Returns: The RTF data representation of the document
-    // /// - Throws: Conversion errors if the operation fails
-    // public func toRTF(options: RTFOptions = .default) async throws -> Data {
-    //     fatalError("RTF conversion not yet implemented")
     // }
 }
