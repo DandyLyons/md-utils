@@ -1,14 +1,60 @@
 # md-utils
 [![Certified Shovelware](https://justin.searls.co/img/shovelware.svg)](https://justin.searls.co/shovelware/)
 
-
-A collection of utilities for working with Markdown files.
+A collection of utilities for working with Markdown files — from Swift library, to CLI tool, to Agent Skill. Each layer is built on top of the previous one.
 
 1. **`MarkdownUtilities`** — A Swift library for parsing and manipulating Markdown content.
-2. **`md-utils`** — A command-line tool, built on top of `MarkdownUtilities`, for performing various operations on Markdown files.
-3. **`markdown-utilities`** — An Agent Skill for LLMs (planned, not yet implemented).
+2. **`md-utils`** — A command-line tool, built on top of `MarkdownUtilities`, for performing operations on Markdown files.
+3. **`markdown-utilities`** — An Agent Skill for AI coding assistants, built on top of the `md-utils` CLI.
 
-## Installation
+## Agent Skill Installation
+
+The `markdown-utilities` Agent Skill teaches AI coding assistants how to use `md-utils` for Markdown operations. It provides commands, examples, and reference documentation that are loaded on demand.
+
+> **Prerequisite:** Install the `md-utils` CLI first (see [CLI Installation](#cli-installation) below).
+
+### Option A: skills.sh (Recommended)
+
+```bash
+npx skills add https://github.com/DandyLyons/md-utils --skill markdown-utilities
+```
+
+Visit the [skills.sh page](https://skills.sh/dandylyons/md-utils/markdown-utilities) for more details.
+
+### Option B: Claude Code Plugin
+
+**Personal usage** — install the skill just for yourself:
+
+```
+/plugin marketplace add DandyLyons/md-utils
+/plugin install markdown-utilities@md-utils
+```
+
+**Project-wide** — share the skill with your whole team automatically:
+
+Add to `.claude/settings.json` in your project:
+
+```json
+{
+  "enabledPlugins": {
+    "markdown-utilities@md-utils": true
+  },
+  "extraKnownMarketplaces": {
+    "md-utils": {
+      "source": {
+        "source": "github",
+        "repo": "DandyLyons/md-utils"
+      }
+    }
+  }
+}
+```
+
+Team members will be prompted to install the skill when they open the project in Claude Code.
+
+---
+
+## CLI Installation
 
 ### Using [Mint](https://github.com/yonaskolb/Mint)
 
@@ -32,7 +78,11 @@ swift build -c release
 # Binary will be at .build/release/md-utils
 ```
 
-### As a Swift Package Dependency
+---
+
+## Library Installation
+
+### Swift Package Manager
 
 Add to your `Package.swift`:
 
@@ -40,7 +90,18 @@ Add to your `Package.swift`:
 .package(url: "https://github.com/DandyLyons/md-utils.git", from: "0.1.0")
 ```
 
-Then add `"MarkdownUtilities"` to your target's dependencies.
+Then add `"MarkdownUtilities"` to your target's dependencies:
+
+```swift
+.target(
+    name: "YourTarget",
+    dependencies: [
+        .product(name: "MarkdownUtilities", package: "md-utils"),
+    ]
+),
+```
+
+---
 
 ## Status
 
@@ -65,29 +126,6 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 - Markdown flavor validation (CommonMark, GFM, Obsidian)
 - Additional format conversions (HTML, RTF, XML)
 - File metadata writing
-
-## Installation
-
-### Swift Package Manager
-
-Add md-utils as a dependency in your `Package.swift`:
-
-```swift
-dependencies: [
-    .package(url: "https://github.com/DandyLyons/md-utils.git", branch: "main"),
-]
-```
-
-Then add `MarkdownUtilities` to your target's dependencies:
-
-```swift
-.target(
-    name: "YourTarget",
-    dependencies: [
-        .product(name: "MarkdownUtilities", package: "md-utils"),
-    ]
-),
-```
 
 ## CLI Usage
 

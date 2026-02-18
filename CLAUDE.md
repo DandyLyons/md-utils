@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-md-utils is a Swift package for parsing and manipulating Markdown files with a library (MarkdownUtilities) and CLI tool (md-utils).
+md-utils is a Swift package for parsing and manipulating Markdown files. It consists of three layers, each built on the previous:
+
+1. **`MarkdownUtilities`** — A Swift library for parsing and manipulating Markdown content.
+2. **`md-utils`** — A CLI tool built on `MarkdownUtilities`.
+3. **`markdown-utilities`** — An Agent Skill for AI coding assistants, distributed from `skill/markdown-utilities/`, built on the `md-utils` CLI.
 
 ## Requirements
 
