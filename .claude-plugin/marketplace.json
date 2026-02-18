@@ -1,0 +1,25 @@
+{
+  "name": "md-utils",
+  "owner": {
+    "name": "DandyLyons"
+  },
+  "metadata": {
+    "description": "Agent Skills for working with Markdown files using the md-utils CLI.",
+    "pluginRoot": "./skill"
+  },
+  "plugins": [
+    {
+      "name": "markdown-utilities",
+      "source": "./skill/markdown-utilities",
+      "description": "Teaches AI coding assistants to use the md-utils CLI for Markdown operations: frontmatter CRUD, heading manipulation, section extraction, TOC generation, wikilink analysis, and format conversion.",
+      "version": "0.1.0",
+      "author": {
+        "name": "DandyLyons"
+      },
+      "homepage": "https://github.com/DandyLyons/md-utils",
+      "repository": "https://github.com/DandyLyons/md-utils",
+      "license": "MIT",
+      "keywords": ["markdown", "frontmatter", "yaml", "cli", "toc", "wikilinks"]
+    }
+  ]
+}
