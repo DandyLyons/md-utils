@@ -231,7 +231,6 @@ extension CLIEntry.FrontMatterCommands {
     private func processBatch(_ paths: [Path], using expression: JMESExpression) -> (matches: [String], hadErrors: Bool) {
       var matches: [String] = []
       var hadErrors = false
-      let constructor = Yams.Constructor.default
 
       for path in paths {
         // Parse the file
@@ -247,13 +246,14 @@ extension CLIEntry.FrontMatterCommands {
         }
 
         // Convert Yams.Node.Mapping to Swift dictionary for JMESPath
-        // Validate that all keys can be converted to strings to avoid Yams crashes
-        if !isValidMapping(doc.frontMatter) {
-          // Skip files with non-string keys
+        let frontMatterDict: Any
+        do {
+          frontMatterDict = try YAMLConversion.safeNodeToSwiftValue(.mapping(doc.frontMatter))
+        } catch {
+          fputs("warning: \(path): \(error.localizedDescription)\n", stderr)
+          hadErrors = true
           continue
         }
-
-        let frontMatterDict: Any = constructor.any(from: .mapping(doc.frontMatter))
 
         // Evaluate the JMESPath expression
         do {
@@ -269,40 +269,6 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       return (matches, hadErrors)
-    }
-
-    /// Validates that a YAML mapping has only string keys (recursively)
-    /// This prevents crashes in Yams.Constructor.any() which force-unwraps string keys
-    private func isValidMapping(_ mapping: Yams.Node.Mapping) -> Bool {
-      for (key, value) in mapping {
-        // Check if key can be constructed as a string
-        guard case .scalar = key else {
-          return false
-        }
-        guard String.construct(from: key) != nil else {
-          return false
-        }
-
-        // Recursively validate nested mappings
-        if case .mapping(let nestedMapping) = value {
-          if !isValidMapping(nestedMapping) {
-            return false
-          }
-        }
-
-        // Recursively validate sequences containing mappings
-        if case .sequence(let sequence) = value {
-          // Iterate using index since .nodes is private
-          for i in 0..<sequence.count {
-            if case .mapping(let nestedMapping) = sequence[i] {
-              if !isValidMapping(nestedMapping) {
-                return false
-              }
-            }
-          }
-        }
-      }
-      return true
     }
 
     /// Determines if a value is "truthy" for the purposes of filtering

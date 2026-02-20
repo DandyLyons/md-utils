@@ -3,6 +3,7 @@
 //  md-utilsTests
 //
 
+import ArgumentParser
 import Foundation
 import PathKit
 import Testing
@@ -653,6 +654,43 @@ struct SearchTests {
     var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Search)
 
     // Should not throw
+    try await command.run()
+  }
+
+  // MARK: - Non-String Key Tests
+
+  @Test
+  func `search processes file with integer YAML key without crashing`() async throws {
+    // Integer-tagged scalar keys like `123:` are representable as strings ("123")
+    // and must NOT crash — safeNodeToSwiftValue stringifies them safely.
+    let tempDir = try createTempDir()
+    defer { try? tempDir.delete() }
+
+    let goodFile = tempDir + "good.md"
+    let intKeyFile = tempDir + "intkey.md"
+
+    try goodFile.write("""
+      ---
+      draft: true
+      title: Good
+      ---
+      # Good
+      """)
+    try intKeyFile.write("""
+      ---
+      123: value
+      draft: false
+      ---
+      # Int Key
+      """)
+
+    let command_ = try CLIEntry.FrontMatterCommands.Search.parseAsRoot([
+      "draft == `true`",
+      tempDir.string,
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Search)
+
+    // Should succeed — integer key file is processed, good.md matches the query
     try await command.run()
   }
 

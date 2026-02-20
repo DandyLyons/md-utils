@@ -22,6 +22,8 @@ public enum YAMLConversionError: Error {
   case jsonParsingFailed(underlyingError: Error)
   /// Failed to parse plist input
   case plistParsingFailed(underlyingError: Error)
+  /// YAML mapping contains a non-string key that cannot be safely converted
+  case nonStringKey(String)
 }
 
 extension YAMLConversionError: LocalizedError {
@@ -41,6 +43,8 @@ extension YAMLConversionError: LocalizedError {
       return "Failed to parse JSON input: \(underlyingError.localizedDescription)"
     case .plistParsingFailed(let underlyingError):
       return "Failed to parse plist input: \(underlyingError.localizedDescription)"
+    case .nonStringKey(let key):
+      return "YAML mapping contains a non-string key: \(key)"
     }
   }
 }
@@ -59,6 +63,8 @@ extension YAMLConversionError: Equatable {
       case (.jsonParsingFailed, .jsonParsingFailed):
         return true
       case (.plistParsingFailed, .plistParsingFailed):
+        return true
+      case (.nonStringKey, .nonStringKey):
         return true
       default:
         return false
@@ -111,6 +117,33 @@ public enum YAMLConversion {
     try Yams.serialize(node: .mapping(mapping))
   }
 
+  /// Safely convert a Yams.Node to a Swift value.
+  ///
+  /// Unlike `Constructor.any(from:)`, this method throws `YAMLConversionError.nonStringKey`
+  /// instead of crashing when a YAML mapping contains a non-string key.
+  ///
+  /// - Parameter node: The YAML node to convert
+  /// - Returns: A Swift value (`[String: Any]`, `[Any]`, or a scalar)
+  /// - Throws: `YAMLConversionError.nonStringKey` if a mapping key cannot be represented as a String
+  public static func safeNodeToSwiftValue(_ node: Yams.Node) throws -> Any {
+    switch node {
+    case .scalar, .alias:
+      // Scalar and alias construction never force-unwraps mapping keys — safe to delegate
+      return Yams.Constructor.default.any(from: node)
+    case .mapping(let mapping):
+      var result: [String: Any] = [:]
+      for (keyNode, valueNode) in mapping {
+        guard let key = keyNode.string else {
+          throw YAMLConversionError.nonStringKey(String(describing: keyNode))
+        }
+        result[key] = try safeNodeToSwiftValue(valueNode)
+      }
+      return result
+    case .sequence(let sequence):
+      return try sequence.map { try safeNodeToSwiftValue($0) }
+    }
+  }
+
   /// Convert a Yams Node to a JSON string.
   ///
   /// - Parameters:
@@ -119,8 +152,7 @@ public enum YAMLConversion {
   /// - Returns: A JSON string representation
   /// - Throws: `YAMLConversionError.jsonConversionFailed` if conversion fails
   public static func nodeToJSON(_ node: Yams.Node, options: JSONSerialization.WritingOptions = []) throws -> String {
-    let constructor = Yams.Constructor.default
-    let value: Any = constructor.any(from: node)
+    let value: Any = try safeNodeToSwiftValue(node)
     return try anyToJSON(value, options: options)
   }
 
@@ -196,8 +228,7 @@ public enum YAMLConversion {
   /// - Returns: A PropertyList XML string representation
   /// - Throws: `YAMLConversionError.plistConversionFailed` if conversion fails
   public static func nodeToPlist(_ node: Yams.Node) throws -> String {
-    let constructor = Yams.Constructor.default
-    let value: Any = constructor.any(from: node)
+    let value: Any = try safeNodeToSwiftValue(node)
     return try anyToPlist(value)
   }
 

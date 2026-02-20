@@ -148,7 +148,6 @@ extension CLIEntry.FrontMatterCommands {
         }
       } else {
         // Collection mode: single parseable document with $path metadata
-        let constructor = Yams.Constructor.default
         var collection: [[String: Any]] = []
 
         for file in files {
@@ -157,7 +156,7 @@ extension CLIEntry.FrontMatterCommands {
             let doc = try MarkdownDocument(content: content)
             let node = Yams.Node.mapping(doc.frontMatter)
 
-            guard var dict = constructor.any(from: node) as? [String: Any] else {
+            guard var dict = try YAMLConversion.safeNodeToSwiftValue(node) as? [String: Any] else {
               continue
             }
 
