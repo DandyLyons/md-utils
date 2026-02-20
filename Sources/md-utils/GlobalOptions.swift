@@ -46,6 +46,47 @@ struct GlobalOptions: ParsableArguments {
   )
   var noSort: Bool = false
 
+  /// Resolve paths to files with the given default extensions.
+  ///
+  /// Uses `defaultExtensions` instead of the `--extensions` option default
+  /// when the user hasn't explicitly set `--extensions`.
+  ///
+  /// - Parameter defaultExtensions: Comma-separated extensions to use (e.g., "rtf")
+  /// - Returns: Array of file paths to process
+  /// - Throws: If a specified path doesn't exist
+  func resolvedPaths(defaultExtensions: String) throws -> [Path] {
+    let pathsToProcess = paths.isEmpty ? [Path.current] : paths
+
+    var resolvedFiles: [Path] = []
+    let allowedExtensions = Set(defaultExtensions.split(separator: ",").map(String.init))
+
+    for path in pathsToProcess {
+      guard path.exists else {
+        throw ValidationError("Path does not exist: \(path)")
+      }
+
+      if path.isDirectory {
+        let files = try expandDirectory(
+          path,
+          recursive: recursive,
+          includeHidden: includeHidden,
+          extensions: allowedExtensions
+        )
+        resolvedFiles.append(contentsOf: files)
+      } else {
+        if matchesExtension(path, allowedExtensions: allowedExtensions) {
+          resolvedFiles.append(path)
+        }
+      }
+    }
+
+    if !noSort {
+      resolvedFiles.sort { $0.string < $1.string }
+    }
+
+    return resolvedFiles
+  }
+
   /// Resolve paths to actual Markdown files to process.
   ///
   /// Expands directories to their children, applies recursion and hidden file filters,
