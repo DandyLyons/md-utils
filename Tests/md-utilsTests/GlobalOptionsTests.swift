@@ -19,7 +19,8 @@ struct GlobalOptionsTests {
     recursive: Bool = true,
     includeHidden: Bool = false,
     extensions: String = "md,markdown",
-    noSort: Bool = false
+    noSort: Bool = false,
+    exclude: [Path] = []
   ) -> GlobalOptions {
     var options = GlobalOptions()
     options.paths = paths
@@ -27,6 +28,7 @@ struct GlobalOptionsTests {
     options.includeHidden = includeHidden
     options.extensions = extensions
     options.noSort = noSort
+    options.exclude = exclude
     return options
   }
 
@@ -263,5 +265,92 @@ struct GlobalOptionsTests {
     let fileNames = Set(withHidden.map { $0.lastComponent })
     #expect(fileNames.contains("normal.md"))
     #expect(fileNames.contains(".hidden.md"))
+  }
+
+  @Test
+  func `resolvedPaths excludes specified directory`() async throws {
+    let tempDir = Path(NSTemporaryDirectory()) + "md-utils-test-\(UUID().uuidString)"
+    try tempDir.mkpath()
+    defer { try? tempDir.delete() }
+
+    let includeDir = tempDir + "include"
+    let excludeDir = tempDir + "exclude"
+    try includeDir.mkpath()
+    try excludeDir.mkpath()
+
+    try (includeDir + "included.md").write("---\ntitle: Included\n---")
+    try (excludeDir + "excluded.md").write("---\ntitle: Excluded\n---")
+
+    let options = createGlobalOptions(paths: [tempDir], exclude: [excludeDir])
+    let resolved = try options.resolvedPaths()
+
+    #expect(resolved.count == 1)
+    #expect(resolved[0].lastComponent == "included.md")
+  }
+
+  @Test
+  func `resolvedPaths excludes multiple directories`() async throws {
+    let tempDir = Path(NSTemporaryDirectory()) + "md-utils-test-\(UUID().uuidString)"
+    try tempDir.mkpath()
+    defer { try? tempDir.delete() }
+
+    let dir1 = tempDir + "archive"
+    let dir2 = tempDir + "templates"
+    let dir3 = tempDir + "notes"
+    try dir1.mkpath()
+    try dir2.mkpath()
+    try dir3.mkpath()
+
+    try (dir1 + "old.md").write("---\ntitle: Old\n---")
+    try (dir2 + "template.md").write("---\ntitle: Template\n---")
+    try (dir3 + "current.md").write("---\ntitle: Current\n---")
+
+    let options = createGlobalOptions(paths: [tempDir], exclude: [dir1, dir2])
+    let resolved = try options.resolvedPaths()
+
+    #expect(resolved.count == 1)
+    #expect(resolved[0].lastComponent == "current.md")
+  }
+
+  @Test
+  func `resolvedPaths excludes files matching glob pattern`() async throws {
+    let tempDir = Path(NSTemporaryDirectory()) + "md-utils-test-\(UUID().uuidString)"
+    try tempDir.mkpath()
+    defer { try? tempDir.delete() }
+
+    let archiveDir = tempDir + "archive"
+    let notesDir = tempDir + "notes"
+    try archiveDir.mkpath()
+    try notesDir.mkpath()
+
+    try (archiveDir + "old.md").write("---\ntitle: Old\n---")
+    try (notesDir + "current.md").write("---\ntitle: Current\n---")
+
+    // Glob pattern matching all files inside archive/
+    let globPattern = Path(archiveDir.string + "/*")
+    let options = createGlobalOptions(paths: [tempDir], exclude: [globPattern])
+    let resolved = try options.resolvedPaths()
+
+    #expect(resolved.count == 1)
+    #expect(resolved[0].lastComponent == "current.md")
+  }
+
+  @Test
+  func `resolvedPaths excludes single file`() async throws {
+    let tempDir = Path(NSTemporaryDirectory()) + "md-utils-test-\(UUID().uuidString)"
+    try tempDir.mkpath()
+    defer { try? tempDir.delete() }
+
+    let file1 = tempDir + "keep.md"
+    let file2 = tempDir + "skip.md"
+
+    try file1.write("---\ntitle: Keep\n---")
+    try file2.write("---\ntitle: Skip\n---")
+
+    let options = createGlobalOptions(paths: [tempDir], exclude: [file2])
+    let resolved = try options.resolvedPaths()
+
+    #expect(resolved.count == 1)
+    #expect(resolved[0].lastComponent == "keep.md")
   }
 }

@@ -46,6 +46,15 @@ struct GlobalOptions: ParsableArguments {
   )
   var noSort: Bool = false
 
+  /// Paths or glob patterns to exclude from processing.
+  @Option(
+    name: .customLong("exclude"),
+    help: "Paths or glob patterns to exclude from processing (can be repeated)",
+    completion: .file(),
+    transform: { Path($0) }
+  )
+  var exclude: [Path] = []
+
   /// Resolve paths to actual Markdown files to process.
   ///
   /// Expands directories to their children, applies recursion and hidden file filters,
@@ -59,6 +68,7 @@ struct GlobalOptions: ParsableArguments {
 
     var resolvedFiles: [Path] = []
     let allowedExtensions = Set(extensions.split(separator: ",").map(String.init))
+    let excludePatterns = exclude.map { $0.absolute().string }
 
     for path in pathsToProcess {
       guard path.exists else {
@@ -71,12 +81,15 @@ struct GlobalOptions: ParsableArguments {
           path,
           recursive: recursive,
           includeHidden: includeHidden,
-          extensions: allowedExtensions
+          extensions: allowedExtensions,
+          excludePatterns: excludePatterns
         )
         resolvedFiles.append(contentsOf: files)
       } else {
-        // Single file - check if it matches extension filter
-        if matchesExtension(path, allowedExtensions: allowedExtensions) {
+        // Single file - check extension filter and exclusions
+        if matchesExtension(path, allowedExtensions: allowedExtensions)
+          && !isExcluded(path, excludePatterns: excludePatterns)
+        {
           resolvedFiles.append(path)
         }
       }
@@ -95,7 +108,8 @@ struct GlobalOptions: ParsableArguments {
     _ directory: Path,
     recursive: Bool,
     includeHidden: Bool,
-    extensions: Set<String>
+    extensions: Set<String>,
+    excludePatterns: [String]
   ) throws -> [Path] {
     var files: [Path] = []
 
@@ -107,6 +121,11 @@ struct GlobalOptions: ParsableArguments {
         continue
       }
 
+      // Skip excluded paths
+      if isExcluded(child, excludePatterns: excludePatterns) {
+        continue
+      }
+
       if child.isDirectory {
         // Recurse into subdirectory if recursive
         if recursive {
@@ -114,7 +133,8 @@ struct GlobalOptions: ParsableArguments {
             child,
             recursive: recursive,
             includeHidden: includeHidden,
-            extensions: extensions
+            extensions: extensions,
+            excludePatterns: excludePatterns
           )
           files.append(contentsOf: subdirFiles)
         }
@@ -135,5 +155,111 @@ struct GlobalOptions: ParsableArguments {
       return false
     }
     return allowedExtensions.contains(ext)
+  }
+
+  /// Returns true if the path should be excluded based on the exclude patterns.
+  ///
+  /// Non-glob patterns use prefix matching, so a directory path excludes all its contents.
+  /// Glob patterns support `*` (within a path component), `**` (across path components),
+  /// `?` (single character), and `[...]` character classes.
+  private func isExcluded(_ path: Path, excludePatterns: [String]) -> Bool {
+    guard !excludePatterns.isEmpty else { return false }
+    let absolutePathString = path.absolute().string
+
+    for pattern in excludePatterns {
+      let isGlob = pattern.contains("*") || pattern.contains("?") || pattern.contains("[")
+      if isGlob {
+        if matchesGlobPattern(absolutePathString, glob: pattern) {
+          return true
+        }
+      } else {
+        // Normalize trailing slash for directory patterns
+        let normalizedPattern =
+          pattern.hasSuffix("/") ? String(pattern.dropLast()) : pattern
+        // Match exact path or any path nested inside the excluded directory
+        if absolutePathString == normalizedPattern
+          || absolutePathString.hasPrefix(normalizedPattern + "/")
+        {
+          return true
+        }
+      }
+    }
+
+    return false
+  }
+
+  /// Returns true if the path string matches the glob pattern.
+  ///
+  /// Supports:
+  /// - `*` — any characters within a single path component
+  /// - `**/` — zero or more complete path components
+  /// - `**` — any characters including path separators (when not followed by `/`)
+  /// - `?` — any single character within a path component
+  /// - `[...]` — character classes (use `!` after `[` to negate)
+  private func matchesGlobPattern(_ pathString: String, glob: String) -> Bool {
+    let pattern = globToRegex(glob)
+    guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+      return false
+    }
+    let range = NSRange(pathString.startIndex..., in: pathString)
+    return regex.firstMatch(in: pathString, range: range) != nil
+  }
+
+  /// Converts a glob pattern to a regular expression string.
+  private func globToRegex(_ glob: String) -> String {
+    var result = "^"
+    var i = glob.startIndex
+
+    while i < glob.endIndex {
+      let ch = glob[i]
+      let nextIdx = glob.index(after: i)
+
+      switch ch {
+      case "*":
+        if nextIdx < glob.endIndex && glob[nextIdx] == "*" {
+          // Double star: "**"
+          let afterStars = glob.index(after: nextIdx)
+          if afterStars < glob.endIndex && glob[afterStars] == "/" {
+            // "**/" matches zero or more complete path components
+            result += "([^/]+/)*"
+            i = glob.index(after: afterStars)
+          } else {
+            // "**" at end or before non-"/": match any characters including separators
+            result += ".*"
+            i = afterStars
+          }
+        } else {
+          // Single "*": match any characters within a path component
+          result += "[^/]*"
+          i = nextIdx
+        }
+      case "?":
+        result += "[^/]"
+        i = nextIdx
+      case "[":
+        var charClass = "["
+        i = nextIdx
+        // Handle negation
+        if i < glob.endIndex && glob[i] == "!" {
+          charClass += "^"
+          i = glob.index(after: i)
+        }
+        while i < glob.endIndex && glob[i] != "]" {
+          charClass += NSRegularExpression.escapedPattern(for: String(glob[i]))
+          i = glob.index(after: i)
+        }
+        charClass += "]"
+        result += charClass
+        if i < glob.endIndex {
+          i = glob.index(after: i)  // consume "]"
+        }
+      default:
+        result += NSRegularExpression.escapedPattern(for: String(ch))
+        i = nextIdx
+      }
+    }
+
+    result += "$"
+    return result
   }
 }
