@@ -35,17 +35,27 @@ extension CLIEntry.FrontMatterCommands {
         throw ValidationError("No Markdown files found to process")
       }
 
-      for file in files {
-        let content: String = try file.read()
-        let doc = try MarkdownDocument(content: content)
-        let exists = doc.hasKey(key)
+      var hasErrors = false
 
-        if files.count > 1 {
-          print("\(file): \(exists)")
-        } else {
-          print(exists)
+      for file in files {
+        do {
+          let content: String = try file.read()
+          let doc = try MarkdownDocument(content: content)
+          let exists = doc.hasKey(key)
+
+          if files.count > 1 {
+            print("\(file): \(exists)")
+          } else {
+            print(exists)
+          }
+        } catch {
+          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          hasErrors = true
+          continue
         }
       }
+
+      if hasErrors { throw ExitCode.failure }
     }
   }
 }

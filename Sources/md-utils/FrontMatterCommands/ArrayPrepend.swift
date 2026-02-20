@@ -60,29 +60,39 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         throw ValidationError("No Markdown files found to process")
       }
 
+      var hasErrors = false
+
       for path in paths {
-        // Parse file
-        let content: String = try path.read()
-        var doc = try MarkdownDocument(content: content)
+        do {
+          // Parse file
+          let content: String = try path.read()
+          var doc = try MarkdownDocument(content: content)
 
-        // Get array (creates empty if doesn't exist, errors if not an array)
-        let sequence = try ArrayHelpers.getOrCreateArrayKey(key, in: doc, path: path)
+          // Get array (creates empty if doesn't exist, errors if not an array)
+          let sequence = try ArrayHelpers.getOrCreateArrayKey(key, in: doc, path: path)
 
-        // Check for duplicates if requested
-        if skipDuplicates {
-          if ArrayHelpers.containsValue(value, in: sequence, caseInsensitive: caseInsensitive) {
-            continue
+          // Check for duplicates if requested
+          if skipDuplicates {
+            if ArrayHelpers.containsValue(value, in: sequence, caseInsensitive: caseInsensitive) {
+              continue
+            }
           }
+
+          // Prepend value
+          let updatedSequence = ArrayHelpers.prepend(value: value, to: sequence)
+          doc.frontMatter[key] = .sequence(updatedSequence)
+
+          // Write back
+          let updatedContent = try doc.render()
+          try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
+        } catch {
+          fputs("error: \(path): \(error.localizedDescription)\n", stderr)
+          hasErrors = true
+          continue
         }
-
-        // Prepend value
-        let updatedSequence = ArrayHelpers.prepend(value: value, to: sequence)
-        doc.frontMatter[key] = .sequence(updatedSequence)
-
-        // Write back
-        let updatedContent = try doc.render()
-        try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
       }
+
+      if hasErrors { throw ExitCode.failure }
     }
   }
 }

@@ -68,6 +68,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
     mutating func run() async throws {
       var matchingFiles: [String] = []
+      var hasErrors = false
       let paths = try options.resolvedPaths()
 
       guard !paths.isEmpty else {
@@ -82,6 +83,8 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           content = try path.read()
           doc = try MarkdownDocument(content: content)
         } catch {
+          fputs("error: \(path): \(error.localizedDescription)\n", stderr)
+          hasErrors = true
           continue
         }
 
@@ -106,6 +109,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
       // 5. Output results
       try outputResults(matchingFiles)
+      if hasErrors { throw ExitCode.failure }
     }
 
     private func outputResults(_ matchingFiles: [String]) throws {

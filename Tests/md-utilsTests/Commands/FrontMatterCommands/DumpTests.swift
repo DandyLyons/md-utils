@@ -8,6 +8,7 @@ import Foundation
 import PathKit
 @testable import md_utils
 import MarkdownUtilities
+import ArgumentParser
 
 @Suite("fm dump command")
 struct DumpTests {
@@ -177,6 +178,47 @@ struct DumpTests {
 
     // Single file always outputs directly regardless of --cat-headers
     try await command.run()
+  }
+
+  // MARK: - Invalid YAML Error Handling Tests
+
+  @Test
+  func `batch dump skips file with invalid YAML and exits with failure`() async throws {
+    let tempDir = Path(NSTemporaryDirectory()) + "md-utils-invalid-yaml-\(UUID().uuidString)"
+    try tempDir.mkpath()
+    defer { try? tempDir.delete() }
+
+    let goodFile = tempDir + "good.md"
+    let badFile = tempDir + "bad.md"
+
+    try goodFile.write("""
+    ---
+    title: Good File
+    ---
+    Body
+    """)
+    // Invalid YAML: unclosed array bracket
+    try badFile.write("""
+    ---
+    key: [unclosed
+    ---
+    Body
+    """)
+
+    let command_ = try CLIEntry.FrontMatterCommands.Dump.parseAsRoot([
+      goodFile.string, badFile.string
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Dump)
+
+    // Should skip the bad file and exit with failure, not propagate the raw YAML error
+    do {
+      try await command.run()
+      Issue.record("Expected ExitCode.failure to be thrown")
+    } catch let code as ExitCode {
+      #expect(code == ExitCode.failure)
+    } catch {
+      Issue.record("Expected ExitCode, got: \(error)")
+    }
   }
 
   // MARK: - Test Helpers

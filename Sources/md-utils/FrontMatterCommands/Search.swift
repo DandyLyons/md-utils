@@ -140,7 +140,7 @@ extension CLIEntry.FrontMatterCommands {
       let processedPaths = try expandPaths(paths: paths)
 
       // Process files in batches of 500
-      let matchingFiles = processBatches(
+      let (matchingFiles, hadErrors) = processBatches(
         processedPaths,
         batchSize: 500,
         using: expression
@@ -165,6 +165,8 @@ extension CLIEntry.FrontMatterCommands {
           try printAny(matchingFiles, format: .plist)
         }
       }
+
+      if hadErrors { throw ExitCode.failure }
     }
 
     /// Expand paths with recursive directory traversal and extension filtering
@@ -204,8 +206,9 @@ extension CLIEntry.FrontMatterCommands {
       _ paths: [Path],
       batchSize: Int = 500,
       using expression: JMESExpression
-    ) -> [String] {
+    ) -> (matches: [String], hadErrors: Bool) {
       var allMatches: [String] = []
+      var hadErrors = false
       let totalBatches = (paths.count + batchSize - 1) / batchSize
 
       for (batchIndex, batch) in paths.chunked(into: batchSize).enumerated() {
@@ -216,16 +219,18 @@ extension CLIEntry.FrontMatterCommands {
           fputs("Processing batch \(batchNumber)/\(totalBatches)...\n", stderr)
         }
 
-        let batchMatches = processBatch(batch, using: expression)
+        let (batchMatches, batchHadErrors) = processBatch(batch, using: expression)
         allMatches.append(contentsOf: batchMatches)
+        hadErrors = hadErrors || batchHadErrors
       }
 
-      return allMatches
+      return (allMatches, hadErrors)
     }
 
     /// Process a single batch of files
-    private func processBatch(_ paths: [Path], using expression: JMESExpression) -> [String] {
+    private func processBatch(_ paths: [Path], using expression: JMESExpression) -> (matches: [String], hadErrors: Bool) {
       var matches: [String] = []
+      var hadErrors = false
       let constructor = Yams.Constructor.default
 
       for path in paths {
@@ -236,7 +241,8 @@ extension CLIEntry.FrontMatterCommands {
           content = try path.read(.utf8)
           doc = try MarkdownDocument(content: content)
         } catch {
-          // Silently skip files that can't be parsed
+          fputs("error: \(path): \(error.localizedDescription)\n", stderr)
+          hadErrors = true
           continue
         }
 
@@ -262,7 +268,7 @@ extension CLIEntry.FrontMatterCommands {
         }
       }
 
-      return matches
+      return (matches, hadErrors)
     }
 
     /// Validates that a YAML mapping has only string keys (recursively)

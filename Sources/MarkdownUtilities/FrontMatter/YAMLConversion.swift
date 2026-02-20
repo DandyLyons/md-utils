@@ -11,7 +11,7 @@ import Yams
 /// Error types for YAML conversion
 public enum YAMLConversionError: Error {
   /// The YAML string could not be parsed into a valid Yams `Node`.
-  case invalidYAML
+  case invalidYAML(underlyingError: Error)
   /// The root object of the YAML string is not a mapping (dictionary).
   case notAMapping
   /// Failed to convert to JSON format
@@ -24,11 +24,32 @@ public enum YAMLConversionError: Error {
   case plistParsingFailed(underlyingError: Error)
 }
 
+extension YAMLConversionError: LocalizedError {
+  public var errorDescription: String? {
+    switch self {
+    case .invalidYAML(let underlyingError):
+      let detail = (underlyingError as? CustomStringConvertible)?.description
+        ?? underlyingError.localizedDescription
+      return "Invalid YAML frontmatter: \(detail)"
+    case .notAMapping:
+      return "Frontmatter must be a YAML mapping (dictionary)"
+    case .jsonConversionFailed:
+      return "Failed to convert frontmatter to JSON"
+    case .plistConversionFailed:
+      return "Failed to convert frontmatter to PropertyList"
+    case .jsonParsingFailed(let underlyingError):
+      return "Failed to parse JSON input: \(underlyingError.localizedDescription)"
+    case .plistParsingFailed(let underlyingError):
+      return "Failed to parse plist input: \(underlyingError.localizedDescription)"
+    }
+  }
+}
+
 extension YAMLConversionError: Equatable {
   public static func == (lhs: YAMLConversionError, rhs: YAMLConversionError) -> Bool {
     switch (lhs, rhs) {
       case (.invalidYAML, .invalidYAML):
-        return true
+        return true  // underlying errors are not compared
       case (.notAMapping, .notAMapping):
         return true
       case (.jsonConversionFailed, .jsonConversionFailed):
@@ -51,7 +72,7 @@ public enum YAMLConversion {
   ///
   /// - Parameter yamlString: The YAML content to parse
   /// - Returns: A `Yams.Node.Mapping` representing the parsed YAML
-  /// - Throws: `YAMLConversionError.invalidYAML` if the YAML syntax is invalid,
+  /// - Throws: `YAMLConversionError.invalidYAML(underlyingError:)` if the YAML syntax is invalid,
   ///           or `YAMLConversionError.notAMapping` if the root is not a mapping
   public static func parse(_ yamlString: String) throws -> Yams.Node.Mapping {
     // Handle empty or whitespace-only input as valid empty frontmatter
@@ -61,8 +82,16 @@ public enum YAMLConversion {
     }
 
     // Parse YAML string to Node
-    guard let node = try? Yams.compose(yaml: yamlString) else {
-      throw YAMLConversionError.invalidYAML
+    let node: Yams.Node
+    do {
+      guard let parsed = try Yams.compose(yaml: yamlString) else {
+        throw YAMLConversionError.notAMapping
+      }
+      node = parsed
+    } catch let error as YAMLConversionError {
+      throw error
+    } catch {
+      throw YAMLConversionError.invalidYAML(underlyingError: error)
     }
 
     // Verify the root is a mapping (dictionary)
