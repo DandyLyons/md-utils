@@ -47,27 +47,33 @@ extension CLIEntry.FrontMatterCommands {
       var hasErrors = false
 
       for file in files {
-        let content: String = try file.read()
-        let doc = try MarkdownDocument(content: content)
+        do {
+          let content: String = try file.read()
+          let doc = try MarkdownDocument(content: content)
 
-        guard let value = doc.getValue(forKey: key) else {
-          if files.count > 1 {
-            print("\(file): <missing>")
+          guard let value = doc.getValue(forKey: key) else {
+            if files.count > 1 {
+              print("\(file): <missing>")
+            }
+            hasErrors = true
+            continue
           }
+
+          // Print value (use .string for scalars, format for complex types)
+          let stringValue = formatNodeValue(value, format: format)
+          if files.count > 1 {
+            print("\(file): \(stringValue)")
+          } else {
+            print(stringValue)
+          }
+        } catch {
+          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
           hasErrors = true
           continue
         }
-
-        // Print value (use .string for scalars, format for complex types)
-        let stringValue = formatNodeValue(value, format: format)
-        if files.count > 1 {
-          print("\(file): \(stringValue)")
-        } else {
-          print(stringValue)
-        }
       }
 
-      // Exit with error code if any keys were missing
+      // Exit with error code if any keys were missing or files had invalid YAML
       if hasErrors {
         throw ExitCode.failure
       }

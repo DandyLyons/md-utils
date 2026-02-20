@@ -8,6 +8,7 @@ import Foundation
 import PathKit
 @testable import md_utils
 import MarkdownUtilities
+import ArgumentParser
 
 @Suite("fm set command")
 struct SetTests {
@@ -133,6 +134,57 @@ struct SetTests {
 
     #expect(doc1.getValue(forKey: "category")?.string == "Tutorial")
     #expect(doc2.getValue(forKey: "category")?.string == "Tutorial")
+  }
+
+  // MARK: - Invalid YAML Error Handling Tests
+
+  @Test
+  func `batch set skips file with invalid YAML processes valid files and exits with failure`() async throws {
+    let validContent = """
+    ---
+    title: Valid File
+    ---
+    Body
+    """
+    // Invalid YAML: unclosed array bracket
+    let invalidContent = """
+    ---
+    key: [unclosed
+    ---
+    Body
+    """
+
+    let validFile = try createTempFile(content: validContent, name: "valid.md")
+    let invalidFile = try createTempFile(content: invalidContent, name: "invalid.md")
+    defer {
+      try? validFile.delete()
+      try? invalidFile.delete()
+    }
+
+    let command_ = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
+      "--key", "status",
+      "--value", "processed",
+      validFile.string, invalidFile.string
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Set)
+
+    // Should throw ExitCode.failure, not propagate the raw YAML error
+    do {
+      try await command.run()
+      Issue.record("Expected ExitCode.failure to be thrown")
+    } catch let code as ExitCode {
+      #expect(code == ExitCode.failure)
+    } catch {
+      Issue.record("Expected ExitCode, got: \(error)")
+    }
+
+    // Valid file should have been processed despite the error on the invalid file
+    let updatedDoc = try MarkdownDocument(content: try validFile.read())
+    #expect(updatedDoc.getValue(forKey: "status")?.string == "processed")
+
+    // Invalid file should be unchanged (parse failed before write)
+    let invalidFileContent: String = try invalidFile.read()
+    #expect(invalidFileContent == invalidContent)
   }
 
   // MARK: - Test Helpers

@@ -49,6 +49,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     mutating func run() async throws {
       var processedCount = 0
       var skippedCount = 0
+      var hasErrors = false
       let paths = try options.resolvedPaths()
 
       guard !paths.isEmpty else {
@@ -56,40 +57,48 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       }
 
       for path in paths {
-        // Parse file
-        let content: String = try path.read()
-        var doc = try MarkdownDocument(content: content)
+        do {
+          // Parse file
+          let content: String = try path.read()
+          var doc = try MarkdownDocument(content: content)
 
-        // Validate array exists
-        let sequence = try ArrayHelpers.validateArrayKey(key, in: doc, path: path)
+          // Validate array exists
+          let sequence = try ArrayHelpers.validateArrayKey(key, in: doc, path: path)
 
-        // Attempt to remove value
-        guard let updatedSequence = ArrayHelpers.removeFirst(
-          value: value,
-          from: sequence,
-          caseInsensitive: caseInsensitive
-        ) else {
-          skippedCount += 1
+          // Attempt to remove value
+          guard let updatedSequence = ArrayHelpers.removeFirst(
+            value: value,
+            from: sequence,
+            caseInsensitive: caseInsensitive
+          ) else {
+            skippedCount += 1
+            continue
+          }
+
+          doc.frontMatter[key] = .sequence(updatedSequence)
+
+          // Write back
+          let updatedContent = try doc.render()
+          try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
+          processedCount += 1
+        } catch {
+          fputs("error: \(path): \(error.localizedDescription)\n", stderr)
+          hasErrors = true
           continue
         }
-
-        doc.frontMatter[key] = .sequence(updatedSequence)
-
-        // Write back
-        let updatedContent = try doc.render()
-        try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
-        processedCount += 1
       }
 
       // Summary output (to stderr, doesn't interfere with piping)
-      if processedCount == 0 {
+      if processedCount == 0 && !hasErrors {
         fputs("No files were modified (value '\(value)' not found in any arrays)\n", stderr)
-      } else {
+      } else if processedCount > 0 {
         fputs("Updated \(processedCount) file(s)\n", stderr)
         if skippedCount > 0 {
           fputs("Skipped \(skippedCount) file(s) where value was not found\n", stderr)
         }
       }
+
+      if hasErrors { throw ExitCode.failure }
     }
   }
 }

@@ -46,15 +46,25 @@ extension CLIEntry.FrontMatterCommands {
         throw ValidationError("No Markdown files found to process")
       }
 
+      var hasErrors = false
+
       for file in files {
-        let content: String = try file.read()
-        var doc = try MarkdownDocument(content: content)
+        do {
+          let content: String = try file.read()
+          var doc = try MarkdownDocument(content: content)
 
-        try doc.renameKey(from: key, to: newKey)
+          try doc.renameKey(from: key, to: newKey)
 
-        let updated = try doc.render()
-        try file.write(updated)
+          let updated = try doc.render()
+          try file.write(updated)
+        } catch {
+          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          hasErrors = true
+          continue
+        }
       }
+
+      if hasErrors { throw ExitCode.failure }
     }
   }
 }

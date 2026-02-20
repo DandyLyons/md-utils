@@ -97,27 +97,7 @@ extension CLIEntry.FrontMatterCommands {
       // Single file: output directly
       if !isMultipleFiles {
         let file = files[0]
-        let content: String = try file.read()
-        let doc = try MarkdownDocument(content: content)
-
-        if includeDelimiters && (format == .yaml || format == .raw) {
-          Swift.print("---")
-        }
-
-        try print(node: .mapping(doc.frontMatter), format: format)
-
-        if includeDelimiters && (format == .yaml || format == .raw) {
-          Swift.print("---")
-        }
-        return
-      }
-
-      // Multiple files
-      if catHeaders {
-        // Cat-style output with headers
-        for (index, file) in files.enumerated() {
-          Swift.print("==> \(file) <==")
-
+        do {
           let content: String = try file.read()
           let doc = try MarkdownDocument(content: content)
 
@@ -129,6 +109,36 @@ extension CLIEntry.FrontMatterCommands {
 
           if includeDelimiters && (format == .yaml || format == .raw) {
             Swift.print("---")
+          }
+        } catch {
+          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          throw ExitCode.failure
+        }
+        return
+      }
+
+      // Multiple files
+      var hasErrors = false
+      if catHeaders {
+        // Cat-style output with headers
+        for (index, file) in files.enumerated() {
+          Swift.print("==> \(file) <==")
+          do {
+            let content: String = try file.read()
+            let doc = try MarkdownDocument(content: content)
+
+            if includeDelimiters && (format == .yaml || format == .raw) {
+              Swift.print("---")
+            }
+
+            try print(node: .mapping(doc.frontMatter), format: format)
+
+            if includeDelimiters && (format == .yaml || format == .raw) {
+              Swift.print("---")
+            }
+          } catch {
+            fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+            hasErrors = true
           }
 
           // Add empty line between files (except after last file)
@@ -142,20 +152,26 @@ extension CLIEntry.FrontMatterCommands {
         var collection: [[String: Any]] = []
 
         for file in files {
-          let content: String = try file.read()
-          let doc = try MarkdownDocument(content: content)
-          let node = Yams.Node.mapping(doc.frontMatter)
+          do {
+            let content: String = try file.read()
+            let doc = try MarkdownDocument(content: content)
+            let node = Yams.Node.mapping(doc.frontMatter)
 
-          guard var dict = constructor.any(from: node) as? [String: Any] else {
-            continue
+            guard var dict = constructor.any(from: node) as? [String: Any] else {
+              continue
+            }
+
+            dict["$path"] = file.string
+            collection.append(dict)
+          } catch {
+            fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+            hasErrors = true
           }
-
-          dict["$path"] = file.string
-          collection.append(dict)
         }
 
         try printAny(collection, format: format)
       }
+      if hasErrors { throw ExitCode.failure }
     }
   }
 }

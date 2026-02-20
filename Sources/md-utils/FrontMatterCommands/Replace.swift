@@ -109,7 +109,7 @@ extension CLIEntry.FrontMatterCommands {
             newFrontMatter = try YAMLConversion.parsePlist(dataString)
         }
       } catch let error as YAMLConversionError {
-        throw ValidationError(formatError(error))
+        throw ValidationError(error.localizedDescription)
       }
 
       // Process each file
@@ -119,9 +119,19 @@ extension CLIEntry.FrontMatterCommands {
         throw ValidationError("No Markdown files found to process")
       }
 
+      var hasErrors = false
+
       for file in files {
-        try replaceInFile(path: file, newFrontMatter: newFrontMatter)
+        do {
+          try replaceInFile(path: file, newFrontMatter: newFrontMatter)
+        } catch {
+          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          hasErrors = true
+          continue
+        }
       }
+
+      if hasErrors { throw ExitCode.failure }
     }
 
     private func replaceInFile(path: Path, newFrontMatter: Yams.Node.Mapping) throws {
@@ -155,21 +165,5 @@ extension CLIEntry.FrontMatterCommands {
       print("✓ Replaced frontmatter in '\(path)'")
     }
 
-    private func formatError(_ error: YAMLConversionError) -> String {
-      switch error {
-        case .invalidYAML:
-          return "Invalid YAML format"
-        case .notAMapping:
-          return "Frontmatter must be a dictionary/mapping, not an array or scalar"
-        case .jsonConversionFailed:
-          return "Failed to convert to JSON format"
-        case .plistConversionFailed:
-          return "Failed to convert to plist format"
-        case .jsonParsingFailed(let underlyingError):
-          return "Failed to parse JSON: \(underlyingError.localizedDescription)"
-        case .plistParsingFailed(let underlyingError):
-          return "Failed to parse plist: \(underlyingError.localizedDescription)"
-      }
-    }
   }
 }

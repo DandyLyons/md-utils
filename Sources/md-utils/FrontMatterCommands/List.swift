@@ -33,34 +33,44 @@ extension CLIEntry.FrontMatterCommands {
         throw ValidationError("No Markdown files found to process")
       }
 
+      var hasErrors = false
+
       for file in files {
-        let content: String = try file.read()
-        let doc = try MarkdownDocument(content: content)
+        do {
+          let content: String = try file.read()
+          let doc = try MarkdownDocument(content: content)
 
-        // Extract keys from frontmatter
-        let keys = Array(doc.frontMatter.keys)
-          .compactMap { $0.string }
-          .sorted()
+          // Extract keys from frontmatter
+          let keys = Array(doc.frontMatter.keys)
+            .compactMap { $0.string }
+            .sorted()
 
-        // Print keys
-        if keys.isEmpty {
-          print("  (no frontmatter keys)")
-          return
-        }
-        if files.count > 1 {
-          // Multiple files: prefix with filename
-          print("======================")
-          print("\(file):")
-          for key in keys {
-            print("  \(key)")
+          // Print keys
+          if keys.isEmpty {
+            print("  (no frontmatter keys)")
+            return
           }
-        } else {
-          // Single file: just list keys
-          for key in keys {
-            print(key)
+          if files.count > 1 {
+            // Multiple files: prefix with filename
+            print("======================")
+            print("\(file):")
+            for key in keys {
+              print("  \(key)")
+            }
+          } else {
+            // Single file: just list keys
+            for key in keys {
+              print(key)
+            }
           }
+        } catch {
+          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          hasErrors = true
+          continue
         }
       }
+
+      if hasErrors { throw ExitCode.failure }
     }
   }
 }
