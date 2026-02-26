@@ -278,8 +278,8 @@ struct TableNormalizerTests {
         #expect(result == input)
     }
 
-    @Test("Leaves content in fenced code blocks unchanged")
-    func fencedCodePreserved() {
+    @Test("Normalizes tables inside fenced code blocks")
+    func normalizesTablesInFencedCodeBlocks() {
         let input = """
             ```
             | not | a | table |
@@ -287,7 +287,52 @@ struct TableNormalizerTests {
             ```
             """
         let result = TableNormalizer.normalize(input)
-        #expect(result == input)
+        let lines = result.components(separatedBy: "\n")
+        // Fence markers are preserved
+        #expect(lines[0] == "```")
+        #expect(lines[3] == "```")
+        // Table inside is normalized: all content rows have the same width
+        #expect(lines[1].count == lines[2].count)
+        // Separator contains only dashes and pipes
+        let sepChars = lines[2].filter { !$0.isWhitespace && $0 != "|" }
+        #expect(sepChars.allSatisfy { $0 == "-" })
+    }
+
+    @Test("Caps column padding at maxWidth")
+    func maxWidthCapsColumnPadding() {
+        // Column 2 has max content width of 5 ("hello"), but maxWidth = 3
+        // So column 2 width = min(5, 3) = 3
+        // "hello" (5 chars) > 3 → padded to max(3, 5) = 5, no truncation
+        // "hi" (2 chars) < 3 → padded to max(3, 2) = 3
+        let input = """
+            | a | hello |
+            | - | ----- |
+            | b | hi |
+            """
+        let result = TableNormalizer.normalize(input, maxWidth: 3)
+        let lines = result.components(separatedBy: "\n")
+        #expect(lines[0].contains("hello"))   // content preserved, not truncated
+        #expect(lines[2].contains("| hi  |")) // "hi" padded to 3 chars
+    }
+
+    @Test("Does not truncate cell content exceeding maxWidth")
+    func cellContentNotTruncatedBeyondMaxWidth() {
+        let longCell = String(repeating: "x", count: 100)
+        let input = "| \(longCell) |\n| --- |\n| short |"
+        let result = TableNormalizer.normalize(input, maxWidth: 10)
+        #expect(result.contains(longCell))
+    }
+
+    @Test("Default maxWidth matches explicit maxWidth of 80")
+    func defaultMaxWidthIs80() {
+        let input = """
+            | Name | Score |
+            | ---- | ----- |
+            | Alice | 100 |
+            """
+        let defaultResult = TableNormalizer.normalize(input)
+        let explicitResult = TableNormalizer.normalize(input, maxWidth: 80)
+        #expect(defaultResult == explicitResult)
     }
 
     @Test("Output is idempotent (second pass does not change result)")
