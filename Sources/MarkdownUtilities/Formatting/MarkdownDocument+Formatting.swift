@@ -13,14 +13,21 @@ public struct FormattingOptions: Sendable {
     /// When `true`, GFM tables are reformatted so that columns align vertically.
     public var normalizeTables: Bool
 
+    /// Maximum column width (in characters) when normalizing tables.
+    /// Columns are padded to at most this width; cells whose content already
+    /// exceeds this value are never truncated. Defaults to `80`.
+    public var tableMaxWidth: Int
+
     public init(
         bulletMarker: BulletNormalizer.Marker? = nil,
         italicMarker: ItalicNormalizer.Marker? = nil,
-        normalizeTables: Bool = false
+        normalizeTables: Bool = false,
+        tableMaxWidth: Int = 80
     ) {
         self.bulletMarker = bulletMarker
         self.italicMarker = italicMarker
         self.normalizeTables = normalizeTables
+        self.tableMaxWidth = tableMaxWidth
     }
 }
 
@@ -54,7 +61,7 @@ extension MarkdownDocument {
 
         // --- Table normalization ---
         if options.normalizeTables {
-            result = TableNormalizer.normalize(result)
+            result = TableNormalizer.normalize(result, maxWidth: options.tableMaxWidth)
         }
 
         let fullContent = try reconstructFullDocument(frontMatter: frontMatter, body: result)

@@ -7,30 +7,20 @@ public enum TableNormalizer {
     /// Normalizes table formatting in `content`.
     ///
     /// Detects GFM tables (rows containing `|`), pads each cell to the column's maximum
-    /// width, and reconstructs aligned rows. Content inside fenced code blocks is skipped.
+    /// width, and reconstructs aligned rows. Tables inside fenced code blocks are also
+    /// normalized. Column widths are capped at `maxWidth` to prevent excessively wide rows;
+    /// cells whose content already exceeds `maxWidth` are never truncated.
     ///
-    /// - Parameter content: The Markdown body text to normalize
+    /// - Parameters:
+    ///   - content: The Markdown body text to normalize
+    ///   - maxWidth: Maximum width (in characters) to which any column is padded. Defaults to `80`.
     /// - Returns: The normalized content string with padded table columns
-    public static func normalize(_ content: String) -> String {
+    public static func normalize(_ content: String, maxWidth: Int = 80) -> String {
         var lines = content.components(separatedBy: "\n")
-        var inFencedCodeBlock = false
         var i = 0
 
         while i < lines.count {
             let line = lines[i]
-
-            // Track fenced code block boundaries
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                inFencedCodeBlock.toggle()
-                i += 1
-                continue
-            }
-
-            if inFencedCodeBlock {
-                i += 1
-                continue
-            }
 
             // Detect start of a table block (non-empty line containing |)
             if !line.isEmpty && isTableLine(line) {
@@ -44,7 +34,7 @@ public enum TableNormalizer {
 
                 // Normalize the table block
                 let tableLines = Array(lines[tableRange])
-                let normalized = normalizeTable(tableLines)
+                let normalized = normalizeTable(tableLines, maxWidth: maxWidth)
                 lines.replaceSubrange(tableRange, with: normalized)
 
                 // Advance past the table block
@@ -68,7 +58,7 @@ public enum TableNormalizer {
     ///
     /// If the block does not have a valid separator row at index 1, the lines are
     /// returned unchanged.
-    private static func normalizeTable(_ tableLines: [String]) -> [String] {
+    private static func normalizeTable(_ tableLines: [String], maxWidth: Int) -> [String] {
         guard tableLines.count >= 2 else { return tableLines }
 
         // Split each row into cells
@@ -87,8 +77,8 @@ public enum TableNormalizer {
             return row + Array(repeating: "", count: colCount - row.count)
         }
 
-        // Compute the maximum trimmed cell width per column
-        let widths = columnWidths(for: paddedRows)
+        // Compute the maximum trimmed cell width per column, capped at maxWidth
+        let widths = columnWidths(for: paddedRows, maxWidth: maxWidth)
 
         // Reconstruct each row
         return paddedRows.enumerated().map { (rowIndex, cells) in
@@ -130,8 +120,10 @@ public enum TableNormalizer {
         }
     }
 
-    /// Computes the maximum trimmed cell content width per column across all rows.
-    private static func columnWidths(for rows: [[String]]) -> [Int] {
+    /// Computes the maximum trimmed cell content width per column across all rows,
+    /// capped at `maxWidth`. Individual cells wider than `maxWidth` are still rendered
+    /// at their natural content width (see `reconstructRow`).
+    private static func columnWidths(for rows: [[String]], maxWidth: Int) -> [Int] {
         guard let colCount = rows.map(\.count).max(), colCount > 0 else { return [] }
 
         var widths = Array(repeating: 0, count: colCount)
@@ -149,7 +141,7 @@ public enum TableNormalizer {
                 widths[col] = max(widths[col], cellWidth)
             }
         }
-        return widths
+        return widths.map { min($0, maxWidth) }
     }
 
     /// Reconstructs a single table row with cells padded to the given column widths.

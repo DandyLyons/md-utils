@@ -24,6 +24,8 @@ extension CLIEntry {
 
                 TABLES:
                   Use --normalize-tables to pad table cells so columns align vertically.
+                  Use --max-width <n> to cap how far columns are padded (default: 80).
+                  Cells whose content already exceeds --max-width are never truncated.
 
                 OUTPUT:
                   By default, formatted content is written to stdout.
@@ -60,6 +62,10 @@ extension CLIEntry {
               help: "Pad table cells to align columns vertically")
         var normalizeTables: Bool = false
 
+        @Option(name: .customLong("max-width"),
+                help: "Cap column padding to this width when normalizing tables (default: 80); content wider than this is never truncated")
+        var maxWidth: Int = 80
+
         @Flag(name: .long,
               help: "Modify files in place instead of writing to stdout")
         var inPlace: Bool = false
@@ -89,7 +95,8 @@ extension CLIEntry {
             let formatOptions = FormattingOptions(
                 bulletMarker: bulletMarker,
                 italicMarker: italicMarker,
-                normalizeTables: normalizeTables
+                normalizeTables: normalizeTables,
+                tableMaxWidth: maxWidth
             )
 
             // Resolve files
