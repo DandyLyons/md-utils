@@ -221,6 +221,63 @@ struct DumpTests {
     }
   }
 
+  // MARK: - Non-String Key Tests
+
+  @Test
+  func `single file with integer YAML key succeeds without crashing`() async throws {
+    // Integer-tagged scalar keys like `123:` are representable as strings ("123")
+    // and must NOT crash — safeNodeToSwiftValue stringifies them safely.
+    let tempFile = try createTempFile(content: """
+    ---
+    123: value
+    title: test
+    ---
+    # Content
+    """, name: "int-key.md")
+    defer { try? tempFile.delete() }
+
+    let command_ = try CLIEntry.FrontMatterCommands.Dump.parseAsRoot([
+      tempFile.string
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Dump)
+
+    // Should succeed — integer key becomes string "123"
+    try await command.run()
+  }
+
+  @Test
+  func `collection mode with integer key file succeeds`() async throws {
+    // Files with integer YAML keys should be included in the collection, not skipped.
+    let tempDir = Path(NSTemporaryDirectory()) + "md-utils-intkey-\(UUID().uuidString)"
+    try tempDir.mkpath()
+    defer { try? tempDir.delete() }
+
+    let file1 = tempDir + "good.md"
+    let file2 = tempDir + "intkey.md"
+
+    try file1.write("""
+    ---
+    title: Good
+    ---
+    Body
+    """)
+    try file2.write("""
+    ---
+    123: value
+    title: IntKey
+    ---
+    Body
+    """)
+
+    let command_ = try CLIEntry.FrontMatterCommands.Dump.parseAsRoot([
+      file1.string, file2.string
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Dump)
+
+    // Should succeed — both files included, integer key becomes "123"
+    try await command.run()
+  }
+
   // MARK: - Test Helpers
 
   private func createTempFile(content: String, name: String) throws -> Path {
