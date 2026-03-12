@@ -64,21 +64,6 @@ extension MarkdownDocument {
             result = TableNormalizer.normalize(result, maxWidth: options.tableMaxWidth)
         }
 
-        let fullContent = try reconstructFullDocument(frontMatter: frontMatter, body: result)
-        return try MarkdownDocument(content: fullContent)
-    }
-
-    /// Reconstructs the full markdown document combining frontmatter and body.
-    private func reconstructFullDocument(
-        frontMatter: Yams.Node.Mapping,
-        body: String
-    ) throws -> String {
-        guard !frontMatter.isEmpty else { return body }
-        let yamlContent = try YAMLConversion.serialize(frontMatter)
-        return """
-            ---
-            \(yamlContent)---
-            \(body)
-            """
+        return MarkdownDocument(frontMatter: frontMatter, body: result)
     }
 }

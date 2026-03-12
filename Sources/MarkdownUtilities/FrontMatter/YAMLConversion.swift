@@ -114,7 +114,9 @@ public enum YAMLConversion {
   /// - Returns: A YAML string representation
   /// - Throws: If serialization fails
   public static func serialize(_ mapping: Yams.Node.Mapping) throws -> String {
-    try Yams.serialize(node: .mapping(mapping))
+    var blockMapping = mapping
+    blockMapping.style = .block
+    return try Yams.serialize(node: .mapping(blockMapping))
   }
 
   /// Safely convert a Yams.Node to a Swift value.
