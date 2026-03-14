@@ -38,6 +38,19 @@ public struct MarkdownDocument: @unchecked Sendable {
     self.body = body
   }
 
+  /// Initialize a markdown document directly from its parsed components.
+  ///
+  /// Use this when frontmatter and body are already available as structured data,
+  /// avoiding the YAML serialize/parse round-trip that `init(content:)` performs.
+  ///
+  /// - Parameters:
+  ///   - frontMatter: The parsed YAML frontmatter mapping (empty mapping if none)
+  ///   - body: The markdown body text
+  public init(frontMatter: Yams.Node.Mapping, body: String) {
+    self.frontMatter = frontMatter
+    self.body = body
+  }
+
   /// Parse the body text into a Markdown AST.
   ///
   /// This method uses the MarkdownSyntax library to parse the body content into an Abstract Syntax Tree (AST).

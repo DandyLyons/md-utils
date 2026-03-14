@@ -422,6 +422,29 @@ struct MarkdownDocumentFormattingTests {
         #expect(result.body.contains("- item one"))
     }
 
+    @Test("Preserves block-style YAML frontmatter through table normalization")
+    func frontmatterStylePreservedThroughTableNormalization() async throws {
+        let content = """
+            ---
+            title: My Document
+            tags:
+              - swift
+              - yaml
+            ---
+            | Name | Age |
+            | --- | --- |
+            | Alice | 30 |
+            """
+        let doc = try MarkdownDocument(content: content)
+        let options = FormattingOptions(normalizeTables: true)
+        let result = try await doc.format(options: options)
+
+        let serialized = try YAMLConversion.serialize(result.frontMatter)
+        // Block-style: tags should be a block sequence, not flow style [swift, yaml]
+        #expect(serialized.contains("- swift"))
+        #expect(!serialized.contains("[swift"))
+    }
+
     @Test("No-op when all options are nil/false")
     func noOpOptions() async throws {
         let original = "* item one\n* item two"

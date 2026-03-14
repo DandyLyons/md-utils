@@ -30,9 +30,7 @@ extension YAMLConversionError: LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .invalidYAML(let underlyingError):
-      let detail = (underlyingError as? CustomStringConvertible)?.description
-        ?? underlyingError.localizedDescription
-      return "Invalid YAML frontmatter: \(detail)"
+      return "Invalid YAML frontmatter: \(underlyingError)"
     case .notAMapping:
       return "Frontmatter must be a YAML mapping (dictionary)"
     case .jsonConversionFailed:
@@ -114,7 +112,9 @@ public enum YAMLConversion {
   /// - Returns: A YAML string representation
   /// - Throws: If serialization fails
   public static func serialize(_ mapping: Yams.Node.Mapping) throws -> String {
-    try Yams.serialize(node: .mapping(mapping))
+    var blockMapping = mapping
+    blockMapping.style = .block
+    return try Yams.serialize(node: .mapping(blockMapping))
   }
 
   /// Safely convert a Yams.Node to a Swift value.
