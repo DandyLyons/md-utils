@@ -30,9 +30,7 @@ extension YAMLConversionError: LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .invalidYAML(let underlyingError):
-      let detail = (underlyingError as? CustomStringConvertible)?.description
-        ?? underlyingError.localizedDescription
-      return "Invalid YAML frontmatter: \(detail)"
+      return "Invalid YAML frontmatter: \(underlyingError)"
     case .notAMapping:
       return "Frontmatter must be a YAML mapping (dictionary)"
     case .jsonConversionFailed:
