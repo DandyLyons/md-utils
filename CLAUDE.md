@@ -25,6 +25,9 @@ swift test
 swift run md-utils <command>
 ```
 
+> [!Note] 
+> If no `.build` directory exists, run `swift build` first to create. Do not use the `.build` directory from another worktree or branch. 
+
 ## Critical Rules
 
 **STRICTLY FORBIDDEN: Force Unwrapping with `!`**
@@ -46,6 +49,18 @@ Detailed guidance organized by topic:
 - **[Development Workflow](docs/development-workflow.md)** - Feature addition process and commit checklist
 - **[Common Use Cases](docs/common-use-cases.md)** - CLI usage examples and recipes
 - **[Release Procedures](docs/release-procedures.md)** - Versioning and release process
+
+## Syncing SKILL.md
+
+`Sources/md-utils/Resources/SKILL.md` is a copy of the canonical file at
+`skill/markdown-utilities/skills/markdown-utilities/SKILL.md`. Both must be kept in sync.
+
+After editing the canonical SKILL.md, run:
+```bash
+cp skill/markdown-utilities/skills/markdown-utilities/SKILL.md \
+   Sources/md-utils/Resources/SKILL.md
+```
+Then commit both files. A Swift test enforces this and will fail if they drift.
 
 ## Status
 

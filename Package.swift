@@ -53,6 +53,9 @@ let package = Package(
         .product(name: "PathKit", package: "PathKit"),
         .product(name: "JMESPath", package: "jmespath.swift"),
         "Yams",
+      ],
+      resources: [
+        .process("Resources/SKILL.md")
       ]
     ),
     .testTarget(
