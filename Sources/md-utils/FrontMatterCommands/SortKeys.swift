@@ -54,6 +54,10 @@ extension CLIEntry.FrontMatterCommands {
           let content: String = try file.read()
           var doc = try MarkdownDocument(content: content)
 
+          if doc.containsYAMLComments {
+            fputs("warning: \(file): frontmatter contains YAML comments which will be lost\n", stderr)
+          }
+
           doc.sortKeys(by: method, reverse: reverse)
 
           let updated = try doc.render()
