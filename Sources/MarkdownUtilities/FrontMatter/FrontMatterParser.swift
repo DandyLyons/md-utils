@@ -41,6 +41,31 @@ struct FrontMatterParser: Parsing.Parser {
     }
   }
 
+  /// Returns true if the raw YAML string contains any YAML comments.
+  ///
+  /// This is a naive check that detects standalone comment lines — lines where
+  /// the first non-whitespace character is `#`. It does not detect inline
+  /// comments (e.g. `key: value # comment`).
+  ///
+  /// Detection runs on the raw frontmatter string before Yams parses it,
+  /// because Yams (via libYAML) discards comments and they are unrecoverable
+  /// from the parsed AST.
+  static func containsYAMLComments(_ rawYAML: String) -> Bool {
+    // Use swift-parsing's Prefix to consume leading horizontal whitespace,
+    // then check if the first remaining character is '#'.
+    // This catches standalone comment lines; inline comments (key: value # …)
+    // are out of scope for this naive check.
+    let whitespace = Prefix<Substring>(while: { $0 == " " || $0 == "\t" })
+    for line in rawYAML.split(separator: "\n", omittingEmptySubsequences: false) {
+      var lineInput = line[...]
+      _ = try? whitespace.parse(&lineInput)
+      if lineInput.first == "#" {
+        return true
+      }
+    }
+    return false
+  }
+
   /// Parser that extracts only the frontmatter content (between delimiters)
   private var frontMatterOnlyParser: some Parsing.Parser<Substring, String> {
     Parse {

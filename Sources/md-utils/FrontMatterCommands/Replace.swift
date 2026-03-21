@@ -155,6 +155,10 @@ extension CLIEntry.FrontMatterCommands {
       let content: String = try path.read()
       var doc = try MarkdownDocument(content: content)
 
+      if doc.containsYAMLComments {
+        fputs("warning: \(path): frontmatter contains YAML comments which will be lost\n", stderr)
+      }
+
       // Replace frontmatter (direct assignment)
       doc.frontMatter = newFrontMatter
 

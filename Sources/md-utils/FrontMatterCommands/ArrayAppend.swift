@@ -67,6 +67,10 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           let content: String = try path.read()
           var doc = try MarkdownDocument(content: content)
 
+          if doc.containsYAMLComments {
+            fputs("warning: \(path): frontmatter contains YAML comments which will be lost\n", stderr)
+          }
+
           // Get array (creates empty if doesn't exist, errors if not an array)
           let sequence = try ArrayHelpers.getOrCreateArrayKey(key, in: doc, path: path)
 

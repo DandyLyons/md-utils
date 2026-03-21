@@ -213,6 +213,27 @@ Select content by heading or line range.
 
 - **CLI**: `md-utils body` (extract body without frontmatter), `md-utils lines` (extract line ranges), `md-utils extract` (extract by section)
 
+## Known Limitations
+
+### YAML Comment Loss on Frontmatter Write
+
+**Affects**: all `fm` write commands (`set`, `remove`, `rename`, `replace`, `sort-keys`, `touch`, `array append`, `array prepend`, `array remove`)
+
+YAML comments (lines beginning with `#`) in frontmatter are permanently lost whenever any write operation is performed. This is a fundamental limitation of the YAML parsing stack:
+
+- **Root cause**: Yams is built on libYAML, a streaming event-based parser. libYAML silently discards comment tokens — they never surface as parse events and therefore cannot be stored in `Yams.Node.Mapping` or any downstream structure.
+- **No workaround within Yams**: Comments are unrecoverable from the parsed AST regardless of serialization settings.
+
+**Detection**: `MarkdownDocument.containsYAMLComments` is set to `true` at `init(content:)` time if `FrontMatterParser.containsYAMLComments(_:)` finds any comment lines in the raw frontmatter string (before Yams parses it). All write CLI commands emit a warning to stderr when this is true:
+
+```
+warning: path/to/file.md: frontmatter contains YAML comments which will be lost
+```
+
+**Scope of detection**: The check is intentionally naive — it detects standalone comment lines (where the first non-whitespace character on a line is `#`). It does **not** detect inline comments (`key: value # comment`). This tradeoff avoids false positives on YAML string values that legitimately contain `#` characters (e.g. URLs, hex color codes).
+
+**Possible future fix**: Replace Yams with a YAML library that preserves comments in its AST (uncommon), or implement raw-text frontmatter surgery that avoids a full parse/serialize round-trip.
+
 ## Planned Features
 
 The following features are **NOT YET IMPLEMENTED**:
