@@ -141,8 +141,10 @@ swift run md-utils <command> [options]
 # Generate a table of contents
 swift run md-utils toc README.md
 
-# Get a frontmatter value
+# Get a frontmatter value (JSON by default)
 swift run md-utils fm get --key title document.md
+# => [{"path":"...","value":"My Title"}]
+swift run md-utils fm get --key title posts/ | jq '.[] | select(has("value")) | .value'
 
 # Set a frontmatter value
 swift run md-utils fm set --key tags --value "[swift, cli]" document.md

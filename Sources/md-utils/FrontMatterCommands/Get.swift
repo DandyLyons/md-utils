@@ -20,6 +20,22 @@ extension CLIEntry.FrontMatterCommands {
 
         If the key doesn't exist, the command exits with an error code.
         When processing multiple files, the filename is included in the output.
+
+        JSON OUTPUT (default)
+        Returns an array of objects, one per file:
+
+          [
+            { "path": "/path/to/file.md", "value": "hello" },
+            { "path": "/path/to/null.md",  "value": null   },
+            { "path": "/path/to/other.md"                  }
+          ]
+
+        "value" present  → key was found; typed JSON value (string, number, bool, array, object)
+        "value": null    → key exists with a YAML null value
+        "value" absent   → key not present in frontmatter
+
+        Pipe to jq for filtering:
+          md-utils fm get --key title posts/ | jq '.[] | select(has("value")) | .value'
         """
     )
 
