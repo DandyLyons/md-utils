@@ -69,12 +69,14 @@ The default format is JSON — an array of objects with `path` and (optionally) 
 - `"value"` absent → key not present in frontmatter
 
 ```bash
-# Get values from multiple files and filter with jq
-md-utils fm get --key title posts/ | jq '.[] | select(has("value")) | .value'
+# Keep only entries where the key was found (missing entries excluded)
+md-utils fm get --key title posts/ | jq 'map(select(has("value")))'
 
-# Find files where the key is missing
-md-utils fm get --key title posts/ | jq '.[] | select(has("value") | not) | .path'
+# Keep only entries where the key was found AND the value is not null
+md-utils fm get --key title posts/ | jq 'map(select(.value != null))'
 ```
+
+`map(select(...))` filters an array in place — simpler than `.[] | select(...)` which breaks the array into a stream.
 
 #### Get frontmatter value as plain text
 ```bash
@@ -180,7 +182,7 @@ md-utils fm search --key status --value draft . | xargs ls -l
 
 ### Get all titles from multiple files
 ```bash
-md-utils fm get --key title posts/*.md | jq '.[] | select(has("value")) | [.path, .value] | join(": ")'
+md-utils fm get --key title posts/*.md | jq 'map(select(has("value")))'
 ```
 
 ### Extract lines and search for pattern

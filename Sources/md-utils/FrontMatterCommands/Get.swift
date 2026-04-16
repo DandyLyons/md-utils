@@ -35,7 +35,8 @@ extension CLIEntry.FrontMatterCommands {
         "value" absent   → key not present in frontmatter
 
         Pipe to jq for filtering:
-          md-utils fm get --key title posts/ | jq '.[] | select(has("value")) | .value'
+          md-utils fm get --key title posts/ | jq 'map(select(has("value")))'
+          md-utils fm get --key title posts/ | jq 'map(select(.value != null))'
         """
     )
 
