@@ -20,6 +20,23 @@ extension CLIEntry.FrontMatterCommands {
 
         If the key doesn't exist, the command exits with an error code.
         When processing multiple files, the filename is included in the output.
+
+        JSON OUTPUT (default)
+        Returns an array of objects, one per file:
+
+          [
+            { "path": "/path/to/file.md", "value": "hello" },
+            { "path": "/path/to/null.md",  "value": null   },
+            { "path": "/path/to/other.md"                  }
+          ]
+
+        "value" present  → key was found; typed JSON value (string, number, bool, array, object)
+        "value": null    → key exists with a YAML null value
+        "value" absent   → key not present in frontmatter
+
+        Pipe to jq for filtering:
+          md-utils fm get --key title posts/ | jq 'map(select(has("value")))'
+          md-utils fm get --key title posts/ | jq 'map(select(.value != null))'
         """
     )
 
@@ -28,10 +45,11 @@ extension CLIEntry.FrontMatterCommands {
     @Option(name: .long, help: "The frontmatter key to retrieve")
     var key: String
 
-    @Option(name: .long, help: "Output format for array values (inline, bullets, numbered-list)")
-    var format: OutputFormat = .inline
+    @Option(name: .long, help: "Output format (json, inline, bullets, numbered-list); json is the default")
+    var format: OutputFormat = .json
 
     enum OutputFormat: String, ExpressibleByArgument {
+      case json
       case inline
       case bullets
       case numberedList = "numbered-list"
@@ -45,6 +63,33 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       var hasErrors = false
+
+      if format == .json {
+        var results: [[String: Any]] = []
+        for file in files {
+          do {
+            let content: String = try file.read()
+            let doc = try MarkdownDocument(content: content)
+
+            if let value = doc.getValue(forKey: key) {
+              // Key found — include "value" (NSNull if YAML value is null)
+              let jsonValue = try YAMLConversion.safeNodeToSwiftValue(value)
+              results.append(["path": file.string, "value": jsonValue])
+            } else {
+              // Key missing — omit "value" key; absence is the signal
+              results.append(["path": file.string])
+              hasErrors = true
+            }
+          } catch {
+            fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+            hasErrors = true
+          }
+        }
+        let jsonString = try YAMLConversion.anyToJSON(results, options: [.prettyPrinted])
+        print(jsonString)
+        if hasErrors { throw ExitCode.failure }
+        return
+      }
 
       for file in files {
         do {
@@ -105,7 +150,7 @@ extension CLIEntry.FrontMatterCommands {
         let items = sequence.map { formatNodeValue($0, format: .inline) }
 
         switch format {
-        case .inline:
+        case .json, .inline:
           return "[\(items.joined(separator: ", "))]"
         case .bullets:
           return items.map { "- \($0)" }.joined(separator: "\n")

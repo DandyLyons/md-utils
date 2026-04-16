@@ -57,9 +57,37 @@ md-utils demote --index 2 document.md --in-place
 
 ### Basic Frontmatter Management
 
-#### Get frontmatter value
+#### Get frontmatter value (JSON, default)
 ```bash
 md-utils fm get --key title document.md
+# Output: [{"path":"/abs/path/document.md","value":"My Title"}]
+```
+
+The default format is JSON — an array of objects with `path` and (optionally) `value`:
+- `"value"` present → key found; typed value (string, number, bool, array, object)
+- `"value": null` → key exists with a YAML null value
+- `"value"` absent → key not present in frontmatter
+
+```bash
+# Keep only entries where the key was found (missing entries excluded)
+md-utils fm get --key title posts/ | jq 'map(select(has("value")))'
+
+# Keep only entries where the key was found AND the value is not null
+md-utils fm get --key title posts/ | jq 'map(select(.value != null))'
+```
+
+`map(select(...))` filters an array in place — simpler than `.[] | select(...)` which breaks the array into a stream.
+
+#### Get frontmatter value as plain text
+```bash
+# Scalar
+md-utils fm get --key title --format inline document.md
+
+# Array as bullet list
+md-utils fm get --key tags --format bullets document.md
+
+# Array as numbered list
+md-utils fm get --key tags --format numbered-list document.md
 ```
 
 #### Set frontmatter value
@@ -154,7 +182,7 @@ md-utils fm search --key status --value draft . | xargs ls -l
 
 ### Get all titles from multiple files
 ```bash
-for file in posts/*.md; do echo "$file: $(md-utils fm get --key title $file)"; done
+md-utils fm get --key title posts/*.md | jq 'map(select(has("value")))'
 ```
 
 ### Extract lines and search for pattern
