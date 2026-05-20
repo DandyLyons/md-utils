@@ -23,6 +23,7 @@ let package = Package(
     .package(url: "https://github.com/pointfreeco/swift-parsing.git", from: "0.14.1"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.1"),
     .package(url: "https://github.com/kylef/PathKit", from: "1.0.1"),
+    .package(url: "https://github.com/kylef/JSONSchema.swift", from: "0.6.0"),
     .package(url: "https://github.com/jpsim/Yams.git", from: "6.1.0"),
     .package(url: "https://github.com/adam-fowler/jmespath.swift.git", from: "1.0.3"),
   ],
@@ -50,12 +51,14 @@ let package = Package(
       dependencies: [
         "MarkdownUtilities",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "JSONSchema", package: "JSONSchema.swift"),
         .product(name: "PathKit", package: "PathKit"),
         .product(name: "JMESPath", package: "jmespath.swift"),
         "Yams",
       ],
       resources: [
-        .process("Resources/SKILL.md")
+        .process("Resources/SKILL.md"),
+        .process("Resources/md-utils.schema.json"),
       ]
     ),
     .testTarget(

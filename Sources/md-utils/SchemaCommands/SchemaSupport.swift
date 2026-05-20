@@ -1,0 +1,565 @@
+//
+//  SchemaSupport.swift
+//  md-utils
+//
+
+import ArgumentParser
+import Foundation
+import JSONSchema
+import MarkdownUtilities
+import PathKit
+import Yams
+
+struct MdUtilsConfig {
+  static let defaultSchemaDirectory = ".md-utils/schemas"
+
+  var schemaReference: String?
+  var schemaDirectory: String
+  var schemaRules: [SchemaRule]
+
+  init(
+    schemaReference: String? = "md-utils.schema.json",
+    schemaDirectory: String = Self.defaultSchemaDirectory,
+    schemaRules: [SchemaRule] = []
+  ) {
+    self.schemaReference = schemaReference
+    self.schemaDirectory = schemaDirectory
+    self.schemaRules = schemaRules
+  }
+
+  static func load(from path: Path = SchemaPaths.configFile) throws -> MdUtilsConfig {
+    guard path.exists else {
+      throw ValidationError("Project config not found: \(path.string). Run md-utils schema init first.")
+    }
+
+    let data = try Data(contentsOf: URL(fileURLWithPath: path.string))
+    guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw ValidationError("Project config must be a JSON object: \(path.string)")
+    }
+
+    let schemaReference = object["$schema"] as? String
+    let schemaDirectory = object["schemaDirectory"] as? String ?? Self.defaultSchemaDirectory
+    let rawRules = object["schemaRules"] as? [[String: Any]] ?? []
+    let rules = try rawRules.map { try SchemaRule(json: $0) }
+    let names = rules.map(\.name)
+    if Set(names).count != names.count {
+      throw ValidationError("Schema rule names must be unique")
+    }
+
+    return MdUtilsConfig(
+      schemaReference: schemaReference,
+      schemaDirectory: schemaDirectory,
+      schemaRules: rules
+    )
+  }
+
+  func save(to path: Path = SchemaPaths.configFile) throws {
+    var object: [String: Any] = [
+      "schemaDirectory": schemaDirectory,
+      "schemaRules": schemaRules.map { $0.jsonObject },
+    ]
+    if let schemaReference {
+      object["$schema"] = schemaReference
+    }
+
+    let data = try JSONSerialization.data(
+      withJSONObject: object,
+      options: [.prettyPrinted, .sortedKeys]
+    )
+    guard let json = String(data: data, encoding: .utf8) else {
+      throw ValidationError("Failed to encode md-utils config")
+    }
+    try path.write(json + "\n")
+  }
+}
+
+struct SchemaRule {
+  var name: String
+  var schema: String
+  var frontmatterRequired: Bool
+  var match: SchemaRuleMatch
+
+  init(name: String, schema: String, frontmatterRequired: Bool = true, match: SchemaRuleMatch) {
+    self.name = name
+    self.schema = schema
+    self.frontmatterRequired = frontmatterRequired
+    self.match = match
+  }
+
+  init(json: [String: Any]) throws {
+    guard let name = json["name"] as? String, !name.isEmpty else {
+      throw ValidationError("Schema rules require a non-empty name")
+    }
+    guard let schema = json["schema"] as? String, !schema.isEmpty else {
+      throw ValidationError("Schema rule \"\(name)\" requires a non-empty schema")
+    }
+    guard let matchObject = json["match"] as? [String: Any] else {
+      throw ValidationError("Schema rule \"\(name)\" requires a match object")
+    }
+
+    self.name = name
+    self.schema = schema
+    self.frontmatterRequired = json["frontmatterRequired"] as? Bool ?? true
+    self.match = try SchemaRuleMatch(json: matchObject, ruleName: name)
+  }
+
+  var jsonObject: [String: Any] {
+    [
+      "name": name,
+      "schema": schema,
+      "frontmatterRequired": frontmatterRequired,
+      "match": match.jsonObject,
+    ]
+  }
+}
+
+struct SchemaRuleMatch {
+  var paths: [String]
+  var frontmatter: [String: FrontmatterMatcher]
+
+  init(paths: [String] = [], frontmatter: [String: FrontmatterMatcher] = [:]) {
+    self.paths = paths
+    self.frontmatter = frontmatter
+  }
+
+  init(json: [String: Any], ruleName: String) throws {
+    let paths = json["paths"] as? [String] ?? []
+    let frontmatterObject = json["frontmatter"] as? [String: Any] ?? [:]
+    var frontmatter: [String: FrontmatterMatcher] = [:]
+
+    for (key, rawMatcher) in frontmatterObject {
+      guard let matcherObject = rawMatcher as? [String: Any] else {
+        throw ValidationError("Schema rule \"\(ruleName)\" has invalid frontmatter matcher for \"\(key)\"")
+      }
+      frontmatter[key] = try FrontmatterMatcher(json: matcherObject, key: key, ruleName: ruleName)
+    }
+
+    if paths.isEmpty && frontmatter.isEmpty {
+      throw ValidationError("Schema rule \"\(ruleName)\" must define at least one match condition")
+    }
+
+    self.paths = paths
+    self.frontmatter = frontmatter
+  }
+
+  var jsonObject: [String: Any] {
+    var object: [String: Any] = [:]
+    if !paths.isEmpty {
+      object["paths"] = paths
+    }
+    if !frontmatter.isEmpty {
+      object["frontmatter"] = frontmatter.mapValues { $0.jsonObject }
+    }
+    return object
+  }
+}
+
+struct FrontmatterMatcher {
+  var includes: Any
+
+  init(includes: Any) {
+    self.includes = includes
+  }
+
+  init(json: [String: Any], key: String, ruleName: String) throws {
+    guard let includes = json["includes"] else {
+      throw ValidationError("Schema rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" requires includes")
+    }
+    self.includes = includes
+  }
+
+  var jsonObject: [String: Any] {
+    ["includes": includes]
+  }
+}
+
+enum SchemaPaths {
+  static var projectDirectory: Path { Path(".md-utils") }
+  static var configFile: Path { projectDirectory + "md-utils.json" }
+  static let bundledConfigSchemaFileName = "md-utils.schema.json"
+
+  static func schemaDirectory(for config: MdUtilsConfig) -> Path {
+    Path(config.schemaDirectory)
+  }
+
+  static func schemaFile(rule: SchemaRule, config: MdUtilsConfig) -> Path {
+    let schemaPath = Path(rule.schema)
+    if schemaPath.isAbsolute {
+      return schemaPath
+    }
+    return schemaDirectory(for: config) + rule.schema
+  }
+}
+
+enum SchemaConfigBootstrapper {
+  static func ensureProjectFiles() throws {
+    try SchemaPaths.projectDirectory.mkpath()
+    try Path(MdUtilsConfig.defaultSchemaDirectory).mkpath()
+    try copyBundledConfigSchema()
+
+    if !SchemaPaths.configFile.exists {
+      try MdUtilsConfig().save()
+    }
+  }
+
+  private static func copyBundledConfigSchema() throws {
+    guard let resourceURL = Bundle.module.url(
+      forResource: "md-utils.schema",
+      withExtension: "json"
+    ) else {
+      throw ValidationError("Bundled md-utils config schema is missing")
+    }
+
+    let destination = SchemaPaths.projectDirectory + SchemaPaths.bundledConfigSchemaFileName
+    let data = try Data(contentsOf: resourceURL)
+    try data.write(to: URL(fileURLWithPath: destination.string))
+  }
+}
+
+enum SchemaFileScanner {
+  static func markdownFiles(root: Path = .current) throws -> [Path] {
+    let manager = FileManager.default
+    let rootURL = URL(fileURLWithPath: root.absolute().string)
+    guard let enumerator = manager.enumerator(
+      at: rootURL,
+      includingPropertiesForKeys: [.isDirectoryKey],
+      options: [.skipsHiddenFiles]
+    ) else {
+      return []
+    }
+
+    var files: [Path] = []
+    for case let url as URL in enumerator {
+      let path = Path(url.path)
+      guard !path.isDirectory else { continue }
+      guard let ext = path.extension?.lowercased(), ["md", "markdown"].contains(ext) else { continue }
+      files.append(path)
+    }
+    files.sort { $0.string < $1.string }
+    return files
+  }
+}
+
+struct SchemaValidationErrorDetail {
+  var path: String
+  var message: String
+}
+
+struct SchemaValidationResult {
+  enum Status {
+    case ok
+    case error
+    case skipped
+  }
+
+  var ruleName: String
+  var schemaPath: String
+  var filePath: String
+  var status: Status
+  var errors: [SchemaValidationErrorDetail]
+}
+
+struct SchemaValidationSummary {
+  var results: [SchemaValidationResult]
+  var totalMarkdownFiles: Int
+
+  var errors: Int {
+    results.reduce(0) { count, result in
+      count + (result.status == .error ? max(result.errors.count, 1) : 0)
+    }
+  }
+
+  var skipped: Int {
+    results.filter { $0.status == .skipped }.count
+  }
+
+  var matchedFiles: Int {
+    Set(results.map(\.filePath)).count
+  }
+
+  var fileRuleMatches: Int {
+    results.count
+  }
+
+  var hasFailures: Bool {
+    results.contains { $0.status == .error }
+  }
+}
+
+enum SchemaValidatorRunner {
+  static func validate(ruleName: String? = nil) throws -> SchemaValidationSummary {
+    let config = try MdUtilsConfig.load()
+    let rules: [SchemaRule]
+    if let ruleName {
+      guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
+        throw ValidationError("Schema rule not found: \"\(ruleName)\"")
+      }
+      rules = [rule]
+    } else {
+      rules = config.schemaRules
+    }
+
+    let files = try SchemaFileScanner.markdownFiles()
+    var results: [SchemaValidationResult] = []
+    var loadedSchemas: [String: [String: Any]] = [:]
+
+    for file in files {
+      let relativePath = projectRelativePath(file)
+      let pathMatchedRules = rules.filter { rulePathConditionsMatch(rule: $0, relativePath: relativePath) }
+      guard !pathMatchedRules.isEmpty else { continue }
+
+      let content = try file.read(.utf8)
+      let frontmatterPresence = frontmatterPresence(in: content)
+      var parsedFrontmatter: Any?
+      var yamlError: Error?
+
+      if frontmatterPresence.hasFrontmatter {
+        do {
+          let document = try MarkdownDocument(content: content)
+          parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
+        } catch {
+          yamlError = error
+        }
+      }
+
+      for rule in pathMatchedRules {
+        let schemaPath = SchemaPaths.schemaFile(rule: rule, config: config)
+        if let yamlError {
+          results.append(errorResult(
+            rule: rule,
+            schemaPath: schemaPath,
+            filePath: relativePath,
+            path: "frontmatter",
+            message: "invalid YAML: \(yamlError.localizedDescription)"
+          ))
+          continue
+        }
+
+        guard frontmatterPresence.hasFrontmatter else {
+          if rule.frontmatterRequired {
+            results.append(errorResult(
+              rule: rule,
+              schemaPath: schemaPath,
+              filePath: relativePath,
+              path: "frontmatter",
+              message: "required by rule \"\(rule.name)\""
+            ))
+          } else if rule.match.frontmatter.isEmpty {
+            results.append(SchemaValidationResult(
+              ruleName: rule.name,
+              schemaPath: schemaPath.string,
+              filePath: relativePath,
+              status: .skipped,
+              errors: [SchemaValidationErrorDetail(path: "frontmatter", message: "not present")]
+            ))
+          }
+          continue
+        }
+
+        guard let parsedFrontmatter else { continue }
+        guard frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
+
+        let schemaKey = schemaPath.absolute().string
+        let schema: [String: Any]
+        if let loaded = loadedSchemas[schemaKey] {
+          schema = loaded
+        } else {
+          schema = try loadSchema(path: schemaPath)
+          loadedSchemas[schemaKey] = schema
+        }
+
+        let compatibleFrontmatter = jsonCompatibleValue(parsedFrontmatter)
+        let validationResult = try JSONSchema.validate(compatibleFrontmatter, schema: schema)
+        if validationResult.valid {
+          results.append(SchemaValidationResult(
+            ruleName: rule.name,
+            schemaPath: schemaPath.string,
+            filePath: relativePath,
+            status: .ok,
+            errors: []
+          ))
+        } else {
+          let errors = validationResult.errors?.map { error in
+            SchemaValidationErrorDetail(
+              path: pointerDisplayPath(error.instanceLocation.path),
+              message: error.description
+            )
+          } ?? [SchemaValidationErrorDetail(path: "frontmatter", message: "schema validation failed")]
+          results.append(SchemaValidationResult(
+            ruleName: rule.name,
+            schemaPath: schemaPath.string,
+            filePath: relativePath,
+            status: .error,
+            errors: errors
+          ))
+        }
+      }
+    }
+
+    return SchemaValidationSummary(results: results, totalMarkdownFiles: files.count)
+  }
+
+  private static func loadSchema(path: Path) throws -> [String: Any] {
+    guard path.exists else {
+      throw ValidationError("Schema file not found: \(path.string)")
+    }
+    let data = try Data(contentsOf: URL(fileURLWithPath: path.string))
+    guard let schema = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw ValidationError("Schema file must contain a JSON object: \(path.string)")
+    }
+    return schema
+  }
+
+  private static func rulePathConditionsMatch(rule: SchemaRule, relativePath: String) -> Bool {
+    if rule.match.paths.isEmpty {
+      return true
+    }
+    return rule.match.paths.contains { matchesGlob(relativePath, glob: $0) }
+  }
+
+  private static func frontmatterConditionsMatch(rule: SchemaRule, frontmatter: Any) -> Bool {
+    guard !rule.match.frontmatter.isEmpty else { return true }
+    guard let object = frontmatter as? [String: Any] else { return false }
+
+    for (key, matcher) in rule.match.frontmatter {
+      guard let value = object[key] as? [Any] else { return false }
+      if !value.contains(where: { jsonValuesEqual($0, matcher.includes) }) {
+        return false
+      }
+    }
+    return true
+  }
+
+  private static func errorResult(
+    rule: SchemaRule,
+    schemaPath: Path,
+    filePath: String,
+    path: String,
+    message: String
+  ) -> SchemaValidationResult {
+    SchemaValidationResult(
+      ruleName: rule.name,
+      schemaPath: schemaPath.string,
+      filePath: filePath,
+      status: .error,
+      errors: [SchemaValidationErrorDetail(path: path, message: message)]
+    )
+  }
+}
+
+func frontmatterPresence(in content: String) -> (hasFrontmatter: Bool, raw: String?) {
+  guard content.hasPrefix("---\n") else {
+    return (false, nil)
+  }
+  let searchStart = content.index(content.startIndex, offsetBy: 4)
+  if content[searchStart...].hasPrefix("---") {
+    return (true, "")
+  }
+  guard let closingRange = content.range(of: "\n---", range: searchStart..<content.endIndex) else {
+    return (false, nil)
+  }
+  return (true, String(content[searchStart..<closingRange.lowerBound]))
+}
+
+func projectRelativePath(_ path: Path) -> String {
+  let root = Path.current.absolute().string
+  let absolute = path.absolute().string
+  let normalizedRoot = root.hasSuffix("/") ? root : root + "/"
+  if absolute.hasPrefix(normalizedRoot) {
+    return String(absolute.dropFirst(normalizedRoot.count))
+  }
+  return path.string
+}
+
+func matchesGlob(_ value: String, glob: String) -> Bool {
+  let regex = globToRegex(glob)
+  guard let expression = try? NSRegularExpression(pattern: regex) else {
+    return false
+  }
+  let range = NSRange(value.startIndex..., in: value)
+  return expression.firstMatch(in: value, range: range) != nil
+}
+
+func globToRegex(_ glob: String) -> String {
+  var result = "^"
+  var index = glob.startIndex
+
+  while index < glob.endIndex {
+    let character = glob[index]
+    let nextIndex = glob.index(after: index)
+
+    switch character {
+    case "*":
+      if nextIndex < glob.endIndex && glob[nextIndex] == "*" {
+        let afterStars = glob.index(after: nextIndex)
+        if afterStars < glob.endIndex && glob[afterStars] == "/" {
+          result += "([^/]+/)*"
+          index = glob.index(after: afterStars)
+        } else {
+          result += ".*"
+          index = afterStars
+        }
+      } else {
+        result += "[^/]*"
+        index = nextIndex
+      }
+    case "?":
+      result += "[^/]"
+      index = nextIndex
+    default:
+      result += NSRegularExpression.escapedPattern(for: String(character))
+      index = nextIndex
+    }
+  }
+
+  return result + "$"
+}
+
+func jsonValuesEqual(_ lhs: Any, _ rhs: Any) -> Bool {
+  let left = jsonCompatibleValue(lhs)
+  let right = jsonCompatibleValue(rhs)
+
+  switch (left, right) {
+  case (let left as String, let right as String):
+    return left == right
+  case (let left as Bool, let right as Bool):
+    return left == right
+  case (let left as Int, let right as Int):
+    return left == right
+  case (let left as Double, let right as Double):
+    return left == right
+  case (let left as NSNumber, let right as NSNumber):
+    return left == right
+  case (_ as NSNull, _ as NSNull):
+    return true
+  default:
+    return false
+  }
+}
+
+func jsonCompatibleValue(_ value: Any) -> Any {
+  if let dict = value as? [String: Any] {
+    return dict.mapValues { jsonCompatibleValue($0) }
+  }
+  if let dict = value as? [AnyHashable: Any] {
+    return dict.reduce(into: [String: Any]()) { result, pair in
+      result[String(describing: pair.key)] = jsonCompatibleValue(pair.value)
+    }
+  }
+  if let array = value as? [Any] {
+    return array.map { jsonCompatibleValue($0) }
+  }
+  if let date = value as? Date {
+    let formatter = ISO8601DateFormatter()
+    return formatter.string(from: date)
+  }
+  return value
+}
+
+func pointerDisplayPath(_ pointer: String) -> String {
+  if pointer.isEmpty || pointer == "/" {
+    return "frontmatter"
+  }
+  let trimmed = pointer.hasPrefix("/") ? String(pointer.dropFirst()) : pointer
+  return trimmed.replacingOccurrences(of: "/", with: ".")
+}

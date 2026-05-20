@@ -27,6 +27,7 @@ public struct CLIEntry: AsyncParsableCommand {
       HeadingCommands.self,
       LinkCommands.self,
       Lines.self,
+      SchemaCommands.self,
       SectionCommands.self,
     ],
     helpNames: [.long, .short]
