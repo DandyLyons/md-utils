@@ -214,6 +214,63 @@ struct SchemaCommandsTests {
   }
 
   @Test
+  func `double star path rule matches files in descendant folders`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(
+      project,
+      rules: [ruleJSON(
+        name: "integrations",
+        schema: "integration.schema.json",
+        paths: ["INTEGRATIONS/**/*.md"],
+        frontmatter: "\"tags\": { \"includes\": \"Integration\" }"
+      )],
+      schemas: ["integration.schema.json": requiredStringSchema(required: "title")]
+    )
+    try writeFile(project + "INTEGRATIONS/top.md", content: bookMarkdown(title: "Top", tags: ["Integration"]))
+    try writeFile(project + "INTEGRATIONS/Child/grandchild.md", content: bookMarkdown(title: "Grandchild", tags: ["Integration"]))
+    try writeFile(project + "INTEGRATIONS/Child/Grandchild/deep.md", content: bookMarkdown(title: "Deep", tags: ["Integration"]))
+
+    try withCurrentDirectory(project) {
+      let summary = try SchemaValidatorRunner.validate(ruleName: "integrations")
+      let files = Set(summary.results.map(\.filePath))
+
+      #expect(files == [
+        "INTEGRATIONS/top.md",
+        "INTEGRATIONS/Child/grandchild.md",
+        "INTEGRATIONS/Child/Grandchild/deep.md",
+      ])
+      #expect(!summary.hasFailures)
+    }
+  }
+
+  @Test
+  func `missing frontmatter does not match rule with frontmatter matcher`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(
+      project,
+      rules: [ruleJSON(
+        name: "integrations",
+        schema: "integration.schema.json",
+        paths: ["INTEGRATIONS/**/*.md"],
+        frontmatter: "\"tags\": { \"includes\": \"Integration\" }"
+      )],
+      schemas: ["integration.schema.json": requiredStringSchema(required: "title")]
+    )
+    try writeFile(project + "INTEGRATIONS/INTEGRATIONS_README.md", content: "# Integrations\n")
+    try writeFile(project + "INTEGRATIONS/github.md", content: bookMarkdown(title: "GitHub", tags: ["Integration"]))
+
+    try withCurrentDirectory(project) {
+      let summary = try SchemaValidatorRunner.validate(ruleName: "integrations")
+
+      #expect(summary.fileRuleMatches == 1)
+      #expect(summary.results.first?.filePath == "INTEGRATIONS/github.md")
+      #expect(!summary.hasFailures)
+    }
+  }
+
+  @Test
   func `same file can be validated by multiple rules`() throws {
     let project = try createTempProject()
     defer { try? project.delete() }
@@ -267,7 +324,10 @@ struct SchemaCommandsTests {
   func `missing frontmatter is an error when required`() throws {
     let project = try createTempProject()
     defer { try? project.delete() }
-    try writeSchemaProject(project)
+    try writeSchemaProject(
+      project,
+      rules: [ruleJSON(name: "books", schema: "book.schema.json", paths: ["Books/**/*.md"])]
+    )
     try writeFile(project + "Books/plain.md", content: "# Plain\n")
 
     try withCurrentDirectory(project) {

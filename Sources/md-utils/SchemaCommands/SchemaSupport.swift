@@ -421,7 +421,9 @@ enum SchemaValidatorRunner {
         }
 
         guard frontmatterPresence.hasFrontmatter else {
-          if rule.frontmatterRequired {
+          if !rule.match.frontmatter.isEmpty {
+            continue
+          } else if rule.frontmatterRequired {
             results.append(errorResult(
               rule: rule,
               schemaPath: schemaPath,
