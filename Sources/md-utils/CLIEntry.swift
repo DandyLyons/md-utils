@@ -18,6 +18,7 @@ public struct CLIEntry: AsyncParsableCommand {
     subcommands: [
       AgentCommands.self,
       Body.self,
+      ConfigCommands.self,
       ConvertCommands.self,
       ExtractSection.self,
       FileMetadataCommands.self,

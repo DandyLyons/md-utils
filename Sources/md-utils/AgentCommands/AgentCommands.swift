@@ -10,7 +10,7 @@ extension CLIEntry {
     static let configuration = CommandConfiguration(
       commandName: "agents",
       abstract: "Commands for AI agent integration",
-      subcommands: [AgentSkill.self, AgentInstall.self]
+      subcommands: [AgentSkill.self, AgentInstall.self, PrintConfigSchema.self]
     )
   }
 }

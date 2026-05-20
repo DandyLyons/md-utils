@@ -14,9 +14,17 @@ struct AgentCommandsTests {
   func agentCommandsConfiguration() {
     let config = CLIEntry.AgentCommands.configuration
     #expect(config.commandName == "agents")
-    #expect(config.subcommands.count == 2)
+    #expect(config.subcommands.count == 3)
     #expect(config.subcommands[0] is CLIEntry.AgentCommands.AgentSkill.Type)
     #expect(config.subcommands[1] is CLIEntry.AgentCommands.AgentInstall.Type)
+    #expect(config.subcommands[2] is CLIEntry.AgentCommands.PrintConfigSchema.Type)
+  }
+
+  @Test("agents printConfigSchema parses")
+  func printConfigSchemaParses() throws {
+    let parsed = try CLIEntry.parseAsRoot(["agents", "printConfigSchema"])
+
+    #expect(parsed is CLIEntry.AgentCommands.PrintConfigSchema)
   }
 
   @Test("Resources/SKILL.md matches canonical SKILL.md")
