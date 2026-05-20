@@ -1,5 +1,5 @@
 {
-  "originHash" : "735626bbee1c38fc7d9f3f7cdc6ec8680fd98d0ca2f862df874e896733c8d96b",
+  "originHash" : "498d7d763f2ce49301fbbc5860b56155a749700687ac84c42238d72e1d2e402d",
   "pins" : [
     {
       "identity" : "jmespath.swift",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "3877a5060e85ae33e3b9fe51ab581784f65ec80e",
         "version" : "1.0.3"
+      }
+    },
+    {
+      "identity" : "jsonschema.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/kylef/JSONSchema.swift",
+      "state" : {
+        "revision" : "d14de4b2d9205068c9db89c00d097ca43c897000",
+        "version" : "0.6.0"
       }
     },
     {
