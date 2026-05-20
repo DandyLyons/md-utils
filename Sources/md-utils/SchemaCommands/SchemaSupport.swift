@@ -216,6 +216,91 @@ enum SchemaConfigBootstrapper {
   }
 }
 
+struct SchemaRuleOptions {
+  var name: String
+  var schema: String?
+  var path: String
+  var tag: String?
+  var frontmatterRequired: Bool
+}
+
+enum SchemaRuleManager {
+  static func addRule(_ options: SchemaRuleOptions) throws -> Path {
+    var config = try MdUtilsConfig.load()
+    if config.schemaRules.contains(where: { $0.name == options.name }) {
+      throw ValidationError("Schema rule already exists: \"\(options.name)\"")
+    }
+
+    let schemaFilename = options.schema ?? "\(options.name).schema.json"
+    let schemaDirectory = SchemaPaths.schemaDirectory(for: config)
+    try schemaDirectory.mkpath()
+    let schemaFile = schemaDirectory + schemaFilename
+    if !schemaFile.exists {
+      try schemaFile.write(starterSchema(title: options.name))
+    }
+
+    var frontmatterMatchers: [String: FrontmatterMatcher] = [:]
+    if let tag = options.tag {
+      frontmatterMatchers["tags"] = FrontmatterMatcher(includes: tag)
+    }
+
+    let rule = SchemaRule(
+      name: options.name,
+      schema: schemaFilename,
+      frontmatterRequired: options.frontmatterRequired,
+      match: SchemaRuleMatch(paths: [options.path], frontmatter: frontmatterMatchers)
+    )
+    config.schemaRules.append(rule)
+    try config.save()
+    return schemaFile
+  }
+
+  static func removeRule(named name: String, deleteSchema: Bool) throws -> (removed: SchemaRule, deletedSchema: Bool, schemaPath: Path) {
+    var config = try MdUtilsConfig.load()
+    guard let index = config.schemaRules.firstIndex(where: { $0.name == name }) else {
+      throw ValidationError("Schema rule not found: \"\(name)\"")
+    }
+
+    let removed = config.schemaRules.remove(at: index)
+    let schemaPath = SchemaPaths.schemaFile(rule: removed, config: config)
+    var deletedSchema = false
+
+    if deleteSchema {
+      let isStillReferenced = config.schemaRules.contains { $0.schema == removed.schema }
+      if !isStillReferenced && !Path(removed.schema).isAbsolute && schemaPath.exists {
+        try schemaPath.delete()
+        deletedSchema = true
+      }
+    }
+
+    try config.save()
+    return (removed, deletedSchema, schemaPath)
+  }
+
+  static func starterSchema(title: String) -> String {
+    """
+    {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "\(title)",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+
+    """
+  }
+}
+
 enum SchemaFileScanner {
   static func markdownFiles(root: Path = .current) throws -> [Path] {
     let manager = FileManager.default

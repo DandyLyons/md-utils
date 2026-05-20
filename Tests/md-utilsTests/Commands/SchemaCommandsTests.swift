@@ -17,10 +17,12 @@ struct SchemaCommandsTests {
     let config = CLIEntry.SchemaCommands.configuration
 
     #expect(config.commandName == "schema")
-    #expect(config.subcommands.count == 3)
+    #expect(config.subcommands.count == 5)
     #expect(config.subcommands[0] is CLIEntry.SchemaCommands.Init.Type)
-    #expect(config.subcommands[1] is CLIEntry.SchemaCommands.List.Type)
-    #expect(config.subcommands[2] is CLIEntry.SchemaCommands.Validate.Type)
+    #expect(config.subcommands[1] is CLIEntry.SchemaCommands.Add.Type)
+    #expect(config.subcommands[2] is CLIEntry.SchemaCommands.Remove.Type)
+    #expect(config.subcommands[3] is CLIEntry.SchemaCommands.List.Type)
+    #expect(config.subcommands[4] is CLIEntry.SchemaCommands.Validate.Type)
   }
 
   @Test
@@ -65,6 +67,131 @@ struct SchemaCommandsTests {
       var command = try #require(parsed as? CLIEntry.SchemaCommands.List)
 
       try await command.run()
+    }
+  }
+
+  @Test
+  func `schema add adds rule to existing config`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project, rules: [], schemas: [:])
+
+    try await withCurrentDirectory(project) {
+      let parsed = try CLIEntry.parseAsRoot([
+        "schema", "add", "books", "--path", "Books/**/*.md", "--tag", "Book",
+      ])
+      var command = try #require(parsed as? CLIEntry.SchemaCommands.Add)
+      try await command.run()
+
+      let config = try MdUtilsConfig.load()
+      #expect(config.schemaRules.count == 1)
+      #expect(config.schemaRules.first?.name == "books")
+      #expect((project + ".md-utils/schemas/books.schema.json").exists)
+    }
+  }
+
+  @Test
+  func `schema add requires existing config`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+
+    try await withCurrentDirectory(project) {
+      let parsed = try CLIEntry.parseAsRoot(["schema", "add", "books"])
+      var command = try #require(parsed as? CLIEntry.SchemaCommands.Add)
+
+      await #expect(throws: Error.self) {
+        try await command.run()
+      }
+    }
+  }
+
+  @Test
+  func `schema add fails on duplicate rule`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+
+    try await withCurrentDirectory(project) {
+      let parsed = try CLIEntry.parseAsRoot(["schema", "add", "books"])
+      var command = try #require(parsed as? CLIEntry.SchemaCommands.Add)
+
+      await #expect(throws: Error.self) {
+        try await command.run()
+      }
+    }
+  }
+
+  @Test
+  func `schema remove removes rule and preserves schema by default`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+
+    try await withCurrentDirectory(project) {
+      let parsed = try CLIEntry.parseAsRoot(["schema", "remove", "books"])
+      var command = try #require(parsed as? CLIEntry.SchemaCommands.Remove)
+      try await command.run()
+
+      let config = try MdUtilsConfig.load()
+      #expect(config.schemaRules.isEmpty)
+      #expect((project + ".md-utils/schemas/book.schema.json").exists)
+    }
+  }
+
+  @Test
+  func `schema remove fails for missing rule`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+
+    try await withCurrentDirectory(project) {
+      let parsed = try CLIEntry.parseAsRoot(["schema", "remove", "missing"])
+      var command = try #require(parsed as? CLIEntry.SchemaCommands.Remove)
+
+      await #expect(throws: Error.self) {
+        try await command.run()
+      }
+    }
+  }
+
+  @Test
+  func `schema remove delete schema deletes unshared schema file`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+
+    try await withCurrentDirectory(project) {
+      let parsed = try CLIEntry.parseAsRoot(["schema", "remove", "books", "--delete-schema"])
+      var command = try #require(parsed as? CLIEntry.SchemaCommands.Remove)
+      try await command.run()
+
+      let config = try MdUtilsConfig.load()
+      #expect(config.schemaRules.isEmpty)
+      #expect(!(project + ".md-utils/schemas/book.schema.json").exists)
+    }
+  }
+
+  @Test
+  func `schema remove delete schema preserves shared schema file`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(
+      project,
+      rules: [
+        ruleJSON(name: "books", schema: "book.schema.json", paths: ["Books/**/*.md"]),
+        ruleJSON(name: "novels", schema: "book.schema.json", paths: ["Novels/**/*.md"]),
+      ]
+    )
+
+    try await withCurrentDirectory(project) {
+      let parsed = try CLIEntry.parseAsRoot(["schema", "remove", "books", "--delete-schema"])
+      var command = try #require(parsed as? CLIEntry.SchemaCommands.Remove)
+      try await command.run()
+
+      let config = try MdUtilsConfig.load()
+      #expect(config.schemaRules.count == 1)
+      #expect(config.schemaRules.first?.name == "novels")
+      #expect((project + ".md-utils/schemas/book.schema.json").exists)
     }
   }
 

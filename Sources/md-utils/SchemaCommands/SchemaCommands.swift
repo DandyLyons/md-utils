@@ -13,6 +13,8 @@ extension CLIEntry {
       abstract: "Validate Markdown frontmatter with JSON Schema",
       subcommands: [
         Init.self,
+        Add.self,
+        Remove.self,
         List.self,
         Validate.self,
       ]

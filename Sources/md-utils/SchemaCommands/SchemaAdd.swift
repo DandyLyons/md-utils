@@ -1,21 +1,19 @@
 //
-//  Init.swift
+//  SchemaAdd.swift
 //  md-utils
 //
 
 import ArgumentParser
-import Foundation
-import PathKit
 
 extension CLIEntry.SchemaCommands {
-  struct Init: AsyncParsableCommand {
+  struct Add: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      commandName: "init",
-      abstract: "Create project schema configuration and a schema rule"
+      commandName: "add",
+      abstract: "Add a schema rule to existing project configuration"
     )
 
     @Argument(help: "Rule name to create")
-    var name: String = "default"
+    var name: String
 
     @Option(name: .long, help: "Schema filename to create inside schemaDirectory")
     var schema: String?
@@ -34,8 +32,6 @@ extension CLIEntry.SchemaCommands {
     var frontmatterRequired: Bool = true
 
     mutating func run() async throws {
-      try SchemaConfigBootstrapper.ensureProjectFiles()
-
       let schemaFile = try SchemaRuleManager.addRule(SchemaRuleOptions(
         name: name,
         schema: schema,
