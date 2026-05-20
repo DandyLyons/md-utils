@@ -182,6 +182,64 @@ swift run md-utils lines --start 10 --end 20 document.md
 
 Run `swift run md-utils --help` or `swift run md-utils <command> --help` for full usage details.
 
+## Project Configuration
+
+Project-level md-utils settings live in `.md-utils/md-utils.json`. The schema command group creates and uses this folder to validate Markdown YAML frontmatter against JSON Schema files. Schemas only apply to frontmatter, not Markdown body content.
+
+Default layout:
+
+```text
+.md-utils/
+  md-utils.json
+  md-utils.schema.json
+  schemas/
+    book.schema.json
+```
+
+Example config:
+
+```json
+{
+  "$schema": "md-utils.schema.json",
+  "schemaDirectory": ".md-utils/schemas",
+  "schemaRules": [
+    {
+      "name": "books",
+      "schema": "book.schema.json",
+      "frontmatterRequired": true,
+      "match": {
+        "paths": ["Books/**/*.md"],
+        "frontmatter": {
+          "tags": { "includes": "Book" }
+        }
+      }
+    }
+  ]
+}
+```
+
+Config fields:
+
+- `$schema`: Optional editor hint for autocomplete and validation.
+- `schemaDirectory`: Directory for JSON Schema files. Defaults to `.md-utils/schemas`.
+- `schemaRules`: Rules that map schemas to Markdown files.
+- `schemaRules[].name`: Unique rule name for `md-utils schema validate <rule-name>`.
+- `schemaRules[].schema`: Schema file, resolved relative to `schemaDirectory`.
+- `schemaRules[].frontmatterRequired`: If `true`, matched files without frontmatter fail; if `false`, they are skipped.
+- `schemaRules[].match.paths`: Glob patterns matched against project-relative Markdown paths.
+- `schemaRules[].match.frontmatter`: Frontmatter matchers. Initially supports `{ "includes": value }` for array values.
+
+Schema commands:
+
+```bash
+md-utils schema init books --path "Books/**/*.md" --tag Book
+md-utils schema list
+md-utils schema validate
+md-utils schema validate books
+```
+
+If a file matches multiple rules, all matching schemas apply. Files matching no rules are ignored. Invalid YAML frontmatter is always reported as an error because schema validation cannot proceed.
+
 ## Architecture
 
 - **Swift 6.2** or later
@@ -193,6 +251,7 @@ Run `swift run md-utils --help` or `swift run md-utils <command> --help` for ful
 - [swift-parsing](https://github.com/pointfreeco/swift-parsing) — Parser combinators
 - [swift-argument-parser](https://github.com/apple/swift-argument-parser) — CLI argument parsing
 - [PathKit](https://github.com/kylef/PathKit) — File path handling
+- [JSONSchema.swift](https://github.com/kylef/JSONSchema.swift) — JSON Schema validation
 - [Yams](https://github.com/jpsim/Yams) — YAML parsing and serialization
 - [jmespath.swift](https://github.com/nicktmro/jmespath.swift) — JMESPath query language for JSON
 
