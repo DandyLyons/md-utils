@@ -15,59 +15,78 @@ extension CLIEntry.SchemaCommands {
     @Argument(help: "Optional schema rule name to validate")
     var ruleName: String?
 
+    @Flag(name: .long, help: "Include successful validation results in output")
+    var includeOk: Bool = false
+
     mutating func run() async throws {
       let summary = try SchemaValidatorRunner.validate(ruleName: ruleName)
-      printSummary(summary)
+      print(SchemaValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk))
       if summary.hasFailures {
         throw ExitCode.failure
       }
     }
+  }
+}
 
-    private func printSummary(_ summary: SchemaValidationSummary) {
-      guard !summary.results.isEmpty else {
-        print("No files matched configured schema rules.")
-        return
-      }
+enum SchemaValidationSummaryFormatter {
+  static func render(
+    _ summary: SchemaValidationSummary,
+    ruleName: String? = nil,
+    includeOk: Bool = false
+  ) -> String {
+    var lines: [String] = []
 
-      if let ruleName {
-        print("Validated \(summary.fileRuleMatches) file(s) against schema rule \"\(ruleName)\".")
-      } else if summary.matchedFiles == summary.fileRuleMatches {
-        print(
-          "Validated \(summary.matchedFiles) file(s) against \(Set(summary.results.map(\.ruleName)).count) schema rule(s)."
-        )
-      } else {
-        print(
-          "Validated \(summary.fileRuleMatches) file-rule match(es) across \(summary.matchedFiles) file(s) and \(Set(summary.results.map(\.ruleName)).count) schema rule(s)."
-        )
-      }
+    guard !summary.results.isEmpty else {
+      return "No files matched configured schema rules."
+    }
 
-      if summary.errors > 0 {
-        print("Found \(summary.errors) error(s).")
-      }
-      if summary.skipped > 0 {
-        print("Skipped \(summary.skipped) file(s) without frontmatter.")
-      }
-      print("")
+    if let ruleName {
+      lines.append("Validated \(summary.fileRuleMatches) file(s) against schema rule \"\(ruleName)\".")
+    } else if summary.matchedFiles == summary.fileRuleMatches {
+      lines.append(
+        "Validated \(summary.matchedFiles) file(s) against \(Set(summary.results.map(\.ruleName)).count) schema rule(s)."
+      )
+    } else {
+      lines.append(
+        "Validated \(summary.fileRuleMatches) file-rule match(es) across \(summary.matchedFiles) file(s) and \(Set(summary.results.map(\.ruleName)).count) schema rule(s)."
+      )
+    }
 
-      let grouped = Dictionary(grouping: summary.results, by: \.ruleName)
+    if summary.errors > 0 {
+      lines.append("Found \(summary.errors) error(s).")
+    }
+    if summary.skipped > 0 {
+      lines.append("Skipped \(summary.skipped) file(s) without frontmatter.")
+    }
+
+    let visibleResults = summary.results.filter { includeOk || $0.status == .error }
+    if !visibleResults.isEmpty {
+      lines.append("")
+      let grouped = Dictionary(grouping: visibleResults, by: \.ruleName)
       for rule in grouped.keys.sorted() {
-        print(rule)
+        lines.append(rule)
         for result in grouped[rule] ?? [] {
-          switch result.status {
-          case .ok:
-            print("  OK \(result.filePath)")
-          case .skipped:
-            print("  SKIP \(result.filePath)")
-            for error in result.errors {
-              print("    \(error.path): \(error.message)")
-            }
-          case .error:
-            print("  ERROR \(result.filePath)")
-            for error in result.errors {
-              print("    \(error.path): \(error.message)")
-            }
-          }
+          append(result, to: &lines)
         }
+      }
+    }
+
+    return lines.joined(separator: "\n")
+  }
+
+  private static func append(_ result: SchemaValidationResult, to lines: inout [String]) {
+    switch result.status {
+    case .ok:
+      lines.append("  OK \(result.filePath)")
+    case .skipped:
+      lines.append("  SKIP \(result.filePath)")
+      for error in result.errors {
+        lines.append("    \(error.path): \(error.message)")
+      }
+    case .error:
+      lines.append("  ERROR \(result.filePath)")
+      for error in result.errors {
+        lines.append("    \(error.path): \(error.message)")
       }
     }
   }

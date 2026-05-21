@@ -186,6 +186,15 @@ Run `swift run md-utils --help` or `swift run md-utils <command> --help` for ful
 
 Project-level md-utils settings live in `.md-utils/md-utils.json`. The schema command group creates and uses this folder to validate Markdown YAML frontmatter against JSON Schema files. Schemas only apply to frontmatter, not Markdown body content.
 
+Treat the directory containing `.md-utils/` as the md-utils project root. Commands that use project configuration read `.md-utils/md-utils.json` relative to the current working directory; md-utils does not search parent directories for project configuration. Run schema/config commands from the directory that contains `.md-utils/`:
+
+```bash
+cd /path/to/project
+md-utils schema validate
+```
+
+Paths in `schemaRules[].match.paths` and the default `schemaDirectory` are interpreted relative to that same working directory. If you run md-utils from a subdirectory, it will look for `.md-utils/md-utils.json` in that subdirectory.
+
 Default layout:
 
 ```text

@@ -34,6 +34,36 @@ struct SchemaCommandsTests {
   }
 
   @Test
+  func `schema validate parses include ok flag`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["schema", "validate", "--include-ok"])
+    let command = try #require(parsed as? CLIEntry.SchemaCommands.Validate)
+
+    #expect(command.includeOk)
+  }
+
+  @Test
+  func `schema validate output hides ok and skipped results by default`() throws {
+    let summary = schemaValidationSummary()
+
+    let output = SchemaValidationSummaryFormatter.render(summary)
+
+    #expect(output.contains("  ERROR Books/broken.md"))
+    #expect(!output.contains("  OK Books/dune.md"))
+    #expect(!output.contains("  SKIP Books/plain.md"))
+  }
+
+  @Test
+  func `schema validate output includes ok results with include ok flag`() throws {
+    let summary = schemaValidationSummary()
+
+    let output = SchemaValidationSummaryFormatter.render(summary, includeOk: true)
+
+    #expect(output.contains("  ERROR Books/broken.md"))
+    #expect(output.contains("  OK Books/dune.md"))
+    #expect(output.contains("  SKIP Books/plain.md"))
+  }
+
+  @Test
   func `schema init creates config schema and rule`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
@@ -542,6 +572,35 @@ struct SchemaCommandsTests {
   private func writeFile(_ path: Path, content: String) throws {
     try path.parent().mkpath()
     try path.write(content)
+  }
+
+  private func schemaValidationSummary() -> SchemaValidationSummary {
+    SchemaValidationSummary(
+      results: [
+        SchemaValidationResult(
+          ruleName: "books",
+          schemaPath: ".md-utils/schemas/book.schema.json",
+          filePath: "Books/dune.md",
+          status: .ok,
+          errors: []
+        ),
+        SchemaValidationResult(
+          ruleName: "books",
+          schemaPath: ".md-utils/schemas/book.schema.json",
+          filePath: "Books/plain.md",
+          status: .skipped,
+          errors: [SchemaValidationErrorDetail(path: "frontmatter", message: "not present")]
+        ),
+        SchemaValidationResult(
+          ruleName: "books",
+          schemaPath: ".md-utils/schemas/book.schema.json",
+          filePath: "Books/broken.md",
+          status: .error,
+          errors: [SchemaValidationErrorDetail(path: "/title", message: "is required")]
+        ),
+      ],
+      totalMarkdownFiles: 3
+    )
   }
 
   private func ruleJSON(
