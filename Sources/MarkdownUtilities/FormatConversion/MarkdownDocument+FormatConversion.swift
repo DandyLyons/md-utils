@@ -61,25 +61,51 @@ extension MarkdownDocument {
         try YAMLConversion.serialize(frontMatter)
     }
 
-    // MARK: - Future Format Conversions (Placeholders)
+    // MARK: - HTML Conversion
 
-    // Uncomment and implement as needed:
+    /// Converts the Markdown document to HTML.
+    ///
+    /// Uses the battle-tested cmark-gfm renderer directly, bypassing the typed AST.
+    /// GFM extensions (tables, autolinks, strikethrough, tagfilters, task lists) are
+    /// enabled by default; disable them individually via `options.extensions`.
+    ///
+    /// Example usage:
+    /// ```swift
+    /// let doc = try MarkdownDocument(content: markdownText)
+    /// let html = try await doc.toHTML()
+    /// ```
+    ///
+    /// With custom options:
+    /// ```swift
+    /// let options = HTMLOptions(wrapInDocument: true, extensions: [.tables, .tasklist])
+    /// let html = try await doc.toHTML(options: options)
+    /// ```
+    ///
+    /// - Parameter options: Configuration options for the conversion (default: .default)
+    /// - Returns: The HTML representation of the document
+    /// - Throws: Conversion errors if the cmark renderer fails
+    public func toHTML(options: HTMLOptions = .default) async throws -> String {
+        var cmarkOptions: CMDocumentOption = [.strikethroughDoubleTilde, .footnotes]
+        if options.hardBreaks      { cmarkOptions.insert(.hardBreaks) }
+        if options.allowUnsafeHTML { cmarkOptions.insert(.unsafe) }
+        if options.smartPunctuation { cmarkOptions.insert(.smart) }
 
-    // /// Converts the Markdown document to HTML.
-    // ///
-    // /// - Parameter options: Configuration options for HTML conversion
-    // /// - Returns: The HTML representation of the document
-    // /// - Throws: Conversion errors if the operation fails
-    // public func toHTML(options: HTMLOptions = .default) async throws -> String {
-    //     fatalError("HTML conversion not yet implemented")
-    // }
+        let document = try CMDocument(
+            text: body,
+            options: cmarkOptions,
+            extensions: options.extensions.asCMExtensionOption
+        )
+        var html = try await document.renderHtml()
 
-    // /// Converts the Markdown document to RTF.
-    // ///
-    // /// - Parameter options: Configuration options for RTF conversion
-    // /// - Returns: The RTF data representation of the document
-    // /// - Throws: Conversion errors if the operation fails
-    // public func toRTF(options: RTFOptions = .default) async throws -> Data {
-    //     fatalError("RTF conversion not yet implemented")
-    // }
+        if options.includeFrontmatter && !frontMatter.isEmpty {
+            let yaml = try serializeFrontmatter()
+            html = "<!--\n\(yaml)-->\n" + html
+        }
+
+        if options.wrapInDocument {
+            html = "<!DOCTYPE html>\n<html>\n<head></head>\n<body>\n\(html)</body>\n</html>\n"
+        }
+
+        return html
+    }
 }
