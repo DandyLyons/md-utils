@@ -53,6 +53,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     var caseInsensitive: Bool = false
 
     mutating func run() async throws {
+      let timer = CommandTimer()
       let paths = try options.resolvedPaths()
 
       guard !paths.isEmpty else {
@@ -60,6 +61,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       }
 
       var hasErrors = false
+      var updatedCount = 0
 
       for path in paths {
         do {
@@ -84,6 +86,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           // Write back
           let updatedContent = try doc.render()
           try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
+          updatedCount += 1
         } catch {
           fputs("error: \(path): \(error.localizedDescription)\n", stderr)
           hasErrors = true
@@ -91,6 +94,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         }
       }
 
+      timer.writeStatus("Appended value to frontmatter array \"\(key)\" in \(updatedCount) file(s)")
       if hasErrors { throw ExitCode.failure }
     }
   }

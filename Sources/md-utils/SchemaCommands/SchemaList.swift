@@ -28,9 +28,10 @@ extension CLIEntry.SchemaCommands {
           print("  paths: \(rule.match.paths.joined(separator: ", "))")
         }
         if !rule.match.frontmatter.isEmpty {
+          print("  \(rule.name) rule will run when:")
           for key in rule.match.frontmatter.keys.sorted() {
             if let matcher = rule.match.frontmatter[key] {
-              print("  frontmatter: \(key) includes \(matcher.includes)")
+              print("    frontmatter key \(key) includes \(matcher.includes)")
             }
           }
         }

@@ -29,6 +29,7 @@ extension CLIEntry.FrontMatterCommands {
     var key: String
 
     mutating func run() async throws {
+      let timer = CommandTimer()
       let files = try options.resolvedPaths()
 
       guard !files.isEmpty else {
@@ -36,6 +37,7 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       var hasErrors = false
+      var checkedCount = 0
 
       for file in files {
         do {
@@ -48,6 +50,7 @@ extension CLIEntry.FrontMatterCommands {
           } else {
             print(exists)
           }
+          checkedCount += 1
         } catch {
           fputs("error: \(file): \(error.localizedDescription)\n", stderr)
           hasErrors = true
@@ -55,6 +58,7 @@ extension CLIEntry.FrontMatterCommands {
         }
       }
 
+      timer.writeStatus("Checked frontmatter key \"\(key)\" in \(checkedCount) file(s)")
       if hasErrors { throw ExitCode.failure }
     }
   }

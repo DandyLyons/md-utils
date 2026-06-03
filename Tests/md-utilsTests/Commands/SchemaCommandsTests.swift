@@ -47,9 +47,39 @@ struct SchemaCommandsTests {
 
     let output = SchemaValidationSummaryFormatter.render(summary)
 
+    #expect(output.contains("Rules validated: books."))
     #expect(output.contains("  ERROR Books/broken.md"))
     #expect(!output.contains("  OK Books/dune.md"))
     #expect(!output.contains("  SKIP Books/plain.md"))
+  }
+
+  @Test
+  func `schema validate output shows rules when all files are ok`() throws {
+    let summary = SchemaValidationSummary(
+      results: [
+        SchemaValidationResult(
+          ruleName: "books",
+          schemaPath: ".md-utils/schemas/book.schema.json",
+          filePath: "Books/dune.md",
+          status: .ok,
+          errors: []
+        ),
+        SchemaValidationResult(
+          ruleName: "authors",
+          schemaPath: ".md-utils/schemas/author.schema.json",
+          filePath: "Authors/herbert.md",
+          status: .ok,
+          errors: []
+        ),
+      ],
+      totalMarkdownFiles: 2
+    )
+
+    let output = SchemaValidationSummaryFormatter.render(summary)
+
+    #expect(output.contains("Rules validated: authors, books."))
+    #expect(!output.contains("  OK Books/dune.md"))
+    #expect(!output.contains("  OK Authors/herbert.md"))
   }
 
   @Test

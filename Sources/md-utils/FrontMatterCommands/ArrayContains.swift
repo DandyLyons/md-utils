@@ -67,12 +67,17 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     var caseInsensitive: Bool = false
 
     mutating func run() async throws {
+      let timer = CommandTimer()
       var matchingFiles: [String] = []
       var hasErrors = false
+      var searchedCount = 0
       let paths = try options.resolvedPaths()
 
       guard !paths.isEmpty else {
         throw ValidationError("No Markdown files found to process")
+      }
+      defer {
+        timer.writeStatus("Searched frontmatter array \"\(key)\" in \(searchedCount) file(s)")
       }
 
       for path in paths {
@@ -87,6 +92,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           hasErrors = true
           continue
         }
+        searchedCount += 1
 
         // 2. Check if key exists and is an array (skip if not)
         let sequence: Yams.Node.Sequence

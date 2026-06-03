@@ -56,6 +56,7 @@ extension CLIEntry.FrontMatterCommands {
     }
 
     mutating func run() async throws {
+      let timer = CommandTimer()
       let files = try options.resolvedPaths()
 
       guard !files.isEmpty else {
@@ -63,6 +64,7 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       var hasErrors = false
+      var processedCount = 0
 
       if format == .json {
         var results: [[String: Any]] = []
@@ -80,6 +82,7 @@ extension CLIEntry.FrontMatterCommands {
               results.append(["path": file.string])
               hasErrors = true
             }
+            processedCount += 1
           } catch {
             fputs("error: \(file): \(error.localizedDescription)\n", stderr)
             hasErrors = true
@@ -87,6 +90,7 @@ extension CLIEntry.FrontMatterCommands {
         }
         let jsonString = try YAMLConversion.anyToJSON(results, options: [.prettyPrinted])
         print(jsonString)
+        timer.writeStatus("Read frontmatter key \"\(key)\" from \(processedCount) file(s)")
         if hasErrors { throw ExitCode.failure }
         return
       }
@@ -95,6 +99,7 @@ extension CLIEntry.FrontMatterCommands {
         do {
           let content: String = try file.read()
           let doc = try MarkdownDocument(content: content)
+          processedCount += 1
 
           guard let value = doc.getValue(forKey: key) else {
             if files.count > 1 {
@@ -118,6 +123,7 @@ extension CLIEntry.FrontMatterCommands {
         }
       }
 
+      timer.writeStatus("Read frontmatter key \"\(key)\" from \(processedCount) file(s)")
       // Exit with error code if any keys were missing or files had invalid YAML
       if hasErrors {
         throw ExitCode.failure

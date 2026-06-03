@@ -20,7 +20,7 @@ extension CLIEntry.FrontMatterCommands {
         Creates the key if it doesn't exist, or updates the value if it does.
         If the document has no frontmatter, it will be added.
 
-        The operation is silent on success (no output).
+        On success, timing/status output is written to stderr.
         """
     )
 
@@ -33,6 +33,7 @@ extension CLIEntry.FrontMatterCommands {
     var value: String
 
     mutating func run() async throws {
+      let timer = CommandTimer()
       let files = try options.resolvedPaths()
 
       guard !files.isEmpty else {
@@ -40,6 +41,7 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       var hasErrors = false
+      var updatedCount = 0
 
       for file in files {
         do {
@@ -50,6 +52,7 @@ extension CLIEntry.FrontMatterCommands {
 
           let updated = try doc.render()
           try file.write(updated)
+          updatedCount += 1
         } catch {
           fputs("error: \(file): \(error.localizedDescription)\n", stderr)
           hasErrors = true
@@ -57,6 +60,7 @@ extension CLIEntry.FrontMatterCommands {
         }
       }
 
+      timer.writeStatus("Set frontmatter key \"\(key)\" in \(updatedCount) file(s)")
       if hasErrors { throw ExitCode.failure }
     }
   }

@@ -47,6 +47,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     var caseInsensitive: Bool = false
 
     mutating func run() async throws {
+      let timer = CommandTimer()
       var processedCount = 0
       var skippedCount = 0
       var hasErrors = false
@@ -98,6 +99,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         }
       }
 
+      timer.writeStatus("Removed value from frontmatter array \"\(key)\" in \(processedCount) file(s)")
       if hasErrors { throw ExitCode.failure }
     }
   }

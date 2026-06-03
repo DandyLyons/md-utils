@@ -19,8 +19,10 @@ extension CLIEntry.SchemaCommands {
     var includeOk: Bool = false
 
     mutating func run() async throws {
+      let timer = CommandTimer()
       let summary = try SchemaValidatorRunner.validate(ruleName: ruleName)
       print(SchemaValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk))
+      timer.writeStatus("Validated \(summary.matchedFiles) file(s)")
       if summary.hasFailures {
         throw ExitCode.failure
       }
@@ -51,6 +53,7 @@ enum SchemaValidationSummaryFormatter {
         "Validated \(summary.fileRuleMatches) file-rule match(es) across \(summary.matchedFiles) file(s) and \(Set(summary.results.map(\.ruleName)).count) schema rule(s)."
       )
     }
+    lines.append("Rules validated: \(Set(summary.results.map(\.ruleName)).sorted().joined(separator: ", ")).")
 
     if summary.errors > 0 {
       lines.append("Found \(summary.errors) error(s).")
