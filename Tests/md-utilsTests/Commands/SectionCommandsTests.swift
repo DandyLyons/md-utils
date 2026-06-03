@@ -25,12 +25,51 @@ struct SectionCommandsTests {
     let config = CLIEntry.SectionCommands.configuration
 
     #expect(config.commandName == "section")
-    #expect(config.subcommands.count == 5)
-    #expect(config.subcommands[0] is CLIEntry.GetSection.Type)
-    #expect(config.subcommands[1] is CLIEntry.SetSection.Type)
-    #expect(config.subcommands[2] is CLIEntry.MoveSectionUp.Type)
-    #expect(config.subcommands[3] is CLIEntry.MoveSectionDown.Type)
-    #expect(config.subcommands[4] is CLIEntry.MoveSectionTo.Type)
+    #expect(config.subcommands.count == 6)
+    #expect(config.subcommands[0] is CLIEntry.ListSections.Type)
+    #expect(config.subcommands[1] is CLIEntry.GetSection.Type)
+    #expect(config.subcommands[2] is CLIEntry.SetSection.Type)
+    #expect(config.subcommands[3] is CLIEntry.MoveSectionUp.Type)
+    #expect(config.subcommands[4] is CLIEntry.MoveSectionDown.Type)
+    #expect(config.subcommands[5] is CLIEntry.MoveSectionTo.Type)
+  }
+
+  @Test
+  func `List command has correct configuration`() {
+    let config = CLIEntry.ListSections.configuration
+    #expect(config.commandName == "list")
+  }
+
+  @Test
+  func `List parses GenerateTOC options`() throws {
+    let testFile = try createTestFile(content: "# Test\n## Other")
+    defer { cleanup(file: testFile) }
+
+    let cmd_ = try CLIEntry.parseAsRoot([
+      "section", "list", testFile.string,
+      "--min-level", "2",
+      "--max-level", "4",
+      "--flat",
+      "--no-slugs",
+      "--format", "plain",
+    ])
+    let cmd = try #require(cmd_ as? CLIEntry.ListSections)
+
+    #expect(cmd.toc.options.paths.count == 1)
+    #expect(cmd.toc.minLevel == 2)
+    #expect(cmd.toc.maxLevel == 4)
+    #expect(cmd.toc.flat == true)
+    #expect(cmd.toc.noSlugs == true)
+    #expect(cmd.toc.format == .plain)
+  }
+
+  @Test
+  func `List alias parses`() throws {
+    let testFile = try createTestFile(content: "# Test")
+    defer { cleanup(file: testFile) }
+
+    let cmd_ = try CLIEntry.parseAsRoot(["section", "ls", testFile.string])
+    _ = try #require(cmd_ as? CLIEntry.ListSections)
   }
 
   @Test

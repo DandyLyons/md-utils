@@ -16,6 +16,7 @@ extension CLIEntry {
         nested content) within a Markdown document.
 
         Available commands:
+        - list: List headings/sections in document order
         - get: Extract a section and output it
         - set: Replace a section with new content
         - move-up: Move a section up by one position
@@ -27,6 +28,7 @@ extension CLIEntry {
         Use --in-place to modify files directly instead of outputting to stdout.
         """,
       subcommands: [
+        ListSections.self,
         GetSection.self,
         SetSection.self,
         MoveSectionUp.self,
