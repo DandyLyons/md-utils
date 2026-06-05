@@ -56,12 +56,11 @@ public enum TOCRenderer {
       return renderHTML(toc)
     }
   }
-
   // MARK: - Markdown Bullet Links Rendering
-
+  /// Renders the table of contents as a Markdown bullet list with anchor links.
   static func renderMdBulletLinks(_ toc: TableOfContents) -> String {
     var lines: [String] = []
-
+    /// Appends one entry and its descendants to the Markdown bullet list.
     func renderEntry(_ entry: TOCEntry, depth: Int) {
       let indent = String(repeating: "  ", count: depth)
       let text: String
@@ -84,12 +83,11 @@ public enum TOCRenderer {
 
     return lines.joined(separator: "\n")
   }
-
   // MARK: - Markdown Only Headings Rendering
-
+  /// Renders the table of contents as Markdown heading lines.
   static func renderMdOnlyHeadings(_ toc: TableOfContents) -> String {
     var lines: [String] = []
-
+    /// Appends one entry and its descendants as Markdown headings.
     func renderEntry(_ entry: TOCEntry) {
       let marker = String(repeating: "#", count: entry.level)
       lines.append("\(marker) \(entry.text)")
@@ -105,12 +103,11 @@ public enum TOCRenderer {
 
     return lines.joined(separator: "\n")
   }
-
   // MARK: - Tree Rendering
-
+  /// Renders the table of contents as an indented tree.
   static func renderTree(_ toc: TableOfContents) -> String {
     var lines: [String] = []
-
+    /// Appends one entry and its descendants to the tree output.
     func renderEntry(_ entry: TOCEntry, prefix: String, isLast: Bool) {
       let connector = isLast ? "└── " : "├── "
       lines.append("\(prefix)\(connector)\(entry.text)")
@@ -129,12 +126,11 @@ public enum TOCRenderer {
 
     return lines.joined(separator: "\n")
   }
-
   // MARK: - Plain Text Rendering
-
+  /// Renders the table of contents as plain indented text.
   static func renderPlainTextIndented(_ toc: TableOfContents) -> String {
     var lines: [String] = []
-
+    /// Appends one entry and its descendants to the plain text output.
     func renderEntry(_ entry: TOCEntry, depth: Int) {
       let indent = String(repeating: "  ", count: depth)
       lines.append("\(indent)\(entry.text)")
@@ -150,9 +146,8 @@ public enum TOCRenderer {
 
     return lines.joined(separator: "\n")
   }
-
   // MARK: - JSON Rendering
-
+  /// Renders the table of contents as compact or pretty-printed JSON.
   static func renderJSON(_ toc: TableOfContents, pretty: Bool) -> String {
     let encoder = JSONEncoder()
     if pretty {
@@ -169,12 +164,11 @@ public enum TOCRenderer {
 
     return string
   }
-
   // MARK: - HTML Rendering
-
+  /// Renders the table of contents as nested HTML lists.
   static func renderHTML(_ toc: TableOfContents) -> String {
     var html = "<ul>\n"
-
+    /// Renders one entry and its descendants as HTML list items.
     func renderEntry(_ entry: TOCEntry, depth: Int) -> String {
       let indent = String(repeating: "  ", count: depth + 1)
       var result = ""
@@ -206,7 +200,7 @@ public enum TOCRenderer {
     html += "</ul>"
     return html
   }
-
+  /// Escapes text for safe inclusion in HTML output.
   static func escapeHTML(_ text: String) -> String {
     text
       .replacingOccurrences(of: "&", with: "&amp;")
@@ -216,26 +210,25 @@ public enum TOCRenderer {
       .replacingOccurrences(of: "'", with: "&#39;")
   }
 }
-
 // MARK: - JSON Representation
-
+/// Represents a table of contents in JSON-encodable form.
 struct TOCJSONRepresentation: Codable {
   let entries: [EntryRepresentation]
   let minLevel: Int
   let maxLevel: Int
-
+  /// Creates a configured instance.
   init(from toc: TableOfContents) {
     self.entries = toc.entries.map { EntryRepresentation(from: $0) }
     self.minLevel = toc.minLevel
     self.maxLevel = toc.maxLevel
   }
-
+  /// Represents table-of-contents entry representation.
   struct EntryRepresentation: Codable {
     let level: Int
     let text: String
     let slug: String?
     let children: [EntryRepresentation]
-
+    /// Creates a configured instance.
     init(from entry: TOCEntry) {
       self.level = entry.level
       self.text = entry.text

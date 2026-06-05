@@ -28,7 +28,9 @@ public enum SectionReorderer {
 
     /// The number of positions to move (must be >= 1).
     public let count: Int
-
+    /// Creates a configured instance.
+    ///
+    /// See <doc:SectionWorkflows> for workflow details.
     public init(
       matchCriteria: SectionExtractor.Options.MatchCriteria,
       direction: Direction,
@@ -47,7 +49,9 @@ public enum SectionReorderer {
 
     /// The target position among siblings (1-based).
     public let targetPosition: Int
-
+    /// Creates a configured instance.
+    ///
+    /// See <doc:SectionWorkflows> for workflow details.
     public init(matchCriteria: SectionExtractor.Options.MatchCriteria, targetPosition: Int) {
       self.matchCriteria = matchCriteria
       self.targetPosition = targetPosition
@@ -196,7 +200,6 @@ public enum SectionReorderer {
       targetPosition: zeroBasedPosition
     )
   }
-
   // MARK: - Private Helpers
 
   /// Resolves the target heading index from match criteria.

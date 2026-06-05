@@ -5,8 +5,13 @@
 
 import ArgumentParser
 import PathKit
-
+/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 extension CLIEntry.SchemaCommands {
+  /// Defines the `SchemaRemove` command behavior.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   struct Remove: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "remove",
@@ -18,7 +23,9 @@ extension CLIEntry.SchemaCommands {
 
     @Flag(name: .long, help: "Delete the removed rule's schema file when it is safe")
     var deleteSchema: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:SchemaValidationCommands> for workflow details.
     mutating func run() async throws {
       let result = try SchemaRuleManager.removeRule(named: name, deleteSchema: deleteSchema)
 

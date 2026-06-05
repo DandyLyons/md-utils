@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
   /// Rename a frontmatter key
   struct Rename: AsyncParsableCommand {
@@ -38,7 +40,9 @@ extension CLIEntry.FrontMatterCommands {
 
     @Option(help: "The new key name")
     var newKey: String
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let files = try options.resolvedPaths()
 

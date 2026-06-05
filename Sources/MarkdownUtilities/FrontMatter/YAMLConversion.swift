@@ -25,7 +25,9 @@ public enum YAMLConversionError: Error {
   /// YAML mapping contains a non-string key that cannot be safely converted
   case nonStringKey(String)
 }
-
+/// Adds frontmatter behavior to ``YAMLConversionError``.
+///
+/// See <doc:FrontmatterWorkflows> for workflow details.
 extension YAMLConversionError: LocalizedError {
   public var errorDescription: String? {
     switch self {
@@ -46,8 +48,11 @@ extension YAMLConversionError: LocalizedError {
     }
   }
 }
-
+/// Adds frontmatter behavior to ``YAMLConversionError``.
+///
+/// See <doc:FrontmatterWorkflows> for workflow details.
 extension YAMLConversionError: Equatable {
+  /// Compares YAML conversion error cases while ignoring wrapped underlying errors.
   public static func == (lhs: YAMLConversionError, rhs: YAMLConversionError) -> Bool {
     switch (lhs, rhs) {
       case (.invalidYAML, .invalidYAML):
@@ -165,6 +170,9 @@ public enum YAMLConversion {
   /// - Throws: `YAMLConversionError.jsonConversionFailed` if conversion fails
   public static func anyToJSON(_ any: Any, options: JSONSerialization.WritingOptions = []) throws -> String {
     // Recursively convert AnyHashable keys to Strings for JSON serialization
+    /// Converts a YAML node into a JSON-compatible Swift value.
+    ///
+    /// See <doc:FrontmatterWorkflows> for workflow details.
     func convertToJSONCompatible(_ value: Any) -> Any {
       if let dict = value as? [AnyHashable: Any] {
         return dict.reduce(into: [String: Any]()) { result, pair in
@@ -353,9 +361,10 @@ public enum YAMLConversion {
     }
   }
 }
-
 // MARK: - Yams.Node Extensions
-
+/// Adds frontmatter conversion helpers to `Yams.Node`.
+///
+/// See <doc:FrontmatterWorkflows> for workflow details.
 extension Yams.Node {
   /// Convert the Yams Node to a JSON string.
   ///

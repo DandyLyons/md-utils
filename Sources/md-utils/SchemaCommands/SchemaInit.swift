@@ -6,8 +6,13 @@
 import ArgumentParser
 import Foundation
 import PathKit
-
+/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 extension CLIEntry.SchemaCommands {
+  /// Defines the `SchemaInit` command behavior.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   struct Init: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "init",
@@ -32,7 +37,9 @@ extension CLIEntry.SchemaCommands {
       help: "Require matching files to have frontmatter"
     )
     var frontmatterRequired: Bool = true
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:SchemaValidationCommands> for workflow details.
     mutating func run() async throws {
       try SchemaConfigBootstrapper.ensureProjectFiles()
 

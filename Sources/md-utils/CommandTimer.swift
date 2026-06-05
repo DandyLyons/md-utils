@@ -4,11 +4,11 @@
 //
 
 import Foundation
-
+/// Represents command timer.
 struct CommandTimer {
   private let clock = ContinuousClock()
   private let start: ContinuousClock.Instant
-
+  /// Creates a configured instance.
   init() {
     start = clock.now
   }
@@ -16,11 +16,11 @@ struct CommandTimer {
   var elapsed: Duration {
     start.duration(to: clock.now)
   }
-
+  /// Writes a status message with elapsed command time.
   func writeStatus(_ message: String) {
     fputs("\(message) in \(formattedElapsed()).\n", stderr)
   }
-
+  /// Formats the value for user-facing output.
   private func formattedElapsed() -> String {
     let components = elapsed.components
     let milliseconds =

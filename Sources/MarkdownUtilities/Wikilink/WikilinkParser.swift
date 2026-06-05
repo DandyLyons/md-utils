@@ -22,7 +22,7 @@ enum WikilinkParserError: Error {
 struct WikilinkParser: Parsing.Parser {
   typealias Input = Substring
   typealias Output = Wikilink
-
+  /// Parses input into structured Markdown data.
   func parse(_ input: inout Substring) throws -> Wikilink {
     let original = input
 

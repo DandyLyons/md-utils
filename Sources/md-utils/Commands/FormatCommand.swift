@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds command implementations to ``CLIEntry``.
 extension CLIEntry {
     /// Normalize Markdown formatting conventions.
     struct FormatCommand: AsyncParsableCommand {
@@ -69,7 +69,7 @@ extension CLIEntry {
         @Flag(name: .long,
               help: "Modify files in place instead of writing to stdout")
         var inPlace: Bool = false
-
+        /// Runs the command using the parsed command-line arguments.
         mutating func run() async throws {
             // Validate mutual exclusions
             guard !(bulletsDashes && bulletsAsterisks) else {
@@ -125,7 +125,7 @@ extension CLIEntry {
                 }
             }
         }
-
+        /// Reconstructs formatted Markdown output from parsed document parts.
         private func reconstructOutput(_ doc: MarkdownDocument) throws -> String {
             guard !doc.frontMatter.isEmpty else { return doc.body }
             let yaml = try YAMLConversion.serialize(doc.frontMatter)

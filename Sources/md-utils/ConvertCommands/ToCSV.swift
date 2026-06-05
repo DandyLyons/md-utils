@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds Markdown document behavior to ``CLIEntry.ConvertCommands``.
+///
+/// See <doc:ConversionCommands> for workflow details.
 extension CLIEntry.ConvertCommands {
     /// Convert Markdown files with frontmatter to CSV
     struct ToCSV: AsyncParsableCommand {
@@ -79,7 +81,9 @@ extension CLIEntry.ConvertCommands {
             transform: parseMetadataColumns
         )
         var includeMeta: Set<CSVOptions.MetadataColumn>?
-
+        /// Runs the command using the parsed command-line arguments.
+        ///
+        /// See <doc:ConversionCommands> for workflow details.
         mutating func run() async throws {
             // Resolve input files
             let files = try options.resolvedPaths()
@@ -147,7 +151,6 @@ extension CLIEntry.ConvertCommands {
                 throw ExitCode.failure
             }
         }
-
         // MARK: - Helper Methods
 
         /// Determine the output path for the CSV file

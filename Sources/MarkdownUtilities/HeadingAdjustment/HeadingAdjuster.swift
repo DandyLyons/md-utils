@@ -12,7 +12,7 @@ public enum HeadingAdjuster {
 
     /// Whether to adjust child headings along with the target
     public var includeChildren: Bool
-
+    /// Creates a configured instance.
     public init(targetIndex: Int, adjustment: Int, includeChildren: Bool = true) {
       self.targetIndex = targetIndex
       self.adjustment = adjustment
@@ -30,7 +30,7 @@ public enum HeadingAdjuster {
 
     /// Whether any headings were clamped at H1 or H6 boundaries
     public let hadClampedHeadings: Bool
-
+    /// Creates a configured instance.
     public init(content: String, adjustedCount: Int, hadClampedHeadings: Bool) {
       self.content = content
       self.adjustedCount = adjustedCount

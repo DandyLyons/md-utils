@@ -15,7 +15,9 @@ import Parsing
 struct FrontMatterParser: Parsing.Parser {
   typealias Input = Substring
   typealias Output = (rawFrontMatter: String, body: String)
-
+  /// Parses input into structured Markdown data.
+  ///
+  /// See <doc:FrontmatterWorkflows> for workflow details.
   func parse(_ input: inout Substring) throws -> Output {
     // Check if input starts with frontmatter delimiter (Unix line endings only)
     if input.starts(with: "---\n") {

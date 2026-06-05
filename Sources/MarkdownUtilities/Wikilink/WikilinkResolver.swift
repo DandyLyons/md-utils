@@ -139,7 +139,6 @@ public struct WikilinkResolver: @unchecked Sendable {
 
     return .unresolved
   }
-
   // MARK: - Private Helpers
 
   /// Tries to resolve a path, appending markdown extensions if needed.

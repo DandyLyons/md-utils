@@ -8,7 +8,9 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
   /// List all keys in frontmatter
   struct List: AsyncParsableCommand {
@@ -23,7 +25,9 @@ extension CLIEntry.FrontMatterCommands {
         """,
       aliases: ["ls"]
     )
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     @OptionGroup var options: GlobalOptions
 
     mutating func run() async throws {

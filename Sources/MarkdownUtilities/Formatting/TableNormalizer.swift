@@ -46,7 +46,6 @@ public enum TableNormalizer {
 
         return lines.joined(separator: "\n")
     }
-
     // MARK: - Private helpers
 
     /// Returns true if a line is part of a GFM table (contains a `|` character).

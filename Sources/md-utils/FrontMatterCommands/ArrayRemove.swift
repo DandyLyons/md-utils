@@ -10,8 +10,13 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands.ArrayCommands {
+  /// Defines the `ArrayRemove` command behavior.
+  ///
+  /// See <doc:FrontmatterCommands> for workflow details.
   struct Remove: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "remove",
@@ -45,7 +50,9 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
     @Flag(name: .long, help: "Case-insensitive comparison")
     var caseInsensitive: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
       var processedCount = 0

@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds Markdown document behavior to ``CLIEntry.ConvertCommands``.
+///
+/// See <doc:ConversionCommands> for workflow details.
 extension CLIEntry.ConvertCommands {
   /// Convert Markdown to plain text
   struct ToText: AsyncParsableCommand {
@@ -109,7 +111,9 @@ extension CLIEntry.ConvertCommands {
       help: "Preserve code blocks in output (use --no-preserve-code to disable)"
     )
     var preserveCode: Bool = true
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:ConversionCommands> for workflow details.
     mutating func run() async throws {
       // Validate flags
       try validateFlags()
@@ -140,15 +144,18 @@ extension CLIEntry.ConvertCommands {
         try await processMultipleFiles(files, options: conversionOptions)
       }
     }
-
     // MARK: - Input Mode Detection
-
+    /// Identifies where the command should read Markdown input from.
+    ///
+    /// See <doc:ConversionCommands> for workflow details.
     enum InputMode {
       case stdin
       case singleFile(Path)
       case multipleFiles([Path])
     }
-
+    /// Determines whether input should be read from stdin, one file, or multiple files.
+    ///
+    /// See <doc:ConversionCommands> for workflow details.
     func determineInputMode() throws -> InputMode {
       // Check for stdin BEFORE resolving paths (stdin detection when no paths provided)
       if options.paths.isEmpty {
@@ -174,18 +181,20 @@ extension CLIEntry.ConvertCommands {
         return .multipleFiles(files)
       }
     }
-
     // MARK: - Validation
-
+    /// Validates the input and returns validation results.
+    ///
+    /// See <doc:ConversionCommands> for workflow details.
     func validateFlags() throws {
       // Cannot use both --output and --in-place
       if output != nil && inPlace {
         throw ValidationError("Cannot use both --output and --in-place")
       }
     }
-
     // MARK: - Processing Methods
-
+    /// Reads Markdown from standard input and writes converted output.
+    ///
+    /// See <doc:ConversionCommands> for workflow details.
     func processStdin(options conversionOptions: PlainTextOptions) async throws {
       // Read from stdin
       var stdinContent = ""
@@ -210,7 +219,9 @@ extension CLIEntry.ConvertCommands {
         print(plainText, terminator: "")
       }
     }
-
+    /// Processes one input file and writes the command output.
+    ///
+    /// See <doc:ConversionCommands> for workflow details.
     func processSingleFile(_ file: Path, options conversionOptions: PlainTextOptions) async throws {
       // Read and convert
       let content: String = try file.read()
@@ -231,7 +242,9 @@ extension CLIEntry.ConvertCommands {
         print(plainText, terminator: "")
       }
     }
-
+    /// Processes multiple input files in resolved path order.
+    ///
+    /// See <doc:ConversionCommands> for workflow details.
     func processMultipleFiles(_ files: [Path], options conversionOptions: PlainTextOptions) async throws {
       // Validate: must have --output DIR or --in-place
       if output == nil && !inPlace {
@@ -298,7 +311,6 @@ extension CLIEntry.ConvertCommands {
         throw ExitCode.failure
       }
     }
-
     // MARK: - Helper Methods
 
     /// Resolves the output path for a single file.

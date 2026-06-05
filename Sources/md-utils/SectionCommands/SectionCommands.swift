@@ -4,7 +4,9 @@
 //
 
 import ArgumentParser
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
   /// Section manipulation commands
   struct SectionCommands: AsyncParsableCommand {

@@ -5,7 +5,9 @@
 
 import Foundation
 import Yams
-
+/// Adds section reordering behavior to ``MarkdownDocument``.
+///
+/// See <doc:SectionWorkflows> for workflow details.
 extension MarkdownDocument {
   /// Moves a section up among its siblings.
   ///

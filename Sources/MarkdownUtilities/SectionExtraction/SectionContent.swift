@@ -22,7 +22,9 @@ public struct SectionContent: Sendable {
 
   /// The number of child headings contained in this section.
   public let childHeadingCount: Int
-
+  /// Creates a configured instance.
+  ///
+  /// See <doc:SectionWorkflows> for workflow details.
   public init(
     text: String,
     heading: Heading,

@@ -7,7 +7,6 @@ import Yams
 /// These methods provide convenient APIs for converting Markdown documents
 /// to various output formats while handling frontmatter appropriately.
 extension MarkdownDocument {
-
     // MARK: - Plain Text Conversion
 
     /// Converts the Markdown document to plain text.
@@ -50,7 +49,6 @@ extension MarkdownDocument {
 
         return bodyText
     }
-
     // MARK: - Private Helpers
 
     /// Serializes the frontmatter mapping back to YAML format.
@@ -60,7 +58,6 @@ extension MarkdownDocument {
     private func serializeFrontmatter() throws -> String {
         try YAMLConversion.serialize(frontMatter)
     }
-
     // MARK: - Future Format Conversions (Placeholders)
 
     // Uncomment and implement as needed:

@@ -9,8 +9,13 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
+  /// Defines the `Lines` command behavior.
+  ///
+  /// See <doc:ContentSelectionCommands> for workflow details.
   struct Lines: ParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "lines",
@@ -57,7 +62,9 @@ extension CLIEntry {
       help: "Show line numbers in output"
     )
     var numbered: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     func run() throws {
       // Validate line numbers
       guard start > 0 else {

@@ -10,8 +10,13 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands.ArrayCommands {
+  /// Defines the `ArrayAppend` command behavior.
+  ///
+  /// See <doc:FrontmatterCommands> for workflow details.
   struct Append: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "append",
@@ -51,7 +56,9 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
     @Flag(name: .long, help: "Case-insensitive duplicate check")
     var caseInsensitive: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
       let paths = try options.resolvedPaths()

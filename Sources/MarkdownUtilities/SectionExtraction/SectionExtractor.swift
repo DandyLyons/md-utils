@@ -30,7 +30,9 @@ public enum SectionExtractor {
 
     /// Whether to remove the section from the original content.
     public let removeFromOriginal: Bool
-
+    /// Creates a configured instance.
+    ///
+    /// See <doc:SectionWorkflows> for workflow details.
     public init(matchCriteria: MatchCriteria, removeFromOriginal: Bool = false) {
       self.matchCriteria = matchCriteria
       self.removeFromOriginal = removeFromOriginal
@@ -50,7 +52,9 @@ public enum SectionExtractor {
 
     /// The remaining content after removal (nil if removeFromOriginal was false).
     public let remainingContent: String?
-
+    /// Creates a configured instance.
+    ///
+    /// See <doc:SectionWorkflows> for workflow details.
     public init(section: SectionContent, remainingContent: String? = nil) {
       self.section = section
       self.remainingContent = remainingContent

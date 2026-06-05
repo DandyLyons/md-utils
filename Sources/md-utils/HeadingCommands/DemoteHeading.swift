@@ -8,7 +8,7 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds command implementations to ``CLIEntry``.
 extension CLIEntry {
   /// Demote headings (increase level) in Markdown files.
   struct DemoteHeading: AsyncParsableCommand {
@@ -46,7 +46,7 @@ extension CLIEntry {
       help: "Modify the file in place instead of writing to stdout"
     )
     var inPlace: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
     mutating func run() async throws {
       // Validate index
       guard index >= 1 else {
@@ -65,7 +65,7 @@ extension CLIEntry {
         try await processFile(file, totalFiles: files.count)
       }
     }
-
+    /// Processes one Markdown file for the command.
     private func processFile(_ path: Path, totalFiles: Int) async throws {
       // Read file content
       let content: String = try path.read()

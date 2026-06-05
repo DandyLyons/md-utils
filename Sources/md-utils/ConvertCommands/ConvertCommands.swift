@@ -4,7 +4,9 @@
 //
 
 import ArgumentParser
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ConversionCommands> for workflow details.
 extension CLIEntry {
   /// Format conversion commands
   struct ConvertCommands: AsyncParsableCommand {

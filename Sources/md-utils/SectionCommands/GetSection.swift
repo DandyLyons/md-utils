@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
   /// Get a section's content from a Markdown document.
   struct GetSection: AsyncParsableCommand {
@@ -63,7 +65,9 @@ extension CLIEntry {
       transform: { Path($0) }
     )
     var output: Path?
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     mutating func run() async throws {
       try validateArguments()
 
@@ -79,7 +83,9 @@ extension CLIEntry {
 
       try await processFile(files[0])
     }
-
+    /// Validates the input and returns validation results.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func validateArguments() throws {
       let hasIndex = index != nil
       let hasName = name != nil
@@ -98,7 +104,9 @@ extension CLIEntry {
         }
       }
     }
-
+    /// Processes one Markdown file for the command.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func processFile(_ path: Path) async throws {
       let content: String = try path.read()
       let doc = try MarkdownDocument(content: content)

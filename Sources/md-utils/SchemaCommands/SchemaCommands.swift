@@ -4,7 +4,9 @@
 //
 
 import ArgumentParser
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 extension CLIEntry {
   /// Project-level frontmatter schema commands.
   struct SchemaCommands: AsyncParsableCommand {

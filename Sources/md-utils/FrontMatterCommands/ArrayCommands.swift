@@ -6,8 +6,13 @@
 //
 
 import ArgumentParser
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
+  /// Defines the `Array commands` command behavior.
+  ///
+  /// See <doc:FrontmatterCommands> for workflow details.
   struct ArrayCommands: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "array",

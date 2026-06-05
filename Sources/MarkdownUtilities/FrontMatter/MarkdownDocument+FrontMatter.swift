@@ -7,7 +7,9 @@
 
 import Foundation
 import Yams
-
+/// Adds frontmatter behavior to ``MarkdownDocument``.
+///
+/// See <doc:FrontmatterWorkflows> for workflow details.
 extension MarkdownDocument {
   /// Check if the document has frontmatter.
   ///

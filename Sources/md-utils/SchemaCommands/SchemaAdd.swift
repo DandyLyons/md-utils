@@ -4,8 +4,13 @@
 //
 
 import ArgumentParser
-
+/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 extension CLIEntry.SchemaCommands {
+  /// Defines the `SchemaAdd` command behavior.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   struct Add: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "add",
@@ -30,7 +35,9 @@ extension CLIEntry.SchemaCommands {
       help: "Require matching files to have frontmatter"
     )
     var frontmatterRequired: Bool = true
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:SchemaValidationCommands> for workflow details.
     mutating func run() async throws {
       let schemaFile = try SchemaRuleManager.addRule(SchemaRuleOptions(
         name: name,

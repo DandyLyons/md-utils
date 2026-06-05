@@ -7,7 +7,7 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds command implementations to ``CLIEntry``.
 extension CLIEntry {
   /// Generate a table of contents for Markdown files.
   struct GenerateTOC: AsyncParsableCommand {
@@ -55,7 +55,7 @@ extension CLIEntry {
       help: "Output format: md-bullet-links, md-only-headings, tree, json, json-pretty, plain, html (default: md-only-headings)"
     )
     var format: OutputFormat = .mdOnlyHeadings
-
+    /// Runs the command using the parsed command-line arguments.
     mutating func run() async throws {
       // Validate level range
       guard minLevel >= 1 && minLevel <= 6 else {
@@ -80,7 +80,7 @@ extension CLIEntry {
         try await processFile(file, totalFiles: files.count)
       }
     }
-
+    /// Processes one Markdown file for the command.
     private func processFile(_ path: Path, totalFiles: Int) async throws {
       // Read file content
       let content: String = try path.read()
@@ -112,7 +112,7 @@ extension CLIEntry {
         print(rendered)
       }
     }
-
+    /// Parses render format into structured Markdown data.
     private func parseRenderFormat() -> TOCRenderer.Format {
       switch format {
       case .mdBulletLinks:

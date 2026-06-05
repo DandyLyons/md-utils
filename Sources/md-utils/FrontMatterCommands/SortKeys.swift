@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
   /// Sort keys in frontmatter
   struct SortKeys: AsyncParsableCommand {
@@ -39,7 +41,9 @@ extension CLIEntry.FrontMatterCommands {
 
     @Flag(name: .long, help: "Reverse the sorting order")
     var reverse: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let files = try options.resolvedPaths()
 
@@ -69,5 +73,7 @@ extension CLIEntry.FrontMatterCommands {
     }
   }
 }
-
+/// Adds command-line argument parsing to `MarkdownDocument.SortMethod`.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension MarkdownDocument.SortMethod: ExpressibleByArgument {}

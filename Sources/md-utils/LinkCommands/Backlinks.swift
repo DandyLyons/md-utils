@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:WikilinkCommands> for workflow details.
 extension CLIEntry {
   /// Find files that link to a given target.
   struct Backlinks: AsyncParsableCommand {
@@ -43,7 +45,9 @@ extension CLIEntry {
 
     @Flag(name: .long, help: "Output as JSON")
     var json: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:WikilinkCommands> for workflow details.
     mutating func run() async throws {
       let targetFiles = try options.resolvedPaths()
       guard !targetFiles.isEmpty else {
@@ -107,7 +111,9 @@ extension CLIEntry {
         printPlainText(entries)
       }
     }
-
+    /// Prints command results in the plain text output format.
+    ///
+    /// See <doc:WikilinkCommands> for workflow details.
     private func printPlainText(_ entries: [BacklinkEntry]) {
       let multiTarget = entries.count > 1
       for entry in entries {

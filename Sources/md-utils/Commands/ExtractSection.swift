@@ -8,7 +8,9 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
   /// Extract a section from Markdown files.
   struct ExtractSection: AsyncParsableCommand {
@@ -86,7 +88,9 @@ extension CLIEntry {
       help: "Modify the source file in place (requires --remove)"
     )
     var inPlace: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     mutating func run() async throws {
       // Validate exactly one of --index or --name is specified
       let hasIndex = index != nil
@@ -127,7 +131,9 @@ extension CLIEntry {
       let file = files[0]
       try await processFile(file)
     }
-
+    /// Processes one Markdown file for the command.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func processFile(_ path: Path) async throws {
       // Read file content
       let content: String = try path.read()

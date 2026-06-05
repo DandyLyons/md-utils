@@ -9,7 +9,9 @@ import JMESPath
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
   /// Search for files matching a JMESPath query
   struct Search: AsyncParsableCommand {
@@ -97,7 +99,9 @@ extension CLIEntry.FrontMatterCommands {
       help: "File extensions to process (comma-separated, no spaces)"
     )
     var extensions: String = "md,markdown"
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       // Convert path strings to Path objects
       let paths = pathStrings.isEmpty ? [Path.current] : pathStrings.map { Path($0) }
@@ -297,9 +301,10 @@ extension CLIEntry.FrontMatterCommands {
     }
   }
 }
-
 // MARK: - Array Utilities
-
+/// Adds Markdown document behavior to ``Array``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 private extension Array {
   /// Split array into chunks of specified size
   func chunked(into size: Int) -> [[Element]] {

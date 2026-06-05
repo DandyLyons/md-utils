@@ -10,7 +10,9 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
   /// Dump entire frontmatter in specified format
   struct Dump: AsyncParsableCommand {
@@ -84,7 +86,9 @@ extension CLIEntry.FrontMatterCommands {
 
     @Flag(name: .long, help: "Use cat-style headers (==> path <==) instead of collection output for multiple files")
     var catHeaders: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let files = try options.resolvedPaths()
 

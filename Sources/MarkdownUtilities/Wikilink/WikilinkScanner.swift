@@ -18,7 +18,7 @@ public enum WikilinkScanner {
   /// Scans the given text and returns all valid wikilinks found.
   ///
   /// The scanner walks through the text looking for `[[` (or `![[` for embeds).
-  /// Each candidate is attempted with ``WikilinkParser``. On success the wikilink
+  /// Each candidate is parsed with the package's wikilink parser. On success the wikilink
   /// is collected and scanning continues after it; on failure the scanner advances
   /// past the failed position and keeps looking.
   ///

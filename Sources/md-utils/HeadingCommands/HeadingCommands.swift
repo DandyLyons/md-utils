@@ -4,7 +4,7 @@
 //
 
 import ArgumentParser
-
+/// Adds command implementations to ``CLIEntry``.
 extension CLIEntry {
   /// Heading manipulation commands
   struct HeadingCommands: AsyncParsableCommand {

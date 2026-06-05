@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:WikilinkCommands> for workflow details.
 extension CLIEntry {
   /// List all wikilinks in Markdown files with resolution status.
   struct ListLinks: AsyncParsableCommand {
@@ -28,7 +30,9 @@ extension CLIEntry {
 
     @Flag(name: .long, help: "Output as JSON")
     var json: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:WikilinkCommands> for workflow details.
     mutating func run() async throws {
       let files = try options.resolvedPaths()
       guard !files.isEmpty else {
@@ -65,7 +69,9 @@ extension CLIEntry {
         printPlainText(entries)
       }
     }
-
+    /// Prints command results in the plain text output format.
+    ///
+    /// See <doc:WikilinkCommands> for workflow details.
     private func printPlainText(_ entries: [FileLinksEntry]) {
       let multiFile = entries.count > 1
       for entry in entries {
@@ -87,7 +93,9 @@ extension CLIEntry {
         }
       }
     }
-
+    /// Returns the display marker for a link resolution status.
+    ///
+    /// See <doc:WikilinkCommands> for workflow details.
     private func statusIcon(for status: String) -> String {
       switch status {
       case "resolved": return "✓"

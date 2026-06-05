@@ -4,7 +4,9 @@
 //
 
 import ArgumentParser
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
   /// List sections/headings from a Markdown document.
   struct ListSections: AsyncParsableCommand {
@@ -23,7 +25,9 @@ extension CLIEntry {
         """,
       aliases: ["ls"]
     )
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     @OptionGroup var toc: GenerateTOC
 
     mutating func run() async throws {

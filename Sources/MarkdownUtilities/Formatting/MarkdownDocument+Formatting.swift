@@ -17,7 +17,7 @@ public struct FormattingOptions: Sendable {
     /// Columns are padded to at most this width; cells whose content already
     /// exceeds this value are never truncated. Defaults to `80`.
     public var tableMaxWidth: Int
-
+    /// Creates a configured instance.
     public init(
         bulletMarker: BulletNormalizer.Marker? = nil,
         italicMarker: ItalicNormalizer.Marker? = nil,
@@ -30,7 +30,7 @@ public struct FormattingOptions: Sendable {
         self.tableMaxWidth = tableMaxWidth
     }
 }
-
+/// Adds Markdown document behavior to ``MarkdownDocument``.
 extension MarkdownDocument {
 
     /// Returns a new `MarkdownDocument` with the requested formatting normalizations applied.

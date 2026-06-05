@@ -10,7 +10,7 @@ public enum HeadingAdjusterError: Error, Equatable, Sendable {
   /// The document contains no headings to adjust.
   case noHeadingsInDocument
 }
-
+/// Adds heading adjustment behavior to ``HeadingAdjusterError``.
 extension HeadingAdjusterError: CustomStringConvertible {
   public var description: String {
     switch self {

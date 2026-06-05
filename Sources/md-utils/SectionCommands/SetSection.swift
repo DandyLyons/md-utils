@@ -8,7 +8,9 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
   /// Replace a section's content in a Markdown document.
   struct SetSection: AsyncParsableCommand {
@@ -74,7 +76,9 @@ extension CLIEntry {
       help: "Modify the file in place instead of writing to stdout"
     )
     var inPlace: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     mutating func run() async throws {
       try validateArguments()
 
@@ -90,7 +94,9 @@ extension CLIEntry {
 
       try await processFile(files[0])
     }
-
+    /// Validates the input and returns validation results.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func validateArguments() throws {
       let hasIndex = index != nil
       let hasName = name != nil
@@ -109,7 +115,9 @@ extension CLIEntry {
         }
       }
     }
-
+    /// Reads replacement section content from stdin or an input file.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func readReplacementContent() throws -> String {
       if let inputPath = input {
         guard inputPath.exists else {
@@ -135,7 +143,9 @@ extension CLIEntry {
       }
       return content
     }
-
+    /// Processes one Markdown file for the command.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func processFile(_ path: Path) async throws {
       let content: String = try path.read()
       let doc = try MarkdownDocument(content: content)
@@ -167,7 +177,9 @@ extension CLIEntry {
         print(output)
       }
     }
-
+    /// Reconstructs Markdown text from the updated document.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func reconstructDocument(_ doc: MarkdownDocument) throws -> String {
       guard !doc.frontMatter.isEmpty else {
         return doc.body

@@ -9,6 +9,9 @@ import Foundation
 /// The main entry point for the md-utils CLI application.
 @main
 public struct CLIEntry: AsyncParsableCommand {
+  /// Creates a configured instance.
+  ///
+  /// See <doc:md-utils> for workflow details.
   public init() {}
 
   public static let configuration = CommandConfiguration(

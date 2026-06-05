@@ -7,7 +7,7 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds Markdown document behavior to ``CLIEntry.FileMetadataCommands``.
 extension CLIEntry.FileMetadataCommands {
   /// Read metadata from files
   struct ReadMetadata: AsyncParsableCommand {
@@ -49,14 +49,14 @@ extension CLIEntry.FileMetadataCommands {
       help: "Ignore errors when reading extended attributes and continue processing"
     )
     var ignoreXattrErrors: Bool = false
-
+    /// Defines the `ReadMetadata` command behavior.
     enum OutputFormat: String, ExpressibleByArgument {
       case mdTable = "md-table"
       case csv
       case json
       case jsonPretty = "json-pretty"
     }
-
+    /// Runs the command using the parsed command-line arguments.
     mutating func run() async throws {
       let files = try options.resolvedPaths()
 
@@ -224,7 +224,7 @@ extension CLIEntry.FileMetadataCommands {
     }
   }
 }
-
+/// Adds Markdown document behavior to ``FileHandle``.
 extension FileHandle {
   /// Write a string to this file handle
   func write(_ string: String) {

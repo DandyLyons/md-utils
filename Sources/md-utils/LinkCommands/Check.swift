@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:WikilinkCommands> for workflow details.
 extension CLIEntry {
   /// Check for broken or ambiguous wikilinks.
   struct Check: AsyncParsableCommand {
@@ -27,7 +29,9 @@ extension CLIEntry {
 
     @Flag(name: .long, help: "Output as JSON")
     var json: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:WikilinkCommands> for workflow details.
     mutating func run() async throws {
       let files = try options.resolvedPaths()
       guard !files.isEmpty else {

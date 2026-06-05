@@ -4,7 +4,9 @@
 //
 
 import ArgumentParser
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry {
   /// Frontmatter manipulation commands
   struct FrontMatterCommands: AsyncParsableCommand {

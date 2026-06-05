@@ -4,7 +4,7 @@
 //
 
 import Yams
-
+/// Adds wikilink behavior to ``MarkdownDocument``.
 extension MarkdownDocument {
   /// Scans both the YAML frontmatter and the document body for wikilinks.
   ///

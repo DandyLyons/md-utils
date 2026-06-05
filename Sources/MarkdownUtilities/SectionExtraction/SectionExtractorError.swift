@@ -28,7 +28,9 @@ public enum SectionExtractorError: Error, Equatable, Sendable {
   ///   - availableHeadings: List of available heading texts in the document
   case headingNotFound(name: String, caseSensitive: Bool, availableHeadings: [String])
 }
-
+/// Adds section extraction behavior to ``SectionExtractorError``.
+///
+/// See <doc:SectionWorkflows> for workflow details.
 extension SectionExtractorError: CustomStringConvertible {
   public var description: String {
     switch self {

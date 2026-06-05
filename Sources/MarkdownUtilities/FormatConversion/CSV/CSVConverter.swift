@@ -60,14 +60,15 @@ public struct CSVConverter {
 
         return lines.joined(separator: "\n")
     }
-
     // MARK: - Column Schema Building
 
     /// Column definition for CSV generation
     struct CSVColumn {
         let name: String
         let type: ColumnType
-
+        /// Groups ColumnType cases and related behavior.
+        ///
+        /// See <doc:FormatConversionWorkflows> for workflow details.
         enum ColumnType {
             case metadata(CSVOptions.MetadataColumn)
             case body
@@ -117,7 +118,6 @@ public struct CSVConverter {
 
         return columns
     }
-
     // MARK: - CSV Generation
 
     /// Generate the CSV header row
@@ -223,7 +223,6 @@ public struct CSVConverter {
             return try YAMLConversion.nodeToJSON(node, options: [])
         }
     }
-
     // MARK: - CSV Escaping
 
     /// Escape a CSV field according to RFC 4180

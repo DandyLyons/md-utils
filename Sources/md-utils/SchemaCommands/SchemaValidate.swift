@@ -4,8 +4,13 @@
 //
 
 import ArgumentParser
-
+/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 extension CLIEntry.SchemaCommands {
+  /// Defines the `SchemaValidate` command behavior.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   struct Validate: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "validate",
@@ -17,7 +22,9 @@ extension CLIEntry.SchemaCommands {
 
     @Flag(name: .long, help: "Include successful validation results in output")
     var includeOk: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:SchemaValidationCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
       let summary = try SchemaValidatorRunner.validate(ruleName: ruleName)
@@ -29,8 +36,13 @@ extension CLIEntry.SchemaCommands {
     }
   }
 }
-
+/// Defines the `SchemaValidate` command behavior.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 enum SchemaValidationSummaryFormatter {
+  /// Renders the value into its output representation.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func render(
     _ summary: SchemaValidationSummary,
     ruleName: String? = nil,
@@ -76,7 +88,9 @@ enum SchemaValidationSummaryFormatter {
 
     return lines.joined(separator: "\n")
   }
-
+  /// Appends one validation result to the rendered summary lines.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   private static func append(_ result: SchemaValidationResult, to lines: inout [String]) {
     switch result.status {
     case .ok:

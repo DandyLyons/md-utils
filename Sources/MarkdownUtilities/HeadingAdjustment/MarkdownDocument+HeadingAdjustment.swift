@@ -1,6 +1,6 @@
 import Foundation
 import Yams
-
+/// Adds heading adjustment behavior to ``MarkdownDocument``.
 extension MarkdownDocument {
   /// Promotes a heading (decreases its level by 1) and optionally its children.
   ///

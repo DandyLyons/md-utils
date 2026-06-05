@@ -14,7 +14,6 @@ import Foundation
 /// )
 /// ```
 public struct CSVOptions: ConversionOptions, Sendable {
-
     // MARK: - ConversionOptions Conformance
 
     /// Whether to include YAML frontmatter in the CSV output
@@ -22,7 +21,6 @@ public struct CSVOptions: ConversionOptions, Sendable {
     /// This is always `true` for CSV conversion since the entire purpose
     /// is to export frontmatter as columns.
     public let includeFrontmatter: Bool = true
-
     // MARK: - CSV-Specific Options
 
     /// Whether to include the `$body` column containing the document body content
@@ -42,7 +40,6 @@ public struct CSVOptions: ConversionOptions, Sendable {
     /// When `nil`, relative paths are calculated from the current working directory.
     /// When specified, relative paths use this as the base.
     public let baseDirectory: String?
-
     // MARK: - Initialization
 
     /// Creates CSV conversion options with specified settings.
@@ -60,7 +57,6 @@ public struct CSVOptions: ConversionOptions, Sendable {
         self.metadataColumns = metadataColumns
         self.baseDirectory = baseDirectory
     }
-
     // MARK: - Metadata Column Definition
 
     /// Available metadata columns for CSV export

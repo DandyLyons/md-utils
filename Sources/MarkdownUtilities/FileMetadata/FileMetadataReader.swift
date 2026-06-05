@@ -2,6 +2,7 @@ import Foundation
 
 /// Reads file metadata including standard attributes and extended attributes
 public struct FileMetadataReader: Sendable {
+  /// Creates a configured instance.
   public init() {}
 
   /// Read metadata from a file at the specified path

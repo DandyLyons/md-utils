@@ -6,7 +6,7 @@
 //
 
 import Foundation
-
+/// Adds Markdown document behavior to ``StringProtocol``.
 extension StringProtocol {
   /// Calculates the 1-based line number for a given `String.Index` within this string.
   /// This method can be called on `String` or `Substring` (as both conform to `StringProtocol`).
@@ -24,7 +24,7 @@ extension StringProtocol {
     return lineNumber
   }
 }
-
+/// Adds Markdown document behavior to ``Substring``.
 extension Substring {
   /// Calculates the 1-based starting and ending line numbers for this `Substring`,
   /// relative to its original full `String`.
@@ -64,7 +64,7 @@ extension Substring {
     return self.lineRange.upperBound
   }
 }
-
+/// Adds Markdown document behavior to ``String``.
 extension String {
   /// Extracts a substring corresponding to the specified 1-based line number range.
   ///

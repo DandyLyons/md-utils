@@ -15,7 +15,6 @@ import Foundation
 /// let plainText = try await doc.toPlainText(options: options)
 /// ```
 public struct PlainTextOptions: ConversionOptions, Sendable {
-
     // MARK: - ConversionOptions Conformance
 
     /// Whether to include YAML frontmatter in the plain text output
@@ -23,7 +22,6 @@ public struct PlainTextOptions: ConversionOptions, Sendable {
     /// When `true`, frontmatter is preserved as a YAML block at the beginning.
     /// When `false`, frontmatter is excluded from the output.
     public let includeFrontmatter: Bool
-
     // MARK: - Block Formatting Options
 
     /// Number of newlines to use between block elements
@@ -31,7 +29,6 @@ public struct PlainTextOptions: ConversionOptions, Sendable {
     /// Default is `2` (double-spacing for readability).
     /// Use `1` for single-spacing.
     public let blockSeparator: Int
-
     // MARK: - Inline Content Options
 
     /// Whether to preserve line breaks as newlines or convert them to spaces
@@ -45,7 +42,6 @@ public struct PlainTextOptions: ConversionOptions, Sendable {
     /// When `true`, image alt text is included in the output.
     /// When `false`, images are completely omitted.
     public let extractImageAltText: Bool
-
     // MARK: - List Formatting Options
 
     /// Whether to indent nested list items
@@ -59,7 +55,6 @@ public struct PlainTextOptions: ConversionOptions, Sendable {
     /// Only applies when `indentLists` is `true`.
     /// Default is `2` spaces per level.
     public let indentSpaces: Int
-
     // MARK: - Code Block Options
 
     /// Whether to preserve code blocks in the output
@@ -67,7 +62,6 @@ public struct PlainTextOptions: ConversionOptions, Sendable {
     /// When `true`, code block content is included with indentation.
     /// When `false`, code blocks are omitted entirely.
     public let preserveCodeBlocks: Bool
-
     // MARK: - Initialization
 
     /// Creates plain text conversion options with specified settings.
@@ -97,7 +91,6 @@ public struct PlainTextOptions: ConversionOptions, Sendable {
         self.indentSpaces = indentSpaces
         self.preserveCodeBlocks = preserveCodeBlocks
     }
-
     // MARK: - Presets
 
     /// Default options for plain text conversion

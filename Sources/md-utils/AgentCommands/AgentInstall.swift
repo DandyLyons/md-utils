@@ -4,14 +4,15 @@
 //
 
 import ArgumentParser
-
+/// Adds Markdown document behavior to ``CLIEntry.AgentCommands``.
 extension CLIEntry.AgentCommands {
+  /// Defines the `AgentInstall` command behavior.
   struct AgentInstall: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "install",
       abstract: "Print installation instructions for the markdown-utilities skill"
     )
-
+    /// Runs the command using the parsed command-line arguments.
     mutating func run() async throws {
       print("""
         markdown-utilities Skill — Installation Instructions

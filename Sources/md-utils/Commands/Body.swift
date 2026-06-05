@@ -9,8 +9,13 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
+  /// Extracts Markdown body content after removing YAML frontmatter.
+  ///
+  /// See <doc:ContentSelectionCommands> for workflow details.
   struct Body: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "body",
@@ -48,7 +53,9 @@ extension CLIEntry {
       help: "Output format: 'markdown' (default) or 'plain-text'"
     )
     var format: BodyFormat = .markdown
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     mutating func run() async throws {
       // Determine input mode
       let inputMode = try determineInputMode()
@@ -65,15 +72,18 @@ extension CLIEntry {
         try await processMultipleFiles(files)
       }
     }
-
     // MARK: - Input Mode Detection
-
+    /// Identifies where the command should read Markdown input from.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     enum InputMode {
       case stdin
       case singleFile(Path)
       case multipleFiles([Path])
     }
-
+    /// Determines whether input should be read from stdin, one file, or multiple files.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     func determineInputMode() throws -> InputMode {
       // Check for stdin (when no paths provided and stdin has data)
       if options.paths.isEmpty {
@@ -98,9 +108,10 @@ extension CLIEntry {
         return .multipleFiles(files)
       }
     }
-
     // MARK: - Processing Methods
-
+    /// Reads Markdown from standard input and writes converted output.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     func processStdin() async throws {
       // Read from stdin
       var stdinContent = ""
@@ -117,14 +128,18 @@ extension CLIEntry {
       let output = try await extractBody(from: doc)
       print(output, terminator: "")
     }
-
+    /// Processes one input file and writes the command output.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     func processSingleFile(_ file: Path) async throws {
       let content: String = try file.read()
       let doc = try MarkdownDocument(content: content)
       let output = try await extractBody(from: doc)
       print(output, terminator: "")
     }
-
+    /// Processes multiple input files in resolved path order.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     func processMultipleFiles(_ files: [Path]) async throws {
       for file in files {
         let content: String = try file.read()
@@ -137,7 +152,6 @@ extension CLIEntry {
         print()  // Extra newline between files
       }
     }
-
     // MARK: - Helper Methods
 
     /// Extract the body content from a MarkdownDocument based on the selected format.
@@ -162,9 +176,10 @@ extension CLIEntry {
     }
   }
 }
-
 // MARK: - Body Format Enum
-
+/// Selects how extracted body content is rendered.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 enum BodyFormat: String, CaseIterable, ExpressibleByArgument {
   case markdown
   case plainText = "plain-text"

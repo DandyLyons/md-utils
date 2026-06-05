@@ -5,7 +5,9 @@
 
 import Foundation
 import Yams
-
+/// Adds section extraction behavior to ``MarkdownDocument``.
+///
+/// See <doc:SectionWorkflows> for workflow details.
 extension MarkdownDocument {
   /// Extracts a section from the document.
   ///

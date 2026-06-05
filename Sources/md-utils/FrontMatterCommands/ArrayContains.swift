@@ -10,8 +10,13 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands.ArrayCommands {
+  /// Defines the `ArrayContains` command behavior.
+  ///
+  /// See <doc:FrontmatterCommands> for workflow details.
   struct Contains: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "contains",
@@ -65,7 +70,9 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
     @Flag(name: .long, help: "Case-insensitive comparison")
     var caseInsensitive: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
       var matchingFiles: [String] = []
@@ -117,7 +124,9 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       try outputResults(matchingFiles)
       if hasErrors { throw ExitCode.failure }
     }
-
+    /// Writes matching file paths using the selected output behavior.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     private func outputResults(_ matchingFiles: [String]) throws {
       if matchingFiles.isEmpty {
         // Print to stderr so it doesn't interfere with piping

@@ -7,7 +7,9 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import PathKit
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
   /// Add frontmatter keys without values
   struct Touch: AsyncParsableCommand {
@@ -36,7 +38,9 @@ extension CLIEntry.FrontMatterCommands {
       help: "Comma-separated list of frontmatter keys to add"
     )
     var keys: String
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       // Parse comma-separated keys
       let keyList = keys

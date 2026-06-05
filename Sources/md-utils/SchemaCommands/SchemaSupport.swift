@@ -9,14 +9,18 @@ import JSONSchema
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Stores project-level md-utils schema validation configuration.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 struct MdUtilsConfig {
   static let defaultSchemaDirectory = ".md-utils/schemas"
 
   var schemaReference: String?
   var schemaDirectory: String
   var schemaRules: [SchemaRule]
-
+  /// Creates a configured instance.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   init(
     schemaReference: String? = "md-utils.schema.json",
     schemaDirectory: String = Self.defaultSchemaDirectory,
@@ -26,7 +30,9 @@ struct MdUtilsConfig {
     self.schemaDirectory = schemaDirectory
     self.schemaRules = schemaRules
   }
-
+  /// Loads the requested data from disk.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func load(from path: Path = SchemaPaths.configFile) throws -> MdUtilsConfig {
     guard path.exists else {
       throw ValidationError("Project config not found: \(path.string). Run md-utils schema init first.")
@@ -52,7 +58,9 @@ struct MdUtilsConfig {
       schemaRules: rules
     )
   }
-
+  /// Saves the current data to disk.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   func save(to path: Path = SchemaPaths.configFile) throws {
     var object: [String: Any] = [
       "schemaDirectory": schemaDirectory,
@@ -72,20 +80,26 @@ struct MdUtilsConfig {
     try path.write(json + "\n")
   }
 }
-
+/// Defines one named frontmatter schema rule from the project configuration.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 struct SchemaRule {
   var name: String
   var schema: String
   var frontmatterRequired: Bool
   var match: SchemaRuleMatch
-
+  /// Creates a configured instance.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   init(name: String, schema: String, frontmatterRequired: Bool = true, match: SchemaRuleMatch) {
     self.name = name
     self.schema = schema
     self.frontmatterRequired = frontmatterRequired
     self.match = match
   }
-
+  /// Creates a configured instance.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   init(json: [String: Any]) throws {
     guard let name = json["name"] as? String, !name.isEmpty else {
       throw ValidationError("Schema rules require a non-empty name")
@@ -112,16 +126,22 @@ struct SchemaRule {
     ]
   }
 }
-
+/// Describes the path and frontmatter conditions that select files for a schema rule.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 struct SchemaRuleMatch {
   var paths: [String]
   var frontmatter: [String: FrontmatterMatcher]
-
+  /// Creates a configured instance.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   init(paths: [String] = [], frontmatter: [String: FrontmatterMatcher] = [:]) {
     self.paths = paths
     self.frontmatter = frontmatter
   }
-
+  /// Creates a configured instance.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   init(json: [String: Any], ruleName: String) throws {
     let paths = json["paths"] as? [String] ?? []
     let frontmatterObject = json["frontmatter"] as? [String: Any] ?? [:]
@@ -153,14 +173,20 @@ struct SchemaRuleMatch {
     return object
   }
 }
-
+/// Describes a frontmatter matcher that requires an array to include a value.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 struct FrontmatterMatcher {
   var includes: Any
-
+  /// Creates a configured instance.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   init(includes: Any) {
     self.includes = includes
   }
-
+  /// Creates a configured instance.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   init(json: [String: Any], key: String, ruleName: String) throws {
     guard let includes = json["includes"] else {
       throw ValidationError("Schema rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" requires includes")
@@ -172,16 +198,22 @@ struct FrontmatterMatcher {
     ["includes": includes]
   }
 }
-
+/// Centralizes project configuration and schema file paths.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 enum SchemaPaths {
   static var projectDirectory: Path { Path(".md-utils") }
   static var configFile: Path { projectDirectory + "md-utils.json" }
   static let bundledConfigSchemaFileName = "md-utils.schema.json"
-
+  /// Returns the directory that stores md-utils project configuration.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func schemaDirectory(for config: MdUtilsConfig) -> Path {
     Path(config.schemaDirectory)
   }
-
+  /// Returns the schema file path for a configured schema rule.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func schemaFile(rule: SchemaRule, config: MdUtilsConfig) -> Path {
     let schemaPath = Path(rule.schema)
     if schemaPath.isAbsolute {
@@ -190,8 +222,13 @@ enum SchemaPaths {
     return schemaDirectory(for: config) + rule.schema
   }
 }
-
+/// Bootstraps the `.md-utils` project configuration files.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 enum SchemaConfigBootstrapper {
+  /// Creates the project configuration directory and bundled schema file when needed.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func ensureProjectFiles() throws {
     try SchemaPaths.projectDirectory.mkpath()
     try Path(MdUtilsConfig.defaultSchemaDirectory).mkpath()
@@ -201,7 +238,9 @@ enum SchemaConfigBootstrapper {
       try MdUtilsConfig().save()
     }
   }
-
+  /// Copies the bundled md-utils configuration schema into the project directory.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   private static func copyBundledConfigSchema() throws {
     guard let resourceURL = Bundle.module.url(
       forResource: "md-utils.schema",
@@ -215,7 +254,9 @@ enum SchemaConfigBootstrapper {
     try data.write(to: URL(fileURLWithPath: destination.string))
   }
 }
-
+/// Captures options used to create or initialize a schema rule.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 struct SchemaRuleOptions {
   var name: String
   var schema: String?
@@ -223,8 +264,13 @@ struct SchemaRuleOptions {
   var tag: String?
   var frontmatterRequired: Bool
 }
-
+/// Adds and removes schema rules from the project configuration.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 enum SchemaRuleManager {
+  /// Adds a schema validation rule to the project configuration.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func addRule(_ options: SchemaRuleOptions) throws -> Path {
     var config = try MdUtilsConfig.load()
     if config.schemaRules.contains(where: { $0.name == options.name }) {
@@ -254,7 +300,9 @@ enum SchemaRuleManager {
     try config.save()
     return schemaFile
   }
-
+  /// Removes a schema validation rule from the project configuration.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func removeRule(named name: String, deleteSchema: Bool) throws -> (removed: SchemaRule, deletedSchema: Bool, schemaPath: Path) {
     var config = try MdUtilsConfig.load()
     guard let index = config.schemaRules.firstIndex(where: { $0.name == name }) else {
@@ -276,7 +324,9 @@ enum SchemaRuleManager {
     try config.save()
     return (removed, deletedSchema, schemaPath)
   }
-
+  /// Builds starter JSON Schema content for a new frontmatter rule.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func starterSchema(title: String) -> String {
     """
     {
@@ -300,8 +350,13 @@ enum SchemaRuleManager {
     """
   }
 }
-
+/// Finds Markdown files that can participate in schema validation.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 enum SchemaFileScanner {
+  /// Finds Markdown files below the project root for schema validation.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func markdownFiles(root: Path = .current) throws -> [Path] {
     let manager = FileManager.default
     let rootURL = URL(fileURLWithPath: root.absolute().string)
@@ -324,13 +379,20 @@ enum SchemaFileScanner {
     return files
   }
 }
-
+/// Describes one JSON Schema validation issue for a Markdown file.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 struct SchemaValidationErrorDetail {
   var path: String
   var message: String
 }
-
+/// Records the validation status for one file and one schema rule.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 struct SchemaValidationResult {
+  /// Indicates whether a file-rule validation passed, failed, or was skipped.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   enum Status {
     case ok
     case error
@@ -343,7 +405,9 @@ struct SchemaValidationResult {
   var status: Status
   var errors: [SchemaValidationErrorDetail]
 }
-
+/// Aggregates schema validation results for command output and exit status.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 struct SchemaValidationSummary {
   var results: [SchemaValidationResult]
   var totalMarkdownFiles: Int
@@ -370,8 +434,13 @@ struct SchemaValidationSummary {
     results.contains { $0.status == .error }
   }
 }
-
+/// Runs project schema validation and returns a structured summary.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 enum SchemaValidatorRunner {
+  /// Validates the input and returns validation results.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   static func validate(ruleName: String? = nil) throws -> SchemaValidationSummary {
     let config = try MdUtilsConfig.load()
     let rules: [SchemaRule]
@@ -485,7 +554,9 @@ enum SchemaValidatorRunner {
 
     return SchemaValidationSummary(results: results, totalMarkdownFiles: files.count)
   }
-
+  /// Loads the requested data from disk.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   private static func loadSchema(path: Path) throws -> [String: Any] {
     guard path.exists else {
       throw ValidationError("Schema file not found: \(path.string)")
@@ -496,14 +567,18 @@ enum SchemaValidatorRunner {
     }
     return schema
   }
-
+  /// Returns whether a project-relative path matches a schema rule path condition.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   private static func rulePathConditionsMatch(rule: SchemaRule, relativePath: String) -> Bool {
     if rule.match.paths.isEmpty {
       return true
     }
     return rule.match.paths.contains { matchesGlob(relativePath, glob: $0) }
   }
-
+  /// Returns whether parsed frontmatter satisfies a schema rule frontmatter condition.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   private static func frontmatterConditionsMatch(rule: SchemaRule, frontmatter: Any) -> Bool {
     guard !rule.match.frontmatter.isEmpty else { return true }
     guard let object = frontmatter as? [String: Any] else { return false }
@@ -516,7 +591,9 @@ enum SchemaValidatorRunner {
     }
     return true
   }
-
+  /// Builds a validation result for an error that prevents schema validation.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   private static func errorResult(
     rule: SchemaRule,
     schemaPath: Path,
@@ -533,7 +610,9 @@ enum SchemaValidatorRunner {
     )
   }
 }
-
+/// Detects whether Markdown content contains a frontmatter block and returns its raw YAML.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 func frontmatterPresence(in content: String) -> (hasFrontmatter: Bool, raw: String?) {
   guard content.hasPrefix("---\n") else {
     return (false, nil)
@@ -547,7 +626,9 @@ func frontmatterPresence(in content: String) -> (hasFrontmatter: Bool, raw: Stri
   }
   return (true, String(content[searchStart..<closingRange.lowerBound]))
 }
-
+/// Returns a normalized project-relative path for matching and reporting.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 func projectRelativePath(_ path: Path) -> String {
   let root = Path.current.absolute().string
   let absolute = path.absolute().string
@@ -557,7 +638,9 @@ func projectRelativePath(_ path: Path) -> String {
   }
   return path.string
 }
-
+/// Returns whether a value matches a simple glob pattern.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 func matchesGlob(_ value: String, glob: String) -> Bool {
   let regex = globToRegex(glob)
   guard let expression = try? NSRegularExpression(pattern: regex) else {
@@ -566,7 +649,9 @@ func matchesGlob(_ value: String, glob: String) -> Bool {
   let range = NSRange(value.startIndex..., in: value)
   return expression.firstMatch(in: value, range: range) != nil
 }
-
+/// Converts a simple glob pattern into a regular expression string.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 func globToRegex(_ glob: String) -> String {
   var result = "^"
   var index = glob.startIndex
@@ -601,7 +686,9 @@ func globToRegex(_ glob: String) -> String {
 
   return result + "$"
 }
-
+/// Compares two JSON-compatible values for semantic equality.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 func jsonValuesEqual(_ lhs: Any, _ rhs: Any) -> Bool {
   let left = jsonCompatibleValue(lhs)
   let right = jsonCompatibleValue(rhs)
@@ -623,7 +710,9 @@ func jsonValuesEqual(_ lhs: Any, _ rhs: Any) -> Bool {
     return false
   }
 }
-
+/// Normalizes a value into a JSON-compatible representation for comparison.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 func jsonCompatibleValue(_ value: Any) -> Any {
   if let dict = value as? [String: Any] {
     return dict.mapValues { jsonCompatibleValue($0) }
@@ -642,7 +731,9 @@ func jsonCompatibleValue(_ value: Any) -> Any {
   }
   return value
 }
-
+/// Converts a JSON Pointer into a user-facing display path.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 func pointerDisplayPath(_ pointer: String) -> String {
   if pointer.isEmpty || pointer == "/" {
     return "frontmatter"

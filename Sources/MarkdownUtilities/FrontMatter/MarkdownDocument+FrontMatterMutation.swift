@@ -1,6 +1,8 @@
 import Foundation
 import Yams
-
+/// Adds frontmatter behavior to ``MarkdownDocument``.
+///
+/// See <doc:FrontmatterWorkflows> for workflow details.
 extension MarkdownDocument {
   /// Get value for key from frontmatter
   ///
@@ -21,7 +23,9 @@ extension MarkdownDocument {
   public mutating func setValue(_ value: String, forKey key: String) {
     frontMatter[key] = Yams.Node.scalar(.init(value))
   }
-  
+  /// Groups CreateKeyError cases and related behavior.
+  ///
+  /// See <doc:FrontmatterWorkflows> for workflow details.
   public enum CreateKeyError: Error, LocalizedError {
     case keyAlreadyExists
 
@@ -73,6 +77,9 @@ extension MarkdownDocument {
   /// - Throws: `RenameKeyError.oldKeyNotFound` if oldKey doesn't exist,
   ///           `RenameKeyError.newKeyAlreadyExists` if newKey already exists
   public mutating func renameKey(from oldKey: String, to newKey: String) throws {
+    /// Groups RenameKeyError cases and related behavior.
+    ///
+    /// See <doc:FrontmatterWorkflows> for workflow details.
     enum RenameKeyError: Error, LocalizedError {
       case oldKeyNotFound
       case newKeyAlreadyExists

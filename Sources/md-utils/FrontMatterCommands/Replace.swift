@@ -10,7 +10,9 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
   /// Replace entire frontmatter with new data
   struct Replace: AsyncParsableCommand {
@@ -76,7 +78,9 @@ extension CLIEntry.FrontMatterCommands {
 
     @Flag(name: [.customShort("y"), .long], help: "Skip confirmation prompt")
     var yes: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       // Validate input options
       guard data != nil || fromFile != nil else {
@@ -133,7 +137,9 @@ extension CLIEntry.FrontMatterCommands {
 
       if hasErrors { throw ExitCode.failure }
     }
-
+    /// Replaces frontmatter in one Markdown file.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     private func replaceInFile(path: Path, newFrontMatter: Yams.Node.Mapping) throws {
       // Prompt for confirmation (unless --yes flag is used)
       if !yes {

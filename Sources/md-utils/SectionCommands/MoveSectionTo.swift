@@ -8,7 +8,9 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
   /// Move a section to a specific position among its siblings.
   struct MoveSectionTo: AsyncParsableCommand {
@@ -71,7 +73,9 @@ extension CLIEntry {
       help: "Modify the file in place instead of writing to stdout"
     )
     var inPlace: Bool = false
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     mutating func run() async throws {
       try validateArguments()
 
@@ -87,7 +91,9 @@ extension CLIEntry {
 
       try await processFile(files[0])
     }
-
+    /// Validates the input and returns validation results.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func validateArguments() throws {
       let hasIndex = index != nil
       let hasName = name != nil
@@ -110,7 +116,9 @@ extension CLIEntry {
         throw ValidationError("Position must be positive (1-based: 1 = first sibling)")
       }
     }
-
+    /// Processes one Markdown file for the command.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func processFile(_ path: Path) async throws {
       let content: String = try path.read()
       let doc = try MarkdownUtilities.MarkdownDocument(content: content)
@@ -140,7 +148,9 @@ extension CLIEntry {
         print(output)
       }
     }
-
+    /// Reconstructs Markdown text from the updated document.
+    ///
+    /// See <doc:ContentSelectionCommands> for workflow details.
     private func reconstructDocument(_ doc: MarkdownDocument) throws -> String {
       guard !doc.frontMatter.isEmpty else {
         return doc.body

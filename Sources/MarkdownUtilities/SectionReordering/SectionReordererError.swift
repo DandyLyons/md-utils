@@ -44,7 +44,9 @@ public enum SectionReordererError: Error, Equatable, Sendable {
   ///   - availableHeadings: List of available heading texts in the document
   case headingNotFound(name: String, caseSensitive: Bool, availableHeadings: [String])
 }
-
+/// Adds section reordering behavior to ``SectionReordererError``.
+///
+/// See <doc:SectionWorkflows> for workflow details.
 extension SectionReordererError: CustomStringConvertible {
   public var description: String {
     switch self {

@@ -8,7 +8,9 @@ import Foundation
 import MarkdownUtilities
 import PathKit
 import Yams
-
+/// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
+///
+/// See <doc:FrontmatterCommands> for workflow details.
 extension CLIEntry.FrontMatterCommands {
   /// Retrieve a frontmatter value by key
   struct Get: AsyncParsableCommand {
@@ -47,14 +49,18 @@ extension CLIEntry.FrontMatterCommands {
 
     @Option(name: .long, help: "Output format (json, inline, bullets, numbered-list); json is the default")
     var format: OutputFormat = .json
-
+    /// Defines the `Get` command behavior.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     enum OutputFormat: String, ExpressibleByArgument {
       case json
       case inline
       case bullets
       case numberedList = "numbered-list"
     }
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
       let files = try options.resolvedPaths()

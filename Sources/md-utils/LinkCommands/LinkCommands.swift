@@ -4,7 +4,9 @@
 //
 
 import ArgumentParser
-
+/// Adds command implementations to ``CLIEntry``.
+///
+/// See <doc:WikilinkCommands> for workflow details.
 extension CLIEntry {
   /// Wikilink analysis commands
   struct LinkCommands: AsyncParsableCommand {

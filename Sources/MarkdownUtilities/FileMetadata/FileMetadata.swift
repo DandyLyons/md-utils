@@ -67,9 +67,8 @@ public struct FileMetadata: Sendable, Codable {
     self.isSymbolicLink = isSymbolicLink
   }
 }
-
 // MARK: - Computed Properties
-
+/// Adds Markdown document behavior to ``FileMetadata``.
 extension FileMetadata {
   /// Permission string in Unix format (e.g., "rwxr-xr-x")
   public var permissionString: String? {
@@ -105,16 +104,16 @@ extension FileMetadata {
     accessDate.map { ISO8601DateFormatter().string(from: $0) }
   }
 }
-
 // MARK: - Codable
-
+/// Adds Markdown document behavior to ``FileMetadata``.
 extension FileMetadata {
+  /// Groups CodingKeys cases and related behavior.
   private enum CodingKeys: String, CodingKey {
     case path, size, creationDate, modificationDate, accessDate
     case posixPermissions, ownerAccount, groupOwnerAccount
     case extendedAttributes, fileType, isDirectory, isSymbolicLink
   }
-
+  /// Creates a configured instance.
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     path = try container.decode(String.self, forKey: .path)
@@ -164,7 +163,7 @@ extension FileMetadata {
     isDirectory = try container.decode(Bool.self, forKey: .isDirectory)
     isSymbolicLink = try container.decode(Bool.self, forKey: .isSymbolicLink)
   }
-
+  /// Encodes file metadata using stable, portable representations.
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(path, forKey: .path)

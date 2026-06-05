@@ -29,7 +29,7 @@ public struct Wikilink: Sendable, Equatable, Hashable, Codable {
 
   /// Whether this wikilink is an embed (prefixed with `!`).
   public let isEmbed: Bool
-
+  /// Creates a configured instance.
   public init(
     rawValue: String,
     target: String,

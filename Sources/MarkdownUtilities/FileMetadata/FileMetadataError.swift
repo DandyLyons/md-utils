@@ -20,7 +20,7 @@ public enum FileMetadataError: Error, Sendable {
   /// An underlying system error occurred
   case systemError(path: String, underlyingError: Error)
 }
-
+/// Adds Markdown document behavior to ``FileMetadataError``.
 extension FileMetadataError: CustomStringConvertible {
   public var description: String {
     switch self {

@@ -4,14 +4,21 @@
 //
 
 import ArgumentParser
-
+/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
 extension CLIEntry.SchemaCommands {
+  /// Defines the `SchemaList` command behavior.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
   struct List: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "list",
       abstract: "List configured schema rules"
     )
-
+    /// Runs the command using the parsed command-line arguments.
+    ///
+    /// See <doc:SchemaValidationCommands> for workflow details.
     mutating func run() async throws {
       let config = try MdUtilsConfig.load()
       if config.schemaRules.isEmpty {
