@@ -9,3 +9,4 @@ DerivedData/
 .vscode/
 .claude/settings.local.json
 tmp/
+solo.yml
