@@ -18,9 +18,48 @@ enum CLIStyle {
     text.bit8(244)
   }
 
+  /// Styles unobtrusive guidance that should remain discoverable.
+  static func hint(_ text: String) -> String {
+    text.bit8(110)
+  }
+
   /// Styles human-readable group headings.
   static func heading(_ text: String) -> String {
     text.bold
+  }
+
+  /// Styles Markdown heading hash markers by heading depth.
+  static func headingMarker(_ text: String, level: Int) -> String {
+    switch level {
+    case 1:
+      return text.red
+    case 2:
+      return text.lightRed
+    case 3:
+      return text.yellow
+    case 4:
+      return text.green
+    case 5:
+      return text.blue
+    default:
+      return text.magenta
+    }
+  }
+
+  /// Styles synthetic explore nodes such as frontmatter and preamble.
+  static func exploreLabel(_ text: String) -> String {
+    text.lightBlue
+  }
+
+  /// Styles only the leading hash marker of a Markdown heading line.
+  static func markdownHeading(_ text: String, level: Int) -> String {
+    let marker = String(repeating: "#", count: level)
+    guard text.hasPrefix(marker) else {
+      return text
+    }
+
+    let rest = text.dropFirst(marker.count)
+    return headingMarker(marker, level: level) + rest
   }
 
   /// Styles filesystem paths in human-facing output.

@@ -23,6 +23,7 @@ public struct CLIEntry: AsyncParsableCommand {
       Body.self,
       ConfigCommands.self,
       ConvertCommands.self,
+      Explore.self,
       ExtractSection.self,
       FileMetadataCommands.self,
       FormatCommand.self,
