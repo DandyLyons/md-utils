@@ -22,23 +22,23 @@ extension CLIEntry.SchemaCommands {
     mutating func run() async throws {
       let config = try MdUtilsConfig.load()
       if config.schemaRules.isEmpty {
-        print("No schema rules configured.")
+        print(CLIStyle.muted("No schema rules configured."))
         return
       }
 
       for rule in config.schemaRules {
         let schemaPath = SchemaPaths.schemaFile(rule: rule, config: config)
-        print(rule.name)
-        print("  schema: \(schemaPath.string)")
-        print("  frontmatterRequired: \(rule.frontmatterRequired)")
+        print(CLIStyle.heading(rule.name))
+        print("  \(CLIStyle.metadata("schema:")) \(CLIStyle.path(schemaPath.string))")
+        print("  \(CLIStyle.metadata("frontmatterRequired:")) \(rule.frontmatterRequired)")
         if !rule.match.paths.isEmpty {
-          print("  paths: \(rule.match.paths.joined(separator: ", "))")
+          print("  \(CLIStyle.metadata("paths:")) \(rule.match.paths.joined(separator: ", "))")
         }
         if !rule.match.frontmatter.isEmpty {
-          print("  \(rule.name) rule will run when:")
+          print("  \(CLIStyle.metadata("\(rule.name) rule will run when:"))")
           for key in rule.match.frontmatter.keys.sorted() {
             if let matcher = rule.match.frontmatter[key] {
-              print("    frontmatter key \(key) includes \(matcher.includes)")
+              print("    \(CLIStyle.metadata("frontmatter key")) \(key) \(CLIStyle.metadata("includes")) \(matcher.includes)")
             }
           }
         }

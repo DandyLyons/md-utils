@@ -29,16 +29,16 @@ extension CLIEntry.SchemaCommands {
     mutating func run() async throws {
       let result = try SchemaRuleManager.removeRule(named: name, deleteSchema: deleteSchema)
 
-      print("Removed schema rule \"\(result.removed.name)\"")
+      print("\(CLIStyle.success("Removed schema rule")) \"\(result.removed.name)\"")
       if deleteSchema {
         if result.deletedSchema {
-          print("Deleted schema: \(result.schemaPath.string)")
+          print("\(CLIStyle.success("Deleted schema:")) \(CLIStyle.path(result.schemaPath.string))")
         } else if Path(result.removed.schema).isAbsolute {
-          print("Schema not deleted because it is an absolute path: \(result.schemaPath.string)")
+          print("\(CLIStyle.metadata("Schema not deleted because it is an absolute path:")) \(CLIStyle.path(result.schemaPath.string))")
         } else if result.schemaPath.exists {
-          print("Schema not deleted because it is still referenced: \(result.schemaPath.string)")
+          print("\(CLIStyle.metadata("Schema not deleted because it is still referenced:")) \(CLIStyle.path(result.schemaPath.string))")
         } else {
-          print("Schema file not found: \(result.schemaPath.string)")
+          print("\(CLIStyle.warning("Schema file not found:")) \(CLIStyle.path(result.schemaPath.string))")
         }
       }
     }

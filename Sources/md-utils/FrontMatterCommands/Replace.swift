@@ -129,7 +129,7 @@ extension CLIEntry.FrontMatterCommands {
         do {
           try replaceInFile(path: file, newFrontMatter: newFrontMatter)
         } catch {
-          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
           hasErrors = true
           continue
         }
@@ -143,16 +143,19 @@ extension CLIEntry.FrontMatterCommands {
     private func replaceInFile(path: Path, newFrontMatter: Yams.Node.Mapping) throws {
       // Prompt for confirmation (unless --yes flag is used)
       if !yes {
-        print("⚠️  This will REPLACE the entire frontmatter in '\(path)'. Continue? (y/n): ", terminator: "")
+        print(
+          "\(CLIStyle.warning("⚠️"))  This will REPLACE the entire frontmatter in '\(CLIStyle.path(path.string))'. Continue? (y/n): ",
+          terminator: ""
+        )
         fflush(stdout)
 
         guard let response = readLine()?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else {
-          print("Cancelled (no input).")
+          print(CLIStyle.muted("Cancelled (no input)."))
           return
         }
 
         guard response == "y" || response == "yes" else {
-          print("Cancelled.")
+          print(CLIStyle.muted("Cancelled."))
           return
         }
       }
@@ -168,7 +171,7 @@ extension CLIEntry.FrontMatterCommands {
       let updatedContent = try doc.render()
       try path.write(updatedContent)
 
-      print("✓ Replaced frontmatter in '\(path)'")
+      print("\(CLIStyle.success("✓")) Replaced frontmatter in '\(CLIStyle.path(path.string))'")
     }
 
   }

@@ -68,7 +68,7 @@ extension CLIEntry.FrontMatterCommands {
             }
           }
         } catch {
-          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
           hasErrors = true
           continue
         }

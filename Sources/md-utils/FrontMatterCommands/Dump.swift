@@ -115,7 +115,7 @@ extension CLIEntry.FrontMatterCommands {
             Swift.print("---")
           }
         } catch {
-          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
           throw ExitCode.failure
         }
         return
@@ -141,7 +141,7 @@ extension CLIEntry.FrontMatterCommands {
               Swift.print("---")
             }
           } catch {
-            fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+            CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
             hasErrors = true
           }
 
@@ -167,7 +167,7 @@ extension CLIEntry.FrontMatterCommands {
             dict["$path"] = file.string
             collection.append(dict)
           } catch {
-            fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+            CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
             hasErrors = true
           }
         }

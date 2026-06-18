@@ -58,7 +58,7 @@ extension CLIEntry.FrontMatterCommands {
           try file.write(updated)
           updatedCount += 1
         } catch {
-          fputs("error: \(file): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
           hasErrors = true
           continue
         }

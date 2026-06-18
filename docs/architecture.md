@@ -231,6 +231,7 @@ The following features are **NOT YET IMPLEMENTED**:
 - **PathKit** (1.0.1+) - File path handling
 - **Yams** (6.1.0+) - YAML parsing and serialization
 - **jmespath.swift** (1.0.3+) - JMESPath query language for JSON (used by `fm search`)
+- **Rainbow** (4.2.1+) - ANSI styling for human-facing CLI output
 
 ### Transitive Dependencies
 
@@ -446,4 +447,3 @@ md-utils/
 ### Test Files
 - Match the file they're testing with "Tests" suffix
 - Example: `MarkdownDocument.swift` → `MarkdownDocumentTests.swift`
-

@@ -95,7 +95,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           content = try path.read()
           doc = try MarkdownDocument(content: content)
         } catch {
-          fputs("error: \(path): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hasErrors = true
           continue
         }
@@ -131,7 +131,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       if matchingFiles.isEmpty {
         // Print to stderr so it doesn't interfere with piping
         let invertMsg = invert ? " NOT" : ""
-        fputs("No files found where '\(key)' array\(invertMsg) contains '\(value)'\n", stderr)
+        CLIStyle.writeStderr(CLIStyle.muted("No files found where '\(key)' array\(invertMsg) contains '\(value)'"))
         throw ExitCode.failure
       } else {
         print(matchingFiles.joined(separator: "\n"))

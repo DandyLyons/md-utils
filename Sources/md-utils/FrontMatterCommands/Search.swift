@@ -153,8 +153,8 @@ extension CLIEntry.FrontMatterCommands {
       // Output results based on format
       if matchingFiles.isEmpty {
         // Print helpful message to stderr (doesn't interfere with piping stdout)
-        fputs("No files matched the query: \"\(query)\"\n", stderr)
-        fputs("Searched \(processedPaths.count) file(s)\n", stderr)
+        CLIStyle.writeStderr(CLIStyle.muted("No files matched the query: \"\(query)\""))
+        CLIStyle.writeStderr(CLIStyle.metadata("Searched \(processedPaths.count) file(s)"))
       } else {
         switch format {
         case .json:
@@ -220,7 +220,7 @@ extension CLIEntry.FrontMatterCommands {
 
         // Show progress to stderr (only for multi-batch operations)
         if paths.count > batchSize {
-          fputs("Processing batch \(batchNumber)/\(totalBatches)...\n", stderr)
+          CLIStyle.writeStderr(CLIStyle.metadata("Processing batch \(batchNumber)/\(totalBatches)..."))
         }
 
         let (batchMatches, batchHadErrors) = processBatch(batch, using: expression)
@@ -244,7 +244,7 @@ extension CLIEntry.FrontMatterCommands {
           content = try path.read(.utf8)
           doc = try MarkdownDocument(content: content)
         } catch {
-          fputs("error: \(path): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hadErrors = true
           continue
         }
@@ -254,7 +254,7 @@ extension CLIEntry.FrontMatterCommands {
         do {
           frontMatterDict = try YAMLConversion.safeNodeToSwiftValue(.mapping(doc.frontMatter))
         } catch {
-          fputs("warning: \(path): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeWarning("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hadErrors = true
           continue
         }

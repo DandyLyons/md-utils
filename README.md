@@ -182,6 +182,10 @@ swift run md-utils lines --start 10 --end 20 document.md
 
 Run `swift run md-utils --help` or `swift run md-utils <command> --help` for full usage details.
 
+### ANSI Color
+
+Human-facing CLI output may use ANSI color to distinguish status, errors, warnings, paths, and metadata from Markdown content. Machine-readable output such as JSON, YAML, PropertyList, raw path lists, and extracted Markdown content remains unstyled. Color handling is provided by Rainbow, which automatically emits plain text when output is redirected; use `NO_COLOR=1` to disable color or `FORCE_COLOR=1` to force color when supported by Rainbow.
+
 ## Project Configuration
 
 Project-level md-utils settings live in `.md-utils/md-utils.json`. The schema command group creates and uses this folder to validate Markdown YAML frontmatter against JSON Schema files. Schemas only apply to frontmatter, not Markdown body content.

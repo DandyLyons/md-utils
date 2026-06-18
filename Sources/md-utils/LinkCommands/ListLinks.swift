@@ -76,16 +76,16 @@ extension CLIEntry {
       let multiFile = entries.count > 1
       for entry in entries {
         if multiFile {
-          print("==> \(entry.file) <==")
+          print(CLIStyle.heading("==> \(entry.file) <=="))
         }
         if entry.links.isEmpty {
-          print("  (no wikilinks)")
+          print("  \(CLIStyle.muted("(no wikilinks)"))")
         } else {
           for link in entry.links {
-            let statusIcon = statusIcon(for: link.status)
+            let statusIcon = styledStatusIcon(for: link.status)
             let target = link.target
-            let resolution = link.resolvedPath ?? link.status
-            print("  \(statusIcon) [[\(target)]] -> \(resolution)")
+            let resolution = link.resolvedPath.map(CLIStyle.path) ?? styledStatus(link.status)
+            print("  \(statusIcon) [[\(target)]] \(CLIStyle.metadata("->")) \(resolution)")
           }
         }
         if multiFile {
@@ -96,12 +96,22 @@ extension CLIEntry {
     /// Returns the display marker for a link resolution status.
     ///
     /// See <doc:WikilinkCommands> for workflow details.
-    private func statusIcon(for status: String) -> String {
+    private func styledStatusIcon(for status: String) -> String {
       switch status {
-      case "resolved": return "✓"
-      case "unresolved": return "✗"
-      case "ambiguous": return "?"
+      case "resolved": return CLIStyle.success("✓")
+      case "unresolved": return CLIStyle.error("✗")
+      case "ambiguous": return CLIStyle.warning("?")
       default: return " "
+      }
+    }
+
+    /// Returns a styled display value for a link resolution status.
+    private func styledStatus(_ status: String) -> String {
+      switch status {
+      case "resolved": return CLIStyle.success(status)
+      case "unresolved": return CLIStyle.error(status)
+      case "ambiguous": return CLIStyle.warning(status)
+      default: return status
       }
     }
   }

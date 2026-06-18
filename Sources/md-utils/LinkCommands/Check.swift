@@ -92,16 +92,17 @@ extension CLIEntry {
         print(output)
       } else {
         for problem in problems {
-          let icon = problem.status == "unresolved" ? "✗" : "?"
-          print("\(icon) \(problem.file): [[\(problem.target)]] (\(problem.status))")
+          let icon = problem.status == "unresolved" ? CLIStyle.error("✗") : CLIStyle.warning("?")
+          let status = problem.status == "unresolved" ? CLIStyle.error(problem.status) : CLIStyle.warning(problem.status)
+          print("\(icon) \(CLIStyle.path(problem.file)): [[\(problem.target)]] (\(status))")
           if let candidates = problem.candidates {
             for candidate in candidates {
-              print("    candidate: \(candidate)")
+              print("    \(CLIStyle.metadata("candidate:")) \(CLIStyle.path(candidate))")
             }
           }
         }
         print("")
-        print("Total: \(totalLinks) links, \(brokenCount) broken, \(ambiguousCount) ambiguous")
+        print(CLIStyle.metadata("Total: \(totalLinks) links, \(brokenCount) broken, \(ambiguousCount) ambiguous"))
       }
 
       if brokenCount > 0 || ambiguousCount > 0 {

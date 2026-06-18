@@ -90,7 +90,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
           processedCount += 1
         } catch {
-          fputs("error: \(path): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hasErrors = true
           continue
         }
@@ -98,11 +98,11 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
       // Summary output (to stderr, doesn't interfere with piping)
       if processedCount == 0 && !hasErrors {
-        fputs("No files were modified (value '\(value)' not found in any arrays)\n", stderr)
+        CLIStyle.writeStderr(CLIStyle.muted("No files were modified (value '\(value)' not found in any arrays)"))
       } else if processedCount > 0 {
-        fputs("Updated \(processedCount) file(s)\n", stderr)
+        CLIStyle.writeStderr("Updated \(processedCount) file(s)")
         if skippedCount > 0 {
-          fputs("Skipped \(skippedCount) file(s) where value was not found\n", stderr)
+          CLIStyle.writeStderr(CLIStyle.metadata("Skipped \(skippedCount) file(s) where value was not found"))
         }
       }
 

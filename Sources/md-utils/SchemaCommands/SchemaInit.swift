@@ -51,9 +51,9 @@ extension CLIEntry.SchemaCommands {
         frontmatterRequired: frontmatterRequired,
       ))
 
-      print("Created schema rule \"\(name)\"")
-      print("Config: \(SchemaPaths.configFile.string)")
-      print("Schema: \(schemaFile.string)")
+      print("\(CLIStyle.success("Created schema rule")) \"\(name)\"")
+      print("\(CLIStyle.metadata("Config:")) \(CLIStyle.path(SchemaPaths.configFile.string))")
+      print("\(CLIStyle.metadata("Schema:")) \(CLIStyle.path(schemaFile.string))")
     }
   }
 }

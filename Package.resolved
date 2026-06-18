@@ -1,5 +1,5 @@
 {
-  "originHash" : "ba6513c3a8c5002efc047b01039559b4402a8642ecce589ddae847eb74a9ee64",
+  "originHash" : "7fc1c58cb7b389f547361da99ecadc597f9dbcbc3c638db56226030e12569835",
   "pins" : [
     {
       "identity" : "jmespath.swift",
@@ -35,6 +35,15 @@
       "state" : {
         "revision" : "3bfd2737b700b9a36565a8c94f4ad2b050a5e574",
         "version" : "1.0.1"
+      }
+    },
+    {
+      "identity" : "rainbow",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/onevcat/Rainbow",
+      "state" : {
+        "revision" : "cdf146ae671b2624917648b61c908d1244b98ca1",
+        "version" : "4.2.1"
       }
     },
     {

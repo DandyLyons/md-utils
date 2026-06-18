@@ -18,7 +18,7 @@ struct CommandTimer {
   }
   /// Writes a status message with elapsed command time.
   func writeStatus(_ message: String) {
-    fputs("\(message) in \(formattedElapsed()).\n", stderr)
+    CLIStyle.writeStderr("\(message) \(CLIStyle.metadata("in \(formattedElapsed())."))")
   }
   /// Formats the value for user-facing output.
   private func formattedElapsed() -> String {

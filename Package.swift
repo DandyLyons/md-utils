@@ -26,6 +26,7 @@ let package = Package(
     .package(url: "https://github.com/kylef/JSONSchema.swift", from: "0.6.0"),
     .package(url: "https://github.com/jpsim/Yams.git", from: "6.1.0"),
     .package(url: "https://github.com/adam-fowler/jmespath.swift.git", from: "1.0.3"),
+    .package(url: "https://github.com/onevcat/Rainbow", from: "4.2.1"),
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
@@ -55,6 +56,7 @@ let package = Package(
         .product(name: "JSONSchema", package: "JSONSchema.swift"),
         .product(name: "PathKit", package: "PathKit"),
         .product(name: "JMESPath", package: "jmespath.swift"),
+        "Rainbow",
         "Yams",
       ],
       resources: [

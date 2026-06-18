@@ -118,14 +118,14 @@ extension CLIEntry {
       let multiTarget = entries.count > 1
       for entry in entries {
         if multiTarget {
-          print("==> \(entry.target) <==")
+          print(CLIStyle.heading("==> \(entry.target) <=="))
         }
         if entry.backlinks.isEmpty {
-          print("  (no backlinks)")
+          print("  \(CLIStyle.muted("(no backlinks)"))")
         } else {
           for source in entry.backlinks {
             let linkText = source.links.map { "[[\($0)]]" }.joined(separator: ", ")
-            print("  \(source.file) via \(linkText)")
+            print("  \(CLIStyle.path(source.file)) \(CLIStyle.metadata("via")) \(linkText)")
           }
         }
         if multiTarget {

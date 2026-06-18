@@ -95,7 +95,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
           updatedCount += 1
         } catch {
-          fputs("error: \(path): \(error.localizedDescription)\n", stderr)
+          CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hasErrors = true
           continue
         }
