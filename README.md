@@ -165,13 +165,13 @@ swift run md-utils extract --name "Installation" README.md
 swift run md-utils headings promote document.md
 
 # List wikilinks with resolution status
-swift run md-utils links list --vault ~/notes note.md
+swift run md-utils links list --vault ~/notes/ note.md
 
 # Check for broken wikilinks
-swift run md-utils links check --vault ~/notes docs/
+swift run md-utils links check --vault ~/notes/ docs/
 
 # Find backlinks to a file
-swift run md-utils links backlinks --vault ~/notes --target "My Note"
+swift run md-utils links backlinks --vault ~/notes/ --target "My Note"
 
 # Read file metadata
 swift run md-utils meta read document.md
@@ -193,7 +193,7 @@ Project-level md-utils settings live in `.md-utils/md-utils.json`. The schema co
 Treat the directory containing `.md-utils/` as the md-utils project root. Commands that use project configuration read `.md-utils/md-utils.json` relative to the current working directory; md-utils does not search parent directories for project configuration. Run schema/config commands from the directory that contains `.md-utils/`:
 
 ```bash
-cd /path/to/project
+cd /path/to/project/
 md-utils schema validate
 ```
 
@@ -214,7 +214,7 @@ Example config:
 ```json
 {
   "$schema": "md-utils.schema.json",
-  "schemaDirectory": ".md-utils/schemas",
+  "schemaDirectory": ".md-utils/schemas/",
   "schemaRules": [
     {
       "name": "books",
@@ -234,7 +234,7 @@ Example config:
 Config fields:
 
 - `$schema`: Optional editor hint for autocomplete and validation.
-- `schemaDirectory`: Directory for JSON Schema files. Defaults to `.md-utils/schemas`.
+- `schemaDirectory`: Directory for JSON Schema files. Defaults to `.md-utils/schemas/`.
 - `schemaRules`: Rules that map schemas to Markdown files.
 - `schemaRules[].name`: Unique rule name for `md-utils schema validate <rule-name>`.
 - `schemaRules[].schema`: Schema file, resolved relative to `schemaDirectory`.

@@ -41,7 +41,7 @@ swift run md-utils <command>
 ```
 
 > [!Note] 
-> If no `.build` directory exists, run `swift build` first to create. Do not use the `.build` directory from another worktree or branch. 
+> If no `.build/` directory exists, run `swift build` first to create. Do not use the `.build/` directory from another worktree or branch. 
 
 ## Critical Rules
 
@@ -52,6 +52,10 @@ Force unwrapping optionals with `!` is absolutely prohibited. Use safe alternati
 - `try #require()` in tests
 - Nil coalescing (`??`)
 - Optional chaining (`?.`)
+
+## Path Conventions
+
+- Use explicit trailing slashes for all paths that refer to directories, including examples, documentation, config snippets, and CLI help text. Bare `.`, `..`, and `~` are exceptions and do not need trailing slashes.
 
 ## Documentation
 

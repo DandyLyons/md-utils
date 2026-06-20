@@ -586,7 +586,7 @@ struct SchemaCommandsTests {
     try (mdUtils + "md-utils.json").write("""
       {
         "$schema": "md-utils.schema.json",
-        "schemaDirectory": ".md-utils/schemas",
+        "schemaDirectory": ".md-utils/schemas/",
         "schemaRules": [
           \(ruleEntries.joined(separator: ",\n"))
         ]

@@ -94,5 +94,5 @@ md-utils fm search "status == 'draft'" posts/ \
   | xargs grep -l "TODO"
 
 # Check wikilinks across a vault
-md-utils links check posts/ --root ~/vault
+md-utils links check posts/ --root ~/vault/
 ```

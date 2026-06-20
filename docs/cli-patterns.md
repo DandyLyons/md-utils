@@ -10,7 +10,7 @@
 
 Pattern to follow:
 
-1. Create Sources/md-utils/Commands/ directory (when needed)
+1. Create `Sources/md-utils/Commands/` directory (when needed)
 2. Each command is a struct conforming to `ParsableCommand`
 3. Use `@OptionGroup var options: GlobalOptions` for shared options
 4. Register in CLIEntry.configuration.subcommands array

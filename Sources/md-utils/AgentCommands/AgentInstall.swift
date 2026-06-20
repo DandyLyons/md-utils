@@ -18,7 +18,7 @@ extension CLIEntry.AgentCommands {
         markdown-utilities Skill — Installation Instructions
 
         CLAUDE CODE
-          1. mkdir -p ~/.claude/skills/markdown-utilities
+          1. mkdir -p ~/.claude/skills/markdown-utilities/
           2. md-utils agents skill > ~/.claude/skills/markdown-utilities/SKILL.md
           3. Restart Claude Code or reload skills.
 

@@ -10,7 +10,7 @@ import Foundation
 /// let options = CSVOptions(
 ///     includeBody: true,
 ///     metadataColumns: [.fileName, .relPath],
-///     baseDirectory: "/path/to/docs"
+///     baseDirectory: "/path/to/docs/"
 /// )
 /// ```
 public struct CSVOptions: ConversionOptions, Sendable {

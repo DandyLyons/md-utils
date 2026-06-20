@@ -11,7 +11,7 @@
     },
     "schemaDirectory": {
       "type": "string",
-      "default": ".md-utils/schemas",
+      "default": ".md-utils/schemas/",
       "description": "Directory where schema files are stored. Relative paths are resolved from the project root."
     },
     "schemaRules": {

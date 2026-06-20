@@ -34,7 +34,7 @@ extension CLIEntry.FrontMatterCommands {
           md-utils fm search 'draft == `true`' .
 
           # Find files with specific tag
-          md-utils fm search 'contains(tags, `"swift"`)' ./posts
+          md-utils fm search 'contains(tags, `"swift"`)' ./posts/
 
           # Complex query with multiple conditions
           md-utils fm search 'draft == `false` && author == `"John"`' .
@@ -69,7 +69,7 @@ extension CLIEntry.FrontMatterCommands {
           for piping into other commands:
 
           # Bulk update: mark all drafts as published
-          md-utils fm search 'draft == `true`' ./posts | xargs md-utils fm set --key draft --value false
+          md-utils fm search 'draft == `true`' ./posts/ | xargs md-utils fm set --key draft --value false
 
           # Chain operations: publish posts and add date
           md-utils fm search 'ready == `true`' . | while read -r file; do

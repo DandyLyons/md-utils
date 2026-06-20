@@ -13,7 +13,7 @@ import Yams
 ///
 /// See <doc:SchemaValidationCommands> for workflow details.
 struct MdUtilsConfig {
-  static let defaultSchemaDirectory = ".md-utils/schemas"
+  static let defaultSchemaDirectory = ".md-utils/schemas/"
 
   var schemaReference: String?
   var schemaDirectory: String

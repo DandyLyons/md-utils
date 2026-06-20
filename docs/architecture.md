@@ -43,7 +43,7 @@ if let heading = ast.children.first as? Heading {
 - Uses swift-argument-parser
 - Main command: `md-utils`
 - Conforms to `AsyncParsableCommand` to support async subcommands
-- Subcommands defined in Sources/md-utils/Commands/
+- Subcommands defined in `Sources/md-utils/Commands/`
 
 ### Current Subcommands
 

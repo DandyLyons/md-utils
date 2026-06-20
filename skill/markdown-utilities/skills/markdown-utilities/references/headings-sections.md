@@ -94,13 +94,13 @@ md-utils convert to-csv posts/
 ```bash
 # List all wikilinks with resolution status
 md-utils links list document.md
-md-utils links ls posts/ --root ~/vault --json
+md-utils links ls posts/ --root ~/vault/ --json
 
 # Check for broken or ambiguous links
-md-utils links check posts/ --root ~/vault
+md-utils links check posts/ --root ~/vault/
 
 # Find backlinks to a target file
-md-utils links backlinks target.md --root ~/vault
+md-utils links backlinks target.md --root ~/vault/
 ```
 
 > Note: For Obsidian vault-specific operations, the Obsidian CLI may provide more reliable results. `md-utils links` is designed for general Markdown workflows.
