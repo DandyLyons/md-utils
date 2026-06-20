@@ -57,6 +57,13 @@ Force unwrapping optionals with `!` is absolutely prohibited. Use safe alternati
 
 - Use explicit trailing slashes for all paths that refer to directories, including examples, documentation, config snippets, and CLI help text. Bare `.`, `..`, and `~` are exceptions and do not need trailing slashes.
 
+## OKF Support
+
+- OKF tooling currently targets the Open Knowledge Format v0.1 draft.
+- The OKF v0.1 draft spec is readable at https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md.
+- Do not make OKF behavior stricter than the draft conformance rules unless the command clearly labels checks as advisory.
+- Do not guess OKF `type` values. Apply a `type` only when the user provides the value explicitly.
+
 ## Documentation
 
 Detailed guidance organized by topic:

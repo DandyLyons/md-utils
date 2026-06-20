@@ -71,3 +71,11 @@ Key details:
 - `extensions` is a comma-separated string (not an array)
 - `recursive` supports `--no-recursive` via `inversion: .prefixedNo`
 - Use `resolvedPaths()` to expand directories and apply filters
+
+## OKF Command Pattern
+
+`md-utils okf` currently targets the Open Knowledge Format v0.1 draft. The draft spec is readable at https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md.
+
+OKF commands should keep hard validation aligned with the draft conformance rules. Optional quality checks should be labeled as advisory. Directory paths in CLI help, examples, and output should use explicit trailing slashes, except for bare `.`, `..`, and `~`.
+
+`okf type set` must not guess concept types. It should write only an explicit user-provided `--type` value and should default to recursively scanning the current directory when `--dir` is omitted.

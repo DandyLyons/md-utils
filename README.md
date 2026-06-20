@@ -119,6 +119,7 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 - **Format Conversion** — Convert Markdown to plain text or CSV
 - **File Metadata** — Read file metadata including standard and extended attributes (xattr)
 - **Wikilink Parsing & Resolution** — Parse Obsidian-flavored wikilinks, resolve against a vault directory, detect broken/ambiguous links, find backlinks
+- **OKF v0.1 Draft Tooling** — Validate Open Knowledge Format bundles and batch-set explicit concept `type` values
 
 ### Planned
 
@@ -173,6 +174,15 @@ swift run md-utils links check --vault ~/notes/ docs/
 # Find backlinks to a file
 swift run md-utils links backlinks --vault ~/notes/ --target "My Note"
 
+# Validate an OKF v0.1 draft bundle
+swift run md-utils okf validate ./knowledge/
+
+# Set an explicit OKF type on matching concept files under the current directory
+swift run md-utils okf type set --type=Book --array-key=tags --array-contains=Books
+
+# Set an explicit OKF type under a specific directory
+swift run md-utils okf type set --type=BigQueryTable --dir=./knowledge/tables/
+
 # Read file metadata
 swift run md-utils meta read document.md
 
@@ -185,6 +195,25 @@ Run `swift run md-utils --help` or `swift run md-utils <command> --help` for ful
 ### ANSI Color
 
 Human-facing CLI output may use ANSI color to distinguish status, errors, warnings, paths, and metadata from Markdown content. Machine-readable output such as JSON, YAML, PropertyList, raw path lists, and extracted Markdown content remains unstyled. Color handling is provided by Rainbow, which automatically emits plain text when output is redirected; use `NO_COLOR=1` to disable color or `FORCE_COLOR=1` to force color when supported by Rainbow.
+
+## Open Knowledge Format
+
+`md-utils okf` currently targets the Open Knowledge Format (OKF) v0.1 draft. The draft spec is readable at https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md.
+
+OKF v0.1 draft bundles are directories of Markdown files with YAML frontmatter. `md-utils` validates the hard conformance rules from the draft without rejecting intentionally permitted content such as unknown `type` values, unknown frontmatter keys, broken links, or missing optional fields.
+
+OKF commands:
+
+```bash
+md-utils okf validate ./knowledge/
+md-utils okf type set --type=Book
+md-utils okf type set --type=Book --array-key=tags --array-contains=Books
+md-utils okf type set --type=BigQueryTable --dir=./knowledge/tables/
+```
+
+`okf type set` never guesses concept types. It writes only the explicit `--type` value supplied by the user. If `--dir` is omitted, it scans the current directory recursively. Use `--array-key` and `--array-contains` together to update only files whose YAML frontmatter array includes a specific string, such as files whose `tags` array contains `Books`.
+
+The package also bundles `OKF-concept.schema.json` for OKF v0.1 draft concept frontmatter. The schema requires a non-empty string `type` and allows additional frontmatter keys, matching the draft's permissive consumption model.
 
 ## Project Configuration
 

@@ -148,6 +148,32 @@ md-utils fm dump document.md
 md-utils convert to-text document.md
 ```
 
+## Open Knowledge Format Operations
+
+`md-utils okf` currently targets the Open Knowledge Format (OKF) v0.1 draft. The draft spec is readable at https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md.
+
+### Validate an OKF bundle
+```bash
+md-utils okf validate ./knowledge/
+```
+
+### Set an explicit type under the current directory
+```bash
+md-utils okf type set --type=Book
+```
+
+### Set an explicit type for tagged files
+```bash
+md-utils okf type set --type=Book --array-key=tags --array-contains=Books
+```
+
+### Set an explicit type under a specific directory
+```bash
+md-utils okf type set --type=BigQueryTable --dir=./knowledge/tables/
+```
+
+`okf type set` never guesses concept types. It only writes the explicit `--type` value supplied by the user. If `--dir` is omitted, the command scans the current directory recursively.
+
 ## Advanced Operations
 
 ### Find files with specific tag and publish them
@@ -209,4 +235,3 @@ md-utils meta read document.md
 ```bash
 md-utils fm set --key updated --value "2026-01-24" --recursive posts/
 ```
-

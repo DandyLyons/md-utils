@@ -79,6 +79,9 @@ if let heading = ast.children.first as? Heading {
   - `links backlinks` / `bl` - Find files that link to a given target
 - `meta` (FileMetadataCommands) - Read file metadata including standard and extended attributes
   - `meta read` - Read metadata from files with multiple output formats
+- `okf` (OKFCommands) - Work with Open Knowledge Format v0.1 draft bundles
+  - `okf validate` - Validate hard OKF v0.1 draft conformance rules
+  - `okf type set` - Set an explicit OKF concept `type` value on matching files
 - `section` / `sect` (SectionCommands) - Manipulate sections in Markdown documents
   - `section move-up` - Move a section up among siblings
   - `section move-down` - Move a section down among siblings

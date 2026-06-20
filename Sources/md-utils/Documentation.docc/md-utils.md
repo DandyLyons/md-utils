@@ -16,6 +16,10 @@ The executable target wraps the `MarkdownUtilities` library in a Swift Argument 
 
 - <doc:SchemaValidationCommands>
 
+### Open Knowledge Format
+
+- <doc:OKFCommands>
+
 ### Content Selection
 
 - <doc:ContentSelectionCommands>
