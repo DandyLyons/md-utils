@@ -6,6 +6,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 2. **`md-utils`** — A CLI tool built on `MarkdownUtilities`.
 3. **`markdown-utilities`** — An Agent Skill for AI coding assistants, distributed from `skill/markdown-utilities/`, built on the `md-utils` CLI.
 
+[`treedocs`](https://github.com/DandyLyons/treedocs) is a sister project of `md-utils`. Future integrations are planned between the two projects.
+
 ## Project Brief
 
 - **Language**: Swift 6.2+

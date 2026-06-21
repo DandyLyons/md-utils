@@ -1,5 +1,7 @@
 # Architecture
 
+`md-utils` is part of a broader Markdown tooling ecosystem. [`treedocs`](https://github.com/DandyLyons/treedocs) is a sister project, and future integrations are planned between the two projects.
+
 ## Core Library (MarkdownUtilities)
 
 ### MarkdownDocument
@@ -223,6 +225,7 @@ The following features are **NOT YET IMPLEMENTED**:
 1. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
 2. **Additional Format Conversions** - HTML, RTF, XML (infrastructure ready, plain text and CSV implemented)
 3. **File Metadata Writing** - Write/update file metadata (read operations implemented)
+4. **`treedocs` Integration** - Integration with the sister project [`treedocs`](https://github.com/DandyLyons/treedocs)
 
 ## Dependencies
 

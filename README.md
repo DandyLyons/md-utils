@@ -7,6 +7,8 @@ A collection of utilities for working with Markdown files — from Swift library
 2. **`md-utils`** — A command-line tool, built on top of `MarkdownUtilities`, for performing operations on Markdown files.
 3. **`markdown-utilities`** — An Agent Skill for AI coding assistants, built on top of the `md-utils` CLI.
 
+[`treedocs`](https://github.com/DandyLyons/treedocs) is a sister project of `md-utils`. Future integrations are planned between the two projects.
+
 ## Agent Skill Installation
 
 The `markdown-utilities` Agent Skill teaches AI coding assistants how to use `md-utils` for Markdown operations. It provides commands, examples, and reference documentation that are loaded on demand.
@@ -127,6 +129,7 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 - Markdown flavor validation (CommonMark, GFM, Obsidian)
 - Additional format conversions (HTML, RTF, XML)
 - File metadata writing
+- Integration with the sister project [`treedocs`](https://github.com/DandyLyons/treedocs)
 
 ## CLI Usage
 
