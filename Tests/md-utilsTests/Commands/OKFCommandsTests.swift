@@ -18,9 +18,29 @@ struct OKFCommandsTests {
     let config = CLIEntry.OKFCommands.configuration
 
     #expect(config.commandName == "okf")
-    #expect(config.subcommands.count == 2)
-    #expect(config.subcommands[0] is CLIEntry.OKFCommands.Validate.Type)
-    #expect(config.subcommands[1] is CLIEntry.OKFCommands.TypeCommands.Type)
+    #expect(config.subcommands.count == 5)
+    #expect(config.subcommands[0] is CLIEntry.OKFCommands.Init.Type)
+    #expect(config.subcommands[1] is CLIEntry.OKFCommands.Validate.Type)
+    #expect(config.subcommands[2] is CLIEntry.OKFCommands.Report.Type)
+    #expect(config.subcommands[3] is CLIEntry.OKFCommands.Doctor.Type)
+    #expect(config.subcommands[4] is CLIEntry.OKFCommands.TypeCommands.Type)
+  }
+
+  @Test
+  func `okf init parses with log flag`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["okf", "init", "./knowledge/", "--with-log"])
+    let command = try #require(parsed as? CLIEntry.OKFCommands.Init)
+
+    #expect(command.bundlePath == Path("./knowledge/"))
+    #expect(command.withLog)
+  }
+
+  @Test
+  func `okf init parses without path`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["okf", "init"])
+    let command = try #require(parsed as? CLIEntry.OKFCommands.Init)
+
+    #expect(!command.withLog)
   }
 
   @Test
@@ -29,6 +49,40 @@ struct OKFCommandsTests {
     let command = try #require(parsed as? CLIEntry.OKFCommands.Validate)
 
     #expect(command.bundlePath == Path("./knowledge/"))
+  }
+
+  @Test
+  func `okf report parses json format`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["okf", "report", "./knowledge/", "--format", "json"])
+    let command = try #require(parsed as? CLIEntry.OKFCommands.Report)
+
+    #expect(command.bundlePath == Path("./knowledge/"))
+    #expect(command.format == .json)
+  }
+
+  @Test
+  func `okf report parses without path`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["okf", "report"])
+    let command = try #require(parsed as? CLIEntry.OKFCommands.Report)
+
+    #expect(command.format == .terminal)
+  }
+
+  @Test
+  func `okf doctor parses terminal format by default`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["okf", "doctor", "./knowledge/"])
+    let command = try #require(parsed as? CLIEntry.OKFCommands.Doctor)
+
+    #expect(command.bundlePath == Path("./knowledge/"))
+    #expect(command.format == .terminal)
+  }
+
+  @Test
+  func `okf doctor parses without path`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["okf", "doctor"])
+    let command = try #require(parsed as? CLIEntry.OKFCommands.Doctor)
+
+    #expect(command.format == .terminal)
   }
 
   @Test
@@ -169,6 +223,118 @@ struct OKFCommandsTests {
   }
 
   @Test
+  func `init creates schema config without log by default`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    let bundle = project + "knowledge"
+
+    let summary = try OKFInitializer.initialize(options: OKFInitOptions(bundlePath: bundle, withLog: false))
+
+    #expect((bundle + "index.md").exists)
+    #expect(!(bundle + "log.md").exists)
+    #expect((bundle + ".md-utils/md-utils.json").exists)
+    #expect((bundle + ".md-utils/md-utils.schema.json").exists)
+    #expect((bundle + ".md-utils/schemas/OKF-concept.schema.json").exists)
+    #expect(summary.createdFiles.contains("index.md"))
+    #expect(!summary.createdFiles.contains("log.md"))
+  }
+
+  @Test
+  func `init creates log only when requested and preserves existing files`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    let bundle = project + "knowledge"
+    try writeFile(bundle + "index.md", content: "# Existing\n")
+
+    let summary = try OKFInitializer.initialize(options: OKFInitOptions(bundlePath: bundle, withLog: true))
+
+    #expect((bundle + "log.md").exists)
+    #expect(try (bundle + "index.md").read() == "# Existing\n")
+    #expect(summary.existingFiles.contains("index.md"))
+    #expect(summary.createdFiles.contains("log.md"))
+  }
+
+  @Test
+  func `report analysis counts types and advisory fields`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeFile(project + "books/dune.md", content: """
+      ---
+      type: Book
+      title: Dune
+      timestamp: not-a-date
+      ---
+      # Citations
+
+      [1] Source
+      """)
+
+    let analysis = try OKFAnalyzer.analyze(bundlePath: project)
+
+    #expect(analysis.typeCounts["Book"] == 1)
+    #expect(analysis.citationDocuments == 1)
+    #expect(analysis.missingRecommendedFields["books/dune.md"]?.contains("description") == true)
+    #expect(analysis.advisoryIssues.contains { $0.path == "frontmatter.timestamp" })
+    #expect(analysis.advisoryIssues.contains { $0.filePath == "index.md" })
+  }
+
+  @Test
+  func `report formatter emits json`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeFile(project + "books/dune.md", content: concept(type: "Book"))
+
+    let analysis = try OKFAnalyzer.analyze(bundlePath: project)
+    let output = try OKFReportFormatter.render(analysis, format: .json)
+
+    #expect(output.contains("\"typeCounts\""))
+    #expect(output.contains("\"Book\""))
+  }
+
+  @Test
+  func `doctor exits successfully for advisory warnings only`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeFile(project + "books/dune.md", content: concept(type: "Book"))
+
+    let parsed = try CLIEntry.parseAsRoot(["okf", "doctor", project.string])
+    var command = try #require(parsed as? CLIEntry.OKFCommands.Doctor)
+
+    try await command.run()
+  }
+
+  @Test
+  func `doctor exits failure for hard validation errors`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeFile(project + "books/dune.md", content: "# Dune\n")
+
+    let parsed = try CLIEntry.parseAsRoot(["okf", "doctor", project.string])
+    var command = try #require(parsed as? CLIEntry.OKFCommands.Doctor)
+
+    await #expect(throws: ExitCode.self) {
+      try await command.run()
+    }
+  }
+
+  @Test
+  func `schema exclude paths skip reserved okf files`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    _ = try OKFInitializer.initialize(options: OKFInitOptions(bundlePath: project, withLog: true))
+    try writeFile(project + "books/dune.md", content: concept(type: "Book"))
+
+    let summary = try SchemaValidatorRunner.validate(
+      ruleName: "okf-concepts",
+      root: project,
+      configPath: project + ".md-utils/md-utils.json"
+    )
+
+    #expect(summary.results.map(\.filePath) == ["books/dune.md"])
+    #expect(!summary.hasFailures)
+  }
+
+  @Test
   func `type set updates concepts and skips reserved files`() throws {
     let project = try createTempProject()
     defer { try? project.delete() }
@@ -189,21 +355,19 @@ struct OKFCommandsTests {
   }
 
   @Test
-  func `type set defaults to current directory`() throws {
+  func `type set scans requested directory recursively`() throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeFile(project + "books/dune.md", content: "# Dune\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try OKFTypeSetter.setType(options: OKFTypeSetOptions(
-        directory: .current,
-        type: "Book",
-        arrayKey: nil,
-        arrayContains: nil
-      ))
+    let summary = try OKFTypeSetter.setType(options: OKFTypeSetOptions(
+      directory: project,
+      type: "Book",
+      arrayKey: nil,
+      arrayContains: nil
+    ))
 
-      #expect(summary.updatedFiles == ["books/dune.md"])
-    }
+    #expect(summary.updatedFiles == ["books/dune.md"])
   }
 
   @Test
@@ -262,15 +426,6 @@ struct OKFCommandsTests {
   private func writeFile(_ path: Path, content: String) throws {
     try path.parent().mkpath()
     try path.write(content)
-  }
-
-  private func withCurrentDirectory<T>(_ path: Path, operation: () throws -> T) throws -> T {
-    let original = FileManager.default.currentDirectoryPath
-    guard FileManager.default.changeCurrentDirectoryPath(path.string) else {
-      throw ValidationError("Failed to change current directory to \(path.string)")
-    }
-    defer { _ = FileManager.default.changeCurrentDirectoryPath(original) }
-    return try operation()
   }
 
   private func concept(type: String, tags: [String] = []) -> String {

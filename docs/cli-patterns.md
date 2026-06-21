@@ -78,4 +78,8 @@ Key details:
 
 OKF commands should keep hard validation aligned with the draft conformance rules. Optional quality checks should be labeled as advisory. Directory paths in CLI help, examples, and output should use explicit trailing slashes, except for bare `.`, `..`, and `~`.
 
+Use `okf validate` as the hard conformance gate, `okf doctor` as conformance plus advisory health diagnostics, and `okf report` as informational inventory and analytics. `okf doctor` should exit non-zero only for hard conformance errors, not for advisory warnings.
+
+`okf init` should preserve existing files and create optional `log.md` only when the user passes `--with-log`.
+
 `okf type set` must not guess concept types. It should write only an explicit user-provided `--type` value and should default to recursively scanning the current directory when `--dir` is omitted.

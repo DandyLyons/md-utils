@@ -157,6 +157,23 @@ md-utils convert to-text document.md
 md-utils okf validate ./knowledge/
 ```
 
+### Initialize an OKF bundle
+```bash
+md-utils okf init ./knowledge/
+md-utils okf init ./knowledge/ --with-log
+```
+
+`okf init` installs `.md-utils/` schema configuration and preserves existing files. It creates optional `log.md` only when `--with-log` is passed.
+
+### Report or doctor an OKF bundle
+```bash
+md-utils okf report ./knowledge/
+md-utils okf report ./knowledge/ --format json
+md-utils okf doctor ./knowledge/
+```
+
+`okf validate` is the hard conformance gate. `okf doctor` adds advisory quality diagnostics and exits non-zero only for hard conformance errors. `okf report` is informational inventory and analytics.
+
 ### Set an explicit type under the current directory
 ```bash
 md-utils okf type set --type=Book

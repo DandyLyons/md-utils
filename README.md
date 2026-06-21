@@ -121,7 +121,7 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 - **Format Conversion** — Convert Markdown to plain text or CSV
 - **File Metadata** — Read file metadata including standard and extended attributes (xattr)
 - **Wikilink Parsing & Resolution** — Parse Obsidian-flavored wikilinks, resolve against a vault directory, detect broken/ambiguous links, find backlinks
-- **OKF v0.1 Draft Tooling** — Validate Open Knowledge Format bundles and batch-set explicit concept `type` values
+- **OKF v0.1 Draft Tooling** — Initialize, validate, report on, doctor, and batch-update Open Knowledge Format bundles
 
 ### Planned
 
@@ -180,6 +180,18 @@ swift run md-utils links backlinks --vault ~/notes/ --target "My Note"
 # Validate an OKF v0.1 draft bundle
 swift run md-utils okf validate ./knowledge/
 
+# Initialize an OKF bundle and install OKF schema config
+swift run md-utils okf init ./knowledge/
+
+# Initialize with optional log.md
+swift run md-utils okf init ./knowledge/ --with-log
+
+# Report bundle inventory and advisory diagnostics
+swift run md-utils okf report ./knowledge/
+
+# Run hard validation plus advisory health checks
+swift run md-utils okf doctor ./knowledge/
+
 # Set an explicit OKF type on matching concept files under the current directory
 swift run md-utils okf type set --type=Book --array-key=tags --array-contains=Books
 
@@ -209,14 +221,23 @@ OKF commands:
 
 ```bash
 md-utils okf validate ./knowledge/
+md-utils okf init ./knowledge/
+md-utils okf init ./knowledge/ --with-log
+md-utils okf report ./knowledge/
+md-utils okf report ./knowledge/ --format json
+md-utils okf doctor ./knowledge/
 md-utils okf type set --type=Book
 md-utils okf type set --type=Book --array-key=tags --array-contains=Books
 md-utils okf type set --type=BigQueryTable --dir=./knowledge/tables/
 ```
 
+`okf validate` is the conformance gate for hard OKF v0.1 draft rules. `okf doctor` runs validation plus advisory diagnostics for agent usefulness and exits non-zero only for hard conformance errors. `okf report` is inventory and analytics; it does not fail because issues are present.
+
+`okf init` creates a minimal bundle scaffold and installs `.md-utils/` schema configuration. It preserves existing files. Because `log.md` is optional in OKF, it is created only when `--with-log` is passed.
+
 `okf type set` never guesses concept types. It writes only the explicit `--type` value supplied by the user. If `--dir` is omitted, it scans the current directory recursively. Use `--array-key` and `--array-contains` together to update only files whose YAML frontmatter array includes a specific string, such as files whose `tags` array contains `Books`.
 
-The package also bundles `OKF-concept.schema.json` for OKF v0.1 draft concept frontmatter. The schema requires a non-empty string `type` and allows additional frontmatter keys, matching the draft's permissive consumption model.
+The package also bundles `OKF-concept.schema.json` for OKF v0.1 draft concept frontmatter. The schema requires a non-empty string `type` and allows additional frontmatter keys, matching the draft's permissive consumption model. `okf init` installs this schema with an `okf-concepts` rule that excludes reserved `index.md` and `log.md` files.
 
 ## Project Configuration
 

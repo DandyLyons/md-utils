@@ -15,12 +15,48 @@ enum OKFConstants {
 }
 
 struct OKFValidationIssue {
-  enum Severity {
+  enum Severity: String, Codable {
     case error
     case warning
   }
 
   var severity: Severity
+  var filePath: String
+  var path: String
+  var message: String
+}
+
+struct OKFAnalysisSummary {
+  var validation: OKFValidationSummary
+  var typeCounts: [String: Int]
+  var missingRecommendedFields: [String: [String]]
+  var advisoryIssues: [OKFValidationIssue]
+  var citationDocuments: Int
+  var emptyBodyDocuments: [String]
+  var rootIndexPresent: Bool
+
+  var advisoryCount: Int { advisoryIssues.count }
+}
+
+struct OKFReportOutput: Codable {
+  var bundlePath: String
+  var filesScanned: Int
+  var conceptDocuments: Int
+  var reservedFiles: Int
+  var errors: Int
+  var warnings: Int
+  var advisoryWarnings: Int
+  var typeCounts: [String: Int]
+  var missingRecommendedFields: [String: [String]]
+  var citationDocuments: Int
+  var emptyBodyDocuments: [String]
+  var rootIndexPresent: Bool
+  var issues: [OKFIssueOutput]
+  var advisoryIssues: [OKFIssueOutput]
+}
+
+struct OKFIssueOutput: Codable {
+  var severity: String
   var filePath: String
   var path: String
   var message: String
@@ -146,6 +182,91 @@ enum OKFValidator {
   }
 }
 
+enum OKFAnalyzer {
+  static let recommendedFields = ["title", "description", "resource", "tags", "timestamp"]
+
+  static func analyze(bundlePath: Path) throws -> OKFAnalysisSummary {
+    let validation = try OKFValidator.validate(bundlePath: bundlePath)
+    let files = try OKFFileScanner.markdownFiles(root: bundlePath)
+    var typeCounts: [String: Int] = [:]
+    var missingRecommendedFields: [String: [String]] = [:]
+    var advisoryIssues: [OKFValidationIssue] = []
+    var citationDocuments = 0
+    var emptyBodyDocuments: [String] = []
+
+    for file in files {
+      guard !OKFConstants.reservedFilenames.contains(file.lastComponent) else { continue }
+      let relative = relativePath(from: bundlePath, to: file)
+      let content: String = try file.read()
+      guard frontmatterPresence(in: content).hasFrontmatter else { continue }
+      guard let document = try? MarkdownDocument(content: content) else { continue }
+
+      if let type = document.frontMatter[Yams.Node("type")]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !type.isEmpty {
+        typeCounts[type, default: 0] += 1
+      }
+
+      let missing = recommendedFields.filter { document.frontMatter[Yams.Node($0)] == nil }
+      if !missing.isEmpty {
+        missingRecommendedFields[relative] = missing
+        advisoryIssues.append(OKFValidationIssue(
+          severity: .warning,
+          filePath: relative,
+          path: "frontmatter",
+          message: "missing recommended field(s): \(missing.joined(separator: ", "))"
+        ))
+      }
+
+      if let timestamp = document.frontMatter[Yams.Node("timestamp")]?.string,
+         !isISO8601Timestamp(timestamp) {
+        advisoryIssues.append(OKFValidationIssue(
+          severity: .warning,
+          filePath: relative,
+          path: "frontmatter.timestamp",
+          message: "optional field is not ISO 8601"
+        ))
+      }
+
+      if document.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        emptyBodyDocuments.append(relative)
+        advisoryIssues.append(OKFValidationIssue(
+          severity: .warning,
+          filePath: relative,
+          path: "body",
+          message: "concept body is empty"
+        ))
+      }
+
+      if document.body.contains("# Citations") {
+        citationDocuments += 1
+      }
+    }
+
+    let rootIndexPresent = (bundlePath + "index.md").exists
+    if !rootIndexPresent {
+      advisoryIssues.append(OKFValidationIssue(
+        severity: .warning,
+        filePath: "index.md",
+        path: "file",
+        message: "root index.md is optional but recommended for progressive disclosure"
+      ))
+    }
+
+    return OKFAnalysisSummary(
+      validation: validation,
+      typeCounts: typeCounts,
+      missingRecommendedFields: missingRecommendedFields,
+      advisoryIssues: advisoryIssues,
+      citationDocuments: citationDocuments,
+      emptyBodyDocuments: emptyBodyDocuments,
+      rootIndexPresent: rootIndexPresent
+    )
+  }
+
+  private static func isISO8601Timestamp(_ value: String) -> Bool {
+    ISO8601DateFormatter().date(from: value) != nil
+  }
+}
+
 enum OKFFileScanner {
   static func markdownFiles(root: Path) throws -> [Path] {
     let manager = FileManager.default
@@ -197,6 +318,255 @@ enum OKFValidationFormatter {
       }
       lines.append("\(label) \(CLIStyle.path(issue.filePath))")
       lines.append("  \(CLIStyle.metadata(issue.path + ":")) \(issue.message)")
+    }
+    return lines.joined(separator: "\n")
+  }
+}
+
+enum OKFReportFormat: String, ExpressibleByArgument {
+  case terminal
+  case json
+}
+
+enum OKFReportFormatter {
+  static func render(_ analysis: OKFAnalysisSummary, format: OKFReportFormat) throws -> String {
+    switch format {
+    case .terminal:
+      return renderTerminal(analysis)
+    case .json:
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+      let data = try encoder.encode(output(from: analysis))
+      guard let string = String(data: data, encoding: .utf8) else {
+        throw ValidationError("Failed to encode OKF report JSON")
+      }
+      return string
+    }
+  }
+
+  private static func renderTerminal(_ analysis: OKFAnalysisSummary) -> String {
+    let summary = analysis.validation
+    var lines: [String] = []
+    lines.append("\(CLIStyle.metadata("OKF bundle:")) \(CLIStyle.path(directoryDisplayPath(summary.bundlePath)))")
+    lines.append("\(CLIStyle.metadata("Files scanned:")) \(summary.filesScanned)")
+    lines.append("\(CLIStyle.metadata("Concept documents:")) \(summary.conceptDocuments)")
+    lines.append("\(CLIStyle.metadata("Reserved files:")) \(summary.reservedFiles)")
+    lines.append("\(CLIStyle.metadata("Errors:")) \(summary.errorCount)")
+    lines.append("\(CLIStyle.metadata("Advisory warnings:")) \(analysis.advisoryCount)")
+    lines.append("\(CLIStyle.metadata("Root index:")) \(analysis.rootIndexPresent ? "present" : "missing")")
+    lines.append("\(CLIStyle.metadata("Concepts with citations:")) \(analysis.citationDocuments)")
+
+    if !analysis.typeCounts.isEmpty {
+      lines.append("")
+      lines.append(CLIStyle.heading("Types"))
+      for key in analysis.typeCounts.keys.sorted() {
+        lines.append("  \(key): \(analysis.typeCounts[key] ?? 0)")
+      }
+    }
+
+    if !summary.issues.isEmpty {
+      lines.append("")
+      lines.append(CLIStyle.heading("Conformance Issues"))
+      appendIssues(summary.issues, to: &lines)
+    }
+
+    if !analysis.advisoryIssues.isEmpty {
+      lines.append("")
+      lines.append(CLIStyle.heading("Advisory Issues"))
+      appendIssues(analysis.advisoryIssues, to: &lines)
+    }
+
+    return lines.joined(separator: "\n")
+  }
+
+  private static func appendIssues(_ issues: [OKFValidationIssue], to lines: inout [String]) {
+    for issue in issues {
+      let label = issue.severity == .error ? CLIStyle.error("ERROR") : CLIStyle.warning("WARN")
+      lines.append("\(label) \(CLIStyle.path(issue.filePath))")
+      lines.append("  \(CLIStyle.metadata(issue.path + ":")) \(issue.message)")
+    }
+  }
+
+  private static func output(from analysis: OKFAnalysisSummary) -> OKFReportOutput {
+    let validation = analysis.validation
+    return OKFReportOutput(
+      bundlePath: directoryDisplayPath(validation.bundlePath),
+      filesScanned: validation.filesScanned,
+      conceptDocuments: validation.conceptDocuments,
+      reservedFiles: validation.reservedFiles,
+      errors: validation.errorCount,
+      warnings: validation.warningCount,
+      advisoryWarnings: analysis.advisoryCount,
+      typeCounts: analysis.typeCounts,
+      missingRecommendedFields: analysis.missingRecommendedFields,
+      citationDocuments: analysis.citationDocuments,
+      emptyBodyDocuments: analysis.emptyBodyDocuments,
+      rootIndexPresent: analysis.rootIndexPresent,
+      issues: validation.issues.map(outputIssue),
+      advisoryIssues: analysis.advisoryIssues.map(outputIssue)
+    )
+  }
+
+  private static func outputIssue(_ issue: OKFValidationIssue) -> OKFIssueOutput {
+    OKFIssueOutput(
+      severity: issue.severity.rawValue,
+      filePath: issue.filePath,
+      path: issue.path,
+      message: issue.message
+    )
+  }
+}
+
+struct OKFInitOptions {
+  var bundlePath: Path
+  var withLog: Bool
+}
+
+struct OKFInitSummary {
+  var bundlePath: Path
+  var createdFiles: [String]
+  var existingFiles: [String]
+}
+
+enum OKFInitializer {
+  static func initialize(options: OKFInitOptions) throws -> OKFInitSummary {
+    let bundle = options.bundlePath
+    if bundle.exists && !bundle.isDirectory {
+      throw ValidationError("OKF bundle path must be a directory: \(bundle.string)")
+    }
+
+    try bundle.mkpath()
+    var created: [String] = []
+    var existing: [String] = []
+
+    try writeIfMissing(bundle + "index.md", relative: "index.md", content: rootIndexContent(), created: &created, existing: &existing)
+    if options.withLog {
+      try writeIfMissing(bundle + "log.md", relative: "log.md", content: logContent(), created: &created, existing: &existing)
+    }
+
+    let configDirectory = bundle + ".md-utils"
+    let schemaDirectory = configDirectory + "schemas"
+    try schemaDirectory.mkpath()
+
+    try copyResource(
+      named: "md-utils.schema",
+      withExtension: "json",
+      to: configDirectory + "md-utils.schema.json",
+      relative: ".md-utils/md-utils.schema.json",
+      created: &created,
+      existing: &existing
+    )
+    try copyResource(
+      named: "OKF-concept.schema",
+      withExtension: "json",
+      to: schemaDirectory + "OKF-concept.schema.json",
+      relative: ".md-utils/schemas/OKF-concept.schema.json",
+      created: &created,
+      existing: &existing
+    )
+
+    let configPath = configDirectory + "md-utils.json"
+    if configPath.exists {
+      existing.append(".md-utils/md-utils.json")
+    } else {
+      let config = MdUtilsConfig(schemaRules: [
+        SchemaRule(
+          name: "okf-concepts",
+          schema: "OKF-concept.schema.json",
+          frontmatterRequired: true,
+          match: SchemaRuleMatch(
+            paths: ["**/*.md"],
+            excludePaths: ["index.md", "log.md", "**/index.md", "**/log.md"]
+          )
+        ),
+      ])
+      try config.save(to: configPath)
+      created.append(".md-utils/md-utils.json")
+    }
+
+    return OKFInitSummary(bundlePath: bundle, createdFiles: created, existingFiles: existing)
+  }
+
+  private static func writeIfMissing(
+    _ path: Path,
+    relative: String,
+    content: String,
+    created: inout [String],
+    existing: inout [String]
+  ) throws {
+    if path.exists {
+      existing.append(relative)
+      return
+    }
+    try path.write(content)
+    created.append(relative)
+  }
+
+  private static func copyResource(
+    named name: String,
+    withExtension fileExtension: String,
+    to destination: Path,
+    relative: String,
+    created: inout [String],
+    existing: inout [String]
+  ) throws {
+    if destination.exists {
+      existing.append(relative)
+      return
+    }
+    guard let resourceURL = Bundle.module.url(forResource: name, withExtension: fileExtension) else {
+      throw ValidationError("Bundled resource is missing: \(name).\(fileExtension)")
+    }
+    let data = try Data(contentsOf: resourceURL)
+    try data.write(to: URL(fileURLWithPath: destination.string))
+    created.append(relative)
+  }
+
+  private static func rootIndexContent() -> String {
+    """
+    # OKF Bundle
+
+    Add directory listings here to support progressive disclosure.
+
+    """
+  }
+
+  private static func logContent() -> String {
+    """
+    # Directory Update Log
+
+    ## \(currentDateString())
+    * **Initialization**: Created OKF bundle scaffold.
+
+    """
+  }
+
+  private static func currentDateString() -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: Date())
+  }
+}
+
+enum OKFInitFormatter {
+  static func render(_ summary: OKFInitSummary) -> String {
+    var lines: [String] = []
+    lines.append("\(CLIStyle.success("Initialized OKF bundle:")) \(CLIStyle.path(directoryDisplayPath(summary.bundlePath)))")
+    if !summary.createdFiles.isEmpty {
+      lines.append("")
+      lines.append(CLIStyle.heading("Created"))
+      for file in summary.createdFiles {
+        lines.append("  \(CLIStyle.success("OK")) \(CLIStyle.path(file))")
+      }
+    }
+    if !summary.existingFiles.isEmpty {
+      lines.append("")
+      lines.append(CLIStyle.heading("Already Present"))
+      for file in summary.existingFiles {
+        lines.append("  \(CLIStyle.muted("SKIP")) \(CLIStyle.path(file))")
+      }
     }
     return lines.joined(separator: "\n")
   }

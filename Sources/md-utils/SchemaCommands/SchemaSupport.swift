@@ -131,12 +131,14 @@ struct SchemaRule {
 /// See <doc:SchemaValidationCommands> for workflow details.
 struct SchemaRuleMatch {
   var paths: [String]
+  var excludePaths: [String]
   var frontmatter: [String: FrontmatterMatcher]
   /// Creates a configured instance.
   ///
   /// See <doc:SchemaValidationCommands> for workflow details.
-  init(paths: [String] = [], frontmatter: [String: FrontmatterMatcher] = [:]) {
+  init(paths: [String] = [], excludePaths: [String] = [], frontmatter: [String: FrontmatterMatcher] = [:]) {
     self.paths = paths
+    self.excludePaths = excludePaths
     self.frontmatter = frontmatter
   }
   /// Creates a configured instance.
@@ -144,6 +146,7 @@ struct SchemaRuleMatch {
   /// See <doc:SchemaValidationCommands> for workflow details.
   init(json: [String: Any], ruleName: String) throws {
     let paths = json["paths"] as? [String] ?? []
+    let excludePaths = json["excludePaths"] as? [String] ?? []
     let frontmatterObject = json["frontmatter"] as? [String: Any] ?? [:]
     var frontmatter: [String: FrontmatterMatcher] = [:]
 
@@ -159,6 +162,7 @@ struct SchemaRuleMatch {
     }
 
     self.paths = paths
+    self.excludePaths = excludePaths
     self.frontmatter = frontmatter
   }
 
@@ -166,6 +170,9 @@ struct SchemaRuleMatch {
     var object: [String: Any] = [:]
     if !paths.isEmpty {
       object["paths"] = paths
+    }
+    if !excludePaths.isEmpty {
+      object["excludePaths"] = excludePaths
     }
     if !frontmatter.isEmpty {
       object["frontmatter"] = frontmatter.mapValues { $0.jsonObject }
@@ -220,6 +227,20 @@ enum SchemaPaths {
       return schemaPath
     }
     return schemaDirectory(for: config) + rule.schema
+  }
+  /// Returns the schema file path for a configured schema rule relative to an explicit root.
+  ///
+  /// See <doc:SchemaValidationCommands> for workflow details.
+  static func schemaFile(rule: SchemaRule, config: MdUtilsConfig, root: Path) -> Path {
+    let schemaPath = Path(rule.schema)
+    if schemaPath.isAbsolute {
+      return schemaPath
+    }
+    let directory = schemaDirectory(for: config)
+    if directory.isAbsolute {
+      return directory + rule.schema
+    }
+    return root + directory + rule.schema
   }
 }
 /// Bootstraps the `.md-utils` project configuration files.
@@ -441,8 +462,12 @@ enum SchemaValidatorRunner {
   /// Validates the input and returns validation results.
   ///
   /// See <doc:SchemaValidationCommands> for workflow details.
-  static func validate(ruleName: String? = nil) throws -> SchemaValidationSummary {
-    let config = try MdUtilsConfig.load()
+  static func validate(
+    ruleName: String? = nil,
+    root: Path = .current,
+    configPath: Path = SchemaPaths.configFile
+  ) throws -> SchemaValidationSummary {
+    let config = try MdUtilsConfig.load(from: configPath)
     let rules: [SchemaRule]
     if let ruleName {
       guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
@@ -453,12 +478,12 @@ enum SchemaValidatorRunner {
       rules = config.schemaRules
     }
 
-    let files = try SchemaFileScanner.markdownFiles()
+    let files = try SchemaFileScanner.markdownFiles(root: root)
     var results: [SchemaValidationResult] = []
     var loadedSchemas: [String: [String: Any]] = [:]
 
     for file in files {
-      let relativePath = projectRelativePath(file)
+      let relativePath = relativePath(from: root, to: file)
       let pathMatchedRules = rules.filter { rulePathConditionsMatch(rule: $0, relativePath: relativePath) }
       guard !pathMatchedRules.isEmpty else { continue }
 
@@ -477,7 +502,7 @@ enum SchemaValidatorRunner {
       }
 
       for rule in pathMatchedRules {
-        let schemaPath = SchemaPaths.schemaFile(rule: rule, config: config)
+        let schemaPath = SchemaPaths.schemaFile(rule: rule, config: config, root: root)
         if let yamlError {
           results.append(errorResult(
             rule: rule,
@@ -571,6 +596,9 @@ enum SchemaValidatorRunner {
   ///
   /// See <doc:SchemaValidationCommands> for workflow details.
   private static func rulePathConditionsMatch(rule: SchemaRule, relativePath: String) -> Bool {
+    if rule.match.excludePaths.contains(where: { matchesGlob(relativePath, glob: $0) }) {
+      return false
+    }
     if rule.match.paths.isEmpty {
       return true
     }

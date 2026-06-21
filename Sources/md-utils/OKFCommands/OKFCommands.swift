@@ -19,7 +19,10 @@ extension CLIEntry {
         Spec: https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md
         """,
       subcommands: [
+        Init.self,
         Validate.self,
+        Report.self,
+        Doctor.self,
         TypeCommands.self,
       ]
     )

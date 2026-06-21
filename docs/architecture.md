@@ -82,7 +82,10 @@ if let heading = ast.children.first as? Heading {
 - `meta` (FileMetadataCommands) - Read file metadata including standard and extended attributes
   - `meta read` - Read metadata from files with multiple output formats
 - `okf` (OKFCommands) - Work with Open Knowledge Format v0.1 draft bundles
+  - `okf init` - Create a minimal OKF bundle scaffold and install schema configuration
   - `okf validate` - Validate hard OKF v0.1 draft conformance rules
+  - `okf report` - Report bundle inventory, type distribution, and advisory diagnostics
+  - `okf doctor` - Run validation plus advisory health diagnostics
   - `okf type set` - Set an explicit OKF concept `type` value on matching files
 - `section` / `sect` (SectionCommands) - Manipulate sections in Markdown documents
   - `section move-up` - Move a section up among siblings
