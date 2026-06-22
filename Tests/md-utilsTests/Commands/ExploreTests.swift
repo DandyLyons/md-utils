@@ -55,6 +55,25 @@ struct ExploreTests {
   }
 
   @Test
+  func `parse supports tree flags`() throws {
+    let parsed = try CLIEntry.Explore.parseAsRoot([
+      "README.md",
+      "--tree-section-title", "Usage",
+      "--tree-section-line", "42,57",
+      "--tree-section-line", "81"
+    ])
+    let command = try #require(parsed as? CLIEntry.Explore)
+
+    #expect(command.tree == false)
+    #expect(command.treeSectionTitles == ["Usage"])
+    #expect(command.treeSectionLines == [42, 57, 81])
+
+    let treeParsed = try CLIEntry.Explore.parseAsRoot(["README.md", "--tree"])
+    let treeCommand = try #require(treeParsed as? CLIEntry.Explore)
+    #expect(treeCommand.tree)
+  }
+
+  @Test
   func `parse rejects invalid comma separated expand lines`() {
     #expect(throws: Error.self) {
       _ = try CLIEntry.Explore.parseAsRoot([
@@ -77,6 +96,8 @@ struct ExploreTests {
 
     #expect(help.contains("md-utils explore README.md --expand \"Usage\""))
     #expect(help.contains("md-utils explore README.md --expand-line 42,57,81"))
+    #expect(help.contains("md-utils explore README.md --tree"))
+    #expect(help.contains("md-utils explore README.md --tree-section-title \"Usage\""))
     #expect(help.contains("md-utils explore README.md --expand-title-contains \"Chapter 7\""))
     #expect(help.contains("heading title exactly matches"))
     #expect(help.contains("slash-separated heading path"))
@@ -317,6 +338,170 @@ struct ExploreTests {
   }
 
   @Test
+  func `tree renders full document without body frontmatter or preamble contents`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      ---
+      title: Test
+      tags:
+        - swift
+      ---
+      Opening paragraph.
+
+      # Alpha
+      Alpha body.
+      ## Child
+      Child body.
+      # Beta
+      Beta body.
+      """)
+
+    let output = render(document, tree: true)
+
+    #expect(output.contains("Tree: Document (13 lines)"))
+    #expect(output.contains("├─ Frontmatter (lines 1-5, 2 fields, 5 lines)"))
+    #expect(output.contains("sections") == false)
+    #expect(output.contains("├─ Preamble (lines 6-7, 2 words, 2 lines)"))
+    #expect(output.contains("├─ Alpha (h1, line 8,"))
+    #expect(output.contains("│  └─ Child (h2, line 10,"))
+    #expect(output.contains("└─ Beta (h1, line 12,"))
+    #expect(output.contains("title: Test") == false)
+    #expect(output.contains("Opening paragraph.") == false)
+    #expect(output.contains("Alpha body.") == false)
+    #expect(output.contains("Child body.") == false)
+  }
+
+  @Test
+  func `tree preserves skipped heading levels without placeholder nodes`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      ## Root
+      Root body.
+      #### Deep
+      Deep body.
+      """)
+
+    let output = render(document, tree: true)
+
+    #expect(output.contains("└─ Root (h2, line 1,"))
+    #expect(output.contains("   └─ Deep (h4, line 3,"))
+    #expect(output.contains("h3") == false)
+  }
+
+  @Test
+  func `tree ignores expansion options and does not reveal bodies`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      # Alpha
+      Alpha body.
+      ## Child
+      Child body.
+      """)
+
+    let output = render(
+      document,
+      expandedTitles: ["Alpha"],
+      expandedLines: [3],
+      tree: true,
+      expandPreamble: true,
+      recursive: true
+    )
+
+    #expect(output.contains("Warning: expansion options are ignored when --tree is used"))
+    #expect(output.contains("Alpha body.") == false)
+    #expect(output.contains("Child body.") == false)
+  }
+
+  @Test
+  func `tree section renders selected descendant tree by title and line`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      # Root
+      Root body.
+      ## Chapter
+      Chapter body.
+      ### Scene
+      Scene body.
+      ## Appendix
+      Appendix body.
+      """)
+
+    let titleOutput = render(document, expandedTitles: ["Root"], treeSectionTitles: ["Chapter"])
+    let lineOutput = render(document, treeSectionLines: [3])
+
+    #expect(titleOutput.contains("▼ # Root"))
+    #expect(titleOutput.contains("Tree: Chapter (h2, line 3,"))
+    #expect(titleOutput.contains("└─ Scene (h3, line 5,"))
+    #expect(titleOutput.contains("Chapter body.") == false)
+    #expect(titleOutput.contains("Scene body.") == false)
+    #expect(titleOutput.contains("► ## Appendix"))
+    #expect(lineOutput.contains("▼ # Root"))
+    #expect(lineOutput.contains("Tree: Chapter (h2, line 3,"))
+  }
+
+  @Test
+  func `tree section boundaries suppress descendant expansion`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      # Root
+      Root body.
+      ## Chapter
+      Chapter body.
+      ### Scene
+      Scene body.
+      """)
+
+    let output = render(
+      document,
+      expandedTitles: ["Root"],
+      expandedLines: [5],
+      treeSectionTitles: ["Chapter"]
+    )
+
+    #expect(output.contains("Root body."))
+    #expect(output.contains("Tree: Chapter (h2, line 3,"))
+    #expect(output.contains("Scene body.") == false)
+  }
+
+  @Test
+  func `tree section renders duplicate titles and unmatched warnings`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      # Root
+      ## Chapter 7: Motivation [03:30:00]
+      Body.
+      # Other
+      ## Chapter 7: Motivation [03:30:00]
+      Other body.
+      """)
+
+    let duplicateOutput = render(document, treeSectionTitles: ["Chapter 7: Motivation [03:30:00]"])
+    let warningOutput = render(
+      document,
+      treeSectionTitles: ["Chapter 7: Motivation"],
+      treeSectionLines: [99]
+    )
+
+    #expect(duplicateOutput.components(separatedBy: "Tree: Chapter 7: Motivation [03:30:00]").count == 3)
+    #expect(warningOutput.contains("Warning: no heading matched --tree-section-title \"Chapter 7: Motivation\""))
+    #expect(warningOutput.contains("Did you mean: Chapter 7: Motivation [03:30:00]"))
+    #expect(warningOutput.contains("Warning: no heading matched --tree-section-line 99"))
+  }
+
+  @Test
+  func `run rejects tree output with markdown formats and redundant tree combinations`() async throws {
+    let file = Path.temporary + "explore-tree-tests-\(UUID().uuidString).md"
+    try "# Alpha\n".write(toFile: file.string, atomically: true, encoding: .utf8)
+    defer { try? file.delete() }
+
+    let markdownParsed = try CLIEntry.Explore.parseAsRoot([file.string, "--tree", "--format", "markdown"])
+    var markdownCommand = try #require(markdownParsed as? CLIEntry.Explore)
+    await #expect(throws: Error.self) {
+      try await markdownCommand.run()
+    }
+
+    let combinedParsed = try CLIEntry.Explore.parseAsRoot([file.string, "--tree", "--tree-section-line", "1"])
+    var combinedCommand = try #require(combinedParsed as? CLIEntry.Explore)
+    await #expect(throws: Error.self) {
+      try await combinedCommand.run()
+    }
+  }
+
+  @Test
   func `markdown output uses source only and omits collapsed frontmatter`() async throws {
     let document = try await ExploreDocument.build(from: """
       ---
@@ -391,6 +576,9 @@ struct ExploreTests {
     expandedPaths: [String] = [],
     expandedLines: [Int] = [],
     expandedTitleContains: [String] = [],
+    tree: Bool = false,
+    treeSectionTitles: [String] = [],
+    treeSectionLines: [Int] = [],
     expandFrontmatter: Bool = false,
     expandPreamble: Bool = false,
     recursive: Bool = false,
@@ -398,10 +586,14 @@ struct ExploreTests {
   ) -> String {
     ExploreRenderer(
       document: document,
+      sourceName: nil,
       expandedTitles: expandedTitles,
       expandedPaths: expandedPaths,
       expandedLines: expandedLines,
       expandedTitleContains: expandedTitleContains,
+      tree: tree,
+      treeSectionTitles: treeSectionTitles,
+      treeSectionLines: treeSectionLines,
       expandFrontmatter: expandFrontmatter,
       expandPreamble: expandPreamble,
       recursive: recursive,

@@ -51,6 +51,16 @@ enum CLIStyle {
     text.lightBlue
   }
 
+  /// Styles frontmatter nodes in explore tree output.
+  static func frontmatterLabel(_ text: String) -> String {
+    text.magenta
+  }
+
+  /// Styles preamble nodes in explore tree output.
+  static func preambleLabel(_ text: String) -> String {
+    text.lightBlue
+  }
+
   /// Styles only the leading hash marker of a Markdown heading line.
   static func markdownHeading(_ text: String, level: Int) -> String {
     let marker = String(repeating: "#", count: level)

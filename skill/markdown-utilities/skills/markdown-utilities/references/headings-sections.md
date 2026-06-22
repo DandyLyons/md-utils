@@ -1,5 +1,44 @@
 # Headings, Sections & Document Structure Reference
 
+## Explore Large Documents
+
+Use `md-utils explore` when reading especially lengthy Markdown files, such as files around 400+ lines or 1000+ words. It supports progressive disclosure: inspect the structure first, then expand only the sections you need.
+
+Default workflow for agents:
+
+```bash
+md-utils explore --tree path/to/file.md
+md-utils explore --expand-line=4,10,123,246 path/to/file.md
+```
+
+Recommended process:
+
+1. Run `md-utils explore --tree path/to/file.md` before reading a long Markdown file directly.
+2. Use the tree output to identify heading line numbers and understand the file structure.
+3. Run `md-utils explore --expand-line=4,10,123,246 path/to/file.md` with only the relevant heading lines.
+4. Avoid expanding broad or recursive sections unless you truly need all descendant body content.
+
+Useful options:
+
+```bash
+# Whole-document structure, including frontmatter and preamble metadata, without body text
+md-utils explore --tree document.md
+
+# Expand specific sections by heading source line number
+md-utils explore --expand-line=42 document.md
+md-utils explore --expand-line=4,10,123,246 document.md
+
+# Expand by title or path when line numbers are not available
+md-utils explore --expand "Usage" document.md
+md-utils explore --expand-path "Usage/Examples" document.md
+
+# Show a compact descendant tree for a section without dumping body text
+md-utils explore --tree-section-line=42 document.md
+md-utils explore --tree-section-title "Usage" document.md
+```
+
+`--tree` is best for orientation. `--expand-line` is best for targeted reading after the tree reveals the relevant heading lines.
+
 ## Table of Contents
 
 Generate a TOC from headings in a Markdown document:
