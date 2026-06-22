@@ -12,7 +12,8 @@ struct ExploreTests {
       "README.md",
       "--expand", "About",
       "-P", "About/History",
-      "-l", "12",
+      "-l", "12,18",
+      "-C", "chap",
       "-F",
       "-p",
       "-r",
@@ -22,7 +23,8 @@ struct ExploreTests {
 
     #expect(command.expandedTitles == ["About"])
     #expect(command.expandedPaths == ["About/History"])
-    #expect(command.expandedLines == [12])
+    #expect(command.expandedLines == [12, 18])
+    #expect(command.expandedTitleContains == ["chap"])
     #expect(command.expandFrontmatter)
     #expect(command.expandPreamble)
     #expect(command.recursive)
@@ -41,6 +43,47 @@ struct ExploreTests {
   }
 
   @Test
+  func `parse supports repeated and comma separated expand lines`() throws {
+    let parsed = try CLIEntry.Explore.parseAsRoot([
+      "README.md",
+      "--expand-line", "42,57",
+      "--expand-line", "81"
+    ])
+    let command = try #require(parsed as? CLIEntry.Explore)
+
+    #expect(command.expandedLines == [42, 57, 81])
+  }
+
+  @Test
+  func `parse rejects invalid comma separated expand lines`() {
+    #expect(throws: Error.self) {
+      _ = try CLIEntry.Explore.parseAsRoot([
+        "README.md",
+        "--expand-line", "42,abc"
+      ])
+    }
+
+    #expect(throws: Error.self) {
+      _ = try CLIEntry.Explore.parseAsRoot([
+        "README.md",
+        "--expand-line", "42, 57"
+      ])
+    }
+  }
+
+  @Test
+  func `help includes progressive disclosure examples and matching descriptions`() throws {
+    let help = CLIEntry.Explore.helpMessage().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+
+    #expect(help.contains("md-utils explore README.md --expand \"Usage\""))
+    #expect(help.contains("md-utils explore README.md --expand-line 42,57,81"))
+    #expect(help.contains("md-utils explore README.md --expand-title-contains \"Chapter 7\""))
+    #expect(help.contains("heading title exactly matches"))
+    #expect(help.contains("slash-separated heading path"))
+    #expect(help.contains("heading title contains"))
+  }
+
+  @Test
   func `terminal default shows top heading level collapsed`() async throws {
     let document = try await ExploreDocument.build(from: """
       ### Alpha
@@ -52,8 +95,8 @@ struct ExploreTests {
       """)
     let output = render(document)
 
-    #expect(output.contains("► ### Alpha"))
-    #expect(output.contains("► ### Beta"))
+    #expect(output.contains("► ### Alpha (line 1,"))
+    #expect(output.contains("► ### Beta (line 5,"))
     #expect(output.contains("Alpha body.") == false)
     #expect(output.contains("Alpha Child") == false)
   }
@@ -106,7 +149,7 @@ struct ExploreTests {
     let terminalOutput = render(document)
     let markdownOutput = render(document, format: .markdown)
 
-    #expect(terminalOutput.contains("Hint: expand by title (-e), path (-P), line (-l), frontmatter (-F), or preamble (-p)."))
+    #expect(terminalOutput.contains("Hint: expand by title (-e), title contains (-C), path (-P), line (-l), frontmatter (-F), or preamble (-p)."))
     #expect(terminalOutput.hasPrefix("Hint:"))
     #expect(markdownOutput.contains("Hint:") == false)
   }
@@ -121,9 +164,9 @@ struct ExploreTests {
       """)
     let output = render(document, expandedTitles: ["About"])
 
-    #expect(output.contains("▼ # About"))
+    #expect(output.contains("▼ # About (line 1)"))
     #expect(output.contains("About body."))
-    #expect(output.contains("► ## History"))
+    #expect(output.contains("► ## History (line 3,"))
     #expect(output.contains("History body.") == false)
   }
 
@@ -165,6 +208,20 @@ struct ExploreTests {
   }
 
   @Test
+  func `terminal expands headings by case insensitive title substring`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      # Chapter 7: Motivation
+      Motivation body.
+      # Chapter 8: Focus
+      Focus body.
+      """)
+    let output = render(document, expandedTitleContains: ["chapter 7"])
+
+    #expect(output.contains("Motivation body."))
+    #expect(output.contains("Focus body.") == false)
+  }
+
+  @Test
   func `terminal expands by path and line`() async throws {
     let document = try await ExploreDocument.build(from: """
       # About
@@ -180,6 +237,44 @@ struct ExploreTests {
     #expect(output.contains("History body."))
     #expect(output.contains("▼ # Usage"))
     #expect(output.contains("Usage body."))
+  }
+
+  @Test
+  func `terminal warns for unmatched expansion targets and suggests one close title or path`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      # My Notes
+      ## Chapter 7: How to Motivate Your Brain [03:30:00]
+      Body.
+      # Usage
+      Usage body.
+      """)
+    let output = render(
+      document,
+      expandedTitles: ["Chapter 7: How to Motivate Your Brain"],
+      expandedPaths: ["My Notes/Chapter 7: How to Motivate Your Brain"],
+      expandedLines: [99],
+      expandedTitleContains: ["missing"]
+    )
+
+    #expect(output.contains("Warning: no heading matched --expand \"Chapter 7: How to Motivate Your Brain\""))
+    #expect(output.contains("Did you mean: Chapter 7: How to Motivate Your Brain [03:30:00]"))
+    #expect(output.contains("Warning: no heading matched --expand-path \"My Notes/Chapter 7: How to Motivate Your Brain\""))
+    #expect(output.contains("Did you mean: My Notes/Chapter 7: How to Motivate Your Brain [03:30:00]"))
+    #expect(output.contains("Warning: no heading matched --expand-line 99"))
+    #expect(output.contains("Warning: no heading matched --expand-title-contains \"missing\""))
+  }
+
+  @Test
+  func `markdown output omits unmatched target warnings`() async throws {
+    let document = try await ExploreDocument.build(from: """
+      # Usage
+      Usage body.
+      """)
+    let output = render(document, expandedTitles: ["Missing"], format: .markdown)
+
+    #expect(output.contains("Warning:") == false)
+    #expect(output.contains("Did you mean:") == false)
+    #expect(output.contains("# Usage"))
   }
 
   @Test
@@ -295,6 +390,7 @@ struct ExploreTests {
     expandedTitles: [String] = [],
     expandedPaths: [String] = [],
     expandedLines: [Int] = [],
+    expandedTitleContains: [String] = [],
     expandFrontmatter: Bool = false,
     expandPreamble: Bool = false,
     recursive: Bool = false,
@@ -305,6 +401,7 @@ struct ExploreTests {
       expandedTitles: expandedTitles,
       expandedPaths: expandedPaths,
       expandedLines: expandedLines,
+      expandedTitleContains: expandedTitleContains,
       expandFrontmatter: expandFrontmatter,
       expandPreamble: expandPreamble,
       recursive: recursive,
