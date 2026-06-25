@@ -21,6 +21,15 @@ public struct MarkdownDocument: @unchecked Sendable {
   /// otherwise it contains the entire document content.
   public var body: String
 
+  /// Whether the original frontmatter source contained YAML comments.
+  ///
+  /// When `true`, any write operation via `md-utils` will silently discard those comments.
+  /// This is a known limitation: Yams (via libYAML) strips comments before they can be
+  /// stored in the parsed AST. See `docs/architecture.md` for details.
+  ///
+  /// Only set by `init(content:)` — always `false` when constructing programmatically.
+  public let containsYAMLComments: Bool
+
   /// Initialize a markdown document by parsing the content to separate frontmatter from body.
   ///
   /// This initializer uses `FrontMatterParser` to detect and separate YAML frontmatter
@@ -36,6 +45,7 @@ public struct MarkdownDocument: @unchecked Sendable {
 
     self.frontMatter = try YAMLConversion.parse(rawFrontMatter)
     self.body = body
+    self.containsYAMLComments = FrontMatterParser.containsYAMLComments(rawFrontMatter)
   }
 
   /// Initialize a markdown document directly from its parsed components.
@@ -49,6 +59,7 @@ public struct MarkdownDocument: @unchecked Sendable {
   public init(frontMatter: Yams.Node.Mapping, body: String) {
     self.frontMatter = frontMatter
     self.body = body
+    self.containsYAMLComments = false
   }
 
   /// Parse the body text into a Markdown AST.
