@@ -301,13 +301,15 @@ Schema commands:
 md-utils schema init books --path "Books/**/*.md" --tag Book
 md-utils schema add published --path "Books/**/*.md" --no-frontmatter-required
 md-utils schema list
+md-utils schema describe books
+md-utils schema describe books --format json
 md-utils schema validate
 md-utils schema validate books
 md-utils schema remove books
 md-utils schema remove books --delete-schema
 ```
 
-`schema init` bootstraps `.md-utils/` and adds an initial rule. `schema add` adds another rule to existing config. `schema remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
+`schema init` bootstraps `.md-utils/` and adds an initial rule. `schema add` adds another rule to existing config. `schema describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema; `--format json` emits the rule configuration with the embedded schema definition. `schema remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
 
 If a file matches multiple rules, all matching schemas apply. Files matching no rules are ignored. Invalid YAML frontmatter is always reported as an error because schema validation cannot proceed.
 

@@ -28,6 +28,21 @@ enum CLIStyle {
     text.bold
   }
 
+  /// Styles schema describe section headings.
+  static func schemaDescribeHeading(_ text: String) -> String {
+    text.lightBlue.bold
+  }
+
+  /// Styles schema describe rule names.
+  static func schemaDescribeRuleName(_ text: String) -> String {
+    text.magenta.bold
+  }
+
+  /// Styles field names in schema descriptions.
+  static func schemaDescribeFieldName(_ text: String) -> String {
+    text.lightGreen.bold
+  }
+
   /// Styles Markdown heading hash markers by heading depth.
   static func headingMarker(_ text: String, level: Int) -> String {
     switch level {

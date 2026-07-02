@@ -371,6 +371,22 @@ enum SchemaRuleManager {
     """
   }
 }
+/// Loads JSON Schema documents from disk.
+///
+/// See <doc:SchemaValidationCommands> for workflow details.
+enum SchemaDocumentLoader {
+  /// Loads a JSON Schema object from disk.
+  static func load(path: Path) throws -> [String: Any] {
+    guard path.exists else {
+      throw ValidationError("Schema file not found: \(path.string)")
+    }
+    let data = try Data(contentsOf: URL(fileURLWithPath: path.string))
+    guard let schema = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw ValidationError("Schema file must contain a JSON object: \(path.string)")
+    }
+    return schema
+  }
+}
 /// Finds Markdown files that can participate in schema validation.
 ///
 /// See <doc:SchemaValidationCommands> for workflow details.
@@ -545,7 +561,7 @@ enum SchemaValidatorRunner {
         if let loaded = loadedSchemas[schemaKey] {
           schema = loaded
         } else {
-          schema = try loadSchema(path: schemaPath)
+          schema = try SchemaDocumentLoader.load(path: schemaPath)
           loadedSchemas[schemaKey] = schema
         }
 
@@ -578,19 +594,6 @@ enum SchemaValidatorRunner {
     }
 
     return SchemaValidationSummary(results: results, totalMarkdownFiles: files.count)
-  }
-  /// Loads the requested data from disk.
-  ///
-  /// See <doc:SchemaValidationCommands> for workflow details.
-  private static func loadSchema(path: Path) throws -> [String: Any] {
-    guard path.exists else {
-      throw ValidationError("Schema file not found: \(path.string)")
-    }
-    let data = try Data(contentsOf: URL(fileURLWithPath: path.string))
-    guard let schema = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-      throw ValidationError("Schema file must contain a JSON object: \(path.string)")
-    }
-    return schema
   }
   /// Returns whether a project-relative path matches a schema rule path condition.
   ///

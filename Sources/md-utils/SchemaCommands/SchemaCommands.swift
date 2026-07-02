@@ -18,6 +18,7 @@ extension CLIEntry {
         Add.self,
         Remove.self,
         List.self,
+        Describe.self,
         Validate.self,
       ]
     )

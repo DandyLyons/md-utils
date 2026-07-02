@@ -17,12 +17,31 @@ struct SchemaCommandsTests {
     let config = CLIEntry.SchemaCommands.configuration
 
     #expect(config.commandName == "schema")
-    #expect(config.subcommands.count == 5)
+    #expect(config.subcommands.count == 6)
     #expect(config.subcommands[0] is CLIEntry.SchemaCommands.Init.Type)
     #expect(config.subcommands[1] is CLIEntry.SchemaCommands.Add.Type)
     #expect(config.subcommands[2] is CLIEntry.SchemaCommands.Remove.Type)
     #expect(config.subcommands[3] is CLIEntry.SchemaCommands.List.Type)
-    #expect(config.subcommands[4] is CLIEntry.SchemaCommands.Validate.Type)
+    #expect(config.subcommands[4] is CLIEntry.SchemaCommands.Describe.Type)
+    #expect(config.subcommands[5] is CLIEntry.SchemaCommands.Validate.Type)
+  }
+
+  @Test
+  func `schema describe parses rule name`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["schema", "describe", "books"])
+    let command = try #require(parsed as? CLIEntry.SchemaCommands.Describe)
+
+    #expect(command.schemaName == "books")
+    #expect(command.format == .text)
+  }
+
+  @Test
+  func `schema describe parses json format`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["schema", "describe", "books", "--format", "json"])
+    let command = try #require(parsed as? CLIEntry.SchemaCommands.Describe)
+
+    #expect(command.schemaName == "books")
+    #expect(command.format == .json)
   }
 
   @Test
@@ -128,6 +147,111 @@ struct SchemaCommandsTests {
 
       try await command.run()
     }
+  }
+
+  @Test
+  func `schema describe loads configured rule and schema`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+
+    try withCurrentDirectory(project) {
+      let description = try SchemaDescriptionBuilder.describe(ruleName: "books")
+
+      #expect(description.rule.name == "books")
+      #expect(description.schemaPath.string == ".md-utils/schemas/book.schema.json")
+      #expect(description.jsonSchema["type"] as? String == "object")
+    }
+  }
+
+  @Test
+  func `schema describe fails for missing rule`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+
+    let _: Void = try withCurrentDirectory(project) {
+      #expect(throws: Error.self) {
+        try SchemaDescriptionBuilder.describe(ruleName: "missing")
+      }
+    }
+  }
+
+  @Test
+  func `schema describe fails for missing schema file`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(
+      project,
+      rules: [ruleJSON(name: "books", schema: "missing.schema.json", paths: ["Books/**/*.md"])],
+      schemas: [:]
+    )
+
+    let _: Void = try withCurrentDirectory(project) {
+      #expect(throws: Error.self) {
+        try SchemaDescriptionBuilder.describe(ruleName: "books")
+      }
+    }
+  }
+
+  @Test
+  func `schema describe human output summarizes rule and all fields`() throws {
+    let description = SchemaDescription(
+      rule: SchemaRule(
+        name: "people-in-the-bible",
+        schema: "people.schema.json",
+        frontmatterRequired: true,
+        match: SchemaRuleMatch(
+          paths: ["People/**/*.md"],
+          excludePaths: ["People/Drafts/**/*.md"],
+          frontmatter: ["tags": FrontmatterMatcher(includes: "Person")]
+        )
+      ),
+      schemaPath: ".md-utils/schemas/people.schema.json",
+      jsonSchema: peopleSchemaObject()
+    )
+
+    let output = SchemaDescriptionFormatter.render(description)
+
+    #expect(output.contains("Schema Rule Name:"))
+    #expect(output.contains("people-in-the-bible"))
+    #expect(output.contains("Schema Rule"))
+    #expect(output.contains("Applies to Markdown files matching People/**/*.md."))
+    #expect(output.contains("Excludes People/Drafts/**/*.md."))
+    #expect(output.contains("Runs only when tags includes \"Person\"."))
+    #expect(output.contains("Schema Definition"))
+    #expect(output.contains("name-meaning"))
+    #expect(output.contains("Type:"))
+    #expect(output.contains("String"))
+    #expect(output.contains("REQUIRED"))
+    #expect(output.contains("minLength 1"))
+    #expect(output.contains("scripture-references[]"))
+    #expect(output.contains("scripture-references[].book"))
+    #expect(output.contains("scripture-references[].chapter"))
+  }
+
+  @Test
+  func `schema describe json output includes rule and embedded schema`() throws {
+    let description = SchemaDescription(
+      rule: SchemaRule(
+        name: "people-in-the-bible",
+        schema: "people.schema.json",
+        match: SchemaRuleMatch(paths: ["People/**/*.md"])
+      ),
+      schemaPath: ".md-utils/schemas/people.schema.json",
+      jsonSchema: peopleSchemaObject()
+    )
+
+    let object = SchemaDescriptionJSONRenderer.render(description)
+    let rule = try #require(object["rule"] as? [String: Any])
+    let match = try #require(rule["match"] as? [String: Any])
+    let jsonSchema = try #require(object["jsonSchema"] as? [String: Any])
+    let properties = try #require(jsonSchema["properties"] as? [String: Any])
+
+    #expect(rule["name"] as? String == "people-in-the-bible")
+    #expect(rule["schemaPath"] as? String == ".md-utils/schemas/people.schema.json")
+    #expect(match["paths"] as? [String] == ["People/**/*.md"])
+    #expect(properties["name-meaning"] != nil)
   }
 
   @Test
@@ -678,6 +802,32 @@ struct SchemaCommandsTests {
       }
     }
     """
+  }
+
+  private func peopleSchemaObject() -> [String: Any] {
+    [
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "required": ["name-meaning"],
+      "properties": [
+        "name-meaning": [
+          "type": "string",
+          "minLength": 1,
+        ],
+        "scripture-references": [
+          "type": "array",
+          "minItems": 1,
+          "items": [
+            "type": "object",
+            "required": ["book", "chapter"],
+            "properties": [
+              "book": ["type": "string"],
+              "chapter": ["type": "integer", "minimum": 1],
+            ],
+          ],
+        ],
+      ],
+    ]
   }
 
   private func bookMarkdown(title: String? = nil, tags: [String]) -> String {
