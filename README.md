@@ -243,7 +243,7 @@ The package also bundles `OKF-concept.schema.json` for OKF v0.1 draft concept fr
 
 Project-level md-utils settings live in `.md-utils/md-utils.json`. The schema command group creates and uses this folder to validate Markdown YAML frontmatter against JSON Schema files. Schemas only apply to frontmatter, not Markdown body content.
 
-The config schema is published at `https://dandylyons.github.io/md-utils/md-utils.schema.json` for editor integration. Versioned copies are published under `https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json`, and `https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json` points to the latest published schema.
+The config schema is published at `https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json` for editor integration. The moving `https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json` alias points to the latest published schema, and `https://dandylyons.github.io/md-utils/md-utils.schema.json` is maintained as a root compatibility alias.
 
 Treat the directory containing `.md-utils/` as the md-utils project root. Commands that use project configuration read `.md-utils/md-utils.json` relative to the current working directory; md-utils does not search parent directories for project configuration. Run schema/config commands from the directory that contains `.md-utils/`:
 
@@ -268,7 +268,7 @@ Example config:
 
 ```json
 {
-  "$schema": "md-utils.schema.json",
+  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json",
   "schemaDirectory": ".md-utils/schemas/",
   "schemaRules": [
     {
@@ -332,7 +332,9 @@ site/
       md-utils-0.1.0.schema.json
 ```
 
-When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json` to both `md-utils.schema.json` at the site root and `schemas/latest/md-utils.schema.json`. For future schema releases, add a new versioned folder under `site/schemas/`, update `CURRENT_MD_UTILS_JSONSCHEMA_VERSION` in `.github/workflows/pages.yml`, and keep the canonical bundled schema in `Sources/md-utils/Resources/md-utils.schema.json` synchronized with the published copy.
+The bundled CLI schema in `Sources/md-utils/Resources/md-utils.schema.json` remains canonical for CLI behavior. Public schema copies must match it exactly, so run `python3 scripts/validate-schema-publication.py` before publishing schema changes.
+
+When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json` to both `md-utils.schema.json` at the site root and `schemas/latest/md-utils.schema.json`. Versioned schema URLs are immutable after release. For future schema releases, add a new versioned folder under `site/schemas/`, update `CURRENT_MD_UTILS_JSONSCHEMA_VERSION` in `.github/workflows/pages.yml`, and keep the canonical bundled schema synchronized with the new published copy. Do not edit already-published versioned schema files; publish a new version instead.
 
 ## Architecture
 

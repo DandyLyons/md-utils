@@ -100,10 +100,10 @@ md-utils schema init books --path "Books/**/*.md" --tag Book
 
     <section class="quickstart" aria-labelledby="schema-title">
       <h2 id="schema-title">Hosted Schema</h2>
-      <p>The <code>md-utils</code> configuration schema is published with this site so editors and tools can reference a stable public URL. The current compatibility endpoint is <a href="https://dandylyons.github.io/md-utils/md-utils.schema.json"><code>https://dandylyons.github.io/md-utils/md-utils.schema.json</code></a>.</p>
-      <p>Versioned schema files are available under <a href="https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json"><code>/schemas/0.1.0/md-utils.schema.json</code></a>, with <a href="https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json"><code>/schemas/latest/md-utils.schema.json</code></a> maintained as a moving alias for the latest published schema.</p>
+      <p>The <code>md-utils</code> configuration schema is published with this site so editors and tools can reference a stable public URL. The current immutable schema endpoint is <a href="https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json"><code>https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json</code></a>.</p>
+      <p>The moving <a href="https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json"><code>/schemas/latest/md-utils.schema.json</code></a> alias points to the latest published schema, and <a href="https://dandylyons.github.io/md-utils/md-utils.schema.json"><code>/md-utils.schema.json</code></a> is maintained as a root compatibility alias.</p>
       <pre><code class="language-json">{
-  "$schema": "https://dandylyons.github.io/md-utils/md-utils.schema.json",
+  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json",
   "schemaDirectory": ".md-utils/schemas/",
   "schemaRules": []
 }</code></pre>

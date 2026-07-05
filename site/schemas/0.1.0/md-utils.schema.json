@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dandylyons.github.io/md-utils/md-utils.schema.json",
+  "$id": "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json",
   "title": "md-utils project configuration",
   "type": "object",
   "additionalProperties": false,

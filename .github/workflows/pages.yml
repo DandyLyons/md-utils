@@ -7,6 +7,7 @@ on:
     paths:
       - site/**
       - Sources/md-utils/Resources/md-utils.schema.json
+      - scripts/validate-schema-publication.py
       - .github/workflows/pages.yml
   workflow_dispatch:
 
@@ -34,6 +35,9 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
+
+      - name: Validate schema publication files
+        run: python3 scripts/validate-schema-publication.py
 
       - name: Prepare Pages artifact
         run: |

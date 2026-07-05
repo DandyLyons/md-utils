@@ -1,0 +1,48 @@
+name: Validate Schema Publication
+
+on:
+  pull_request:
+    paths:
+      - Sources/md-utils/Resources/md-utils.schema.json
+      - site/schemas/**
+      - scripts/validate-schema-publication.py
+      - .github/workflows/schema-publication.yml
+  push:
+    branches:
+      - main
+    paths:
+      - Sources/md-utils/Resources/md-utils.schema.json
+      - site/schemas/**
+      - scripts/validate-schema-publication.py
+      - .github/workflows/schema-publication.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate schema publication files
+        run: python3 scripts/validate-schema-publication.py
+
+      - name: Guard immutable published schema versions
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          changed_files="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- 'site/schemas/*/*.json')"
+          if [ -z "$changed_files" ]; then
+            exit 0
+          fi
+
+          for file in $changed_files; do
+            if git cat-file -e "origin/${{ github.base_ref }}:$file" 2>/dev/null; then
+              echo "Published schema versions are immutable after release: $file"
+              echo "Add a new site/schemas/<version>/ folder instead of editing an existing version."
+              exit 1
+            fi
+          done
