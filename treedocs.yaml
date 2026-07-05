@@ -4,7 +4,7 @@ project:
   last_updated: "2026-06-22"
   name: md-utils
   version: 0.0.0
-signature: sha256:c69b753de7ab26ad1c6e1beeacc4e97f102b0996b1e73aaa3ca290db207eed1c
+signature: sha256:c427a6defad4af8d08031d5b68bc0b14ef30a4cc559b5e7241f24bc9eca6962b
 tree:
   .claude:
     _doc: Claude-specific project configuration, commands, rules, and agent instructions.
@@ -274,6 +274,7 @@ tree:
         _doc: CLI commands for JSON Schema configuration and Markdown metadata validation.
         SchemaAdd.swift: Command that adds schema associations to configuration.
         SchemaCommands.swift: Parent command for schema-related subcommands.
+        SchemaDescribe.swift: "`treedocs schema describe ...` command"
         SchemaInit.swift: Command that initializes schema validation configuration.
         SchemaList.swift: Command that lists configured schema associations.
         SchemaRemove.swift: Command that removes schema associations from configuration.

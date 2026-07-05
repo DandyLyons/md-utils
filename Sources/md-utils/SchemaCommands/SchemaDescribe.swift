@@ -23,7 +23,7 @@ extension CLIEntry.SchemaCommands {
     @Argument(help: "Schema rule name to describe")
     var schemaName: String
 
-    @Option(name: .long, help: "Output format: text or json")
+    @Option(name: .long, help: "Output format: text, markdown, or json")
     var format: SchemaDescribeOutputFormat = .text
     /// Runs the command using the parsed command-line arguments.
     ///
@@ -33,6 +33,8 @@ extension CLIEntry.SchemaCommands {
       switch format {
       case .text:
         print(SchemaDescriptionFormatter.render(description))
+      case .markdown:
+        print(SchemaDescriptionMarkdownFormatter.render(description))
       case .json:
         try printAny(SchemaDescriptionJSONRenderer.render(description), format: .json)
       }
@@ -43,6 +45,7 @@ extension CLIEntry.SchemaCommands {
 /// Supported output formats for the `schema describe` command.
 enum SchemaDescribeOutputFormat: String, ExpressibleByArgument {
   case text
+  case markdown
   case json
 }
 
@@ -100,7 +103,7 @@ enum SchemaDescriptionFormatter {
     lines.append("\(CLIStyle.metadata("Schema Rule Name:")) \(CLIStyle.schemaDescribeRuleName(rule.name))")
     lines.append("")
     lines.append(CLIStyle.schemaDescribeHeading("Schema Rule"))
-    lines.append(contentsOf: ruleSummaryLines(rule, schemaPath: description.schemaPath))
+    lines.append(contentsOf: SchemaRuleDescriptionSummarizer.lines(rule, schemaPath: description.schemaPath))
     lines.append("")
     lines.append(CLIStyle.schemaDescribeHeading("Schema Definition"))
 
@@ -116,8 +119,42 @@ enum SchemaDescriptionFormatter {
 
     return lines.joined(separator: "\n")
   }
+}
 
-  private static func ruleSummaryLines(_ rule: SchemaRule, schemaPath: Path) -> [String] {
+/// Renders schema descriptions as Markdown for documentation and agent-readable summaries.
+enum SchemaDescriptionMarkdownFormatter {
+  /// Renders the value into its Markdown output representation.
+  static func render(_ description: SchemaDescription) -> String {
+    var lines: [String] = []
+    let rule = description.rule
+
+    lines.append("# Schema Rule Name: \(rule.name)")
+    lines.append("")
+    lines.append("## Schema Rule")
+    for line in SchemaRuleDescriptionSummarizer.lines(rule, schemaPath: description.schemaPath) {
+      lines.append("- \(line)")
+    }
+    lines.append("")
+    lines.append("## Schema Definition")
+
+    let fields = JSONSchemaFieldSummarizer.fields(in: description.jsonSchema, styled: false)
+    if fields.isEmpty {
+      lines.append("No top-level fields are defined.")
+    } else {
+      for field in fields {
+        lines.append("### \(field.path)")
+        lines.append("- Type: \(field.typeAndConstraints)")
+      }
+    }
+
+    return lines.joined(separator: "\n")
+  }
+}
+
+/// Summarizes the configured schema rule context in plain text lines.
+enum SchemaRuleDescriptionSummarizer {
+  /// Returns concise lines describing which files the schema rule affects.
+  static func lines(_ rule: SchemaRule, schemaPath: Path) -> [String] {
     var lines: [String] = []
 
     if rule.match.paths.isEmpty {
@@ -132,7 +169,7 @@ enum SchemaDescriptionFormatter {
       lines.append("Runs only when \(frontmatterMatchers(rule.match.frontmatter)).")
     }
     lines.append(rule.frontmatterRequired ? "Frontmatter is required." : "Files without frontmatter are skipped.")
-    lines.append("Schema: \(CLIStyle.path(schemaPath.string))")
+    lines.append("Schema: \(schemaPath.string)")
 
     return lines
   }
@@ -154,9 +191,9 @@ struct JSONSchemaFieldSummary {
 /// Summarizes JSON Schema object properties into concise field descriptions.
 enum JSONSchemaFieldSummarizer {
   /// Returns all fields defined by nested JSON Schema object properties.
-  static func fields(in schema: [String: Any]) -> [JSONSchemaFieldSummary] {
+  static func fields(in schema: [String: Any], styled: Bool = true) -> [JSONSchemaFieldSummary] {
     let required = stringArray(schema["required"])
-    return fields(in: schema, prefix: nil, requiredFields: Set(required))
+    return fields(in: schema, prefix: nil, requiredFields: Set(required), styled: styled)
   }
 
   /// Returns a stable human-readable value for constraints and matchers.
@@ -183,7 +220,8 @@ enum JSONSchemaFieldSummarizer {
   private static func fields(
     in schema: [String: Any],
     prefix: String?,
-    requiredFields: Set<String>
+    requiredFields: Set<String>,
+    styled: Bool
   ) -> [JSONSchemaFieldSummary] {
     guard let properties = schema["properties"] as? [String: Any] else {
       return []
@@ -196,31 +234,31 @@ enum JSONSchemaFieldSummarizer {
       let isRequired = requiredFields.contains(name)
       summaries.append(JSONSchemaFieldSummary(
         path: path,
-        typeAndConstraints: typeAndConstraints(for: property, required: isRequired)
+        typeAndConstraints: typeAndConstraints(for: property, required: isRequired, styled: styled)
       ))
-      summaries.append(contentsOf: nestedFields(in: property, path: path))
+      summaries.append(contentsOf: nestedFields(in: property, path: path, styled: styled))
     }
     return summaries
   }
 
-  private static func nestedFields(in schema: [String: Any], path: String) -> [JSONSchemaFieldSummary] {
+  private static func nestedFields(in schema: [String: Any], path: String, styled: Bool) -> [JSONSchemaFieldSummary] {
     let type = schemaType(schema)
     if type == "object" || schema["properties"] != nil {
-      return fields(in: schema, prefix: path, requiredFields: Set(stringArray(schema["required"])))
+      return fields(in: schema, prefix: path, requiredFields: Set(stringArray(schema["required"])), styled: styled)
     }
     if type == "array", let items = schema["items"] as? [String: Any] {
       let itemPath = "\(path)[]"
       if items["properties"] != nil || schemaType(items) == "object" {
-        return fields(in: items, prefix: itemPath, requiredFields: Set(stringArray(items["required"])))
+        return fields(in: items, prefix: itemPath, requiredFields: Set(stringArray(items["required"])), styled: styled)
       }
     }
     return []
   }
 
-  private static func typeAndConstraints(for schema: [String: Any], required: Bool) -> String {
+  private static func typeAndConstraints(for schema: [String: Any], required: Bool, styled: Bool) -> String {
     var parts = [displayType(schema)]
     if required {
-      parts.append(CLIStyle.warning("REQUIRED"))
+      parts.append(styled ? CLIStyle.warning("REQUIRED") : "REQUIRED")
     }
     parts.append(contentsOf: constraintParts(schema))
     return parts.joined(separator: ", ")

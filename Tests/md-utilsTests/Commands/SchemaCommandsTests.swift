@@ -45,6 +45,15 @@ struct SchemaCommandsTests {
   }
 
   @Test
+  func `schema describe parses markdown format`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["schema", "describe", "books", "--format", "markdown"])
+    let command = try #require(parsed as? CLIEntry.SchemaCommands.Describe)
+
+    #expect(command.schemaName == "books")
+    #expect(command.format == .markdown)
+  }
+
+  @Test
   func `schema validate parses optional rule name`() throws {
     let parsed = try CLIEntry.parseAsRoot(["schema", "validate", "books"])
     let command = try #require(parsed as? CLIEntry.SchemaCommands.Validate)
@@ -252,6 +261,31 @@ struct SchemaCommandsTests {
     #expect(rule["schemaPath"] as? String == ".md-utils/schemas/people.schema.json")
     #expect(match["paths"] as? [String] == ["People/**/*.md"])
     #expect(properties["name-meaning"] != nil)
+  }
+
+  @Test
+  func `schema describe markdown output renders sections and fields`() throws {
+    let description = SchemaDescription(
+      rule: SchemaRule(
+        name: "people-in-the-bible",
+        schema: "people.schema.json",
+        frontmatterRequired: true,
+        match: SchemaRuleMatch(paths: ["People/**/*.md"])
+      ),
+      schemaPath: ".md-utils/schemas/people.schema.json",
+      jsonSchema: peopleSchemaObject()
+    )
+
+    let output = SchemaDescriptionMarkdownFormatter.render(description)
+
+    #expect(output.contains("# Schema Rule Name: people-in-the-bible"))
+    #expect(output.contains("## Schema Rule"))
+    #expect(output.contains("- Applies to Markdown files matching People/**/*.md."))
+    #expect(output.contains("## Schema Definition"))
+    #expect(output.contains("### name-meaning"))
+    #expect(output.contains("- Type: String, REQUIRED, minLength 1"))
+    #expect(output.contains("### scripture-references[].chapter"))
+    #expect(!output.contains("\u{001B}"))
   }
 
   @Test
