@@ -11,7 +11,7 @@ extension CLIEntry {
     static let configuration = CommandConfiguration(
       commandName: "config",
       abstract: "Commands for md-utils project configuration",
-      subcommands: [Schema.self]
+      subcommands: [Schema.self, SchemaVersions.self]
     )
   }
 }

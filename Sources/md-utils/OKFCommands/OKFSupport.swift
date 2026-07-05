@@ -448,11 +448,10 @@ enum OKFInitializer {
     let schemaDirectory = configDirectory + "schemas"
     try schemaDirectory.mkpath()
 
-    try copyResource(
-      named: "md-utils.schema",
-      withExtension: "json",
-      to: configDirectory + "md-utils.schema.json",
+    try writeIfMissing(
+      configDirectory + "md-utils.schema.json",
       relative: ".md-utils/md-utils.schema.json",
+      content: ConfigSchemaRegistry.schemaContent(),
       created: &created,
       existing: &existing
     )

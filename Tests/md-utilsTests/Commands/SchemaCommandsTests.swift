@@ -138,9 +138,109 @@ struct SchemaCommandsTests {
       #expect((project + ".md-utils/schemas/books.schema.json").exists)
 
       let config = try MdUtilsConfig.load()
+      #expect(config.configVersion == "0.1.0")
+      #expect(config.schemaReference == "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json")
       #expect(config.schemaRules.count == 1)
       #expect(config.schemaRules.first?.name == "books")
       #expect(config.schemaRules.first?.match.paths == ["Books/**/*.md"])
+
+      let configData = try Data(contentsOf: URL(fileURLWithPath: (project + ".md-utils/md-utils.json").string))
+      let configObject = try #require(JSONSerialization.jsonObject(with: configData) as? [String: Any])
+      #expect(configObject["configVersion"] as? String == "0.1.0")
+      #expect(configObject["$schema"] as? String == "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json")
+    }
+  }
+
+  @Test
+  func `versioned config loads current schema version`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+
+    try withCurrentDirectory(project) {
+      let config = try MdUtilsConfig.load()
+
+      #expect(config.configVersion == "0.1.0")
+      #expect(config.schemaRules.count == 1)
+    }
+  }
+
+  @Test
+  func `unversioned config loads as legacy current schema version`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project, includeConfigVersion: false)
+
+    try withCurrentDirectory(project) {
+      let config = try MdUtilsConfig.load()
+
+      #expect(config.configVersion == "0.1.0")
+      #expect(config.schemaRules.count == 1)
+    }
+  }
+
+  @Test
+  func `unsupported future config version fails before parsing rules`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project, configVersion: "99.0.0", rules: ["{ \"name\": \"broken\" }"])
+
+    try withCurrentDirectory(project) {
+      do {
+        _ = try MdUtilsConfig.load()
+        Issue.record("Expected unsupported configVersion to throw")
+      } catch {
+        #expect(String(describing: error).contains("Unsupported md-utils configVersion \"99.0.0\""))
+      }
+    }
+  }
+
+  @Test
+  func `non string config version fails clearly`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    let mdUtils = project + ".md-utils"
+    try mdUtils.mkpath()
+    try (mdUtils + "md-utils.json").write("""
+      {
+        "configVersion": 1,
+        "schemaDirectory": ".md-utils/schemas/",
+        "schemaRules": []
+      }
+      """)
+
+    try withCurrentDirectory(project) {
+      do {
+        _ = try MdUtilsConfig.load()
+        Issue.record("Expected non-string configVersion to throw")
+      } catch {
+        #expect(String(describing: error).contains("configVersion must be a non-empty string"))
+      }
+    }
+  }
+
+  @Test
+  func `current config is validated against bundled schema`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    let mdUtils = project + ".md-utils"
+    try mdUtils.mkpath()
+    try (mdUtils + "md-utils.json").write("""
+      {
+        "configVersion": "0.1.0",
+        "schemaDirectory": ".md-utils/schemas/",
+        "schemaRules": [],
+        "unexpected": true
+      }
+      """)
+
+    try withCurrentDirectory(project) {
+      do {
+        _ = try MdUtilsConfig.load()
+        Issue.record("Expected config schema validation to throw")
+      } catch {
+        #expect(String(describing: error).contains("Project config is invalid for configVersion \"0.1.0\""))
+      }
     }
   }
 
@@ -728,6 +828,8 @@ struct SchemaCommandsTests {
 
   private func writeSchemaProject(
     _ project: Path,
+    configVersion: String = "0.1.0",
+    includeConfigVersion: Bool = true,
     rules: [String]? = nil,
     schemas: [String: String]? = nil
   ) throws {
@@ -741,9 +843,11 @@ struct SchemaCommandsTests {
       paths: ["Books/**/*.md"],
       frontmatter: "\"tags\": { \"includes\": \"Book\" }"
     )]
+    let configVersionLine = includeConfigVersion ? "\n  \"configVersion\": \"\(configVersion)\"," : ""
     try (mdUtils + "md-utils.json").write("""
       {
-        "$schema": "md-utils.schema.json",
+        "$schema": "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json",
+      \(configVersionLine)
         "schemaDirectory": ".md-utils/schemas/",
         "schemaRules": [
           \(ruleEntries.joined(separator: ",\n"))

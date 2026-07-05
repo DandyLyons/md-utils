@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - site/**
-      - Sources/md-utils/Resources/md-utils.schema.json
+      - Sources/md-utils/Resources/*_md-utils.schema.json
       - scripts/validate-schema-publication.py
       - .github/workflows/pages.yml
   workflow_dispatch:

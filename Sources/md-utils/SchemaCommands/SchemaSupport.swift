@@ -13,8 +13,10 @@ import Yams
 ///
 /// See <doc:SchemaValidationCommands> for workflow details.
 struct MdUtilsConfig {
+  static let defaultConfigVersion = ConfigSchemaRegistry.defaultVersion
   static let defaultSchemaDirectory = ".md-utils/schemas/"
 
+  var configVersion: String
   var schemaReference: String?
   var schemaDirectory: String
   var schemaRules: [SchemaRule]
@@ -22,10 +24,12 @@ struct MdUtilsConfig {
   ///
   /// See <doc:SchemaValidationCommands> for workflow details.
   init(
-    schemaReference: String? = "md-utils.schema.json",
+    configVersion: String = Self.defaultConfigVersion,
+    schemaReference: String? = ConfigSchemaRegistry.publicSchemaURL(for: ConfigSchemaRegistry.defaultVersion),
     schemaDirectory: String = Self.defaultSchemaDirectory,
     schemaRules: [SchemaRule] = []
   ) {
+    self.configVersion = configVersion
     self.schemaReference = schemaReference
     self.schemaDirectory = schemaDirectory
     self.schemaRules = schemaRules
@@ -43,6 +47,15 @@ struct MdUtilsConfig {
       throw ValidationError("Project config must be a JSON object: \(path.string)")
     }
 
+    let configVersion = try ConfigSchemaRegistry.detectVersion(in: object, path: path)
+    let validationObject = ConfigSchemaRegistry.configObjectForValidation(object, configVersion: configVersion)
+    let configSchema = try ConfigSchemaRegistry.schema(for: configVersion)
+    let validationResult = try JSONSchema.validate(validationObject, schema: configSchema)
+    if !validationResult.valid {
+      let message = validationResult.errors?.map(\.description).joined(separator: "; ") ?? "does not match bundled schema"
+      throw ValidationError("Project config is invalid for configVersion \"\(configVersion)\": \(message)")
+    }
+
     let schemaReference = object["$schema"] as? String
     let schemaDirectory = object["schemaDirectory"] as? String ?? Self.defaultSchemaDirectory
     let rawRules = object["schemaRules"] as? [[String: Any]] ?? []
@@ -53,6 +66,7 @@ struct MdUtilsConfig {
     }
 
     return MdUtilsConfig(
+      configVersion: configVersion,
       schemaReference: schemaReference,
       schemaDirectory: schemaDirectory,
       schemaRules: rules
@@ -63,6 +77,7 @@ struct MdUtilsConfig {
   /// See <doc:SchemaValidationCommands> for workflow details.
   func save(to path: Path = SchemaPaths.configFile) throws {
     var object: [String: Any] = [
+      "configVersion": configVersion,
       "schemaDirectory": schemaDirectory,
       "schemaRules": schemaRules.map { $0.jsonObject },
     ]
@@ -78,6 +93,91 @@ struct MdUtilsConfig {
       throw ValidationError("Failed to encode md-utils config")
     }
     try path.write(json + "\n")
+  }
+}
+
+/// Selects bundled md-utils config schemas by config schema version.
+enum ConfigSchemaRegistry {
+  static let defaultVersion = "0.1.0"
+  static let supportedVersions = ["0.1.0"]
+
+  static func detectVersion(in object: [String: Any], path: Path) throws -> String {
+    guard let rawVersion = object["configVersion"] else {
+      return defaultVersion
+    }
+    guard let version = rawVersion as? String, !version.isEmpty else {
+      throw ValidationError("Project config configVersion must be a non-empty string: \(path.string)")
+    }
+    guard supportedVersions.contains(version) else {
+      throw ValidationError(
+        "Unsupported md-utils configVersion \"\(version)\". This md-utils release supports: \(supportedVersions.joined(separator: ", ")). Upgrade md-utils or migrate the config."
+      )
+    }
+    return version
+  }
+
+  static func configObjectForValidation(_ object: [String: Any], configVersion: String) -> [String: Any] {
+    var validationObject = object
+    validationObject["configVersion"] = configVersion
+    return validationObject
+  }
+
+  static func publicSchemaURL(for version: String) -> String {
+    "https://dandylyons.github.io/md-utils/schemas/\(version)/md-utils.schema.json"
+  }
+
+  static func schemaContent(for version: String = defaultVersion) throws -> String {
+    guard supportedVersions.contains(version) else {
+      throw ValidationError("Unsupported md-utils configVersion \"\(version)\"")
+    }
+    guard let url = Bundle.module.url(forResource: resourceBaseName(for: version), withExtension: "json") else {
+      throw ValidationError("Bundled md-utils config schema is missing for configVersion \"\(version)\"")
+    }
+
+    return try String(contentsOf: url, encoding: .utf8)
+  }
+
+  static func schema(for version: String) throws -> [String: Any] {
+    let content = try schemaContent(for: version)
+    guard let data = content.data(using: .utf8) else {
+      throw ValidationError("Bundled md-utils config schema is not UTF-8 for configVersion \"\(version)\"")
+    }
+    guard let schema = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      throw ValidationError("Bundled md-utils config schema must be a JSON object for configVersion \"\(version)\"")
+    }
+    return schema
+  }
+
+  private static func resourceBaseName(for version: String) -> String {
+    "\(version)_md-utils.schema"
+  }
+}
+
+enum ConfigSchemaVersionsFormatter {
+  static func renderText() -> String {
+    """
+    Supported md-utils config schema versions:
+    \(ConfigSchemaRegistry.supportedVersions.map { "  \($0)" }.joined(separator: "\n"))
+
+    Default generated config schema version:
+      \(ConfigSchemaRegistry.defaultVersion)
+
+    CLI version:
+      \(CLIEntry.configuration.version)
+    """
+  }
+
+  static func renderJSON() throws -> String {
+    let object: [String: Any] = [
+      "cliVersion": CLIEntry.configuration.version,
+      "defaultConfigVersion": ConfigSchemaRegistry.defaultVersion,
+      "supportedConfigVersions": ConfigSchemaRegistry.supportedVersions,
+    ]
+    let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+    guard let json = String(data: data, encoding: .utf8) else {
+      throw ValidationError("Failed to encode config schema versions")
+    }
+    return json + "\n"
   }
 }
 /// Defines one named frontmatter schema rule from the project configuration.
@@ -263,16 +363,8 @@ enum SchemaConfigBootstrapper {
   ///
   /// See <doc:SchemaValidationCommands> for workflow details.
   private static func copyBundledConfigSchema() throws {
-    guard let resourceURL = Bundle.module.url(
-      forResource: "md-utils.schema",
-      withExtension: "json"
-    ) else {
-      throw ValidationError("Bundled md-utils config schema is missing")
-    }
-
     let destination = SchemaPaths.projectDirectory + SchemaPaths.bundledConfigSchemaFileName
-    let data = try Data(contentsOf: resourceURL)
-    try data.write(to: URL(fileURLWithPath: destination.string))
+    try destination.write(try ConfigSchemaRegistry.schemaContent())
   }
 }
 /// Captures options used to create or initialize a schema rule.

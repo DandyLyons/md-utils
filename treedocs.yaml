@@ -4,7 +4,7 @@ project:
   last_updated: "2026-06-22"
   name: md-utils
   version: 0.0.0
-signature: sha256:c427a6defad4af8d08031d5b68bc0b14ef30a4cc559b5e7241f24bc9eca6962b
+signature: sha256:15ad9b3d5db1690c2d145ddbc3d094f3aa260c2d69bbf74a518892a01377aaff
 tree:
   .claude:
     _doc: Claude-specific project configuration, commands, rules, and agent instructions.
@@ -16,6 +16,12 @@ tree:
   .claude-plugin:
     _doc: Claude Code plugin marketplace metadata for distributing the bundled skill.
     marketplace.json: Config Claude plugins
+  .github:
+    _doc: GitHub repository automation, including Pages deployment and schema publication validation workflows.
+    workflows:
+      _doc: GitHub Actions workflow definitions for repository automation.
+      pages.yml: Deploys the static documentation and public JSON Schema files to GitHub Pages.
+      schema-publication.yml: Validates bundled and public JSON Schema publication files stay synchronized.
   .gitignore: Git ignore rules for generated files, local settings, and build artifacts.
   CLAUDE.md: Agent-facing project instructions, architecture notes, and workflow rules.
   Package.resolved: SwiftPM dependency lockfile generated from package resolution.
@@ -181,6 +187,7 @@ tree:
         ConfigCommands.swift: Parent command for configuration-related subcommands.
         ConfigSchema.swift: Embedded schema model for md-utils configuration files.
         ConfigSchemaPrinter.swift: Formatter for printing configuration schema information.
+        ConfigSchemaVersions.swift: Command that reports config schema versions supported by the installed CLI.
       ConvertCommands:
         _doc: CLI commands for converting Markdown to other output formats.
         ConvertCommands.swift: Parent command for conversion subcommands.
@@ -267,9 +274,9 @@ tree:
       OutputFormat.swift: Shared output format enumeration for command result rendering.
       Resources:
         _doc: Runtime resources embedded in the md-utils executable target.
+        0.1.0_md-utils.schema.json: Bundled md-utils config JSON Schema for configVersion 0.1.0.
         OKF-concept.schema.json: Bundled JSON Schema for OKF concept metadata validation.
         SKILL.md: Embedded copy of the markdown-utilities agent skill instructions.
-        md-utils.schema.json: Bundled JSON Schema for md-utils configuration files.
       SchemaCommands:
         _doc: CLI commands for JSON Schema configuration and Markdown metadata validation.
         SchemaAdd.swift: Command that adds schema associations to configuration.
@@ -427,6 +434,19 @@ tree:
     release-procedures.md: Versioning and release process documentation.
     swift-coding-standards.md: Swift style and safety rules used in this package.
     testing-standards.md: Swift Testing conventions and test organization guidance.
+  scripts:
+    _doc: Project maintenance scripts for validation and release support.
+    validate-schema-publication.py: Checks bundled and public md-utils config schemas are synchronized and correctly versioned.
+  site:
+    _doc: Static GitHub Pages site content and published JSON Schema files.
+    index.html: Landing page for the md-utils GitHub Pages site.
+    schemas:
+      _doc: Public md-utils config JSON Schema files organized by schema version.
+      0.1.0:
+        _doc: Public config schema files for md-utils configVersion 0.1.0.
+        md-utils-0.1.0.schema.json: Named public copy of the md-utils configVersion 0.1.0 JSON Schema.
+        md-utils.schema.json: Canonical public md-utils configVersion 0.1.0 JSON Schema used for editor IntelliSense.
+    styles.css: Stylesheet for the md-utils GitHub Pages site.
   skill:
     _doc: Packaged markdown-utilities agent skill distribution files.
     markdown-utilities:

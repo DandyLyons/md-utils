@@ -8,12 +8,8 @@ import Foundation
 /// Defines the `ConfigSchemaPrinter` command behavior.
 enum ConfigSchemaPrinter {
   /// Loads the bundled configuration schema content.
-  static func content() throws -> String {
-    guard let url = Bundle.module.url(forResource: "md-utils.schema", withExtension: "json") else {
-      throw ValidationError("Bundled md-utils config schema is missing")
-    }
-
-    return try String(contentsOf: url, encoding: .utf8)
+  static func content(version: String = ConfigSchemaRegistry.defaultVersion) throws -> String {
+    try ConfigSchemaRegistry.schemaContent(for: version)
   }
   /// Prints the bundled configuration schema to standard output.
   static func printSchema() throws {

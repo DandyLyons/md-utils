@@ -12,6 +12,7 @@ from pathlib import Path
 
 CURRENT_VERSION = "0.1.0"
 SCHEMA_FILE = "md-utils.schema.json"
+BUNDLED_SCHEMA_FILE = f"{CURRENT_VERSION}_md-utils.schema.json"
 VERSIONED_SCHEMA_FILE = f"md-utils-{CURRENT_VERSION}.schema.json"
 VERSIONED_SCHEMA_URL = (
     f"https://dandylyons.github.io/md-utils/schemas/{CURRENT_VERSION}/{SCHEMA_FILE}"
@@ -52,7 +53,7 @@ def main() -> None:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
-    bundled = repo_root / "Sources/md-utils/Resources" / SCHEMA_FILE
+    bundled = repo_root / "Sources/md-utils/Resources" / BUNDLED_SCHEMA_FILE
     versioned = repo_root / "site/schemas" / CURRENT_VERSION / SCHEMA_FILE
     named_versioned = repo_root / "site/schemas" / CURRENT_VERSION / VERSIONED_SCHEMA_FILE
 

@@ -3,7 +3,7 @@ name: Validate Schema Publication
 on:
   pull_request:
     paths:
-      - Sources/md-utils/Resources/md-utils.schema.json
+      - Sources/md-utils/Resources/*_md-utils.schema.json
       - site/schemas/**
       - scripts/validate-schema-publication.py
       - .github/workflows/schema-publication.yml
@@ -11,7 +11,7 @@ on:
     branches:
       - main
     paths:
-      - Sources/md-utils/Resources/md-utils.schema.json
+      - Sources/md-utils/Resources/*_md-utils.schema.json
       - site/schemas/**
       - scripts/validate-schema-publication.py
       - .github/workflows/schema-publication.yml

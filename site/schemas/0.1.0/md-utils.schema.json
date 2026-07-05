@@ -7,7 +7,11 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "description": "JSON Schema reference for editor autocomplete."
+      "description": "JSON Schema reference for editor autocomplete. Runtime behavior is driven by configVersion, not this URL."
+    },
+    "configVersion": {
+      "enum": ["0.1.0"],
+      "description": "md-utils config schema version. This is independent from the md-utils CLI version."
     },
     "schemaDirectory": {
       "type": "string",
@@ -23,7 +27,7 @@
       "default": []
     }
   },
-  "required": ["schemaDirectory", "schemaRules"],
+  "required": ["configVersion", "schemaDirectory", "schemaRules"],
   "$defs": {
     "schemaRule": {
       "type": "object",
