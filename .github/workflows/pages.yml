@@ -1,0 +1,53 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - site/**
+      - Sources/md-utils/Resources/md-utils.schema.json
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CURRENT_MD_UTILS_JSONSCHEMA_VERSION: 0.1.0
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare Pages artifact
+        run: |
+          mkdir -p "$RUNNER_TEMP/md-utils-pages"
+          cp -R site/. "$RUNNER_TEMP/md-utils-pages/"
+          mkdir -p "$RUNNER_TEMP/md-utils-pages/schemas/latest"
+          cp "site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json" "$RUNNER_TEMP/md-utils-pages/md-utils.schema.json"
+          cp "site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json" "$RUNNER_TEMP/md-utils-pages/schemas/latest/md-utils.schema.json"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/md-utils-pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

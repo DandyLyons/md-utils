@@ -1,0 +1,260 @@
+:root {
+  color-scheme: dark;
+  --bg: #100f18;
+  --panel: #1b1827;
+  --text: #f5f1ff;
+  --muted: #c7bfd8;
+  --accent: #8bd7ff;
+  --accent-strong: #d7b4ff;
+  --border: #352d49;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(215, 180, 255, 0.2), transparent 34rem),
+    linear-gradient(135deg, #100f18 0%, #1b1930 54%, #101b24 100%);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.shell {
+  width: min(68rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 5rem 0;
+}
+
+.hero {
+  max-width: 48rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--accent-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(4rem, 14vw, 9rem);
+  line-height: 0.9;
+  letter-spacing: -0.08em;
+}
+
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.85rem 1rem;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding-top: 0.55rem;
+}
+
+.badges a,
+.badges span {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.32rem 0.58rem;
+  color: var(--accent-strong);
+  background: rgba(27, 24, 39, 0.78);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.badges a:hover,
+.badges a:focus-visible {
+  border-color: var(--accent);
+}
+
+h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.lede {
+  margin: 1.5rem 0 0;
+  max-width: 38rem;
+  font-size: clamp(1.2rem, 3vw, 1.75rem);
+}
+
+code {
+  color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 2rem;
+}
+
+a {
+  color: var(--text);
+}
+
+.actions a {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.85rem 1.1rem;
+  background: rgba(27, 24, 39, 0.78);
+  text-decoration: none;
+}
+
+.actions a:hover,
+.actions a:focus-visible {
+  border-color: var(--accent);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 4rem;
+}
+
+article,
+.example,
+.installation,
+.quickstart,
+.video {
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  padding: 1.25rem;
+  background: rgba(27, 24, 39, 0.72);
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.18);
+}
+
+article p {
+  margin-bottom: 0;
+}
+
+.quickstart {
+  margin-top: 1rem;
+}
+
+.video {
+  margin-top: 3rem;
+}
+
+.video-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: #000;
+  aspect-ratio: 16 / 9;
+}
+
+.video-frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.installation {
+  margin-top: 1rem;
+}
+
+details > summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+}
+
+details > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0.35rem;
+}
+
+.installation > details > summary {
+  font-size: 1.15rem;
+}
+
+.install-method {
+  margin-top: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  padding: 0.9rem;
+  background: rgba(16, 15, 24, 0.42);
+}
+
+.install-method pre {
+  margin-top: 0.85rem;
+}
+
+.install-method p {
+  margin-bottom: 0;
+}
+
+.example {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.75fr) minmax(0, 1.25fr);
+  gap: 1.25rem;
+  margin-top: 3rem;
+}
+
+.example p {
+  margin-bottom: 0;
+}
+
+pre {
+  margin: 0;
+  overflow-x: auto;
+  color: var(--accent);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.current {
+  color: var(--accent-strong);
+}
+
+.stale {
+  color: #ff8a80;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding: 3rem 0;
+  }
+
+  .grid,
+  .example {
+    grid-template-columns: 1fr;
+  }
+}

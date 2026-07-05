@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>md-utils</title>
+  <meta name="description" content="md-utils is a Swift toolkit, CLI, and agent skill for parsing and manipulating Markdown files.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero" aria-labelledby="title">
+      <p class="eyebrow">Swift CLI</p>
+      <div class="title-row">
+        <h1 id="title">md-utils</h1>
+        <div class="badges" aria-label="Project metadata">
+          <a href="https://github.com/DandyLyons/md-utils/releases/tag/0.1.0">v0.1.0</a>
+          <span>macOS 13+</span>
+        </div>
+      </div>
+      <p class="lede">Parse, inspect, and reshape Markdown from Swift code, shell scripts, and AI agent workflows.</p>
+      <div class="actions" aria-label="Primary links">
+        <a href="https://github.com/DandyLyons/md-utils">GitHub Repository</a>
+        <a href="https://swiftpackageindex.com/DandyLyons/md-utils/documentation">Package Documentation</a>
+        <a class="github-button" href="https://github.com/DandyLyons/md-utils" data-color-scheme="no-preference: dark; light: dark; dark: dark;" data-size="large" data-show-count="true" aria-label="Star DandyLyons/md-utils on GitHub">Star</a>
+      </div>
+    </section>
+
+    <section class="example" aria-labelledby="example-title">
+      <div>
+        <h2 id="example-title">Markdown Commands</h2>
+        <p>Use one CLI to work with frontmatter, headings, sections, wikilinks, metadata, format conversion, and schema validation.</p>
+      </div>
+      <pre><code><span class="current">$ md-utils fm get --key title docs/</span>
+[{"path":"docs/guide.md","value":"Guide"}]
+
+<span class="current">$ md-utils toc README.md</span>
+- [Agent Skill Installation](#agent-skill-installation)
+- [CLI Installation](#cli-installation)
+- [Features](#features)
+
+<span class="current">$ md-utils links check --vault ~/notes/ docs/</span>
+<span class="current">ok</span> docs/index.md
+<span class="stale">broken</span> docs/archive.md [[Missing Note]]</code></pre>
+    </section>
+
+    <section class="grid" aria-label="Project highlights">
+      <article>
+        <h2>Shape Markdown</h2>
+        <p>Extract sections, generate tables of contents, adjust heading levels, normalize formatting, and convert Markdown to text or CSV.</p>
+      </article>
+      <article>
+        <h2>Validate Knowledge</h2>
+        <p>Attach JSON Schema rules to Markdown frontmatter, initialize OKF bundles, and keep structured notes machine-checkable.</p>
+      </article>
+      <article>
+        <h2>Equip Agents</h2>
+        <p>Install the bundled <code>markdown-utilities</code> skill so coding assistants can use the CLI instead of fragile regex workflows.</p>
+      </article>
+    </section>
+
+    <section class="installation" aria-labelledby="installation-title">
+      <details>
+        <summary id="installation-title">Installation</summary>
+        <p><code>md-utils</code> currently supports macOS 13 and newer. Version 0.1.0 is source-build only, so installing through Mint or Swift Package Manager requires a Swift 6-capable build environment, usually Xcode 16+.</p>
+
+        <details class="install-method">
+          <summary>Mint</summary>
+          <pre><code class="language-bash">mint install DandyLyons/md-utils@0.1.0
+mint run DandyLyons/md-utils@0.1.0 --help</code></pre>
+          <p><a href="https://github.com/yonaskolb/Mint">Mint</a> builds the Swift executable package from the tagged GitHub source.</p>
+        </details>
+
+        <details class="install-method">
+          <summary>From Source</summary>
+          <pre><code class="language-bash">git clone https://github.com/DandyLyons/md-utils.git
+cd md-utils
+swift build -c release</code></pre>
+          <p>Swift Package Manager builds the <code>MarkdownUtilities</code> library and the <code>md-utils</code> executable from source.</p>
+        </details>
+
+        <details class="install-method">
+          <summary>Agent Skill</summary>
+          <pre><code class="language-bash">npx skills add https://github.com/DandyLyons/md-utils --skill markdown-utilities</code></pre>
+          <p>The bundled skill teaches AI coding assistants how to use <code>md-utils</code> for structured Markdown operations.</p>
+        </details>
+      </details>
+    </section>
+
+    <section class="quickstart" aria-labelledby="quickstart-title">
+      <h2 id="quickstart-title">Quick Start</h2>
+      <pre><code class="language-bash">
+md-utils toc README.md
+md-utils fm dump document.md
+md-utils extract --name "Installation" README.md
+md-utils links check --vault ~/notes/ docs/
+md-utils schema init books --path "Books/**/*.md" --tag Book
+</code></pre>
+    </section>
+
+    <section class="quickstart" aria-labelledby="schema-title">
+      <h2 id="schema-title">Hosted Schema</h2>
+      <p>The <code>md-utils</code> configuration schema is published with this site so editors and tools can reference a stable public URL. The current compatibility endpoint is <a href="https://dandylyons.github.io/md-utils/md-utils.schema.json"><code>https://dandylyons.github.io/md-utils/md-utils.schema.json</code></a>.</p>
+      <p>Versioned schema files are available under <a href="https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json"><code>/schemas/0.1.0/md-utils.schema.json</code></a>, with <a href="https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json"><code>/schemas/latest/md-utils.schema.json</code></a> maintained as a moving alias for the latest published schema.</p>
+      <pre><code class="language-json">{
+  "$schema": "https://dandylyons.github.io/md-utils/md-utils.schema.json",
+  "schemaDirectory": ".md-utils/schemas/",
+  "schemaRules": []
+}</code></pre>
+    </section>
+  </main>
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
+</body>
+</html>

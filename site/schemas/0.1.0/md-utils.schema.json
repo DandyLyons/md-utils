@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dandylyons.github.io/md-utils/md-utils.schema.json",
+  "title": "md-utils project configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for editor autocomplete."
+    },
+    "schemaDirectory": {
+      "type": "string",
+      "default": ".md-utils/schemas/",
+      "description": "Directory where schema files are stored. Relative paths are resolved from the project root."
+    },
+    "schemaRules": {
+      "type": "array",
+      "description": "Rules that decide which JSON Schema applies to which Markdown files.",
+      "items": {
+        "$ref": "#/$defs/schemaRule"
+      },
+      "default": []
+    }
+  },
+  "required": ["schemaDirectory", "schemaRules"],
+  "$defs": {
+    "schemaRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique rule name used by md-utils schema validate <rule-name>."
+        },
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Schema file path, resolved relative to schemaDirectory."
+        },
+        "frontmatterRequired": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, files matched by this rule are invalid if they have no frontmatter."
+        },
+        "match": {
+          "$ref": "#/$defs/ruleMatch"
+        }
+      },
+      "required": ["name", "schema", "frontmatterRequired", "match"]
+    },
+    "ruleMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Glob patterns matched against project-relative Markdown file paths."
+        },
+        "excludePaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Glob patterns excluded after paths match."
+        },
+        "frontmatter": {
+          "type": "object",
+          "description": "Frontmatter field matchers. Each key is a frontmatter key.",
+          "additionalProperties": {
+            "$ref": "#/$defs/frontmatterMatcher"
+          }
+        }
+      },
+      "anyOf": [
+        { "required": ["paths"] },
+        { "required": ["frontmatter"] }
+      ]
+    },
+    "frontmatterMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "includes": {
+          "description": "Matches when the frontmatter value is an array containing this JSON value."
+        }
+      },
+      "required": ["includes"]
+    }
+  }
+}

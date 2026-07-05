@@ -243,6 +243,8 @@ The package also bundles `OKF-concept.schema.json` for OKF v0.1 draft concept fr
 
 Project-level md-utils settings live in `.md-utils/md-utils.json`. The schema command group creates and uses this folder to validate Markdown YAML frontmatter against JSON Schema files. Schemas only apply to frontmatter, not Markdown body content.
 
+The config schema is published at `https://dandylyons.github.io/md-utils/md-utils.schema.json` for editor integration. Versioned copies are published under `https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json`, and `https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json` points to the latest published schema.
+
 Treat the directory containing `.md-utils/` as the md-utils project root. Commands that use project configuration read `.md-utils/md-utils.json` relative to the current working directory; md-utils does not search parent directories for project configuration. Run schema/config commands from the directory that contains `.md-utils/`:
 
 ```bash
@@ -313,6 +315,24 @@ md-utils schema remove books --delete-schema
 `schema init` bootstraps `.md-utils/` and adds an initial rule. `schema add` adds another rule to existing config. `schema describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `schema remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
 
 If a file matches multiple rules, all matching schemas apply. Files matching no rules are ignored. Invalid YAML frontmatter is always reported as an error because schema validation cannot proceed.
+
+## GitHub Pages
+
+The static project site lives in `site/` and deploys to `https://dandylyons.github.io/md-utils/` through `.github/workflows/pages.yml`. GitHub Pages should be configured to use GitHub Actions as its deployment source.
+
+Schema publishing layout:
+
+```text
+site/
+  index.html
+  styles.css
+  schemas/
+    0.1.0/
+      md-utils.schema.json
+      md-utils-0.1.0.schema.json
+```
+
+When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json` to both `md-utils.schema.json` at the site root and `schemas/latest/md-utils.schema.json`. For future schema releases, add a new versioned folder under `site/schemas/`, update `CURRENT_MD_UTILS_JSONSCHEMA_VERSION` in `.github/workflows/pages.yml`, and keep the canonical bundled schema in `Sources/md-utils/Resources/md-utils.schema.json` synchronized with the published copy.
 
 ## Architecture
 
