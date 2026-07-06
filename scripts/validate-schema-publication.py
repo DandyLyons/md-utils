@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 
 
-CURRENT_VERSION = "0.1.0"
+CURRENT_VERSION = "0.2.0"
 SCHEMA_FILE = "md-utils.schema.json"
 BUNDLED_SCHEMA_FILE = f"{CURRENT_VERSION}_md-utils.schema.json"
 VERSIONED_SCHEMA_FILE = f"md-utils-{CURRENT_VERSION}.schema.json"

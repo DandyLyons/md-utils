@@ -1,5 +1,5 @@
 //
-//  SchemaCommandsTests.swift
+//  RulesCommandsTests.swift
 //  md-utilsTests
 //
 
@@ -10,70 +10,70 @@ import Testing
 
 @testable import md_utils
 
-@Suite("schema commands", .serialized)
-struct SchemaCommandsTests {
+@Suite("rules commands", .serialized)
+struct RulesCommandsTests {
   @Test
-  func `schema command group has correct configuration`() {
-    let config = CLIEntry.SchemaCommands.configuration
+  func `rules command group has correct configuration`() {
+    let config = CLIEntry.RulesCommands.configuration
 
-    #expect(config.commandName == "schema")
+    #expect(config.commandName == "rules")
     #expect(config.subcommands.count == 6)
-    #expect(config.subcommands[0] is CLIEntry.SchemaCommands.Init.Type)
-    #expect(config.subcommands[1] is CLIEntry.SchemaCommands.Add.Type)
-    #expect(config.subcommands[2] is CLIEntry.SchemaCommands.Remove.Type)
-    #expect(config.subcommands[3] is CLIEntry.SchemaCommands.List.Type)
-    #expect(config.subcommands[4] is CLIEntry.SchemaCommands.Describe.Type)
-    #expect(config.subcommands[5] is CLIEntry.SchemaCommands.Validate.Type)
+    #expect(config.subcommands[0] is CLIEntry.RulesCommands.Init.Type)
+    #expect(config.subcommands[1] is CLIEntry.RulesCommands.Add.Type)
+    #expect(config.subcommands[2] is CLIEntry.RulesCommands.Remove.Type)
+    #expect(config.subcommands[3] is CLIEntry.RulesCommands.List.Type)
+    #expect(config.subcommands[4] is CLIEntry.RulesCommands.Describe.Type)
+    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Validate.Type)
   }
 
   @Test
-  func `schema describe parses rule name`() throws {
-    let parsed = try CLIEntry.parseAsRoot(["schema", "describe", "books"])
-    let command = try #require(parsed as? CLIEntry.SchemaCommands.Describe)
+  func `rules describe parses rule name`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "describe", "books"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.Describe)
 
     #expect(command.schemaName == "books")
     #expect(command.format == .text)
   }
 
   @Test
-  func `schema describe parses json format`() throws {
-    let parsed = try CLIEntry.parseAsRoot(["schema", "describe", "books", "--format", "json"])
-    let command = try #require(parsed as? CLIEntry.SchemaCommands.Describe)
+  func `rules describe parses json format`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "describe", "books", "--format", "json"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.Describe)
 
     #expect(command.schemaName == "books")
     #expect(command.format == .json)
   }
 
   @Test
-  func `schema describe parses markdown format`() throws {
-    let parsed = try CLIEntry.parseAsRoot(["schema", "describe", "books", "--format", "markdown"])
-    let command = try #require(parsed as? CLIEntry.SchemaCommands.Describe)
+  func `rules describe parses markdown format`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "describe", "books", "--format", "markdown"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.Describe)
 
     #expect(command.schemaName == "books")
     #expect(command.format == .markdown)
   }
 
   @Test
-  func `schema validate parses optional rule name`() throws {
-    let parsed = try CLIEntry.parseAsRoot(["schema", "validate", "books"])
-    let command = try #require(parsed as? CLIEntry.SchemaCommands.Validate)
+  func `rules validate parses optional rule name`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "validate", "books"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.Validate)
 
     #expect(command.ruleName == "books")
   }
 
   @Test
-  func `schema validate parses include ok flag`() throws {
-    let parsed = try CLIEntry.parseAsRoot(["schema", "validate", "--include-ok"])
-    let command = try #require(parsed as? CLIEntry.SchemaCommands.Validate)
+  func `rules validate parses include ok flag`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "validate", "--include-ok"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.Validate)
 
     #expect(command.includeOk)
   }
 
   @Test
-  func `schema validate output hides ok and skipped results by default`() throws {
+  func `rules validate output hides ok and skipped results by default`() throws {
     let summary = schemaValidationSummary()
 
-    let output = SchemaValidationSummaryFormatter.render(summary)
+    let output = RuleValidationSummaryFormatter.render(summary)
 
     #expect(output.contains("Rules validated: books."))
     #expect(output.contains("  ERROR Books/broken.md"))
@@ -82,17 +82,17 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema validate output shows rules when all files are ok`() throws {
-    let summary = SchemaValidationSummary(
+  func `rules validate output shows rules when all files are ok`() throws {
+    let summary = RuleValidationSummary(
       results: [
-        SchemaValidationResult(
+        RuleValidationResult(
           ruleName: "books",
           schemaPath: ".md-utils/schemas/book.schema.json",
           filePath: "Books/dune.md",
           status: .ok,
           errors: []
         ),
-        SchemaValidationResult(
+        RuleValidationResult(
           ruleName: "authors",
           schemaPath: ".md-utils/schemas/author.schema.json",
           filePath: "Authors/herbert.md",
@@ -103,7 +103,7 @@ struct SchemaCommandsTests {
       totalMarkdownFiles: 2
     )
 
-    let output = SchemaValidationSummaryFormatter.render(summary)
+    let output = RuleValidationSummaryFormatter.render(summary)
 
     #expect(output.contains("Rules validated: authors, books."))
     #expect(!output.contains("  OK Books/dune.md"))
@@ -111,10 +111,10 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema validate output includes ok results with include ok flag`() throws {
+  func `rules validate output includes ok results with include ok flag`() throws {
     let summary = schemaValidationSummary()
 
-    let output = SchemaValidationSummaryFormatter.render(summary, includeOk: true)
+    let output = RuleValidationSummaryFormatter.render(summary, includeOk: true)
 
     #expect(output.contains("  ERROR Books/broken.md"))
     #expect(output.contains("  OK Books/dune.md"))
@@ -122,15 +122,15 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema init creates config schema and rule`() async throws {
+  func `rules init creates config schema and rule`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
 
     try await withCurrentDirectory(project) {
       let parsed = try CLIEntry.parseAsRoot([
-        "schema", "init", "books", "--path", "Books/**/*.md", "--tag", "Book",
+        "rules", "init", "books", "--path", "Books/**/*.md", "--tag", "Book",
       ])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.Init)
+      var command = try #require(parsed as? CLIEntry.RulesCommands.Init)
       try await command.run()
 
       #expect((project + ".md-utils/md-utils.json").exists)
@@ -138,16 +138,17 @@ struct SchemaCommandsTests {
       #expect((project + ".md-utils/schemas/books.schema.json").exists)
 
       let config = try MdUtilsConfig.load()
-      #expect(config.configVersion == "0.1.0")
-      #expect(config.schemaReference == "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json")
+      #expect(config.configVersion == "0.2.0")
+      #expect(config.schemaReference == "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json")
       #expect(config.schemaRules.count == 1)
       #expect(config.schemaRules.first?.name == "books")
       #expect(config.schemaRules.first?.match.paths == ["Books/**/*.md"])
 
       let configData = try Data(contentsOf: URL(fileURLWithPath: (project + ".md-utils/md-utils.json").string))
       let configObject = try #require(JSONSerialization.jsonObject(with: configData) as? [String: Any])
-      #expect(configObject["configVersion"] as? String == "0.1.0")
-      #expect(configObject["$schema"] as? String == "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json")
+      #expect(configObject["configVersion"] as? String == "0.2.0")
+      #expect(configObject["$schema"] as? String == "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json")
+      #expect(configObject["rules"] != nil)
     }
   }
 
@@ -245,49 +246,49 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema list runs with configured rules`() async throws {
+  func `rules list runs with configured rules`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
 
     try await withCurrentDirectory(project) {
-      let parsed = try CLIEntry.parseAsRoot(["schema", "list"])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.List)
+      let parsed = try CLIEntry.parseAsRoot(["rules", "list"])
+      var command = try #require(parsed as? CLIEntry.RulesCommands.List)
 
       try await command.run()
     }
   }
 
   @Test
-  func `schema describe loads configured rule and schema`() throws {
+  func `rules describe loads configured rule and schema`() throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
 
     try withCurrentDirectory(project) {
-      let description = try SchemaDescriptionBuilder.describe(ruleName: "books")
+      let description = try RuleDescriptionBuilder.describe(ruleName: "books")
 
       #expect(description.rule.name == "books")
-      #expect(description.schemaPath.string == ".md-utils/schemas/book.schema.json")
+      #expect(description.schemaPath?.string == ".md-utils/schemas/book.schema.json")
       #expect(description.jsonSchema["type"] as? String == "object")
     }
   }
 
   @Test
-  func `schema describe fails for missing rule`() throws {
+  func `rules describe fails for missing rule`() throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
 
     let _: Void = try withCurrentDirectory(project) {
       #expect(throws: Error.self) {
-        try SchemaDescriptionBuilder.describe(ruleName: "missing")
+        try RuleDescriptionBuilder.describe(ruleName: "missing")
       }
     }
   }
 
   @Test
-  func `schema describe fails for missing schema file`() throws {
+  func `rules describe fails for missing schema file`() throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -298,19 +299,19 @@ struct SchemaCommandsTests {
 
     let _: Void = try withCurrentDirectory(project) {
       #expect(throws: Error.self) {
-        try SchemaDescriptionBuilder.describe(ruleName: "books")
+        try RuleDescriptionBuilder.describe(ruleName: "books")
       }
     }
   }
 
   @Test
-  func `schema describe human output summarizes rule and all fields`() throws {
-    let description = SchemaDescription(
-      rule: SchemaRule(
+  func `rules describe human output summarizes rule and all fields`() throws {
+    let description = RuleDescription(
+      rule: Rule(
         name: "people-in-the-bible",
         schema: "people.schema.json",
         frontmatterRequired: true,
-        match: SchemaRuleMatch(
+        match: RuleMatch(
           paths: ["People/**/*.md"],
           excludePaths: ["People/Drafts/**/*.md"],
           frontmatter: ["tags": FrontmatterMatcher(includes: "Person")]
@@ -320,11 +321,11 @@ struct SchemaCommandsTests {
       jsonSchema: peopleSchemaObject()
     )
 
-    let output = SchemaDescriptionFormatter.render(description)
+    let output = RuleDescriptionFormatter.render(description)
 
-    #expect(output.contains("Schema Rule Name:"))
+    #expect(output.contains("Rule Name:"))
     #expect(output.contains("people-in-the-bible"))
-    #expect(output.contains("Schema Rule"))
+    #expect(output.contains("Rule"))
     #expect(output.contains("Applies to Markdown files matching People/**/*.md."))
     #expect(output.contains("Excludes People/Drafts/**/*.md."))
     #expect(output.contains("Runs only when tags includes \"Person\"."))
@@ -340,18 +341,18 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema describe json output includes rule and embedded schema`() throws {
-    let description = SchemaDescription(
-      rule: SchemaRule(
+  func `rules describe json output includes rule and embedded schema`() throws {
+    let description = RuleDescription(
+      rule: Rule(
         name: "people-in-the-bible",
         schema: "people.schema.json",
-        match: SchemaRuleMatch(paths: ["People/**/*.md"])
+        match: RuleMatch(paths: ["People/**/*.md"])
       ),
       schemaPath: ".md-utils/schemas/people.schema.json",
       jsonSchema: peopleSchemaObject()
     )
 
-    let object = SchemaDescriptionJSONRenderer.render(description)
+    let object = RuleDescriptionJSONRenderer.render(description)
     let rule = try #require(object["rule"] as? [String: Any])
     let match = try #require(rule["match"] as? [String: Any])
     let jsonSchema = try #require(object["jsonSchema"] as? [String: Any])
@@ -364,22 +365,22 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema describe markdown output renders sections and fields`() throws {
-    let description = SchemaDescription(
-      rule: SchemaRule(
+  func `rules describe markdown output renders sections and fields`() throws {
+    let description = RuleDescription(
+      rule: Rule(
         name: "people-in-the-bible",
         schema: "people.schema.json",
         frontmatterRequired: true,
-        match: SchemaRuleMatch(paths: ["People/**/*.md"])
+        match: RuleMatch(paths: ["People/**/*.md"])
       ),
       schemaPath: ".md-utils/schemas/people.schema.json",
       jsonSchema: peopleSchemaObject()
     )
 
-    let output = SchemaDescriptionMarkdownFormatter.render(description)
+    let output = RuleDescriptionMarkdownFormatter.render(description)
 
-    #expect(output.contains("# Schema Rule Name: people-in-the-bible"))
-    #expect(output.contains("## Schema Rule"))
+    #expect(output.contains("# Rule Name: people-in-the-bible"))
+    #expect(output.contains("## Rule"))
     #expect(output.contains("- Applies to Markdown files matching People/**/*.md."))
     #expect(output.contains("## Schema Definition"))
     #expect(output.contains("### name-meaning"))
@@ -389,16 +390,16 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema add adds rule to existing config`() async throws {
+  func `rules add adds rule to existing config`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project, rules: [], schemas: [:])
 
     try await withCurrentDirectory(project) {
       let parsed = try CLIEntry.parseAsRoot([
-        "schema", "add", "books", "--path", "Books/**/*.md", "--tag", "Book",
+        "rules", "add", "books", "--path", "Books/**/*.md", "--tag", "Book",
       ])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.Add)
+      var command = try #require(parsed as? CLIEntry.RulesCommands.Add)
       try await command.run()
 
       let config = try MdUtilsConfig.load()
@@ -409,13 +410,13 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema add requires existing config`() async throws {
+  func `rules add requires existing config`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
 
     try await withCurrentDirectory(project) {
-      let parsed = try CLIEntry.parseAsRoot(["schema", "add", "books"])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.Add)
+      let parsed = try CLIEntry.parseAsRoot(["rules", "add", "books"])
+      var command = try #require(parsed as? CLIEntry.RulesCommands.Add)
 
       await #expect(throws: Error.self) {
         try await command.run()
@@ -424,14 +425,14 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema add fails on duplicate rule`() async throws {
+  func `rules add fails on duplicate rule`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
 
     try await withCurrentDirectory(project) {
-      let parsed = try CLIEntry.parseAsRoot(["schema", "add", "books"])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.Add)
+      let parsed = try CLIEntry.parseAsRoot(["rules", "add", "books"])
+      var command = try #require(parsed as? CLIEntry.RulesCommands.Add)
 
       await #expect(throws: Error.self) {
         try await command.run()
@@ -440,14 +441,14 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema remove removes rule and preserves schema by default`() async throws {
+  func `rules remove removes rule and preserves schema by default`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
 
     try await withCurrentDirectory(project) {
-      let parsed = try CLIEntry.parseAsRoot(["schema", "remove", "books"])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.Remove)
+      let parsed = try CLIEntry.parseAsRoot(["rules", "remove", "books"])
+      var command = try #require(parsed as? CLIEntry.RulesCommands.Remove)
       try await command.run()
 
       let config = try MdUtilsConfig.load()
@@ -457,14 +458,14 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema remove fails for missing rule`() async throws {
+  func `rules remove fails for missing rule`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
 
     try await withCurrentDirectory(project) {
-      let parsed = try CLIEntry.parseAsRoot(["schema", "remove", "missing"])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.Remove)
+      let parsed = try CLIEntry.parseAsRoot(["rules", "remove", "missing"])
+      var command = try #require(parsed as? CLIEntry.RulesCommands.Remove)
 
       await #expect(throws: Error.self) {
         try await command.run()
@@ -473,14 +474,14 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema remove delete schema deletes unshared schema file`() async throws {
+  func `rules remove delete schema deletes unshared schema file`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
 
     try await withCurrentDirectory(project) {
-      let parsed = try CLIEntry.parseAsRoot(["schema", "remove", "books", "--delete-schema"])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.Remove)
+      let parsed = try CLIEntry.parseAsRoot(["rules", "remove", "books", "--delete-schema"])
+      var command = try #require(parsed as? CLIEntry.RulesCommands.Remove)
       try await command.run()
 
       let config = try MdUtilsConfig.load()
@@ -490,7 +491,7 @@ struct SchemaCommandsTests {
   }
 
   @Test
-  func `schema remove delete schema preserves shared schema file`() async throws {
+  func `rules remove delete schema preserves shared schema file`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -502,8 +503,8 @@ struct SchemaCommandsTests {
     )
 
     try await withCurrentDirectory(project) {
-      let parsed = try CLIEntry.parseAsRoot(["schema", "remove", "books", "--delete-schema"])
-      var command = try #require(parsed as? CLIEntry.SchemaCommands.Remove)
+      let parsed = try CLIEntry.parseAsRoot(["rules", "remove", "books", "--delete-schema"])
+      var command = try #require(parsed as? CLIEntry.RulesCommands.Remove)
       try await command.run()
 
       let config = try MdUtilsConfig.load()
@@ -523,7 +524,7 @@ struct SchemaCommandsTests {
     try writeFile(project + "Other/book.md", content: bookMarkdown(title: "Other", tags: ["Book"]))
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(summary.fileRuleMatches == 1)
       #expect(summary.results.first?.filePath == "Books/dune.md")
@@ -550,7 +551,7 @@ struct SchemaCommandsTests {
     try writeFile(project + "INTEGRATIONS/Child/Grandchild/deep.md", content: bookMarkdown(title: "Deep", tags: ["Integration"]))
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate(ruleName: "integrations")
+      let summary = try RulesValidatorRunner.validate(ruleName: "integrations")
       let files = Set(summary.results.map(\.filePath))
 
       #expect(files == [
@@ -580,7 +581,7 @@ struct SchemaCommandsTests {
     try writeFile(project + "INTEGRATIONS/github.md", content: bookMarkdown(title: "GitHub", tags: ["Integration"]))
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate(ruleName: "integrations")
+      let summary = try RulesValidatorRunner.validate(ruleName: "integrations")
 
       #expect(summary.fileRuleMatches == 1)
       #expect(summary.results.first?.filePath == "INTEGRATIONS/github.md")
@@ -615,7 +616,7 @@ struct SchemaCommandsTests {
     )
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(summary.matchedFiles == 1)
       #expect(summary.fileRuleMatches == 2)
@@ -631,7 +632,7 @@ struct SchemaCommandsTests {
     try writeFile(project + "Notes/plain.md", content: "# Plain\n")
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(summary.results.isEmpty)
       #expect(!summary.hasFailures)
@@ -649,7 +650,7 @@ struct SchemaCommandsTests {
     try writeFile(project + "Books/plain.md", content: "# Plain\n")
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(summary.hasFailures)
       #expect(summary.results.first?.status == .error)
@@ -673,7 +674,7 @@ struct SchemaCommandsTests {
     try writeFile(project + "Books/plain.md", content: "# Plain\n")
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(!summary.hasFailures)
       #expect(summary.results.first?.status == .skipped)
@@ -697,7 +698,7 @@ struct SchemaCommandsTests {
     )
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(summary.hasFailures)
       #expect(summary.results.first?.errors.first?.path == "frontmatter")
@@ -713,7 +714,7 @@ struct SchemaCommandsTests {
     try writeFile(project + "Books/dune.md", content: bookMarkdown(tags: ["Book"]))
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(summary.hasFailures)
       #expect(summary.results.first?.status == .error)
@@ -769,7 +770,7 @@ struct SchemaCommandsTests {
     )
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(!summary.hasFailures)
       #expect(summary.results.first?.status == .ok)
@@ -795,10 +796,127 @@ struct SchemaCommandsTests {
     )
 
     try withCurrentDirectory(project) {
-      let summary = try SchemaValidatorRunner.validate()
+      let summary = try RulesValidatorRunner.validate()
 
       #expect(!summary.hasFailures)
       #expect(summary.results.first?.status == .ok)
+    }
+  }
+
+  @Test
+  func `v2 boolean equals matcher selects matching files`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [ruleV2JSON(
+      name: "published",
+      paths: ["Posts/**/*.md"],
+      frontmatter: "\"publish\": { \"equals\": true }",
+      checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+    )])
+    try writeFile(project + "Posts/live.md", content: "---\npublish: true\n---\n# Live\n")
+    try writeFile(project + "Posts/draft.md", content: "---\npublish: false\n---\n# Draft\n")
+
+    try withCurrentDirectory(project) {
+      let summary = try RulesValidatorRunner.validate(ruleName: "published")
+
+      #expect(summary.fileRuleMatches == 1)
+      #expect(summary.results.first?.filePath == "Posts/live.md")
+      #expect(!summary.hasFailures)
+    }
+  }
+
+  @Test
+  func `v2 not includes matcher excludes arrays containing value`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [ruleV2JSON(
+      name: "current",
+      paths: ["Notes/**/*.md"],
+      frontmatter: "\"tags\": { \"notIncludes\": \"DEPRECATED\" }",
+      checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+    )])
+    try writeFile(project + "Notes/current.md", content: "---\ntags: [Current]\n---\n# Current\n")
+    try writeFile(project + "Notes/old.md", content: "---\ntags: [DEPRECATED]\n---\n# Old\n")
+
+    try withCurrentDirectory(project) {
+      let summary = try RulesValidatorRunner.validate(ruleName: "current")
+
+      #expect(summary.fileRuleMatches == 1)
+      #expect(summary.results.first?.filePath == "Notes/current.md")
+    }
+  }
+
+  @Test
+  func `v2 after and between date matchers select dates`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [
+      ruleV2JSON(
+        name: "after-2000",
+        paths: ["Dates/**/*.md"],
+        frontmatter: "\"date\": { \"after\": \"2000-01-01\" }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+      ruleV2JSON(
+        name: "range",
+        paths: ["Dates/**/*.md"],
+        frontmatter: "\"date\": { \"between\": { \"from\": \"2000-01-01\", \"to\": \"2015-04-01\" } }",
+        checks: ["{ \"type\": \"maxBodyWords\", \"max\": 10 }"]
+      ),
+    ])
+    try writeFile(project + "Dates/old.md", content: "---\ndate: 1999-12-31\n---\n# Old\n")
+    try writeFile(project + "Dates/mid.md", content: "---\ndate: 2010-06-01\n---\n# Mid\n")
+    try writeFile(project + "Dates/new.md", content: "---\ndate: 2020-01-01\n---\n# New\n")
+
+    try withCurrentDirectory(project) {
+      let after = try RulesValidatorRunner.validate(ruleName: "after-2000")
+      let range = try RulesValidatorRunner.validate(ruleName: "range")
+
+      #expect(Set(after.results.map(\.filePath)) == ["Dates/mid.md", "Dates/new.md"])
+      #expect(Set(range.results.map(\.filePath)) == ["Dates/mid.md"])
+    }
+  }
+
+  @Test
+  func `v2 missing frontmatter key does not match predicate`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [ruleV2JSON(
+      name: "published",
+      paths: ["Posts/**/*.md"],
+      frontmatter: "\"publish\": { \"equals\": true }",
+      checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+    )])
+    try writeFile(project + "Posts/missing.md", content: "---\ntitle: Missing\n---\n# Missing\n")
+
+    try withCurrentDirectory(project) {
+      let summary = try RulesValidatorRunner.validate(ruleName: "published")
+
+      #expect(summary.results.isEmpty)
+    }
+  }
+
+  @Test
+  func `v2 document checks report required heading and body limits`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [ruleV2JSON(
+      name: "body",
+      paths: ["Docs/**/*.md"],
+      checks: [
+        "{ \"type\": \"requiredHeading\", \"heading\": \"Footnotes\" }",
+        "{ \"type\": \"maxBodyLines\", \"max\": 2 }",
+        "{ \"type\": \"maxBodyWords\", \"max\": 4 }",
+      ]
+    )])
+    try writeFile(project + "Docs/bad.md", content: "# Title\n\nOne two three four five\n")
+
+    try withCurrentDirectory(project) {
+      let summary = try RulesValidatorRunner.validate(ruleName: "body")
+      let paths = Set(summary.results.flatMap { $0.errors.map(\.path) })
+
+      #expect(summary.hasFailures)
+      #expect(paths == ["heading", "body.lines", "body.words"])
     }
   }
 
@@ -861,34 +979,59 @@ struct SchemaCommandsTests {
     }
   }
 
+  private func writeRulesProject(
+    _ project: Path,
+    rules: [String],
+    schemas: [String: String] = [:]
+  ) throws {
+    let mdUtils = project + ".md-utils"
+    let schemaDir = mdUtils + "schemas"
+    try schemaDir.mkpath()
+
+    try (mdUtils + "md-utils.json").write("""
+      {
+        "$schema": "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json",
+        "configVersion": "0.2.0",
+        "schemaDirectory": ".md-utils/schemas/",
+        "rules": [
+          \(rules.joined(separator: ",\n"))
+        ]
+      }
+      """)
+
+    for (filename, content) in schemas {
+      try (schemaDir + filename).write(content)
+    }
+  }
+
   private func writeFile(_ path: Path, content: String) throws {
     try path.parent().mkpath()
     try path.write(content)
   }
 
-  private func schemaValidationSummary() -> SchemaValidationSummary {
-    SchemaValidationSummary(
+  private func schemaValidationSummary() -> RuleValidationSummary {
+    RuleValidationSummary(
       results: [
-        SchemaValidationResult(
+        RuleValidationResult(
           ruleName: "books",
           schemaPath: ".md-utils/schemas/book.schema.json",
           filePath: "Books/dune.md",
           status: .ok,
           errors: []
         ),
-        SchemaValidationResult(
+        RuleValidationResult(
           ruleName: "books",
           schemaPath: ".md-utils/schemas/book.schema.json",
           filePath: "Books/plain.md",
           status: .skipped,
-          errors: [SchemaValidationErrorDetail(path: "frontmatter", message: "not present")]
+          errors: [RuleValidationErrorDetail(path: "frontmatter", message: "not present")]
         ),
-        SchemaValidationResult(
+        RuleValidationResult(
           ruleName: "books",
           schemaPath: ".md-utils/schemas/book.schema.json",
           filePath: "Books/broken.md",
           status: .error,
-          errors: [SchemaValidationErrorDetail(path: "/title", message: "is required")]
+          errors: [RuleValidationErrorDetail(path: "/title", message: "is required")]
         ),
       ],
       totalMarkdownFiles: 3
@@ -912,6 +1055,27 @@ struct SchemaCommandsTests {
         "match": {
           "paths": [\(quotedPaths)]\(frontmatterBlock)
         }
+      }
+      """
+  }
+
+  private func ruleV2JSON(
+    name: String,
+    paths: [String],
+    frontmatter: String? = nil,
+    checks: [String]
+  ) -> String {
+    let quotedPaths = paths.map { "\"\($0)\"" }.joined(separator: ", ")
+    let frontmatterBlock = frontmatter.map { ",\n        \"frontmatter\": { \($0) }" } ?? ""
+    return """
+      {
+        "name": "\(name)",
+        "match": {
+          "paths": [\(quotedPaths)]\(frontmatterBlock)
+        },
+        "checks": [
+          \(checks.joined(separator: ",\n"))
+        ]
       }
       """
   }

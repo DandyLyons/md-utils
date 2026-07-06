@@ -33,7 +33,7 @@ public struct CLIEntry: AsyncParsableCommand {
       LinkCommands.self,
       Lines.self,
       OKFCommands.self,
-      SchemaCommands.self,
+      RulesCommands.self,
       SectionCommands.self,
     ],
     helpNames: [.long, .short]

@@ -241,33 +241,33 @@ The package also bundles `OKF-concept.schema.json` for OKF v0.1 draft concept fr
 
 ## Project Configuration
 
-Project-level md-utils settings live in `.md-utils/md-utils.json`. The schema command group creates and uses this folder to validate Markdown YAML frontmatter against JSON Schema files. Schemas only apply to frontmatter, not Markdown body content.
+Project-level md-utils settings live in `.md-utils/md-utils.json`. The rules command group creates and uses this folder to validate Markdown files. JSON Schema validation is one supported rule check, alongside document checks such as required headings and body length limits.
 
 The md-utils CLI version and md-utils config schema version are independent. `md-utils --version` reports the installed CLI version. The `configVersion` field in `.md-utils/md-utils.json` selects the config schema version used for parsing, validation, and behavior. Existing unversioned configs are treated as legacy config schema `0.1.0`.
 
 Check the config schema versions supported by the installed CLI with:
 
 ```bash
-md-utils config schema-versions
-md-utils config schema-versions --format json
+md-utils config info
+md-utils config info --format json
 ```
 
 Compatibility:
 
 | CLI version | Supported config schema versions | Default generated config schema version |
 | --- | --- | --- |
-| 0.1.0-alpha | 0.1.0 | 0.1.0 |
+| 0.1.0-alpha | 0.1.0, 0.2.0 | 0.2.0 |
 
-The config schema is published at `https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json` for editor integration and IDE IntelliSense. The moving `https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json` alias points to the latest published schema, and `https://dandylyons.github.io/md-utils/md-utils.schema.json` is maintained as a root compatibility alias. Runtime config validation does not fetch these URLs; the CLI validates configs against bundled schemas selected by `configVersion`.
+The config schema is published at `https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json` for editor integration and IDE IntelliSense. The moving `https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json` alias points to the latest published schema, and `https://dandylyons.github.io/md-utils/md-utils.schema.json` is maintained as a root compatibility alias. Runtime config validation does not fetch these URLs; the CLI validates configs against bundled schemas selected by `configVersion`.
 
-Treat the directory containing `.md-utils/` as the md-utils project root. Commands that use project configuration read `.md-utils/md-utils.json` relative to the current working directory; md-utils does not search parent directories for project configuration. Run schema/config commands from the directory that contains `.md-utils/`:
+Treat the directory containing `.md-utils/` as the md-utils project root. Commands that use project configuration read `.md-utils/md-utils.json` relative to the current working directory; md-utils does not search parent directories for project configuration. Run rules/config commands from the directory that contains `.md-utils/`:
 
 ```bash
 cd /path/to/project/
-md-utils schema validate
+md-utils rules validate
 ```
 
-Paths in `schemaRules[].match.paths` and the default `schemaDirectory` are interpreted relative to that same working directory. If you run md-utils from a subdirectory, it will look for `.md-utils/md-utils.json` in that subdirectory.
+Paths in `rules[].match.paths` and the default `schemaDirectory` are interpreted relative to that same working directory. If you run md-utils from a subdirectory, it will look for `.md-utils/md-utils.json` in that subdirectory. Existing `0.1.0` configs using `schemaRules` still load as legacy configs.
 
 Default layout:
 
@@ -283,20 +283,38 @@ Example config:
 
 ```json
 {
-  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json",
-  "configVersion": "0.1.0",
+  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json",
+  "configVersion": "0.2.0",
   "schemaDirectory": ".md-utils/schemas/",
-  "schemaRules": [
+  "rules": [
     {
       "name": "books",
-      "schema": "book.schema.json",
-      "frontmatterRequired": true,
       "match": {
         "paths": ["Books/**/*.md"],
         "frontmatter": {
-          "tags": { "includes": "Book" }
+          "tags": { "includes": "Book" },
+          "publish": { "equals": true }
         }
-      }
+      },
+      "checks": [
+        {
+          "type": "frontmatterSchema",
+          "schema": "book.schema.json",
+          "frontmatterRequired": true
+        },
+        {
+          "type": "requiredHeading",
+          "heading": "Footnotes"
+        },
+        {
+          "type": "maxBodyLines",
+          "max": 250
+        },
+        {
+          "type": "maxBodyWords",
+          "max": 2000
+        }
+      ]
     }
   ]
 }
@@ -307,31 +325,33 @@ Config fields:
 - `$schema`: Optional editor hint for autocomplete, validation, and IDE IntelliSense. Runtime behavior is not driven by this URL.
 - `configVersion`: md-utils config schema version. This is independent from the md-utils CLI version.
 - `schemaDirectory`: Directory for JSON Schema files. Defaults to `.md-utils/schemas/`.
-- `schemaRules`: Rules that map schemas to Markdown files.
-- `schemaRules[].name`: Unique rule name for `md-utils schema validate <rule-name>`.
-- `schemaRules[].schema`: Schema file, resolved relative to `schemaDirectory`.
-- `schemaRules[].frontmatterRequired`: If `true`, matched files without frontmatter fail; if `false`, they are skipped.
-- `schemaRules[].match.paths`: Glob patterns matched against project-relative Markdown paths.
-- `schemaRules[].match.frontmatter`: Frontmatter matchers. Initially supports `{ "includes": value }` for array values.
+- `rules`: Rules that map Markdown files to one or more checks.
+- `rules[].name`: Unique rule name for `md-utils rules validate <rule-name>`.
+- `rules[].match.paths`: Glob patterns matched against project-relative Markdown paths.
+- `rules[].match.excludePaths`: Glob patterns excluded after paths match.
+- `rules[].match.frontmatter`: Frontmatter predicates. Supported operators are `includes`, `notIncludes`, `equals`, `after`, and inclusive `between` with `YYYY-MM-DD` date strings.
+- `rules[].checks`: Checks to run after a file matches. Supported checks are `frontmatterSchema`, `requiredHeading`, `maxBodyLines`, and `maxBodyWords`.
+- `rules[].checks[].schema`: For `frontmatterSchema`, schema file resolved relative to `schemaDirectory`.
+- `rules[].checks[].frontmatterRequired`: For `frontmatterSchema`, if `true`, matched files without frontmatter fail; if `false`, frontmatter schema validation is skipped.
 
-Schema commands:
+Rules commands:
 
 ```bash
-md-utils schema init books --path "Books/**/*.md" --tag Book
-md-utils schema add published --path "Books/**/*.md" --no-frontmatter-required
-md-utils schema list
-md-utils schema describe books
-md-utils schema describe books --format markdown
-md-utils schema describe books --format json
-md-utils schema validate
-md-utils schema validate books
-md-utils schema remove books
-md-utils schema remove books --delete-schema
+md-utils rules init books --path "Books/**/*.md" --tag Book
+md-utils rules add published --path "Books/**/*.md" --no-frontmatter-required
+md-utils rules list
+md-utils rules describe books
+md-utils rules describe books --format markdown
+md-utils rules describe books --format json
+md-utils rules validate
+md-utils rules validate books
+md-utils rules remove books
+md-utils rules remove books --delete-schema
 ```
 
-`schema init` bootstraps `.md-utils/` and adds an initial rule. `schema add` adds another rule to existing config. `schema describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `schema remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
+`rules init` bootstraps `.md-utils/` and adds an initial frontmatter schema rule. `rules add` adds another frontmatter schema rule to existing config. `rules describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema when the rule has one; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `rules remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
 
-If a file matches multiple rules, all matching schemas apply. Files matching no rules are ignored. Invalid YAML frontmatter is always reported as an error because schema validation cannot proceed.
+If a file matches multiple rules, all matching checks apply. Files matching no rules are ignored. Invalid YAML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed.
 
 ## GitHub Pages
 
@@ -347,9 +367,12 @@ site/
     0.1.0/
       md-utils.schema.json
       md-utils-0.1.0.schema.json
+    0.2.0/
+      md-utils.schema.json
+      md-utils-0.2.0.schema.json
 ```
 
-The bundled CLI schema in `Sources/md-utils/Resources/0.1.0_md-utils.schema.json` remains canonical for CLI behavior for config schema `0.1.0`. Public schema copies must match it exactly, so run `python3 scripts/validate-schema-publication.py` before publishing schema changes.
+The bundled CLI schema in `Sources/md-utils/Resources/0.2.0_md-utils.schema.json` remains canonical for CLI behavior for config schema `0.2.0`. Public schema copies must match it exactly, so run `python3 scripts/validate-schema-publication.py` before publishing schema changes.
 
 When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json` to both `md-utils.schema.json` at the site root and `schemas/latest/md-utils.schema.json`. Versioned schema URLs are immutable after release. For future schema releases, add a new versioned folder under `site/schemas/`, update `CURRENT_MD_UTILS_JSONSCHEMA_VERSION` in `.github/workflows/pages.yml`, and keep the canonical bundled schema synchronized with the new published copy. Do not edit already-published versioned schema files; publish a new version instead.
 

@@ -1,22 +1,22 @@
 //
-//  Init.swift
+//  RulesInit.swift
 //  md-utils
 //
 
 import ArgumentParser
 import Foundation
 import PathKit
-/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+/// Adds Markdown document behavior to ``CLIEntry.RulesCommands``.
 ///
-/// See <doc:SchemaValidationCommands> for workflow details.
-extension CLIEntry.SchemaCommands {
-  /// Defines the `SchemaInit` command behavior.
+/// See <doc:RulesValidationCommands> for workflow details.
+extension CLIEntry.RulesCommands {
+  /// Defines the `rules init` command behavior.
   ///
-  /// See <doc:SchemaValidationCommands> for workflow details.
+  /// See <doc:RulesValidationCommands> for workflow details.
   struct Init: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "init",
-      abstract: "Create project schema configuration and a schema rule"
+      abstract: "Create project rules configuration and a frontmatter schema check"
     )
 
     @Argument(help: "Rule name to create")
@@ -39,11 +39,11 @@ extension CLIEntry.SchemaCommands {
     var frontmatterRequired: Bool = true
     /// Runs the command using the parsed command-line arguments.
     ///
-    /// See <doc:SchemaValidationCommands> for workflow details.
+    /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      try SchemaConfigBootstrapper.ensureProjectFiles()
+      try RulesConfigBootstrapper.ensureProjectFiles()
 
-      let schemaFile = try SchemaRuleManager.addRule(SchemaRuleOptions(
+      let schemaFile = try RuleManager.addRule(RuleOptions(
         name: name,
         schema: schema,
         path: path,
@@ -51,8 +51,8 @@ extension CLIEntry.SchemaCommands {
         frontmatterRequired: frontmatterRequired,
       ))
 
-      print("\(CLIStyle.success("Created schema rule")) \"\(name)\"")
-      print("\(CLIStyle.metadata("Config:")) \(CLIStyle.path(SchemaPaths.configFile.string))")
+      print("\(CLIStyle.success("Created rule")) \"\(name)\"")
+      print("\(CLIStyle.metadata("Config:")) \(CLIStyle.path(RulesPaths.configFile.string))")
       print("\(CLIStyle.metadata("Schema:")) \(CLIStyle.path(schemaFile.string))")
     }
   }

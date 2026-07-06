@@ -32,7 +32,7 @@ struct CLIEntryTests {
     #expect(config.subcommands[11] is CLIEntry.LinkCommands.Type)
     #expect(config.subcommands[12] is CLIEntry.Lines.Type)
     #expect(config.subcommands[13] is CLIEntry.OKFCommands.Type)
-    #expect(config.subcommands[14] is CLIEntry.SchemaCommands.Type)
+    #expect(config.subcommands[14] is CLIEntry.RulesCommands.Type)
     #expect(config.subcommands[15] is CLIEntry.SectionCommands.Type)
   }
 }

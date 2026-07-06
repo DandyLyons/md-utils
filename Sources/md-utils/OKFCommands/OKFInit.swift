@@ -13,7 +13,7 @@ extension CLIEntry.OKFCommands {
       commandName: "init",
       abstract: "EXPERIMENTAL: Initialize an OKF v0.1 draft bundle",
       discussion: """
-        Creates a minimal OKF bundle scaffold and installs md-utils schema configuration.
+        Creates a minimal OKF bundle scaffold and installs md-utils rules configuration.
         Existing files are preserved. log.md is created only when --with-log is passed.
 
         Example: md-utils okf init ./knowledge/ --with-log

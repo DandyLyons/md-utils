@@ -1,18 +1,18 @@
 //
-//  SchemaCommands.swift
+//  RulesCommands.swift
 //  md-utils
 //
 
 import ArgumentParser
 /// Adds command implementations to ``CLIEntry``.
 ///
-/// See <doc:SchemaValidationCommands> for workflow details.
+/// See <doc:RulesValidationCommands> for workflow details.
 extension CLIEntry {
-  /// Project-level frontmatter schema commands.
-  struct SchemaCommands: AsyncParsableCommand {
+  /// Project-level Markdown rules commands.
+  struct RulesCommands: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      commandName: "schema",
-      abstract: "Validate Markdown frontmatter with JSON Schema",
+      commandName: "rules",
+      abstract: "Validate Markdown files with configured rules",
       subcommands: [
         Init.self,
         Add.self,

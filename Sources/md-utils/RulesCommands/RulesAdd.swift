@@ -1,20 +1,20 @@
 //
-//  SchemaAdd.swift
+//  RulesAdd.swift
 //  md-utils
 //
 
 import ArgumentParser
-/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+/// Adds Markdown document behavior to ``CLIEntry.RulesCommands``.
 ///
-/// See <doc:SchemaValidationCommands> for workflow details.
-extension CLIEntry.SchemaCommands {
-  /// Defines the `SchemaAdd` command behavior.
+/// See <doc:RulesValidationCommands> for workflow details.
+extension CLIEntry.RulesCommands {
+  /// Defines the `rules add` command behavior.
   ///
-  /// See <doc:SchemaValidationCommands> for workflow details.
+  /// See <doc:RulesValidationCommands> for workflow details.
   struct Add: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "add",
-      abstract: "Add a schema rule to existing project configuration"
+      abstract: "Add a rule to existing project configuration"
     )
 
     @Argument(help: "Rule name to create")
@@ -37,9 +37,9 @@ extension CLIEntry.SchemaCommands {
     var frontmatterRequired: Bool = true
     /// Runs the command using the parsed command-line arguments.
     ///
-    /// See <doc:SchemaValidationCommands> for workflow details.
+    /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      let schemaFile = try SchemaRuleManager.addRule(SchemaRuleOptions(
+      let schemaFile = try RuleManager.addRule(RuleOptions(
         name: name,
         schema: schema,
         path: path,
@@ -47,8 +47,8 @@ extension CLIEntry.SchemaCommands {
         frontmatterRequired: frontmatterRequired,
       ))
 
-      print("\(CLIStyle.success("Created schema rule")) \"\(name)\"")
-      print("\(CLIStyle.metadata("Config:")) \(CLIStyle.path(SchemaPaths.configFile.string))")
+      print("\(CLIStyle.success("Created rule")) \"\(name)\"")
+      print("\(CLIStyle.metadata("Config:")) \(CLIStyle.path(RulesPaths.configFile.string))")
       print("\(CLIStyle.metadata("Schema:")) \(CLIStyle.path(schemaFile.string))")
     }
   }

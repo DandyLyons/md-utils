@@ -1,34 +1,34 @@
 //
-//  Validate.swift
+//  RulesValidate.swift
 //  md-utils
 //
 
 import ArgumentParser
-/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+/// Adds Markdown document behavior to ``CLIEntry.RulesCommands``.
 ///
-/// See <doc:SchemaValidationCommands> for workflow details.
-extension CLIEntry.SchemaCommands {
-  /// Defines the `SchemaValidate` command behavior.
+/// See <doc:RulesValidationCommands> for workflow details.
+extension CLIEntry.RulesCommands {
+  /// Defines the `rules validate` command behavior.
   ///
-  /// See <doc:SchemaValidationCommands> for workflow details.
+  /// See <doc:RulesValidationCommands> for workflow details.
   struct Validate: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "validate",
-      abstract: "Validate Markdown frontmatter against configured schema rules"
+      abstract: "Validate Markdown files against configured rules"
     )
 
-    @Argument(help: "Optional schema rule name to validate")
+    @Argument(help: "Optional rule name to validate")
     var ruleName: String?
 
     @Flag(name: .long, help: "Include successful validation results in output")
     var includeOk: Bool = false
     /// Runs the command using the parsed command-line arguments.
     ///
-    /// See <doc:SchemaValidationCommands> for workflow details.
+    /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
-      let summary = try SchemaValidatorRunner.validate(ruleName: ruleName)
-      print(SchemaValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk))
+      let summary = try RulesValidatorRunner.validate(ruleName: ruleName)
+      print(RuleValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk))
       timer.writeStatus("Validated \(summary.matchedFiles) file(s)")
       if summary.hasFailures {
         throw ExitCode.failure
@@ -36,33 +36,33 @@ extension CLIEntry.SchemaCommands {
     }
   }
 }
-/// Defines the `SchemaValidate` command behavior.
+/// Formats `rules validate` command results.
 ///
-/// See <doc:SchemaValidationCommands> for workflow details.
-enum SchemaValidationSummaryFormatter {
+/// See <doc:RulesValidationCommands> for workflow details.
+enum RuleValidationSummaryFormatter {
   /// Renders the value into its output representation.
   ///
-  /// See <doc:SchemaValidationCommands> for workflow details.
+  /// See <doc:RulesValidationCommands> for workflow details.
   static func render(
-    _ summary: SchemaValidationSummary,
+    _ summary: RuleValidationSummary,
     ruleName: String? = nil,
     includeOk: Bool = false
   ) -> String {
     var lines: [String] = []
 
     guard !summary.results.isEmpty else {
-      return "No files matched configured schema rules."
+      return "No files matched configured rules."
     }
 
     if let ruleName {
-      lines.append("Validated \(summary.fileRuleMatches) file(s) against schema rule \"\(ruleName)\".")
+      lines.append("Validated \(summary.fileRuleMatches) file(s) against rule \"\(ruleName)\".")
     } else if summary.matchedFiles == summary.fileRuleMatches {
       lines.append(
-        "Validated \(summary.matchedFiles) file(s) against \(Set(summary.results.map(\.ruleName)).count) schema rule(s)."
+        "Validated \(summary.matchedFiles) file(s) against \(Set(summary.results.map(\.ruleName)).count) rule(s)."
       )
     } else {
       lines.append(
-        "Validated \(summary.fileRuleMatches) file-rule match(es) across \(summary.matchedFiles) file(s) and \(Set(summary.results.map(\.ruleName)).count) schema rule(s)."
+        "Validated \(summary.fileRuleMatches) file-rule match(es) across \(summary.matchedFiles) file(s) and \(Set(summary.results.map(\.ruleName)).count) rule(s)."
       )
     }
     lines.append("Rules validated: \(Set(summary.results.map(\.ruleName)).sorted().joined(separator: ", ")).")
@@ -90,8 +90,8 @@ enum SchemaValidationSummaryFormatter {
   }
   /// Appends one validation result to the rendered summary lines.
   ///
-  /// See <doc:SchemaValidationCommands> for workflow details.
-  private static func append(_ result: SchemaValidationResult, to lines: inout [String]) {
+  /// See <doc:RulesValidationCommands> for workflow details.
+  private static func append(_ result: RuleValidationResult, to lines: inout [String]) {
     switch result.status {
     case .ok:
       lines.append("  OK \(result.filePath)")

@@ -62,6 +62,7 @@ let package = Package(
       resources: [
         .process("Resources/SKILL.md"),
         .process("Resources/0.1.0_md-utils.schema.json"),
+        .process("Resources/0.2.0_md-utils.schema.json"),
         .process("Resources/OKF-concept.schema.json"),
       ]
     ),

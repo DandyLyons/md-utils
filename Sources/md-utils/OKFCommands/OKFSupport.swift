@@ -469,11 +469,11 @@ enum OKFInitializer {
       existing.append(".md-utils/md-utils.json")
     } else {
       let config = MdUtilsConfig(schemaRules: [
-        SchemaRule(
+        Rule(
           name: "okf-concepts",
           schema: "OKF-concept.schema.json",
           frontmatterRequired: true,
-          match: SchemaRuleMatch(
+          match: RuleMatch(
             paths: ["**/*.md"],
             excludePaths: ["index.md", "log.md", "**/index.md", "**/log.md"]
           )

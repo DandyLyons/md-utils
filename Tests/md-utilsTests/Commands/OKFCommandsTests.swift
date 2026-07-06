@@ -324,7 +324,7 @@ struct OKFCommandsTests {
     _ = try OKFInitializer.initialize(options: OKFInitOptions(bundlePath: project, withLog: true))
     try writeFile(project + "books/dune.md", content: concept(type: "Book"))
 
-    let summary = try SchemaValidatorRunner.validate(
+    let summary = try RulesValidatorRunner.validate(
       ruleName: "okf-concepts",
       root: project,
       configPath: project + ".md-utils/md-utils.json"

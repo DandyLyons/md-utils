@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json",
+  "title": "md-utils rules configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for editor autocomplete. Runtime behavior is driven by configVersion, not this URL."
+    },
+    "configVersion": {
+      "enum": ["0.2.0"],
+      "description": "md-utils config schema version. This is independent from the md-utils CLI version."
+    },
+    "schemaDirectory": {
+      "type": "string",
+      "default": ".md-utils/schemas/",
+      "description": "Directory where JSON Schema files are stored. Relative paths are resolved from the project root."
+    },
+    "rules": {
+      "type": "array",
+      "description": "Rules that decide which checks apply to which Markdown files.",
+      "items": {
+        "$ref": "#/$defs/rule"
+      },
+      "default": []
+    }
+  },
+  "required": ["configVersion", "schemaDirectory", "rules"],
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique rule name used by md-utils rules validate <rule-name>."
+        },
+        "match": {
+          "$ref": "#/$defs/ruleMatch"
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ruleCheck"
+          }
+        }
+      },
+      "required": ["name", "match", "checks"]
+    },
+    "ruleMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Glob patterns matched against project-relative Markdown file paths."
+        },
+        "excludePaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Glob patterns excluded after paths match."
+        },
+        "frontmatter": {
+          "type": "object",
+          "description": "Frontmatter field matchers. Each key is a frontmatter key.",
+          "additionalProperties": {
+            "$ref": "#/$defs/frontmatterMatcher"
+          }
+        }
+      },
+      "anyOf": [
+        { "required": ["paths"] },
+        { "required": ["frontmatter"] }
+      ]
+    },
+    "frontmatterMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "includes": {
+          "description": "Matches when the frontmatter value is an array containing this JSON value."
+        },
+        "notIncludes": {
+          "description": "Matches when the frontmatter value is an array that does not contain this JSON value."
+        },
+        "equals": {
+          "description": "Matches when the frontmatter value equals this JSON value."
+        },
+        "after": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Matches date-like strings after this YYYY-MM-DD date."
+        },
+        "between": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+            "to": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+          },
+          "required": ["from", "to"],
+          "description": "Matches date-like strings inclusively between from and to."
+        }
+      },
+      "anyOf": [
+        { "required": ["includes"] },
+        { "required": ["notIncludes"] },
+        { "required": ["equals"] },
+        { "required": ["after"] },
+        { "required": ["between"] }
+      ]
+    },
+    "ruleCheck": {
+      "oneOf": [
+        { "$ref": "#/$defs/frontmatterSchemaCheck" },
+        { "$ref": "#/$defs/requiredHeadingCheck" },
+        { "$ref": "#/$defs/maxBodyLinesCheck" },
+        { "$ref": "#/$defs/maxBodyWordsCheck" }
+      ]
+    },
+    "frontmatterSchemaCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "frontmatterSchema" },
+        "schema": { "type": "string", "minLength": 1 },
+        "frontmatterRequired": { "type": "boolean", "default": true }
+      },
+      "required": ["type", "schema", "frontmatterRequired"]
+    },
+    "requiredHeadingCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "requiredHeading" },
+        "heading": { "type": "string", "minLength": 1 }
+      },
+      "required": ["type", "heading"]
+    },
+    "maxBodyLinesCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "maxBodyLines" },
+        "max": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["type", "max"]
+    },
+    "maxBodyWordsCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "maxBodyWords" },
+        "max": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["type", "max"]
+    }
+  }
+}

@@ -12,9 +12,9 @@ The executable target wraps the `MarkdownUtilities` library in a Swift Argument 
 
 - <doc:FrontmatterCommands>
 
-### Project Schemas
+### Project Rules
 
-- <doc:SchemaValidationCommands>
+- <doc:RulesValidationCommands>
 
 ### Open Knowledge Format
 

@@ -12,7 +12,7 @@ An OKF bundle is a directory of Markdown files with YAML frontmatter. Non-reserv
 
 ## Initializing a Bundle
 
-Use `okf init` to create a minimal OKF bundle scaffold and install md-utils schema configuration:
+Use `okf init` to create a minimal OKF bundle scaffold and install md-utils rules configuration:
 
 ```bash
 md-utils okf init ./knowledge/
@@ -98,11 +98,11 @@ Both filter options are required when either one is present. Files without match
 
 The package includes `OKF-concept.schema.json` as a bundled resource. The schema requires a non-empty string `type` field and allows additional frontmatter keys, matching OKF v0.1 draft's permissive consumption model.
 
-`okf init` installs this schema into `.md-utils/schemas/` and creates an `okf-concepts` schema rule. The generated rule excludes reserved OKF files such as `index.md` and `log.md` so the concept schema applies only to concept documents.
+`okf init` installs this schema into `.md-utils/schemas/` and creates an `okf-concepts` rule. The generated rule excludes reserved OKF files such as `index.md` and `log.md` so the concept schema applies only to concept documents.
 
 ## Topics
 
 ### Related Commands
 
 - <doc:FrontmatterCommands>
-- <doc:SchemaValidationCommands>
+- <doc:RulesValidationCommands>

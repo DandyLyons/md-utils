@@ -1,5 +1,5 @@
 //
-//  SchemaDescribe.swift
+//  RulesDescribe.swift
 //  md-utils
 //
 
@@ -7,80 +7,83 @@ import ArgumentParser
 import Foundation
 import PathKit
 
-/// Adds Markdown document behavior to ``CLIEntry.SchemaCommands``.
+/// Adds Markdown document behavior to ``CLIEntry.RulesCommands``.
 ///
-/// See <doc:SchemaValidationCommands> for workflow details.
-extension CLIEntry.SchemaCommands {
-  /// Defines the `SchemaDescribe` command behavior.
+/// See <doc:RulesValidationCommands> for workflow details.
+extension CLIEntry.RulesCommands {
+  /// Defines the `rules describe` command behavior.
   ///
-  /// See <doc:SchemaValidationCommands> for workflow details.
+  /// See <doc:RulesValidationCommands> for workflow details.
   struct Describe: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "describe",
-      abstract: "Describe a configured schema rule and its JSON Schema"
+      abstract: "Describe a configured rule"
     )
 
     @Argument(help: "Schema rule name to describe")
     var schemaName: String
 
     @Option(name: .long, help: "Output format: text, markdown, or json")
-    var format: SchemaDescribeOutputFormat = .text
+    var format: RuleDescribeOutputFormat = .text
     /// Runs the command using the parsed command-line arguments.
     ///
-    /// See <doc:SchemaValidationCommands> for workflow details.
+    /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      let description = try SchemaDescriptionBuilder.describe(ruleName: schemaName)
+      let description = try RuleDescriptionBuilder.describe(ruleName: schemaName)
       switch format {
       case .text:
-        print(SchemaDescriptionFormatter.render(description))
+        print(RuleDescriptionFormatter.render(description))
       case .markdown:
-        print(SchemaDescriptionMarkdownFormatter.render(description))
+        print(RuleDescriptionMarkdownFormatter.render(description))
       case .json:
-        try printAny(SchemaDescriptionJSONRenderer.render(description), format: .json)
+        try printAny(RuleDescriptionJSONRenderer.render(description), format: .json)
       }
     }
   }
 }
 
-/// Supported output formats for the `schema describe` command.
-enum SchemaDescribeOutputFormat: String, ExpressibleByArgument {
+/// Supported output formats for the `rules describe` command.
+enum RuleDescribeOutputFormat: String, ExpressibleByArgument {
   case text
   case markdown
   case json
 }
 
-/// Complete data needed to describe one schema rule.
-struct SchemaDescription {
-  var rule: SchemaRule
-  var schemaPath: Path
+/// Complete data needed to describe one rule.
+struct RuleDescription {
+  var rule: Rule
+  var schemaPath: Path?
   var jsonSchema: [String: Any]
 }
 
-/// Loads configured schema rule details and the referenced JSON Schema.
-enum SchemaDescriptionBuilder {
-  /// Loads the requested schema rule and referenced JSON Schema from disk.
-  static func describe(ruleName: String) throws -> SchemaDescription {
+/// Loads configured rule details and the referenced JSON Schema.
+enum RuleDescriptionBuilder {
+  /// Loads the requested rule and referenced JSON Schema from disk.
+  static func describe(ruleName: String) throws -> RuleDescription {
     let config = try MdUtilsConfig.load()
     guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
       throw ValidationError("Schema rule not found: \"\(ruleName)\"")
     }
 
-    let schemaPath = SchemaPaths.schemaFile(rule: rule, config: config)
+    if rule.schema.isEmpty {
+      return RuleDescription(rule: rule, schemaPath: nil, jsonSchema: [:])
+    }
+    let schemaPath = RulesPaths.schemaFile(rule: rule, config: config)
     let schema = try SchemaDocumentLoader.load(path: schemaPath)
-    return SchemaDescription(rule: rule, schemaPath: schemaPath, jsonSchema: schema)
+    return RuleDescription(rule: rule, schemaPath: schemaPath, jsonSchema: schema)
   }
 }
 
 /// Renders the machine-readable representation for a schema description.
-enum SchemaDescriptionJSONRenderer {
+enum RuleDescriptionJSONRenderer {
   /// Returns a JSON-compatible object for command output.
-  static func render(_ description: SchemaDescription) -> [String: Any] {
+  static func render(_ description: RuleDescription) -> [String: Any] {
     let rule = description.rule
     return [
       "rule": [
         "name": rule.name,
         "schema": rule.schema,
-        "schemaPath": description.schemaPath.string,
+        "schemaPath": description.schemaPath?.string ?? "",
         "frontmatterRequired": rule.frontmatterRequired,
         "match": [
           "paths": rule.match.paths,
@@ -94,16 +97,16 @@ enum SchemaDescriptionJSONRenderer {
 }
 
 /// Renders concise human-readable schema descriptions.
-enum SchemaDescriptionFormatter {
+enum RuleDescriptionFormatter {
   /// Renders the value into its human-readable output representation.
-  static func render(_ description: SchemaDescription) -> String {
+  static func render(_ description: RuleDescription) -> String {
     var lines: [String] = []
     let rule = description.rule
 
-    lines.append("\(CLIStyle.metadata("Schema Rule Name:")) \(CLIStyle.schemaDescribeRuleName(rule.name))")
+    lines.append("\(CLIStyle.metadata("Rule Name:")) \(CLIStyle.schemaDescribeRuleName(rule.name))")
     lines.append("")
-    lines.append(CLIStyle.schemaDescribeHeading("Schema Rule"))
-    lines.append(contentsOf: SchemaRuleDescriptionSummarizer.lines(rule, schemaPath: description.schemaPath))
+    lines.append(CLIStyle.schemaDescribeHeading("Rule"))
+    lines.append(contentsOf: RuleDescriptionSummarizer.lines(rule, schemaPath: description.schemaPath))
     lines.append("")
     lines.append(CLIStyle.schemaDescribeHeading("Schema Definition"))
 
@@ -122,16 +125,16 @@ enum SchemaDescriptionFormatter {
 }
 
 /// Renders schema descriptions as Markdown for documentation and agent-readable summaries.
-enum SchemaDescriptionMarkdownFormatter {
+enum RuleDescriptionMarkdownFormatter {
   /// Renders the value into its Markdown output representation.
-  static func render(_ description: SchemaDescription) -> String {
+  static func render(_ description: RuleDescription) -> String {
     var lines: [String] = []
     let rule = description.rule
 
-    lines.append("# Schema Rule Name: \(rule.name)")
+    lines.append("# Rule Name: \(rule.name)")
     lines.append("")
-    lines.append("## Schema Rule")
-    for line in SchemaRuleDescriptionSummarizer.lines(rule, schemaPath: description.schemaPath) {
+    lines.append("## Rule")
+    for line in RuleDescriptionSummarizer.lines(rule, schemaPath: description.schemaPath) {
       lines.append("- \(line)")
     }
     lines.append("")
@@ -151,10 +154,10 @@ enum SchemaDescriptionMarkdownFormatter {
   }
 }
 
-/// Summarizes the configured schema rule context in plain text lines.
-enum SchemaRuleDescriptionSummarizer {
-  /// Returns concise lines describing which files the schema rule affects.
-  static func lines(_ rule: SchemaRule, schemaPath: Path) -> [String] {
+/// Summarizes the configured rule context in plain text lines.
+enum RuleDescriptionSummarizer {
+  /// Returns concise lines describing which files the rule affects.
+  static func lines(_ rule: Rule, schemaPath: Path?) -> [String] {
     var lines: [String] = []
 
     if rule.match.paths.isEmpty {
@@ -169,7 +172,12 @@ enum SchemaRuleDescriptionSummarizer {
       lines.append("Runs only when \(frontmatterMatchers(rule.match.frontmatter)).")
     }
     lines.append(rule.frontmatterRequired ? "Frontmatter is required." : "Files without frontmatter are skipped.")
-    lines.append("Schema: \(schemaPath.string)")
+    if let schemaPath {
+      lines.append("Schema: \(schemaPath.string)")
+    }
+    if !rule.checks.isEmpty {
+      lines.append("Checks: \(rule.checks.map(checkDescription).joined(separator: ", "))")
+    }
 
     return lines
   }
@@ -177,8 +185,24 @@ enum SchemaRuleDescriptionSummarizer {
   private static func frontmatterMatchers(_ matchers: [String: FrontmatterMatcher]) -> String {
     matchers.keys.sorted().compactMap { key in
       guard let matcher = matchers[key] else { return nil }
-      return "\(key) includes \(JSONSchemaFieldSummarizer.displayValue(matcher.includes))"
+        return matcher.operators.keys.sorted().compactMap { operatorName in
+          guard let value = matcher.operators[operatorName] else { return nil }
+          return "\(key) \(operatorName) \(JSONSchemaFieldSummarizer.displayValue(value))"
+        }.joined(separator: "; ")
     }.joined(separator: "; ")
+  }
+
+  private static func checkDescription(_ check: RuleCheck) -> String {
+    switch check {
+    case .frontmatterSchema(let schema, _):
+      return "frontmatterSchema \(schema)"
+    case .requiredHeading(let heading):
+      return "requiredHeading \"\(heading)\""
+    case .maxBodyLines(let max):
+      return "maxBodyLines \(max)"
+    case .maxBodyWords(let max):
+      return "maxBodyWords \(max)"
+    }
   }
 }
 
