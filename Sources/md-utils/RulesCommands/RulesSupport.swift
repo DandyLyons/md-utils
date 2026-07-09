@@ -781,6 +781,43 @@ enum RulesValidatorRunner {
 
     return RuleValidationSummary(results: results, totalMarkdownFiles: files.count)
   }
+
+  static func filesMatching(
+    ruleName: String,
+    root: Path = .current,
+    configPath: Path = RulesPaths.configFile
+  ) throws -> [Path] {
+    let config = try MdUtilsConfig.load(from: configPath)
+    guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
+      throw ValidationError("Schema rule not found: \"\(ruleName)\"")
+    }
+
+    let files = try RuleFileScanner.markdownFiles(root: root)
+    var matches: [Path] = []
+    for file in files {
+      let relativePath = relativePath(from: root, to: file)
+      guard rulePathConditionsMatch(rule: rule, relativePath: relativePath) else { continue }
+      guard !rule.match.frontmatter.isEmpty else {
+        matches.append(file)
+        continue
+      }
+
+      let content = try file.read(.utf8)
+      let frontmatterPresence = frontmatterPresence(in: content)
+      guard frontmatterPresence.hasFrontmatter else { continue }
+      do {
+        let document = try MarkdownDocument(content: content)
+        let parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
+        if frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) {
+          matches.append(file)
+        }
+      } catch {
+        continue
+      }
+    }
+    return matches
+  }
+
   /// Returns whether a project-relative path matches a rule path condition.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.

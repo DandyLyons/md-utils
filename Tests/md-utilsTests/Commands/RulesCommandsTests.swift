@@ -17,13 +17,14 @@ struct RulesCommandsTests {
     let config = CLIEntry.RulesCommands.configuration
 
     #expect(config.commandName == "rules")
-    #expect(config.subcommands.count == 6)
+    #expect(config.subcommands.count == 7)
     #expect(config.subcommands[0] is CLIEntry.RulesCommands.Init.Type)
     #expect(config.subcommands[1] is CLIEntry.RulesCommands.Add.Type)
     #expect(config.subcommands[2] is CLIEntry.RulesCommands.Remove.Type)
     #expect(config.subcommands[3] is CLIEntry.RulesCommands.List.Type)
-    #expect(config.subcommands[4] is CLIEntry.RulesCommands.Describe.Type)
-    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Validate.Type)
+    #expect(config.subcommands[4] is CLIEntry.RulesCommands.FilesMatching.Type)
+    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Describe.Type)
+    #expect(config.subcommands[6] is CLIEntry.RulesCommands.Validate.Type)
   }
 
   @Test
@@ -75,6 +76,24 @@ struct RulesCommandsTests {
     let command = try #require(parsed as? CLIEntry.RulesCommands.List)
 
     #expect(command.verbose)
+  }
+
+  @Test
+  func `rules files matching parses rule name`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "files-matching", "books"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.FilesMatching)
+
+    #expect(command.ruleName == "books")
+    #expect(!command.absolute)
+  }
+
+  @Test
+  func `rules files matching parses absolute flag`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "files-matching", "books", "--absolute"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.FilesMatching)
+
+    #expect(command.ruleName == "books")
+    #expect(command.absolute)
   }
 
   @Test
@@ -566,6 +585,45 @@ struct RulesCommandsTests {
       #expect(summary.results.first?.filePath == "Books/dune.md")
       #expect(summary.results.first?.status == .ok)
     }
+  }
+
+  @Test
+  func `rules files matching returns project relative predicate matches without running checks`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+    try writeFile(project + "Books/dune.md", content: bookMarkdown(tags: ["Book"]))
+    try writeFile(project + "Books/note.md", content: bookMarkdown(title: "Note", tags: ["Note"]))
+    try writeFile(project + "Other/book.md", content: bookMarkdown(title: "Other", tags: ["Book"]))
+
+    try withCurrentDirectory(project) {
+      let files = try RulesValidatorRunner.filesMatching(ruleName: "books")
+      let output = RulesFilesMatchingFormatter.render(files, ruleName: "books")
+
+      #expect(output == "Books/dune.md")
+    }
+  }
+
+  @Test
+  func `rules files matching can render absolute paths`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+    try writeFile(project + "Books/dune.md", content: bookMarkdown(tags: ["Book"]))
+
+    try withCurrentDirectory(project) {
+      let files = try RulesValidatorRunner.filesMatching(ruleName: "books")
+      let output = RulesFilesMatchingFormatter.render(files, ruleName: "books", absolute: true)
+
+      #expect(output == (project + "Books/dune.md").absolute().string)
+    }
+  }
+
+  @Test
+  func `rules files matching output reports no matching files`() throws {
+    let output = RulesFilesMatchingFormatter.render([], ruleName: "books")
+
+    #expect(output.contains("No files matched rule \"books\"."))
   }
 
   @Test
