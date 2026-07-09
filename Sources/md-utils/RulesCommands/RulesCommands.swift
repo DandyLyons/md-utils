@@ -19,6 +19,7 @@ extension CLIEntry {
         Remove.self,
         List.self,
         FilesMatching.self,
+        Matching.self,
         Describe.self,
         Validate.self,
       ]

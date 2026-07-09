@@ -17,14 +17,15 @@ struct RulesCommandsTests {
     let config = CLIEntry.RulesCommands.configuration
 
     #expect(config.commandName == "rules")
-    #expect(config.subcommands.count == 7)
+    #expect(config.subcommands.count == 8)
     #expect(config.subcommands[0] is CLIEntry.RulesCommands.Init.Type)
     #expect(config.subcommands[1] is CLIEntry.RulesCommands.Add.Type)
     #expect(config.subcommands[2] is CLIEntry.RulesCommands.Remove.Type)
     #expect(config.subcommands[3] is CLIEntry.RulesCommands.List.Type)
     #expect(config.subcommands[4] is CLIEntry.RulesCommands.FilesMatching.Type)
-    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Describe.Type)
-    #expect(config.subcommands[6] is CLIEntry.RulesCommands.Validate.Type)
+    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Matching.Type)
+    #expect(config.subcommands[6] is CLIEntry.RulesCommands.Describe.Type)
+    #expect(config.subcommands[7] is CLIEntry.RulesCommands.Validate.Type)
   }
 
   @Test
@@ -94,6 +95,36 @@ struct RulesCommandsTests {
 
     #expect(command.ruleName == "books")
     #expect(command.absolute)
+  }
+
+  @Test
+  func `rules matching parses file name`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "matching", "Books/dune.md"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.Matching)
+
+    #expect(command.fileName == "Books/dune.md")
+    #expect(!command.explain)
+    #expect(!command.explainNoSkips)
+  }
+
+  @Test
+  func `rules matching parses explain flag`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "matching", "Books/dune.md", "--explain"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.Matching)
+
+    #expect(command.fileName == "Books/dune.md")
+    #expect(command.explain)
+    #expect(!command.explainNoSkips)
+  }
+
+  @Test
+  func `rules matching parses explain no skips flag`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "matching", "Books/dune.md", "--explain-no-skips"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.Matching)
+
+    #expect(command.fileName == "Books/dune.md")
+    #expect(!command.explain)
+    #expect(command.explainNoSkips)
   }
 
   @Test
@@ -624,6 +655,102 @@ struct RulesCommandsTests {
     let output = RulesFilesMatchingFormatter.render([], ruleName: "books")
 
     #expect(output.contains("No files matched rule \"books\"."))
+  }
+
+  @Test
+  func `rules matching returns matching rules for one file`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(
+      project,
+      rules: [
+        ruleJSON(name: "books", schema: "book.schema.json", paths: ["Books/**/*.md"], frontmatter: "\"tags\": { \"includes\": \"Book\" }"),
+        ruleJSON(name: "drafts", schema: "draft.schema.json", paths: ["Drafts/**/*.md"]),
+      ]
+    )
+    try writeFile(project + "Books/dune.md", content: bookMarkdown(tags: ["Book"]))
+
+    try withCurrentDirectory(project) {
+      let evaluations = try RulesValidatorRunner.rulesMatching(fileName: "Books/dune.md")
+      let output = RulesMatchingFormatter.render(evaluations, fileName: "Books/dune.md")
+
+      #expect(output == "books")
+    }
+  }
+
+  @Test
+  func `rules matching explain reports matched and skipped rules`() throws {
+    let evaluations = [
+      RuleMatchEvaluation(
+        rule: Rule(name: "books", schema: "book.schema.json", match: RuleMatch(paths: ["Books/**/*.md"])),
+        matched: true,
+        reasons: ["path \"Books/dune.md\" matched \"Books/**/*.md\""]
+      ),
+      RuleMatchEvaluation(
+        rule: Rule(name: "drafts", schema: "draft.schema.json", match: RuleMatch(paths: ["Drafts/**/*.md"])),
+        matched: false,
+        reasons: ["path \"Books/dune.md\" did not match any configured path pattern"]
+      ),
+    ]
+
+    let output = RulesMatchingFormatter.render(evaluations, fileName: "Books/dune.md", explain: true)
+
+    #expect(output.contains("Rules matching"))
+    #expect(output.contains("MATCH"))
+    #expect(output.contains("books"))
+    #expect(output.contains("SKIP"))
+    #expect(output.contains("drafts"))
+    #expect(output.contains("did not match any configured path pattern"))
+  }
+
+  @Test
+  func `rules matching explain no skips omits skipped rules`() throws {
+    let evaluations = [
+      RuleMatchEvaluation(
+        rule: Rule(name: "books", schema: "book.schema.json", match: RuleMatch(paths: ["Books/**/*.md"])),
+        matched: true,
+        reasons: ["path \"Books/dune.md\" matched \"Books/**/*.md\""]
+      ),
+      RuleMatchEvaluation(
+        rule: Rule(name: "drafts", schema: "draft.schema.json", match: RuleMatch(paths: ["Drafts/**/*.md"])),
+        matched: false,
+        reasons: ["path \"Books/dune.md\" did not match any configured path pattern"]
+      ),
+    ]
+
+    let output = RulesMatchingFormatter.render(
+      evaluations,
+      fileName: "Books/dune.md",
+      explain: true,
+      includeSkips: false
+    )
+
+    #expect(output.contains("Rules matching"))
+    #expect(output.contains("MATCH"))
+    #expect(output.contains("books"))
+    #expect(!output.contains("SKIP"))
+    #expect(!output.contains("drafts"))
+    #expect(!output.contains("did not match any configured path pattern"))
+  }
+
+  @Test
+  func `rules matching explain no skips reports no matches`() throws {
+    let evaluations = [
+      RuleMatchEvaluation(
+        rule: Rule(name: "drafts", schema: "draft.schema.json", match: RuleMatch(paths: ["Drafts/**/*.md"])),
+        matched: false,
+        reasons: ["path \"Books/dune.md\" did not match any configured path pattern"]
+      ),
+    ]
+
+    let output = RulesMatchingFormatter.render(
+      evaluations,
+      fileName: "Books/dune.md",
+      explain: true,
+      includeSkips: false
+    )
+
+    #expect(output.contains("No rules matched file \"Books/dune.md\"."))
   }
 
   @Test

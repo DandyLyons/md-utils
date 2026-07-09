@@ -633,6 +633,14 @@ struct RuleValidationResult {
   var status: Status
   var errors: [RuleValidationErrorDetail]
 }
+/// Records whether one configured rule matches a specific Markdown file.
+///
+/// See <doc:RulesValidationCommands> for workflow details.
+struct RuleMatchEvaluation {
+  var rule: Rule
+  var matched: Bool
+  var reasons: [String]
+}
 /// Aggregates rule validation results for command output and exit status.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
@@ -818,6 +826,86 @@ enum RulesValidatorRunner {
     return matches
   }
 
+  static func rulesMatching(
+    fileName: String,
+    root: Path = .current,
+    configPath: Path = RulesPaths.configFile
+  ) throws -> [RuleMatchEvaluation] {
+    let config = try MdUtilsConfig.load(from: configPath)
+    let file = Path(fileName)
+    guard file.exists else {
+      throw ValidationError("Markdown file not found: \(fileName)")
+    }
+
+    let relativePath = relativePath(from: root, to: file)
+    return try config.schemaRules.map { rule in
+      try evaluateRuleMatch(rule: rule, file: file, relativePath: relativePath)
+    }
+  }
+
+  private static func evaluateRuleMatch(rule: Rule, file: Path, relativePath: String) throws -> RuleMatchEvaluation {
+    var reasons: [String] = []
+
+    if let excluded = rule.match.excludePaths.first(where: { matchesGlob(relativePath, glob: $0) }) {
+      return RuleMatchEvaluation(
+        rule: rule,
+        matched: false,
+        reasons: ["path \"\(relativePath)\" is excluded by \"\(excluded)\""]
+      )
+    }
+
+    if rule.match.paths.isEmpty {
+      reasons.append("no path patterns configured")
+    } else if let matchedPath = rule.match.paths.first(where: { matchesGlob(relativePath, glob: $0) }) {
+      reasons.append("path \"\(relativePath)\" matched \"\(matchedPath)\"")
+    } else {
+      return RuleMatchEvaluation(
+        rule: rule,
+        matched: false,
+        reasons: ["path \"\(relativePath)\" did not match any configured path pattern"]
+      )
+    }
+
+    guard !rule.match.frontmatter.isEmpty else {
+      return RuleMatchEvaluation(rule: rule, matched: true, reasons: reasons)
+    }
+
+    let content = try file.read(.utf8)
+    let frontmatterPresence = frontmatterPresence(in: content)
+    guard frontmatterPresence.hasFrontmatter else {
+      reasons.append("frontmatter not present")
+      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+    }
+
+    let parsedFrontmatter: Any
+    do {
+      let document = try MarkdownDocument(content: content)
+      parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
+    } catch {
+      reasons.append("frontmatter invalid: \(error.localizedDescription)")
+      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+    }
+
+    guard let object = parsedFrontmatter as? [String: Any] else {
+      reasons.append("frontmatter is not an object")
+      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+    }
+
+    for (key, matcher) in rule.match.frontmatter.sorted(by: { $0.key < $1.key }) {
+      guard let value = object[key] else {
+        reasons.append("frontmatter \"\(key)\" is missing")
+        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+      }
+      guard frontmatterValue(value, matches: matcher) else {
+        reasons.append("frontmatter \"\(key)\" did not match \(frontmatterMatcherDescription(matcher))")
+        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+      }
+      reasons.append("frontmatter \"\(key)\" matched \(frontmatterMatcherDescription(matcher))")
+    }
+
+    return RuleMatchEvaluation(rule: rule, matched: true, reasons: reasons)
+  }
+
   /// Returns whether a project-relative path matches a rule path condition.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
@@ -929,6 +1017,12 @@ enum RulesValidatorRunner {
       }
     }
     return true
+  }
+
+  private static func frontmatterMatcherDescription(_ matcher: FrontmatterMatcher) -> String {
+    matcher.operators.sorted(by: { $0.key < $1.key }).map { operatorName, operand in
+      "\(operatorName) \(jsonValueDescription(operand))"
+    }.joined(separator: ", ")
   }
   /// Builds a validation result for an error that prevents rule validation.
   ///
@@ -1069,6 +1163,19 @@ func jsonCompatibleValue(_ value: Any) -> Any {
     return formatter.string(from: date)
   }
   return value
+}
+/// Returns a compact display representation for JSON-compatible values.
+func jsonValueDescription(_ value: Any) -> String {
+  let normalized = jsonCompatibleValue(value)
+  if JSONSerialization.isValidJSONObject([normalized]),
+     let data = try? JSONSerialization.data(withJSONObject: [normalized], options: [.sortedKeys]),
+     let json = String(data: data, encoding: .utf8),
+     json.hasPrefix("["), json.hasSuffix("]") {
+    let start = json.index(after: json.startIndex)
+    let end = json.index(before: json.endIndex)
+    return String(json[start..<end])
+  }
+  return String(describing: normalized)
 }
 /// Returns a normalized YYYY-MM-DD date string when a value can participate in date comparisons.
 func comparableDateString(_ value: Any) -> String? {
