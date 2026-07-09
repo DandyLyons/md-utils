@@ -16,53 +16,70 @@ extension CLIEntry.RulesCommands {
       commandName: "list",
       abstract: "List configured rules"
     )
+
+    @Flag(name: .long, help: "Show rule details")
+    var verbose = false
+
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
       let config = try MdUtilsConfig.load()
-      if config.schemaRules.isEmpty {
-        print(CLIStyle.muted("No rules configured."))
-        return
-      }
+      print(RulesListFormatter.render(config, verbose: verbose))
+    }
+  }
+}
 
-      for rule in config.schemaRules {
-        print(CLIStyle.heading(rule.name))
-        if !rule.schema.isEmpty {
-          let schemaPath = RulesPaths.schemaFile(rule: rule, config: config)
-          print("  \(CLIStyle.metadata("schema:")) \(CLIStyle.path(schemaPath.string))")
-        }
-        print("  \(CLIStyle.metadata("frontmatterRequired:")) \(rule.frontmatterRequired)")
-        print("  \(CLIStyle.metadata("checks:")) \(rule.checks.map(describeCheck).joined(separator: ", "))")
-        if !rule.match.paths.isEmpty {
-          print("  \(CLIStyle.metadata("paths:")) \(rule.match.paths.joined(separator: ", "))")
-        }
-        if !rule.match.frontmatter.isEmpty {
-          print("  \(CLIStyle.metadata("\(rule.name) rule will run when:"))")
-          for key in rule.match.frontmatter.keys.sorted() {
-            if let matcher = rule.match.frontmatter[key] {
-              for operatorName in matcher.operators.keys.sorted() {
-                if let value = matcher.operators[operatorName] {
-                  print("    \(CLIStyle.metadata("frontmatter key")) \(key) \(CLIStyle.metadata(operatorName)) \(value)")
-                }
+enum RulesListFormatter {
+  static func render(_ config: MdUtilsConfig, verbose: Bool = false) -> String {
+    if config.schemaRules.isEmpty {
+      return CLIStyle.muted("No rules configured.")
+    }
+
+    if !verbose {
+      var lines = config.schemaRules.map { CLIStyle.heading($0.name) }
+      lines.append(CLIStyle.muted("Hint: Use --verbose to show rule details."))
+      return lines.joined(separator: "\n")
+    }
+
+    var lines: [String] = []
+    for rule in config.schemaRules {
+      lines.append(CLIStyle.heading(rule.name))
+      if !rule.schema.isEmpty {
+        let schemaPath = RulesPaths.schemaFile(rule: rule, config: config)
+        lines.append("  \(CLIStyle.metadata("schema:")) \(CLIStyle.path(schemaPath.string))")
+      }
+      lines.append("  \(CLIStyle.metadata("frontmatterRequired:")) \(rule.frontmatterRequired)")
+      lines.append("  \(CLIStyle.metadata("checks:")) \(rule.checks.map(describeCheck).joined(separator: ", "))")
+      if !rule.match.paths.isEmpty {
+        lines.append("  \(CLIStyle.metadata("paths:")) \(rule.match.paths.joined(separator: ", "))")
+      }
+      if !rule.match.frontmatter.isEmpty {
+        lines.append("  \(CLIStyle.metadata("\(rule.name) rule will run when:"))")
+        for key in rule.match.frontmatter.keys.sorted() {
+          if let matcher = rule.match.frontmatter[key] {
+            for operatorName in matcher.operators.keys.sorted() {
+              if let value = matcher.operators[operatorName] {
+                lines.append("    \(CLIStyle.metadata("frontmatter key")) \(key) \(CLIStyle.metadata(operatorName)) \(value)")
               }
             }
           }
         }
       }
     }
+    return lines.joined(separator: "\n")
+  }
 
-    private func describeCheck(_ check: RuleCheck) -> String {
-      switch check {
-      case .frontmatterSchema(let schema, _):
-        return "frontmatterSchema(\(schema))"
-      case .requiredHeading(let heading):
-        return "requiredHeading(\(heading))"
-      case .maxBodyLines(let max):
-        return "maxBodyLines(\(max))"
-      case .maxBodyWords(let max):
-        return "maxBodyWords(\(max))"
-      }
+  private static func describeCheck(_ check: RuleCheck) -> String {
+    switch check {
+    case .frontmatterSchema(let schema, _):
+      return "frontmatterSchema(\(schema))"
+    case .requiredHeading(let heading):
+      return "requiredHeading(\(heading))"
+    case .maxBodyLines(let max):
+      return "maxBodyLines(\(max))"
+    case .maxBodyWords(let max):
+      return "maxBodyWords(\(max))"
     }
   }
 }

@@ -70,6 +70,14 @@ struct RulesCommandsTests {
   }
 
   @Test
+  func `rules list parses verbose flag`() throws {
+    let parsed = try CLIEntry.parseAsRoot(["rules", "list", "--verbose"])
+    let command = try #require(parsed as? CLIEntry.RulesCommands.List)
+
+    #expect(command.verbose)
+  }
+
+  @Test
   func `rules validate output hides ok and skipped results by default`() throws {
     let summary = schemaValidationSummary()
 
@@ -257,6 +265,34 @@ struct RulesCommandsTests {
 
       try await command.run()
     }
+  }
+
+  @Test
+  func `rules list default output shows only rule names and verbose hint`() throws {
+    let output = RulesListFormatter.render(rulesListConfig())
+
+    #expect(output.contains("books"))
+    #expect(output.contains("authors"))
+    #expect(output.contains("Hint: Use --verbose to show rule details."))
+    #expect(!output.contains("schema:"))
+    #expect(!output.contains("frontmatterRequired:"))
+    #expect(!output.contains("checks:"))
+    #expect(!output.contains("paths:"))
+  }
+
+  @Test
+  func `rules list verbose output shows rule details`() throws {
+    let output = RulesListFormatter.render(rulesListConfig(), verbose: true)
+
+    #expect(output.contains("books"))
+    #expect(output.contains("schema:"))
+    #expect(output.contains(".md-utils/schemas/book.schema.json"))
+    #expect(output.contains("frontmatterRequired:"))
+    #expect(output.contains("checks:"))
+    #expect(output.contains("requiredHeading(Summary)"))
+    #expect(output.contains("paths:"))
+    #expect(output.contains("Books/**/*.md"))
+    #expect(!output.contains("Hint: Use --verbose"))
   }
 
   @Test
@@ -1007,6 +1043,25 @@ struct RulesCommandsTests {
   private func writeFile(_ path: Path, content: String) throws {
     try path.parent().mkpath()
     try path.write(content)
+  }
+
+  private func rulesListConfig() -> MdUtilsConfig {
+    MdUtilsConfig(schemaRules: [
+      Rule(
+        name: "books",
+        schema: "book.schema.json",
+        match: RuleMatch(paths: ["Books/**/*.md"]),
+        checks: [
+          .frontmatterSchema(schema: "book.schema.json", frontmatterRequired: true),
+          .requiredHeading("Summary"),
+        ]
+      ),
+      Rule(
+        name: "authors",
+        schema: "author.schema.json",
+        match: RuleMatch(paths: ["Authors/**/*.md"])
+      ),
+    ])
   }
 
   private func schemaValidationSummary() -> RuleValidationSummary {
