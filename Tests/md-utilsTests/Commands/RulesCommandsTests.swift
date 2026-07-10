@@ -1118,6 +1118,32 @@ struct RulesCommandsTests {
   }
 
   @Test
+  func `v2 equals and has heading matchers select matching files`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [ruleV2JSON(
+      name: "published-with-summary",
+      paths: ["Posts/**/*.md"],
+      frontmatter: "\"publish\": { \"equals\": true }",
+      document: "\"hasHeading\": \"Summary\"",
+      checks: ["{ \"type\": \"requiredHeading\", \"heading\": \"Details\" }"]
+    )])
+    try writeFile(project + "Posts/match.md", content: "---\npublish: true\n---\n# Title\n\n## Summary\n")
+    try writeFile(project + "Posts/draft.md", content: "---\npublish: false\n---\n# Title\n\n## Summary\n")
+    try writeFile(project + "Posts/no-summary.md", content: "---\npublish: true\n---\n# Title\n")
+
+    try withCurrentDirectory(project) {
+      let summary = try RulesValidatorRunner.validate(ruleName: "published-with-summary")
+
+      #expect(summary.fileRuleMatches == 1)
+      #expect(summary.results.first?.filePath == "Posts/match.md")
+      #expect(summary.hasFailures)
+      #expect(summary.results.first?.errors.first?.path == "heading")
+      #expect(summary.results.first?.errors.first?.message == "required heading \"Details\" not found")
+    }
+  }
+
+  @Test
   func `v2 document checks report required heading and body limits`() throws {
     let project = try createTempProject()
     defer { try? project.delete() }
@@ -1303,15 +1329,17 @@ struct RulesCommandsTests {
     name: String,
     paths: [String],
     frontmatter: String? = nil,
+    document: String? = nil,
     checks: [String]
   ) -> String {
     let quotedPaths = paths.map { "\"\($0)\"" }.joined(separator: ", ")
     let frontmatterBlock = frontmatter.map { ",\n        \"frontmatter\": { \($0) }" } ?? ""
+    let documentBlock = document.map { ",\n        \"document\": { \($0) }" } ?? ""
     return """
       {
         "name": "\(name)",
         "match": {
-          "paths": [\(quotedPaths)]\(frontmatterBlock)
+          "paths": [\(quotedPaths)]\(frontmatterBlock)\(documentBlock)
         },
         "checks": [
           \(checks.joined(separator: ",\n"))

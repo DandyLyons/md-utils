@@ -78,11 +78,30 @@
           "additionalProperties": {
             "$ref": "#/$defs/frontmatterMatcher"
           }
+        },
+        "document": {
+          "$ref": "#/$defs/documentMatcher"
         }
       },
       "anyOf": [
         { "required": ["paths"] },
-        { "required": ["frontmatter"] }
+        { "required": ["frontmatter"] },
+        { "required": ["document"] }
+      ]
+    },
+    "documentMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "All-of Markdown document matchers.",
+      "properties": {
+        "hasHeading": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Matches when the Markdown body has an ATX heading with this exact text."
+        }
+      },
+      "anyOf": [
+        { "required": ["hasHeading"] }
       ]
     },
     "frontmatterMatcher": {

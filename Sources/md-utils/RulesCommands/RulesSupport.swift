@@ -328,13 +328,20 @@ struct RuleMatch {
   var paths: [String]
   var excludePaths: [String]
   var frontmatter: [String: FrontmatterMatcher]
+  var document: DocumentMatcher
   /// Creates a configured instance.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  init(paths: [String] = [], excludePaths: [String] = [], frontmatter: [String: FrontmatterMatcher] = [:]) {
+  init(
+    paths: [String] = [],
+    excludePaths: [String] = [],
+    frontmatter: [String: FrontmatterMatcher] = [:],
+    document: DocumentMatcher = DocumentMatcher()
+  ) {
     self.paths = paths
     self.excludePaths = excludePaths
     self.frontmatter = frontmatter
+    self.document = document
   }
   /// Creates a configured instance.
   ///
@@ -343,6 +350,7 @@ struct RuleMatch {
     let paths = json["paths"] as? [String] ?? []
     let excludePaths = json["excludePaths"] as? [String] ?? []
     let frontmatterObject = json["frontmatter"] as? [String: Any] ?? [:]
+    let documentObject = json["document"] as? [String: Any] ?? [:]
     var frontmatter: [String: FrontmatterMatcher] = [:]
 
     for (key, rawMatcher) in frontmatterObject {
@@ -352,13 +360,16 @@ struct RuleMatch {
       frontmatter[key] = try FrontmatterMatcher(json: matcherObject, key: key, ruleName: ruleName)
     }
 
-    if paths.isEmpty && frontmatter.isEmpty {
+    let document = try DocumentMatcher(json: documentObject, ruleName: ruleName)
+
+    if paths.isEmpty && frontmatter.isEmpty && document.isEmpty {
       throw ValidationError("Schema rule \"\(ruleName)\" must define at least one match condition")
     }
 
     self.paths = paths
     self.excludePaths = excludePaths
     self.frontmatter = frontmatter
+    self.document = document
   }
 
   var jsonObject: [String: Any] {
@@ -371,6 +382,44 @@ struct RuleMatch {
     }
     if !frontmatter.isEmpty {
       object["frontmatter"] = frontmatter.mapValues { $0.jsonObject }
+    }
+    if !document.isEmpty {
+      object["document"] = document.jsonObject
+    }
+    return object
+  }
+}
+
+/// Describes Markdown document conditions that select files for a rule.
+struct DocumentMatcher: Equatable {
+  var hasHeading: String?
+
+  var isEmpty: Bool { hasHeading == nil }
+
+  init(hasHeading: String? = nil) {
+    self.hasHeading = hasHeading
+  }
+
+  init(json: [String: Any], ruleName: String) throws {
+    if let hasHeading = json["hasHeading"] as? String, !hasHeading.isEmpty {
+      self.hasHeading = hasHeading
+    } else if json["hasHeading"] != nil {
+      throw ValidationError("Schema rule \"\(ruleName)\" document hasHeading matcher requires a non-empty heading")
+    } else {
+      self.hasHeading = nil
+    }
+
+    let supported = Set(["hasHeading"])
+    let unsupported = json.keys.filter { !supported.contains($0) }
+    if let firstUnsupported = unsupported.sorted().first {
+      throw ValidationError("Schema rule \"\(ruleName)\" has unsupported document matcher \"\(firstUnsupported)\"")
+    }
+  }
+
+  var jsonObject: [String: Any] {
+    var object: [String: Any] = [:]
+    if let hasHeading {
+      object["hasHeading"] = hasHeading
     }
     return object
   }
@@ -758,6 +807,7 @@ enum RulesValidatorRunner {
           guard let parsedFrontmatter else { continue }
           guard frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
         }
+        guard documentConditionsMatch(rule: rule, document: document) else { continue }
 
         let checkErrors = try validateChecks(
           rule: rule,
@@ -805,18 +855,21 @@ enum RulesValidatorRunner {
     for file in files {
       let relativePath = relativePath(from: root, to: file)
       guard rulePathConditionsMatch(rule: rule, relativePath: relativePath) else { continue }
-      guard !rule.match.frontmatter.isEmpty else {
+      guard !rule.match.frontmatter.isEmpty || !rule.match.document.isEmpty else {
         matches.append(file)
         continue
       }
 
       let content = try file.read(.utf8)
       let frontmatterPresence = frontmatterPresence(in: content)
-      guard frontmatterPresence.hasFrontmatter else { continue }
       do {
         let document = try MarkdownDocument(content: content)
-        let parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
-        if frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) {
+        if !rule.match.frontmatter.isEmpty {
+          guard frontmatterPresence.hasFrontmatter else { continue }
+          let parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
+          guard frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
+        }
+        if documentConditionsMatch(rule: rule, document: document) {
           matches.append(file)
         }
       } catch {
@@ -866,41 +919,58 @@ enum RulesValidatorRunner {
       )
     }
 
-    guard !rule.match.frontmatter.isEmpty else {
+    guard !rule.match.frontmatter.isEmpty || !rule.match.document.isEmpty else {
       return RuleMatchEvaluation(rule: rule, matched: true, reasons: reasons)
     }
 
     let content = try file.read(.utf8)
     let frontmatterPresence = frontmatterPresence(in: content)
-    guard frontmatterPresence.hasFrontmatter else {
-      reasons.append("frontmatter not present")
-      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-    }
-
-    let parsedFrontmatter: Any
+    let document: MarkdownDocument
     do {
-      let document = try MarkdownDocument(content: content)
-      parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
+      document = try MarkdownDocument(content: content)
     } catch {
-      reasons.append("frontmatter invalid: \(error.localizedDescription)")
+      reasons.append("document invalid: \(error.localizedDescription)")
       return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
     }
 
-    guard let object = parsedFrontmatter as? [String: Any] else {
-      reasons.append("frontmatter is not an object")
-      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+    if !rule.match.frontmatter.isEmpty {
+      guard frontmatterPresence.hasFrontmatter else {
+        reasons.append("frontmatter not present")
+        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+      }
+
+      let parsedFrontmatter: Any
+      do {
+        parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
+      } catch {
+        reasons.append("frontmatter invalid: \(error.localizedDescription)")
+        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+      }
+
+      guard let object = parsedFrontmatter as? [String: Any] else {
+        reasons.append("frontmatter is not an object")
+        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+      }
+
+      for (key, matcher) in rule.match.frontmatter.sorted(by: { $0.key < $1.key }) {
+        guard let value = object[key] else {
+          reasons.append("frontmatter \"\(key)\" is missing")
+          return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+        }
+        guard frontmatterValue(value, matches: matcher) else {
+          reasons.append("frontmatter \"\(key)\" did not match \(frontmatterMatcherDescription(matcher))")
+          return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
+        }
+        reasons.append("frontmatter \"\(key)\" matched \(frontmatterMatcherDescription(matcher))")
+      }
     }
 
-    for (key, matcher) in rule.match.frontmatter.sorted(by: { $0.key < $1.key }) {
-      guard let value = object[key] else {
-        reasons.append("frontmatter \"\(key)\" is missing")
+    if let hasHeading = rule.match.document.hasHeading {
+      guard headingTexts(in: document.body).contains(hasHeading) else {
+        reasons.append("document heading \"\(hasHeading)\" not found")
         return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
       }
-      guard frontmatterValue(value, matches: matcher) else {
-        reasons.append("frontmatter \"\(key)\" did not match \(frontmatterMatcherDescription(matcher))")
-        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-      }
-      reasons.append("frontmatter \"\(key)\" matched \(frontmatterMatcherDescription(matcher))")
+      reasons.append("document heading \"\(hasHeading)\" found")
     }
 
     return RuleMatchEvaluation(rule: rule, matched: true, reasons: reasons)
@@ -930,6 +1000,13 @@ enum RulesValidatorRunner {
       if !frontmatterValue(value, matches: matcher) {
         return false
       }
+    }
+    return true
+  }
+
+  private static func documentConditionsMatch(rule: Rule, document: MarkdownDocument?) -> Bool {
+    if let hasHeading = rule.match.document.hasHeading {
+      guard headingTexts(in: document?.body ?? "").contains(hasHeading) else { return false }
     }
     return true
   }

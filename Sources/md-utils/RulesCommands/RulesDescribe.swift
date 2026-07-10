@@ -89,6 +89,7 @@ enum RuleDescriptionJSONRenderer {
           "paths": rule.match.paths,
           "excludePaths": rule.match.excludePaths,
           "frontmatter": rule.match.frontmatter.mapValues { $0.jsonObject },
+          "document": rule.match.document.jsonObject,
         ],
       ],
       "jsonSchema": description.jsonSchema,
@@ -161,7 +162,7 @@ enum RuleDescriptionSummarizer {
     var lines: [String] = []
 
     if rule.match.paths.isEmpty {
-      lines.append("Applies to Markdown files matched by frontmatter conditions.")
+      lines.append("Applies to Markdown files matched by rule conditions.")
     } else {
       lines.append("Applies to Markdown files matching \(rule.match.paths.joined(separator: ", ")).")
     }
@@ -170,6 +171,9 @@ enum RuleDescriptionSummarizer {
     }
     if !rule.match.frontmatter.isEmpty {
       lines.append("Runs only when \(frontmatterMatchers(rule.match.frontmatter)).")
+    }
+    if let hasHeading = rule.match.document.hasHeading {
+      lines.append("Runs only when document has heading \"\(hasHeading)\".")
     }
     lines.append(rule.frontmatterRequired ? "Frontmatter is required." : "Files without frontmatter are skipped.")
     if let schemaPath {
