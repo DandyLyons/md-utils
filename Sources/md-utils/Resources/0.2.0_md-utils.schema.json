@@ -21,9 +21,7 @@
     "rules": {
       "type": "array",
       "description": "Rules that decide which checks apply to which Markdown files.",
-      "items": {
-        "$ref": "#/$defs/rule"
-      },
+      "items": { "$ref": "#/$defs/rule" },
       "default": []
     }
   },
@@ -38,15 +36,11 @@
           "minLength": 1,
           "description": "Unique rule name used by md-utils rules validate <rule-name>."
         },
-        "match": {
-          "$ref": "#/$defs/ruleMatch"
-        },
+        "match": { "$ref": "#/$defs/ruleMatch" },
         "checks": {
           "type": "array",
           "minItems": 1,
-          "items": {
-            "$ref": "#/$defs/ruleCheck"
-          }
+          "items": { "$ref": "#/$defs/ruleCheck" }
         }
       },
       "required": ["name", "match", "checks"]
@@ -54,93 +48,187 @@
     "ruleMatch": {
       "type": "object",
       "additionalProperties": false,
-      "description": "A file matches this rule only when all configured match groups pass: path includes, path excludes, and frontmatter predicates. The paths array is any-of; excludePaths is none-of; frontmatter predicates are all-of. The anyOf below is JSON Schema validation for requiring paths or frontmatter, not runtime OR matching.",
+      "description": "A file matches this rule only when all configured match groups pass: path includes, path excludes, file metadata predicates, frontmatter predicates, whole-frontmatter query predicates, and document predicates. The paths array is any-of; excludePaths is none-of; predicate namespaces are all-of. Logical grouping predicates all/any/not are deferred to config schema 0.3.0.",
       "properties": {
         "paths": {
           "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
+          "items": { "type": "string", "minLength": 1 },
           "description": "Any-of glob patterns matched against project-relative Markdown file paths. If present, a file path must match at least one pattern."
         },
         "excludePaths": {
           "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
+          "items": { "type": "string", "minLength": 1 },
           "description": "None-of glob patterns checked after paths match. If a file path matches any exclude pattern, the rule is skipped."
         },
+        "file": { "$ref": "#/$defs/fileMatcher" },
         "frontmatter": {
           "type": "object",
-          "description": "All-of frontmatter field matchers. Each key is a frontmatter key, and every configured key matcher must pass.",
-          "additionalProperties": {
-            "$ref": "#/$defs/frontmatterMatcher"
-          }
+          "description": "All-of frontmatter field matchers. Each key is a frontmatter key, and every configured key matcher must pass. Missing keys do not match value inequality; only doesntHaveKey intentionally matches a missing key.",
+          "additionalProperties": { "$ref": "#/$defs/frontmatterMatcher" }
         },
-        "document": {
-          "$ref": "#/$defs/documentMatcher"
-        }
+        "frontmatterQuery": { "$ref": "#/$defs/frontmatterQueryMatcher" },
+        "document": { "$ref": "#/$defs/documentMatcher" }
       },
       "anyOf": [
         { "required": ["paths"] },
+        { "required": ["file"] },
         { "required": ["frontmatter"] },
+        { "required": ["frontmatterQuery"] },
         { "required": ["document"] }
       ]
+    },
+    "fileMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "All-of project-relative path and file metadata predicates evaluated before file contents are parsed.",
+      "properties": {
+        "pathRegex": { "type": "string", "minLength": 1, "description": "Matches when the project-relative path matches this Swift NSRegularExpression pattern." },
+        "filenameEquals": { "type": "string", "minLength": 1, "description": "Matches when the basename, including extension, equals this string." },
+        "extensionIn": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "Matches when the file extension without leading dot is in this list. Comparison is case-insensitive." },
+        "modifiedAfter": { "$ref": "#/$defs/dateTimeLiteral", "description": "Matches when the filesystem modification date is after this date or date-time. Date-only operands compare at date precision; RFC 3339 date-time operands compare at date-time precision." },
+        "modifiedBefore": { "$ref": "#/$defs/dateTimeLiteral", "description": "Matches when the filesystem modification date is before this date or date-time. Date-only operands compare at date precision; RFC 3339 date-time operands compare at date-time precision." }
+      },
+      "anyOf": [
+        { "required": ["pathRegex"] },
+        { "required": ["filenameEquals"] },
+        { "required": ["extensionIn"] },
+        { "required": ["modifiedAfter"] },
+        { "required": ["modifiedBefore"] }
+      ]
+    },
+    "frontmatterQueryMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Whole-frontmatter predicates. These are ANDed with field-level frontmatter predicates when both are present.",
+      "properties": {
+        "jmespath": { "type": "string", "minLength": 1, "description": "JMESPath expression evaluated against parsed frontmatter. Truthiness matches md-utils fm search: non-empty strings, arrays, and objects are true; true is true; false, null, and empty values are false." }
+      },
+      "anyOf": [{ "required": ["jmespath"] }]
     },
     "documentMatcher": {
       "type": "object",
       "additionalProperties": false,
-      "description": "All-of Markdown document matchers.",
+      "description": "All-of Markdown body predicates. hasBrokenWikilink is intentionally deferred until resolver context and performance behavior are designed.",
       "properties": {
-        "hasHeading": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Matches when the Markdown body has an ATX heading with this exact text."
-        }
+        "hasHeading": { "type": "string", "minLength": 1, "description": "Matches when the Markdown body has an ATX heading with this exact text." },
+        "headingRegex": { "type": "string", "minLength": 1, "description": "Matches when any ATX heading text matches this Swift NSRegularExpression pattern." },
+        "hasHeadingAtLevel": { "$ref": "#/$defs/headingAtLevelMatcher" },
+        "hasSection": { "type": "string", "minLength": 1, "description": "Matches when the body has an ATX heading with this exact text and non-empty section content before the next same-or-higher-level heading." },
+        "bodyContains": { "type": "string", "minLength": 1, "description": "Matches when the raw Markdown body contains this substring." },
+        "bodyRegex": { "type": "string", "minLength": 1, "description": "Matches when the raw Markdown body matches this Swift NSRegularExpression pattern." },
+        "hasWikilink": { "oneOf": [{ "const": true }, { "type": "string", "minLength": 1 }], "description": "Matches when the body has any wikilink if true, or a wikilink with the configured target when a string is provided." },
+        "lineCount": { "$ref": "#/$defs/countRange" },
+        "wordCount": { "$ref": "#/$defs/countRange" }
       },
       "anyOf": [
-        { "required": ["hasHeading"] }
+        { "required": ["hasHeading"] },
+        { "required": ["headingRegex"] },
+        { "required": ["hasHeadingAtLevel"] },
+        { "required": ["hasSection"] },
+        { "required": ["bodyContains"] },
+        { "required": ["bodyRegex"] },
+        { "required": ["hasWikilink"] },
+        { "required": ["lineCount"] },
+        { "required": ["wordCount"] }
       ]
+    },
+    "headingAtLevelMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "heading": { "type": "string", "minLength": 1 },
+        "level": { "type": "integer", "minimum": 1, "maximum": 6 }
+      },
+      "required": ["heading", "level"],
+      "description": "Matches an exact ATX heading text at one configured heading level."
+    },
+    "countRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "integer", "minimum": 0 },
+        "max": { "type": "integer", "minimum": 0 }
+      },
+      "anyOf": [{ "required": ["min"] }, { "required": ["max"] }],
+      "description": "Inclusive integer range. At least one of min or max is required; when both are present min must be less than or equal to max."
     },
     "frontmatterMatcher": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Predicates for one frontmatter key. If multiple operators are specified, all operators must pass.",
+      "description": "Predicates for one frontmatter key. If multiple operators are specified, all operators must pass. Missing keys do not match value predicates, including doesntEqual, notIncludes, and notIn; only doesntHaveKey matches a missing key.",
       "properties": {
-        "includes": {
-          "description": "Matches when the frontmatter value is an array containing this JSON value."
-        },
-        "notIncludes": {
-          "description": "Matches when the frontmatter value is an array that does not contain this JSON value."
-        },
-        "equals": {
-          "description": "Matches when the frontmatter value equals this JSON value."
-        },
-        "after": {
-          "type": "string",
-          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
-          "description": "Matches date-like strings after this YYYY-MM-DD date."
-        },
-        "between": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "from": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
-            "to": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
-          },
-          "required": ["from", "to"],
-          "description": "Matches date-like strings inclusively between from and to."
-        }
+        "equals": { "description": "Matches when the existing frontmatter value equals this JSON-compatible value." },
+        "doesntEqual": { "description": "Matches when the key exists and its value does not equal this JSON-compatible value. Missing keys do not match." },
+        "includes": { "description": "Matches when the existing frontmatter value is an array containing this JSON-compatible value." },
+        "notIncludes": { "description": "Matches when the key exists, its value is an array, and the array does not contain this JSON-compatible value. Missing keys do not match." },
+        "hasKey": { "const": true, "description": "Matches when the frontmatter object contains this key." },
+        "doesntHaveKey": { "const": true, "description": "Matches when the frontmatter object does not contain this key. This is the only frontmatter field predicate that intentionally matches absence." },
+        "regex": { "type": "string", "minLength": 1, "description": "Matches when the existing value is a string matching this Swift NSRegularExpression pattern." },
+        "startsWith": { "type": "string", "minLength": 1, "description": "Matches when the existing value is a string starting with this prefix." },
+        "endsWith": { "type": "string", "minLength": 1, "description": "Matches when the existing value is a string ending with this suffix." },
+        "contains": { "type": "string", "minLength": 1, "description": "Matches when the existing value is a string containing this substring. Use includes for array membership." },
+        "empty": { "const": true, "description": "Matches when the existing value is an empty string, empty array, or empty object." },
+        "emptyString": { "const": true, "description": "Matches when the existing value is exactly an empty string." },
+        "emptyArray": { "const": true, "description": "Matches when the existing value is an empty array." },
+        "emptyObject": { "const": true, "description": "Matches when the existing value is an empty object." },
+        "notEmpty": { "const": true, "description": "Matches when the existing value is not an empty string, empty array, or empty object." },
+        "in": { "type": "array", "minItems": 1, "description": "Matches when the existing scalar value equals one item in this array." },
+        "notIn": { "type": "array", "minItems": 1, "description": "Matches when the key exists and the scalar value equals none of the items in this array. Missing keys do not match." },
+        "greaterThan": { "type": "number", "description": "Matches when the existing numeric value is greater than this number." },
+        "greaterThanOrEqual": { "type": "number", "description": "Matches when the existing numeric value is greater than or equal to this number." },
+        "lessThan": { "type": "number", "description": "Matches when the existing numeric value is less than this number." },
+        "lessThanOrEqual": { "type": "number", "description": "Matches when the existing numeric value is less than or equal to this number." },
+        "after": { "$ref": "#/$defs/dateTimeLiteral", "description": "Matches when the existing date/date-time value is after this operand using precision-aware comparison." },
+        "onOrAfter": { "$ref": "#/$defs/dateTimeLiteral", "description": "Matches when the existing date/date-time value is on or after this operand using precision-aware comparison." },
+        "before": { "$ref": "#/$defs/dateTimeLiteral", "description": "Matches when the existing date/date-time value is before this operand using precision-aware comparison." },
+        "onOrBefore": { "$ref": "#/$defs/dateTimeLiteral", "description": "Matches when the existing date/date-time value is on or before this operand using precision-aware comparison." },
+        "between": { "$ref": "#/$defs/betweenRange", "description": "Inclusive range. Numeric bounds compare numbers; date/date-time bounds use precision-aware comparison." },
+        "typeIs": { "enum": ["string", "boolean", "number", "array", "object", "null"], "description": "Matches when the existing value has this JSON/YAML type." }
       },
       "anyOf": [
+        { "required": ["equals"] },
+        { "required": ["doesntEqual"] },
         { "required": ["includes"] },
         { "required": ["notIncludes"] },
-        { "required": ["equals"] },
+        { "required": ["hasKey"] },
+        { "required": ["doesntHaveKey"] },
+        { "required": ["regex"] },
+        { "required": ["startsWith"] },
+        { "required": ["endsWith"] },
+        { "required": ["contains"] },
+        { "required": ["empty"] },
+        { "required": ["emptyString"] },
+        { "required": ["emptyArray"] },
+        { "required": ["emptyObject"] },
+        { "required": ["notEmpty"] },
+        { "required": ["in"] },
+        { "required": ["notIn"] },
+        { "required": ["greaterThan"] },
+        { "required": ["greaterThanOrEqual"] },
+        { "required": ["lessThan"] },
+        { "required": ["lessThanOrEqual"] },
         { "required": ["after"] },
-        { "required": ["between"] }
+        { "required": ["onOrAfter"] },
+        { "required": ["before"] },
+        { "required": ["onOrBefore"] },
+        { "required": ["between"] },
+        { "required": ["typeIs"] }
       ]
+    },
+    "dateTimeLiteral": {
+      "type": "string",
+      "pattern": "^([0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2}))$",
+      "description": "Date-only YYYY-MM-DD or RFC 3339 date-time with Z or numeric offset. Date-only operands compare at date precision. Date-time operands compare at date-time precision. A value with more precision can match a less precise rule; a value with less precision does not match a more precise rule."
+    },
+    "betweenRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": { "oneOf": [{ "type": "number" }, { "$ref": "#/$defs/dateTimeLiteral" }] },
+        "to": { "oneOf": [{ "type": "number" }, { "$ref": "#/$defs/dateTimeLiteral" }] }
+      },
+      "required": ["from", "to"],
+      "description": "Inclusive range. from and to must both be numbers or both be date/time literals; from must be less than or equal to to."
     },
     "ruleCheck": {
       "oneOf": [

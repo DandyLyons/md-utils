@@ -20,8 +20,8 @@ extension CLIEntry.RulesCommands {
       abstract: "Describe a configured rule"
     )
 
-    @Argument(help: "Schema rule name to describe")
-    var schemaName: String
+    @Argument(help: "Rule name to describe")
+    var ruleName: String
 
     @Option(name: .long, help: "Output format: text, markdown, or json")
     var format: RuleDescribeOutputFormat = .text
@@ -29,7 +29,7 @@ extension CLIEntry.RulesCommands {
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      let description = try RuleDescriptionBuilder.describe(ruleName: schemaName)
+      let description = try RuleDescriptionBuilder.describe(ruleName: ruleName)
       switch format {
       case .text:
         print(RuleDescriptionFormatter.render(description))
@@ -62,7 +62,7 @@ enum RuleDescriptionBuilder {
   static func describe(ruleName: String) throws -> RuleDescription {
     let config = try MdUtilsConfig.load()
     guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
-      throw ValidationError("Schema rule not found: \"\(ruleName)\"")
+      throw ValidationError("Rule not found: \"\(ruleName)\"")
     }
 
     if rule.schema.isEmpty {

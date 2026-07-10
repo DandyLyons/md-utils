@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import JMESPath
 import JSONSchema
 import MarkdownUtilities
 import PathKit
@@ -66,7 +67,7 @@ struct MdUtilsConfig {
     let rules = try rawRules.map { try Rule(json: $0, configVersion: configVersion) }
     let names = rules.map(\.name)
     if Set(names).count != names.count {
-      throw ValidationError("Schema rule names must be unique")
+      throw ValidationError("Rule names must be unique")
     }
 
     return MdUtilsConfig(
@@ -211,10 +212,10 @@ struct Rule {
   /// See <doc:RulesValidationCommands> for workflow details.
   init(json: [String: Any], configVersion: String = ConfigSchemaRegistry.defaultVersion) throws {
     guard let name = json["name"] as? String, !name.isEmpty else {
-      throw ValidationError("Schema rules require a non-empty name")
+      throw ValidationError("Rules require a non-empty name")
     }
     guard let matchObject = json["match"] as? [String: Any] else {
-      throw ValidationError("Schema rule \"\(name)\" requires a match object")
+      throw ValidationError("Rule \"\(name)\" requires a match object")
     }
 
     self.name = name
@@ -222,7 +223,7 @@ struct Rule {
     self.match = try RuleMatch(json: matchObject, ruleName: name)
     if configVersion == "0.1.0" {
       guard let schema = json["schema"] as? String, !schema.isEmpty else {
-        throw ValidationError("Schema rule \"\(name)\" requires a non-empty schema")
+        throw ValidationError("Rule \"\(name)\" requires a non-empty schema")
       }
       self.schema = schema
       self.checks = [.frontmatterSchema(schema: schema, frontmatterRequired: self.frontmatterRequired)]
@@ -321,14 +322,16 @@ enum RuleCheck: Equatable {
     return false
   }
 }
-/// Describes the path and frontmatter conditions that select files for a rule.
+/// Describes the path, metadata, frontmatter, and document conditions that select files for a rule.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
 struct RuleMatch {
   var paths: [String]
   var excludePaths: [String]
   var frontmatter: [String: FrontmatterMatcher]
+  var frontmatterQuery: FrontmatterQueryMatcher
   var document: DocumentMatcher
+  var file: FileMatcher
   /// Creates a configured instance.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
@@ -336,12 +339,16 @@ struct RuleMatch {
     paths: [String] = [],
     excludePaths: [String] = [],
     frontmatter: [String: FrontmatterMatcher] = [:],
-    document: DocumentMatcher = DocumentMatcher()
+    frontmatterQuery: FrontmatterQueryMatcher = FrontmatterQueryMatcher(),
+    document: DocumentMatcher = DocumentMatcher(),
+    file: FileMatcher = FileMatcher()
   ) {
     self.paths = paths
     self.excludePaths = excludePaths
     self.frontmatter = frontmatter
+    self.frontmatterQuery = frontmatterQuery
     self.document = document
+    self.file = file
   }
   /// Creates a configured instance.
   ///
@@ -350,26 +357,32 @@ struct RuleMatch {
     let paths = json["paths"] as? [String] ?? []
     let excludePaths = json["excludePaths"] as? [String] ?? []
     let frontmatterObject = json["frontmatter"] as? [String: Any] ?? [:]
+    let frontmatterQueryObject = json["frontmatterQuery"] as? [String: Any] ?? [:]
     let documentObject = json["document"] as? [String: Any] ?? [:]
+    let fileObject = json["file"] as? [String: Any] ?? [:]
     var frontmatter: [String: FrontmatterMatcher] = [:]
 
     for (key, rawMatcher) in frontmatterObject {
       guard let matcherObject = rawMatcher as? [String: Any] else {
-        throw ValidationError("Schema rule \"\(ruleName)\" has invalid frontmatter matcher for \"\(key)\"")
+        throw ValidationError("Rule \"\(ruleName)\" has invalid frontmatter matcher for \"\(key)\"")
       }
       frontmatter[key] = try FrontmatterMatcher(json: matcherObject, key: key, ruleName: ruleName)
     }
 
+    let frontmatterQuery = try FrontmatterQueryMatcher(json: frontmatterQueryObject, ruleName: ruleName)
     let document = try DocumentMatcher(json: documentObject, ruleName: ruleName)
+    let file = try FileMatcher(json: fileObject, ruleName: ruleName)
 
-    if paths.isEmpty && frontmatter.isEmpty && document.isEmpty {
-      throw ValidationError("Schema rule \"\(ruleName)\" must define at least one match condition")
+    if paths.isEmpty && frontmatter.isEmpty && frontmatterQuery.isEmpty && document.isEmpty && file.isEmpty {
+      throw ValidationError("Rule \"\(ruleName)\" must define at least one match condition")
     }
 
     self.paths = paths
     self.excludePaths = excludePaths
     self.frontmatter = frontmatter
+    self.frontmatterQuery = frontmatterQuery
     self.document = document
+    self.file = file
   }
 
   var jsonObject: [String: Any] {
@@ -383,8 +396,50 @@ struct RuleMatch {
     if !frontmatter.isEmpty {
       object["frontmatter"] = frontmatter.mapValues { $0.jsonObject }
     }
+    if !frontmatterQuery.isEmpty {
+      object["frontmatterQuery"] = frontmatterQuery.jsonObject
+    }
     if !document.isEmpty {
       object["document"] = document.jsonObject
+    }
+    if !file.isEmpty {
+      object["file"] = file.jsonObject
+    }
+    return object
+  }
+}
+
+/// Describes whole-frontmatter query predicates that select files for a rule.
+struct FrontmatterQueryMatcher: Equatable {
+  var jmespath: String?
+
+  var isEmpty: Bool { jmespath == nil }
+
+  init(jmespath: String? = nil) {
+    self.jmespath = jmespath
+  }
+
+  init(json: [String: Any], ruleName: String) throws {
+    if let jmespath = json["jmespath"] as? String, !jmespath.isEmpty {
+      _ = try compileJMESPath(jmespath, ruleName: ruleName)
+      self.jmespath = jmespath
+    } else if json["jmespath"] != nil {
+      throw ValidationError("Rule \"\(ruleName)\" frontmatterQuery jmespath matcher requires a non-empty expression")
+    } else {
+      self.jmespath = nil
+    }
+
+    let supported = Set(["jmespath"])
+    let unsupported = json.keys.filter { !supported.contains($0) }
+    if let firstUnsupported = unsupported.sorted().first {
+      throw ValidationError("Rule \"\(ruleName)\" has unsupported frontmatterQuery matcher \"\(firstUnsupported)\"")
+    }
+  }
+
+  var jsonObject: [String: Any] {
+    var object: [String: Any] = [:]
+    if let jmespath {
+      object["jmespath"] = jmespath
     }
     return object
   }
@@ -393,27 +448,100 @@ struct RuleMatch {
 /// Describes Markdown document conditions that select files for a rule.
 struct DocumentMatcher: Equatable {
   var hasHeading: String?
+  var headingRegex: String?
+  var hasHeadingAtLevel: HeadingLevelMatcher?
+  var hasSection: String?
+  var bodyContains: String?
+  var bodyRegex: String?
+  var hasWikilink: WikilinkMatcher?
+  var lineCount: CountRange?
+  var wordCount: CountRange?
 
-  var isEmpty: Bool { hasHeading == nil }
+  var isEmpty: Bool {
+    hasHeading == nil && headingRegex == nil && hasHeadingAtLevel == nil && hasSection == nil
+      && bodyContains == nil && bodyRegex == nil && hasWikilink == nil && lineCount == nil && wordCount == nil
+  }
 
-  init(hasHeading: String? = nil) {
+  init(
+    hasHeading: String? = nil,
+    headingRegex: String? = nil,
+    hasHeadingAtLevel: HeadingLevelMatcher? = nil,
+    hasSection: String? = nil,
+    bodyContains: String? = nil,
+    bodyRegex: String? = nil,
+    hasWikilink: WikilinkMatcher? = nil,
+    lineCount: CountRange? = nil,
+    wordCount: CountRange? = nil
+  ) {
     self.hasHeading = hasHeading
+    self.headingRegex = headingRegex
+    self.hasHeadingAtLevel = hasHeadingAtLevel
+    self.hasSection = hasSection
+    self.bodyContains = bodyContains
+    self.bodyRegex = bodyRegex
+    self.hasWikilink = hasWikilink
+    self.lineCount = lineCount
+    self.wordCount = wordCount
   }
 
   init(json: [String: Any], ruleName: String) throws {
     if let hasHeading = json["hasHeading"] as? String, !hasHeading.isEmpty {
       self.hasHeading = hasHeading
     } else if json["hasHeading"] != nil {
-      throw ValidationError("Schema rule \"\(ruleName)\" document hasHeading matcher requires a non-empty heading")
+      throw ValidationError("Rule \"\(ruleName)\" document hasHeading matcher requires a non-empty heading")
     } else {
       self.hasHeading = nil
     }
 
-    let supported = Set(["hasHeading"])
+    self.headingRegex = try Self.regex(json["headingRegex"], name: "headingRegex", ruleName: ruleName)
+    self.hasHeadingAtLevel = try Self.headingLevel(json["hasHeadingAtLevel"], ruleName: ruleName)
+    self.hasSection = try Self.nonEmptyString(json["hasSection"], name: "hasSection", ruleName: ruleName)
+    self.bodyContains = try Self.nonEmptyString(json["bodyContains"], name: "bodyContains", ruleName: ruleName)
+    self.bodyRegex = try Self.regex(json["bodyRegex"], name: "bodyRegex", ruleName: ruleName)
+    self.hasWikilink = try Self.wikilink(json["hasWikilink"], ruleName: ruleName)
+    self.lineCount = try Self.countRange(json["lineCount"], name: "lineCount", ruleName: ruleName)
+    self.wordCount = try Self.countRange(json["wordCount"], name: "wordCount", ruleName: ruleName)
+
+    let supported = Set(["hasHeading", "headingRegex", "hasHeadingAtLevel", "hasSection", "bodyContains", "bodyRegex", "hasWikilink", "lineCount", "wordCount"])
     let unsupported = json.keys.filter { !supported.contains($0) }
     if let firstUnsupported = unsupported.sorted().first {
-      throw ValidationError("Schema rule \"\(ruleName)\" has unsupported document matcher \"\(firstUnsupported)\"")
+      throw ValidationError("Rule \"\(ruleName)\" has unsupported document matcher \"\(firstUnsupported)\"")
     }
+  }
+
+  private static func nonEmptyString(_ value: Any?, name: String, ruleName: String) throws -> String? {
+    guard let value else { return nil }
+    guard let string = value as? String, !string.isEmpty else {
+      throw ValidationError("Rule \"\(ruleName)\" document \(name) matcher requires a non-empty string")
+    }
+    return string
+  }
+
+  private static func regex(_ value: Any?, name: String, ruleName: String) throws -> String? {
+    guard let string = try nonEmptyString(value, name: name, ruleName: ruleName) else { return nil }
+    try validateRegex(string, context: "Rule \"\(ruleName)\" document \(name)")
+    return string
+  }
+
+  private static func headingLevel(_ value: Any?, ruleName: String) throws -> HeadingLevelMatcher? {
+    guard let value else { return nil }
+    guard let object = value as? [String: Any] else {
+      throw ValidationError("Rule \"\(ruleName)\" document hasHeadingAtLevel matcher requires an object")
+    }
+    return try HeadingLevelMatcher(json: object, ruleName: ruleName)
+  }
+
+  private static func wikilink(_ value: Any?, ruleName: String) throws -> WikilinkMatcher? {
+    guard let value else { return nil }
+    return try WikilinkMatcher(value: value, ruleName: ruleName)
+  }
+
+  private static func countRange(_ value: Any?, name: String, ruleName: String) throws -> CountRange? {
+    guard let value else { return nil }
+    guard let object = value as? [String: Any] else {
+      throw ValidationError("Rule \"\(ruleName)\" document \(name) matcher requires an object")
+    }
+    return try CountRange(json: object, context: "Rule \"\(ruleName)\" document \(name)")
   }
 
   var jsonObject: [String: Any] {
@@ -421,6 +549,163 @@ struct DocumentMatcher: Equatable {
     if let hasHeading {
       object["hasHeading"] = hasHeading
     }
+    if let headingRegex { object["headingRegex"] = headingRegex }
+    if let hasHeadingAtLevel { object["hasHeadingAtLevel"] = hasHeadingAtLevel.jsonObject }
+    if let hasSection { object["hasSection"] = hasSection }
+    if let bodyContains { object["bodyContains"] = bodyContains }
+    if let bodyRegex { object["bodyRegex"] = bodyRegex }
+    if let hasWikilink { object["hasWikilink"] = hasWikilink.jsonValue }
+    if let lineCount { object["lineCount"] = lineCount.jsonObject }
+    if let wordCount { object["wordCount"] = wordCount.jsonObject }
+    return object
+  }
+}
+/// Describes an exact heading text at a specific Markdown heading level.
+struct HeadingLevelMatcher: Equatable {
+  var heading: String
+  var level: Int
+
+  init(json: [String: Any], ruleName: String) throws {
+    guard let heading = json["heading"] as? String, !heading.isEmpty else {
+      throw ValidationError("Rule \"\(ruleName)\" document hasHeadingAtLevel matcher requires a non-empty heading")
+    }
+    guard let level = json["level"] as? Int, (1...6).contains(level) else {
+      throw ValidationError("Rule \"\(ruleName)\" document hasHeadingAtLevel matcher requires level 1...6")
+    }
+    self.heading = heading
+    self.level = level
+  }
+
+  var jsonObject: [String: Any] { ["heading": heading, "level": level] }
+}
+/// Describes an inclusive integer range.
+struct CountRange: Equatable {
+  var min: Int?
+  var max: Int?
+
+  init(json: [String: Any], context: String) throws {
+    let min = json["min"] as? Int
+    let max = json["max"] as? Int
+    guard min != nil || max != nil else { throw ValidationError("\(context) matcher requires min or max") }
+    if let min, min < 0 { throw ValidationError("\(context) min must be non-negative") }
+    if let max, max < 0 { throw ValidationError("\(context) max must be non-negative") }
+    if let min, let max, min > max { throw ValidationError("\(context) min must be less than or equal to max") }
+    self.min = min
+    self.max = max
+  }
+
+  var jsonObject: [String: Any] {
+    var object: [String: Any] = [:]
+    if let min { object["min"] = min }
+    if let max { object["max"] = max }
+    return object
+  }
+
+  func contains(_ value: Int) -> Bool {
+    if let min, value < min { return false }
+    if let max, value > max { return false }
+    return true
+  }
+}
+/// Describes a wikilink existence or target matcher.
+struct WikilinkMatcher: Equatable {
+  var target: String?
+
+  init(value: Any, ruleName: String) throws {
+    if let bool = value as? Bool {
+      guard bool else {
+        throw ValidationError("Rule \"\(ruleName)\" document hasWikilink matcher only supports true or a target string")
+      }
+      self.target = nil
+    } else if let string = value as? String, !string.isEmpty {
+      self.target = string
+    } else {
+      throw ValidationError("Rule \"\(ruleName)\" document hasWikilink matcher requires true or a non-empty target string")
+    }
+  }
+
+  var jsonValue: Any { target ?? true }
+}
+/// Describes path and file metadata conditions that select files for a rule.
+struct FileMatcher: Equatable {
+  var pathRegex: String?
+  var filenameEquals: String?
+  var extensionIn: [String]
+  var modifiedAfter: DateTimeLiteral?
+  var modifiedBefore: DateTimeLiteral?
+
+  var isEmpty: Bool {
+    pathRegex == nil && filenameEquals == nil && extensionIn.isEmpty && modifiedAfter == nil && modifiedBefore == nil
+  }
+
+  init(
+    pathRegex: String? = nil,
+    filenameEquals: String? = nil,
+    extensionIn: [String] = [],
+    modifiedAfter: DateTimeLiteral? = nil,
+    modifiedBefore: DateTimeLiteral? = nil
+  ) {
+    self.pathRegex = pathRegex
+    self.filenameEquals = filenameEquals
+    self.extensionIn = extensionIn
+    self.modifiedAfter = modifiedAfter
+    self.modifiedBefore = modifiedBefore
+  }
+
+  init(json: [String: Any], ruleName: String) throws {
+    if let pathRegex = json["pathRegex"] as? String, !pathRegex.isEmpty {
+      try validateRegex(pathRegex, context: "Rule \"\(ruleName)\" file pathRegex")
+      self.pathRegex = pathRegex
+    } else if json["pathRegex"] != nil {
+      throw ValidationError("Rule \"\(ruleName)\" file pathRegex matcher requires a non-empty regex")
+    } else {
+      self.pathRegex = nil
+    }
+
+    if let filenameEquals = json["filenameEquals"] as? String, !filenameEquals.isEmpty {
+      self.filenameEquals = filenameEquals
+    } else if json["filenameEquals"] != nil {
+      throw ValidationError("Rule \"\(ruleName)\" file filenameEquals matcher requires a non-empty string")
+    } else {
+      self.filenameEquals = nil
+    }
+
+    if let extensionIn = json["extensionIn"] as? [String], !extensionIn.isEmpty {
+      self.extensionIn = extensionIn.map { $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")) }
+      if self.extensionIn.contains(where: { $0.isEmpty }) {
+        throw ValidationError("Rule \"\(ruleName)\" file extensionIn matcher requires non-empty extensions")
+      }
+    } else if json["extensionIn"] != nil {
+      throw ValidationError("Rule \"\(ruleName)\" file extensionIn matcher requires a non-empty string array")
+    } else {
+      self.extensionIn = []
+    }
+
+    self.modifiedAfter = try Self.dateTime(json["modifiedAfter"], name: "modifiedAfter", ruleName: ruleName)
+    self.modifiedBefore = try Self.dateTime(json["modifiedBefore"], name: "modifiedBefore", ruleName: ruleName)
+
+    let supported = Set(["pathRegex", "filenameEquals", "extensionIn", "modifiedAfter", "modifiedBefore"])
+    let unsupported = json.keys.filter { !supported.contains($0) }
+    if let firstUnsupported = unsupported.sorted().first {
+      throw ValidationError("Rule \"\(ruleName)\" has unsupported file matcher \"\(firstUnsupported)\"")
+    }
+  }
+
+  private static func dateTime(_ value: Any?, name: String, ruleName: String) throws -> DateTimeLiteral? {
+    guard let value else { return nil }
+    guard let string = value as? String, let literal = DateTimeLiteral(string) else {
+      throw ValidationError("Rule \"\(ruleName)\" file \(name) matcher requires YYYY-MM-DD or RFC 3339 date-time")
+    }
+    return literal
+  }
+
+  var jsonObject: [String: Any] {
+    var object: [String: Any] = [:]
+    if let pathRegex { object["pathRegex"] = pathRegex }
+    if let filenameEquals { object["filenameEquals"] = filenameEquals }
+    if !extensionIn.isEmpty { object["extensionIn"] = extensionIn }
+    if let modifiedAfter { object["modifiedAfter"] = modifiedAfter.rawValue }
+    if let modifiedBefore { object["modifiedBefore"] = modifiedBefore.rawValue }
     return object
   }
 }
@@ -439,12 +724,76 @@ struct FrontmatterMatcher {
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
   init(json: [String: Any], key: String, ruleName: String) throws {
-    let supported = Set(["includes", "equals", "notIncludes", "after", "between"])
+    let supported = Set([
+      "includes", "equals", "notIncludes", "doesntEqual", "hasKey", "doesntHaveKey", "regex", "startsWith",
+      "endsWith", "contains", "empty", "emptyString", "emptyArray", "emptyObject", "notEmpty", "in", "notIn",
+      "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual", "after", "onOrAfter", "before",
+      "onOrBefore", "between", "typeIs",
+    ])
     let operators = json.filter { supported.contains($0.key) }
     guard !operators.isEmpty else {
-      throw ValidationError("Schema rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" requires a supported operator")
+      throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" requires a supported operator")
     }
+    if let unsupported = json.keys.first(where: { !supported.contains($0) }) {
+      throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" has unsupported operator \"\(unsupported)\"")
+    }
+    try Self.validateOperands(operators, key: key, ruleName: ruleName)
     self.operators = operators
+  }
+
+  private static func validateOperands(_ operators: [String: Any], key: String, ruleName: String) throws {
+    for (operatorName, operand) in operators {
+      switch operatorName {
+      case "hasKey", "doesntHaveKey", "empty", "emptyString", "emptyArray", "emptyObject", "notEmpty":
+        if let bool = operand as? Bool, bool == true { continue }
+        throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" operator \"\(operatorName)\" requires true")
+      case "regex":
+        guard let pattern = operand as? String, !pattern.isEmpty else {
+          throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" regex requires a non-empty string")
+        }
+        try validateRegex(pattern, context: "Rule \"\(ruleName)\" frontmatter \"\(key)\" regex")
+      case "startsWith", "endsWith", "contains":
+        guard let string = operand as? String, !string.isEmpty else {
+          throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" operator \"\(operatorName)\" requires a non-empty string")
+        }
+      case "in", "notIn":
+        guard let array = operand as? [Any], !array.isEmpty else {
+          throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" operator \"\(operatorName)\" requires a non-empty array")
+        }
+      case "greaterThan", "greaterThanOrEqual", "lessThan", "lessThanOrEqual":
+        guard numericValue(operand) != nil else {
+          throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" operator \"\(operatorName)\" requires a number")
+        }
+      case "after", "onOrAfter", "before", "onOrBefore":
+        guard let string = operand as? String, DateTimeLiteral(string) != nil else {
+          throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" operator \"\(operatorName)\" requires YYYY-MM-DD or RFC 3339 date-time")
+        }
+      case "between":
+        if let range = operand as? [String: Any], range["from"] != nil || range["to"] != nil {
+          guard let fromValue = range["from"], let toValue = range["to"] else {
+            throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" between requires from and to")
+          }
+          if let from = numericValue(fromValue), let to = numericValue(toValue) {
+            if from > to { throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" between from must be less than or equal to to") }
+          } else if let fromString = fromValue as? String, let toString = toValue as? String,
+                    let from = DateTimeLiteral(fromString), let to = DateTimeLiteral(toString) {
+            guard dateTimeCompare(from, to, precision: min(from.precision, to.precision)) != .orderedDescending else {
+              throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" between from must be less than or equal to to")
+            }
+          } else {
+            throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" between requires numeric or date/time bounds")
+          }
+        } else {
+          throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" between requires from and to")
+        }
+      case "typeIs":
+        guard let type = operand as? String, ["string", "boolean", "number", "array", "object", "null"].contains(type) else {
+          throw ValidationError("Rule \"\(ruleName)\" frontmatter matcher for \"\(key)\" typeIs requires string, boolean, number, array, object, or null")
+        }
+      default:
+        continue
+      }
+    }
   }
 
   var jsonObject: [String: Any] {
@@ -535,7 +884,7 @@ enum RuleManager {
   static func addRule(_ options: RuleOptions) throws -> Path {
     var config = try MdUtilsConfig.load()
     if config.schemaRules.contains(where: { $0.name == options.name }) {
-      throw ValidationError("Schema rule already exists: \"\(options.name)\"")
+      throw ValidationError("Rule already exists: \"\(options.name)\"")
     }
 
     let schemaFilename = options.schema ?? "\(options.name).schema.json"
@@ -567,7 +916,7 @@ enum RuleManager {
   static func removeRule(named name: String, deleteSchema: Bool) throws -> (removed: Rule, deletedSchema: Bool, schemaPath: Path) {
     var config = try MdUtilsConfig.load()
     guard let index = config.schemaRules.firstIndex(where: { $0.name == name }) else {
-      throw ValidationError("Schema rule not found: \"\(name)\"")
+      throw ValidationError("Rule not found: \"\(name)\"")
     }
 
     let removed = config.schemaRules.remove(at: index)
@@ -735,7 +1084,7 @@ enum RulesValidatorRunner {
     let rules: [Rule]
     if let ruleName {
       guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
-        throw ValidationError("Schema rule not found: \"\(ruleName)\"")
+        throw ValidationError("Rule not found: \"\(ruleName)\"")
       }
       rules = [rule]
     } else {
@@ -748,7 +1097,10 @@ enum RulesValidatorRunner {
 
     for file in files {
       let relativePath = relativePath(from: root, to: file)
-      let pathMatchedRules = rules.filter { rulePathConditionsMatch(rule: $0, relativePath: relativePath) }
+      let pathMatchedRules = rules.filter {
+        rulePathConditionsMatch(rule: $0, relativePath: relativePath)
+          && ruleFileConditionsMatch(rule: $0, file: file, relativePath: relativePath)
+      }
       guard !pathMatchedRules.isEmpty else { continue }
 
       let content = try file.read(.utf8)
@@ -780,7 +1132,7 @@ enum RulesValidatorRunner {
         }
 
         if !frontmatterPresence.hasFrontmatter {
-          if !rule.match.frontmatter.isEmpty {
+          if !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty {
             continue
           } else if rule.checks.contains(where: { $0.requiresFrontmatter }) {
             results.append(errorResult(
@@ -806,6 +1158,7 @@ enum RulesValidatorRunner {
         if frontmatterPresence.hasFrontmatter {
           guard let parsedFrontmatter else { continue }
           guard frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
+          guard frontmatterQueryConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
         }
         guard documentConditionsMatch(rule: rule, document: document) else { continue }
 
@@ -847,7 +1200,7 @@ enum RulesValidatorRunner {
   ) throws -> [Path] {
     let config = try MdUtilsConfig.load(from: configPath)
     guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
-      throw ValidationError("Schema rule not found: \"\(ruleName)\"")
+      throw ValidationError("Rule not found: \"\(ruleName)\"")
     }
 
     let files = try RuleFileScanner.markdownFiles(root: root)
@@ -855,7 +1208,8 @@ enum RulesValidatorRunner {
     for file in files {
       let relativePath = relativePath(from: root, to: file)
       guard rulePathConditionsMatch(rule: rule, relativePath: relativePath) else { continue }
-      guard !rule.match.frontmatter.isEmpty || !rule.match.document.isEmpty else {
+      guard ruleFileConditionsMatch(rule: rule, file: file, relativePath: relativePath) else { continue }
+      guard !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty || !rule.match.document.isEmpty else {
         matches.append(file)
         continue
       }
@@ -864,10 +1218,11 @@ enum RulesValidatorRunner {
       let frontmatterPresence = frontmatterPresence(in: content)
       do {
         let document = try MarkdownDocument(content: content)
-        if !rule.match.frontmatter.isEmpty {
+        if !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty {
           guard frontmatterPresence.hasFrontmatter else { continue }
           let parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
           guard frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
+          guard frontmatterQueryConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
         }
         if documentConditionsMatch(rule: rule, document: document) {
           matches.append(file)
@@ -919,7 +1274,11 @@ enum RulesValidatorRunner {
       )
     }
 
-    guard !rule.match.frontmatter.isEmpty || !rule.match.document.isEmpty else {
+    guard ruleFileConditionsMatch(rule: rule, file: file, relativePath: relativePath) else {
+      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons + ["file metadata did not match"])
+    }
+
+    guard !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty || !rule.match.document.isEmpty else {
       return RuleMatchEvaluation(rule: rule, matched: true, reasons: reasons)
     }
 
@@ -933,7 +1292,7 @@ enum RulesValidatorRunner {
       return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
     }
 
-    if !rule.match.frontmatter.isEmpty {
+    if !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty {
       guard frontmatterPresence.hasFrontmatter else {
         reasons.append("frontmatter not present")
         return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
@@ -953,27 +1312,57 @@ enum RulesValidatorRunner {
       }
 
       for (key, matcher) in rule.match.frontmatter.sorted(by: { $0.key < $1.key }) {
-        guard let value = object[key] else {
-          reasons.append("frontmatter \"\(key)\" is missing")
-          return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-        }
-        guard frontmatterValue(value, matches: matcher) else {
-          reasons.append("frontmatter \"\(key)\" did not match \(frontmatterMatcherDescription(matcher))")
+        guard frontmatterValue(object[key], matches: matcher, keyExists: object.keys.contains(key)) else {
+          if object[key] == nil {
+            reasons.append("frontmatter \"\(key)\" is missing")
+          } else {
+            reasons.append("frontmatter \"\(key)\" did not match \(frontmatterMatcherDescription(matcher))")
+          }
           return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
         }
         reasons.append("frontmatter \"\(key)\" matched \(frontmatterMatcherDescription(matcher))")
       }
-    }
 
-    if let hasHeading = rule.match.document.hasHeading {
-      guard headingTexts(in: document.body).contains(hasHeading) else {
-        reasons.append("document heading \"\(hasHeading)\" not found")
+      guard frontmatterQueryConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else {
+        reasons.append("frontmatterQuery did not match")
         return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
       }
-      reasons.append("document heading \"\(hasHeading)\" found")
+      if !rule.match.frontmatterQuery.isEmpty {
+        reasons.append("frontmatterQuery matched")
+      }
+    }
+
+    guard documentConditionsMatch(rule: rule, document: document) else {
+      reasons.append("document predicates did not match")
+      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
     }
 
     return RuleMatchEvaluation(rule: rule, matched: true, reasons: reasons)
+  }
+
+  /// Returns whether file metadata satisfies a rule file condition.
+  private static func ruleFileConditionsMatch(rule: Rule, file: Path, relativePath: String) -> Bool {
+    let matcher = rule.match.file
+    guard !matcher.isEmpty else { return true }
+
+    if let pathRegex = matcher.pathRegex, !regexMatches(relativePath, pattern: pathRegex) { return false }
+    if let filenameEquals = matcher.filenameEquals, file.lastComponent != filenameEquals { return false }
+    if !matcher.extensionIn.isEmpty {
+      guard let ext = file.extension?.lowercased(), matcher.extensionIn.contains(ext) else { return false }
+    }
+    if matcher.modifiedAfter != nil || matcher.modifiedBefore != nil {
+      guard let modified = fileModificationDate(file) else { return false }
+      let literal = DateTimeLiteral(date: modified, precision: .dateTime)
+      if let modifiedAfter = matcher.modifiedAfter,
+         dateTimeCompare(literal, modifiedAfter, precision: modifiedAfter.precision) != .orderedDescending {
+        return false
+      }
+      if let modifiedBefore = matcher.modifiedBefore,
+         dateTimeCompare(literal, modifiedBefore, precision: modifiedBefore.precision) != .orderedAscending {
+        return false
+      }
+    }
+    return true
   }
 
   /// Returns whether a project-relative path matches a rule path condition.
@@ -996,17 +1385,50 @@ enum RulesValidatorRunner {
     guard let object = frontmatter as? [String: Any] else { return false }
 
     for (key, matcher) in rule.match.frontmatter {
-      guard let value = object[key] else { return false }
-      if !frontmatterValue(value, matches: matcher) {
+      if !frontmatterValue(object[key], matches: matcher, keyExists: object.keys.contains(key)) {
         return false
       }
     }
     return true
   }
 
+  private static func frontmatterQueryConditionsMatch(rule: Rule, frontmatter: Any) -> Bool {
+    guard let query = rule.match.frontmatterQuery.jmespath else { return true }
+    guard let expression = try? compileJMESPath(query, ruleName: rule.name) else { return false }
+    guard let result = try? expression.search(object: frontmatter) else { return false }
+    return isTruthy(result)
+  }
+
   private static func documentConditionsMatch(rule: Rule, document: MarkdownDocument?) -> Bool {
-    if let hasHeading = rule.match.document.hasHeading {
-      guard headingTexts(in: document?.body ?? "").contains(hasHeading) else { return false }
+    let matcher = rule.match.document
+    let body = document?.body ?? ""
+    let headings = parsedHeadings(in: body)
+    if let hasHeading = matcher.hasHeading {
+      guard headings.contains(where: { $0.text == hasHeading }) else { return false }
+    }
+    if let headingRegex = matcher.headingRegex {
+      guard headings.contains(where: { regexMatches($0.text, pattern: headingRegex) }) else { return false }
+    }
+    if let hasHeadingAtLevel = matcher.hasHeadingAtLevel {
+      guard headings.contains(where: { $0.text == hasHeadingAtLevel.heading && $0.level == hasHeadingAtLevel.level }) else { return false }
+    }
+    if let hasSection = matcher.hasSection {
+      guard sectionExists(heading: hasSection, in: body) else { return false }
+    }
+    if let bodyContains = matcher.bodyContains {
+      guard body.contains(bodyContains) else { return false }
+    }
+    if let bodyRegex = matcher.bodyRegex {
+      guard regexMatches(body, pattern: bodyRegex) else { return false }
+    }
+    if let hasWikilink = matcher.hasWikilink {
+      guard wikilinkMatches(body: body, matcher: hasWikilink) else { return false }
+    }
+    if let lineCount = matcher.lineCount {
+      guard lineCount.contains(bodyLineCount(body)) else { return false }
+    }
+    if let wordCount = matcher.wordCount {
+      guard wordCount.contains(bodyWordCount(body)) else { return false }
     }
     return true
   }
@@ -1070,29 +1492,82 @@ enum RulesValidatorRunner {
     }
   }
 
-  private static func frontmatterValue(_ value: Any, matches matcher: FrontmatterMatcher) -> Bool {
+  private static func frontmatterValue(_ value: Any?, matches matcher: FrontmatterMatcher, keyExists: Bool = true) -> Bool {
     for (operatorName, operand) in matcher.operators {
       switch operatorName {
+      case "hasKey":
+        guard keyExists else { return false }
+      case "doesntHaveKey":
+        guard !keyExists else { return false }
+      default:
+        guard keyExists, let value else { return false }
+        if !frontmatterExistingValue(value, matches: operatorName, operand: operand) { return false }
+      }
+    }
+    return true
+  }
+
+  private static func frontmatterExistingValue(_ value: Any, matches operatorName: String, operand: Any) -> Bool {
+    switch operatorName {
       case "includes":
         guard let array = value as? [Any], array.contains(where: { jsonValuesEqual($0, operand) }) else { return false }
       case "notIncludes":
         guard let array = value as? [Any], !array.contains(where: { jsonValuesEqual($0, operand) }) else { return false }
       case "equals":
         guard jsonValuesEqual(value, operand) else { return false }
+      case "doesntEqual":
+        guard !jsonValuesEqual(value, operand) else { return false }
+      case "regex":
+        guard let string = value as? String, let pattern = operand as? String, regexMatches(string, pattern: pattern) else { return false }
+      case "startsWith":
+        guard let string = value as? String, let prefix = operand as? String, string.hasPrefix(prefix) else { return false }
+      case "endsWith":
+        guard let string = value as? String, let suffix = operand as? String, string.hasSuffix(suffix) else { return false }
+      case "contains":
+        guard let string = value as? String, let substring = operand as? String, string.contains(substring) else { return false }
+      case "empty":
+        guard isEmptyValue(value) else { return false }
+      case "emptyString":
+        guard let string = value as? String, string.isEmpty else { return false }
+      case "emptyArray":
+        guard let array = value as? [Any], array.isEmpty else { return false }
+      case "emptyObject":
+        guard let object = value as? [String: Any], object.isEmpty else { return false }
+      case "notEmpty":
+        guard !isEmptyValue(value) else { return false }
+      case "in":
+        guard let array = operand as? [Any], array.contains(where: { jsonValuesEqual(value, $0) }) else { return false }
+      case "notIn":
+        guard let array = operand as? [Any], !array.contains(where: { jsonValuesEqual(value, $0) }) else { return false }
+      case "greaterThan":
+        guard compareNumbers(value, operand) == .orderedDescending else { return false }
+      case "greaterThanOrEqual":
+        let comparison = compareNumbers(value, operand)
+        guard comparison == .orderedDescending || comparison == .orderedSame else { return false }
+      case "lessThan":
+        guard compareNumbers(value, operand) == .orderedAscending else { return false }
+      case "lessThanOrEqual":
+        let comparison = compareNumbers(value, operand)
+        guard comparison == .orderedAscending || comparison == .orderedSame else { return false }
       case "after":
-        guard let left = comparableDateString(value), let right = comparableDateString(operand), left > right else { return false }
+        guard compareDateTime(value, operand: operand) == .orderedDescending else { return false }
+      case "onOrAfter":
+        let comparison = compareDateTime(value, operand: operand)
+        guard comparison == .orderedDescending || comparison == .orderedSame else { return false }
+      case "before":
+        guard compareDateTime(value, operand: operand) == .orderedAscending else { return false }
+      case "onOrBefore":
+        let comparison = compareDateTime(value, operand: operand)
+        guard comparison == .orderedAscending || comparison == .orderedSame else { return false }
       case "between":
-        guard
-          let range = operand as? [String: Any],
-          let from = range["from"].flatMap(comparableDateString),
-          let to = range["to"].flatMap(comparableDateString),
-          let value = comparableDateString(value),
-          value >= from && value <= to
-        else { return false }
+        guard betweenMatches(value: value, range: operand) else { return false }
+      case "typeIs":
+        guard let expectedType = operand as? String, jsonTypeName(value) == expectedType else { return false }
+      case "hasKey", "doesntHaveKey":
+        break
       default:
         return false
       }
-    }
     return true
   }
 
@@ -1268,6 +1743,248 @@ func comparableDateString(_ value: Any) -> String? {
     return formatter.string(from: date)
   }
   return nil
+}
+/// Date/time precision used by rules predicates.
+enum DateTimePrecision: Comparable {
+  case date
+  case dateTime
+}
+
+/// Parsed date or date-time literal for precision-aware comparisons.
+struct DateTimeLiteral: Equatable {
+  var rawValue: String
+  var date: Date
+  var precision: DateTimePrecision
+
+  init?(_ rawValue: String) {
+    if let date = Self.dateOnlyFormatter.date(from: rawValue) {
+      self.rawValue = rawValue
+      self.date = date
+      self.precision = .date
+      return
+    }
+
+    if let date = Self.isoFormatter().date(from: rawValue) ?? Self.isoFormatterWithoutFractionalSeconds().date(from: rawValue) {
+      self.rawValue = rawValue
+      self.date = date
+      self.precision = .dateTime
+      return
+    }
+
+    return nil
+  }
+
+  init(date: Date, precision: DateTimePrecision = .date) {
+    self.rawValue = Self.isoFormatterWithoutFractionalSeconds().string(from: date)
+    self.date = date
+    self.precision = precision
+  }
+
+  private static let dateOnlyFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter
+  }()
+
+  private static func isoFormatter() -> ISO8601DateFormatter {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+  }
+
+  private static func isoFormatterWithoutFractionalSeconds() -> ISO8601DateFormatter {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    return formatter
+  }
+
+  private static func dateOnlyComponents(_ date: Date) -> DateComponents {
+    Calendar(identifier: .gregorian).dateComponents(in: TimeZone(secondsFromGMT: 0) ?? .gmt, from: date)
+  }
+
+  var dateKey: String {
+    let components = Self.dateOnlyComponents(date)
+    let year = components.year ?? 0
+    let month = components.month ?? 0
+    let day = components.day ?? 0
+    return String(format: "%04d-%02d-%02d", year, month, day)
+  }
+}
+
+extension DateTimeLiteral {
+  static func parse(_ value: Any) -> DateTimeLiteral? {
+    if let string = value as? String {
+      return DateTimeLiteral(string)
+    }
+    if let date = value as? Date {
+      return DateTimeLiteral(date: date)
+    }
+    return nil
+  }
+}
+
+extension TimeZone {
+  fileprivate static var gmt: TimeZone {
+    TimeZone(secondsFromGMT: 0) ?? TimeZone.current
+  }
+}
+
+/// Returns whether a string matches a configured regular expression.
+func regexMatches(_ value: String, pattern: String) -> Bool {
+  guard let expression = try? NSRegularExpression(pattern: pattern) else { return false }
+  let range = NSRange(value.startIndex..., in: value)
+  return expression.firstMatch(in: value, range: range) != nil
+}
+
+/// Validates a regular expression at config load time.
+func validateRegex(_ pattern: String, context: String) throws {
+  do {
+    _ = try NSRegularExpression(pattern: pattern)
+  } catch {
+    throw ValidationError("\(context) regex is invalid: \(error.localizedDescription)")
+  }
+}
+
+/// Compiles a JMESPath expression and wraps parser errors with rule context.
+func compileJMESPath(_ query: String, ruleName: String) throws -> JMESExpression {
+  do {
+    return try JMESExpression.compile(query)
+  } catch {
+    throw ValidationError("Rule \"\(ruleName)\" frontmatterQuery jmespath expression is invalid: \(error.localizedDescription)")
+  }
+}
+
+/// Returns truthiness using the same rules as `fm search`.
+func isTruthy(_ value: Any?) -> Bool {
+  guard let value else { return false }
+  if let bool = value as? Bool { return bool }
+  if let string = value as? String { return !string.isEmpty }
+  if let array = value as? [Any] { return !array.isEmpty }
+  if let dict = value as? [String: Any] { return !dict.isEmpty }
+  return true
+}
+
+/// Returns a numeric value for JSON/YAML scalar comparisons.
+func numericValue(_ value: Any) -> Double? {
+  if let int = value as? Int { return Double(int) }
+  if let double = value as? Double { return double }
+  if let float = value as? Float { return Double(float) }
+  if let number = value as? NSNumber { return number.doubleValue }
+  return nil
+}
+
+/// Compares two numeric values.
+func compareNumbers(_ lhs: Any, _ rhs: Any) -> ComparisonResult? {
+  guard let left = numericValue(lhs), let right = numericValue(rhs) else { return nil }
+  if left < right { return .orderedAscending }
+  if left > right { return .orderedDescending }
+  return .orderedSame
+}
+
+/// Compares two date/time literals at the requested precision.
+func dateTimeCompare(_ lhs: DateTimeLiteral, _ rhs: DateTimeLiteral, precision: DateTimePrecision) -> ComparisonResult {
+  switch precision {
+  case .date:
+    return lhs.dateKey.compare(rhs.dateKey)
+  case .dateTime:
+    return lhs.date.compare(rhs.date)
+  }
+}
+
+/// Compares a frontmatter value against a date/time predicate operand.
+func compareDateTime(_ value: Any, operand: Any) -> ComparisonResult? {
+  guard let left = DateTimeLiteral.parse(value), let right = DateTimeLiteral.parse(operand) else { return nil }
+  guard left.precision >= right.precision else { return nil }
+  return dateTimeCompare(left, right, precision: right.precision)
+}
+
+/// Returns whether a value falls inside an inclusive numeric or date/time range.
+func betweenMatches(value: Any, range: Any) -> Bool {
+  guard let range = range as? [String: Any], let from = range["from"], let to = range["to"] else { return false }
+  if let valueNumber = numericValue(value), let fromNumber = numericValue(from), let toNumber = numericValue(to) {
+    return valueNumber >= fromNumber && valueNumber <= toNumber
+  }
+  guard let valueDate = DateTimeLiteral.parse(value), let fromDate = DateTimeLiteral.parse(from), let toDate = DateTimeLiteral.parse(to) else {
+    return false
+  }
+  let precision = min(fromDate.precision, toDate.precision)
+  guard valueDate.precision >= precision else { return false }
+  return dateTimeCompare(valueDate, fromDate, precision: precision) != .orderedAscending
+    && dateTimeCompare(valueDate, toDate, precision: precision) != .orderedDescending
+}
+
+/// Returns whether a JSON/YAML value is one of the supported empty values.
+func isEmptyValue(_ value: Any) -> Bool {
+  if let string = value as? String { return string.isEmpty }
+  if let array = value as? [Any] { return array.isEmpty }
+  if let object = value as? [String: Any] { return object.isEmpty }
+  return false
+}
+
+/// Returns a JSON/YAML type name for predicate matching.
+func jsonTypeName(_ value: Any) -> String {
+  if value is NSNull { return "null" }
+  if value is Bool { return "boolean" }
+  if numericValue(value) != nil { return "number" }
+  if value is String { return "string" }
+  if value is [Any] { return "array" }
+  if value is [String: Any] { return "object" }
+  return "object"
+}
+
+/// Returns a file modification date when available.
+func fileModificationDate(_ path: Path) -> Date? {
+  let attributes = try? FileManager.default.attributesOfItem(atPath: path.string)
+  return attributes?[.modificationDate] as? Date
+}
+
+/// Extracts ATX headings and their levels from Markdown body.
+func parsedHeadings(in body: String) -> [(level: Int, text: String)] {
+  body.split(separator: "\n", omittingEmptySubsequences: false).compactMap { line in
+    let trimmed = line.trimmingCharacters(in: .whitespaces)
+    guard trimmed.hasPrefix("#") else { return nil }
+    let hashes = trimmed.prefix { $0 == "#" }
+    guard (1...6).contains(hashes.count) else { return nil }
+    let afterHashes = trimmed.dropFirst(hashes.count)
+    guard afterHashes.first == " " else { return nil }
+    return (hashes.count, String(afterHashes.dropFirst()).trimmingCharacters(in: .whitespaces))
+  }
+}
+
+/// Returns whether a heading starts a non-empty section.
+func sectionExists(heading: String, in body: String) -> Bool {
+  let lines = body.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+  var inSection = false
+  var sectionLevel = 0
+  for line in lines {
+    if let parsed = parsedHeadings(in: line).first {
+      if inSection && parsed.level <= sectionLevel { return false }
+      if parsed.text == heading {
+        inSection = true
+        sectionLevel = parsed.level
+        continue
+      }
+    }
+    if inSection && !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      return true
+    }
+  }
+  return false
+}
+
+/// Returns whether raw Markdown body has any wikilink or a specific wikilink target.
+func wikilinkMatches(body: String, matcher: WikilinkMatcher) -> Bool {
+  guard let expression = try? NSRegularExpression(pattern: #"\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]"#) else { return false }
+  let range = NSRange(body.startIndex..., in: body)
+  let matches = expression.matches(in: body, range: range)
+  guard let target = matcher.target else { return !matches.isEmpty }
+  return matches.contains { match in
+    guard let targetRange = Range(match.range(at: 1), in: body) else { return false }
+    return String(body[targetRange]) == target
+  }
 }
 /// Extracts ATX heading text from Markdown body without requiring a full AST parse.
 func headingTexts(in body: String) -> [String] {

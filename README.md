@@ -291,9 +291,20 @@ Example config:
       "name": "books",
       "match": {
         "paths": ["Books/**/*.md"],
+        "file": {
+          "extensionIn": ["md", "markdown"]
+        },
         "frontmatter": {
           "tags": { "includes": "Book" },
-          "publish": { "equals": true }
+          "publish": { "equals": true },
+          "date": { "between": { "from": "2000-01-01", "to": "2015-04-01" } }
+        },
+        "frontmatterQuery": {
+          "jmespath": "author.name"
+        },
+        "document": {
+          "hasHeading": "Summary",
+          "wordCount": { "max": 2000 }
         }
       },
       "checks": [
@@ -329,10 +340,22 @@ Config fields:
 - `rules[].name`: Unique rule name for `md-utils rules validate <rule-name>`.
 - `rules[].match.paths`: Glob patterns matched against project-relative Markdown paths.
 - `rules[].match.excludePaths`: Glob patterns excluded after paths match.
-- `rules[].match.frontmatter`: Frontmatter predicates. Supported operators are `includes`, `notIncludes`, `equals`, `after`, and inclusive `between` with `YYYY-MM-DD` date strings.
+- `rules[].match.file`: File metadata predicates. Supported operators are `pathRegex`, `filenameEquals`, `extensionIn`, `modifiedAfter`, and `modifiedBefore`.
+- `rules[].match.frontmatter`: Frontmatter field predicates. Supported operators are `equals`, `doesntEqual`, `includes`, `notIncludes`, `hasKey`, `doesntHaveKey`, `regex`, `startsWith`, `endsWith`, `contains`, `empty`, `emptyString`, `emptyArray`, `emptyObject`, `notEmpty`, `in`, `notIn`, numeric comparisons, date/time comparisons, inclusive `between`, and `typeIs`.
+- `rules[].match.frontmatterQuery`: Whole-frontmatter predicates. `jmespath` is supported in `0.2.0`.
+- `rules[].match.document`: Document predicates. Supported operators are `hasHeading`, `headingRegex`, `hasHeadingAtLevel`, `hasSection`, `bodyContains`, `bodyRegex`, `hasWikilink`, `lineCount`, and `wordCount`.
 - `rules[].checks`: Checks to run after a file matches. Supported checks are `frontmatterSchema`, `requiredHeading`, `maxBodyLines`, and `maxBodyWords`.
 - `rules[].checks[].schema`: For `frontmatterSchema`, schema file resolved relative to `schemaDirectory`.
 - `rules[].checks[].frontmatterRequired`: For `frontmatterSchema`, if `true`, matched files without frontmatter fail; if `false`, frontmatter schema validation is skipped.
+
+Predicate semantics:
+
+- Predicate namespaces are all-of. Multiple operators on one frontmatter key are implicit AND.
+- Missing keys are not value inequality. A missing key does not match `doesntEqual`, `notIncludes`, or `notIn`; only `doesntHaveKey` intentionally matches absence.
+- `contains` is string containment. `includes` is array membership.
+- Date/time predicates support `YYYY-MM-DD` and RFC 3339 timestamps with `Z` or numeric offsets. Date-only operands compare at date precision. Date-time operands compare at date-time precision. A value with more precision can match a less precise rule; a value with less precision does not match a more precise rule.
+- Regex predicates use Swift `NSRegularExpression` syntax.
+- Logical grouping predicates `all`, `any`, and `not` are deferred to config schema `0.3.0`. `hasBrokenWikilink` is also deferred.
 
 Rules commands:
 

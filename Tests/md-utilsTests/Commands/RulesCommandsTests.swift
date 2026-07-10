@@ -33,7 +33,7 @@ struct RulesCommandsTests {
     let parsed = try CLIEntry.parseAsRoot(["rules", "describe", "books"])
     let command = try #require(parsed as? CLIEntry.RulesCommands.Describe)
 
-    #expect(command.schemaName == "books")
+    #expect(command.ruleName == "books")
     #expect(command.format == .text)
   }
 
@@ -42,7 +42,7 @@ struct RulesCommandsTests {
     let parsed = try CLIEntry.parseAsRoot(["rules", "describe", "books", "--format", "json"])
     let command = try #require(parsed as? CLIEntry.RulesCommands.Describe)
 
-    #expect(command.schemaName == "books")
+    #expect(command.ruleName == "books")
     #expect(command.format == .json)
   }
 
@@ -51,7 +51,7 @@ struct RulesCommandsTests {
     let parsed = try CLIEntry.parseAsRoot(["rules", "describe", "books", "--format", "markdown"])
     let command = try #require(parsed as? CLIEntry.RulesCommands.Describe)
 
-    #expect(command.schemaName == "books")
+    #expect(command.ruleName == "books")
     #expect(command.format == .markdown)
   }
 
@@ -1167,6 +1167,135 @@ struct RulesCommandsTests {
     }
   }
 
+  @Test
+  func `v2 missing keys only match doesnt have key`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [
+      ruleV2JSON(
+        name: "not-draft",
+        paths: ["Posts/**/*.md"],
+        frontmatter: "\"draft\": { \"doesntEqual\": true }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+      ruleV2JSON(
+        name: "no-draft-key",
+        paths: ["Posts/**/*.md"],
+        frontmatter: "\"draft\": { \"doesntHaveKey\": true }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+    ])
+    try writeFile(project + "Posts/missing.md", content: "---\ntitle: Missing\n---\n# Missing\n")
+    try writeFile(project + "Posts/false.md", content: "---\ndraft: false\n---\n# False\n")
+
+    try withCurrentDirectory(project) {
+      let notDraft = try RulesValidatorRunner.validate(ruleName: "not-draft")
+      let noDraftKey = try RulesValidatorRunner.validate(ruleName: "no-draft-key")
+
+      #expect(Set(notDraft.results.map(\.filePath)) == ["Posts/false.md"])
+      #expect(Set(noDraftKey.results.map(\.filePath)) == ["Posts/missing.md"])
+    }
+  }
+
+  @Test
+  func `v2 frontmatter predicate wishlist selects expected files`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [
+      ruleV2JSON(
+        name: "strings",
+        paths: ["Notes/**/*.md"],
+        frontmatter: "\"title\": { \"regex\": \"^Hello\", \"startsWith\": \"Hello\", \"endsWith\": \"World\", \"contains\": \"lo Wo\", \"typeIs\": \"string\" }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+      ruleV2JSON(
+        name: "numbers",
+        paths: ["Notes/**/*.md"],
+        frontmatter: "\"score\": { \"greaterThan\": 3, \"greaterThanOrEqual\": 4, \"lessThan\": 6, \"lessThanOrEqual\": 5, \"between\": { \"from\": 4, \"to\": 5 }, \"in\": [5], \"notIn\": [6] }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+      ruleV2JSON(
+        name: "empty-values",
+        paths: ["Notes/**/*.md"],
+        frontmatter: "\"summary\": { \"emptyString\": true }, \"items\": { \"emptyArray\": true }, \"meta\": { \"emptyObject\": true }, \"description\": { \"notEmpty\": true }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+    ])
+    try writeFile(project + "Notes/match.md", content: "---\ntitle: Hello World\nscore: 5\nsummary: \"\"\nitems: []\nmeta: {}\ndescription: present\n---\n# Match\n")
+    try writeFile(project + "Notes/nope.md", content: "---\ntitle: Goodbye\nscore: 6\nsummary: text\nitems: [one]\nmeta:\n  key: value\ndescription: \"\"\n---\n# Nope\n")
+
+    try withCurrentDirectory(project) {
+      let strings = try RulesValidatorRunner.validate(ruleName: "strings")
+      let numbers = try RulesValidatorRunner.validate(ruleName: "numbers")
+      let emptyValues = try RulesValidatorRunner.validate(ruleName: "empty-values")
+
+      #expect(Set(strings.results.map(\.filePath)) == ["Notes/match.md"])
+      #expect(Set(numbers.results.map(\.filePath)) == ["Notes/match.md"])
+      #expect(Set(emptyValues.results.map(\.filePath)) == ["Notes/match.md"])
+    }
+  }
+
+  @Test
+  func `v2 date time predicates use operand precision`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [
+      ruleV2JSON(
+        name: "date-only",
+        paths: ["Dates/**/*.md"],
+        frontmatter: "\"date\": { \"between\": { \"from\": \"2020-01-01\", \"to\": \"2020-12-31\" } }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+      ruleV2JSON(
+        name: "date-time",
+        paths: ["Dates/**/*.md"],
+        frontmatter: "\"date\": { \"after\": \"2020-01-01T12:00:00Z\" }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+      ruleV2JSON(
+        name: "offset",
+        paths: ["Dates/**/*.md"],
+        frontmatter: "\"date\": { \"onOrAfter\": \"2020-01-01T07:00:00-05:00\", \"onOrBefore\": \"2020-01-01T08:00:00-05:00\" }",
+        checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+      ),
+    ])
+    try writeFile(project + "Dates/date.md", content: "---\ndate: 2020-06-15\n---\n# Date\n")
+    try writeFile(project + "Dates/time.md", content: "---\ndate: \"2020-01-01T13:00:00Z\"\n---\n# Time\n")
+    try writeFile(project + "Dates/old.md", content: "---\ndate: \"2019-12-31T23:59:59Z\"\n---\n# Old\n")
+
+    try withCurrentDirectory(project) {
+      let dateOnly = try RulesValidatorRunner.validate(ruleName: "date-only")
+      let dateTime = try RulesValidatorRunner.validate(ruleName: "date-time")
+      let offset = try RulesValidatorRunner.validate(ruleName: "offset")
+
+      #expect(Set(dateOnly.results.map(\.filePath)) == ["Dates/date.md", "Dates/time.md"])
+      #expect(Set(dateTime.results.map(\.filePath)) == ["Dates/time.md"])
+      #expect(Set(offset.results.map(\.filePath)) == ["Dates/time.md"])
+    }
+  }
+
+  @Test
+  func `v2 query document and file predicates select expected files`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeRulesProject(project, rules: [ruleV2JSON(
+      name: "rich",
+      paths: ["Docs/**/*.md"],
+      frontmatterQuery: "\"jmespath\": \"status == 'ready'\"",
+      document: "\"headingRegex\": \"^Sum\", \"hasHeadingAtLevel\": { \"heading\": \"Summary\", \"level\": 2 }, \"hasSection\": \"Summary\", \"bodyContains\": \"[[Target]]\", \"bodyRegex\": \"Details\", \"hasWikilink\": \"Target\", \"lineCount\": { \"min\": 4 }, \"wordCount\": { \"max\": 20 }",
+      file: "\"pathRegex\": \"^Docs/\", \"filenameEquals\": \"match.md\", \"extensionIn\": [\"md\"]",
+      checks: ["{ \"type\": \"maxBodyLines\", \"max\": 10 }"]
+    )])
+    try writeFile(project + "Docs/match.md", content: "---\nstatus: ready\n---\n# Title\n\n## Summary\nDetails [[Target]]\n")
+    try writeFile(project + "Docs/other.md", content: "---\nstatus: ready\n---\n# Title\n\n## Summary\nDetails [[Target]]\n")
+
+    try withCurrentDirectory(project) {
+      let summary = try RulesValidatorRunner.validate(ruleName: "rich")
+
+      #expect(Set(summary.results.map(\.filePath)) == ["Docs/match.md"])
+    }
+  }
+
   private func createTempProject() throws -> Path {
     let path = Path(NSTemporaryDirectory()) + "md-utils-schema-tests-\(UUID().uuidString)"
     try path.mkpath()
@@ -1329,17 +1458,21 @@ struct RulesCommandsTests {
     name: String,
     paths: [String],
     frontmatter: String? = nil,
+    frontmatterQuery: String? = nil,
     document: String? = nil,
+    file: String? = nil,
     checks: [String]
   ) -> String {
     let quotedPaths = paths.map { "\"\($0)\"" }.joined(separator: ", ")
     let frontmatterBlock = frontmatter.map { ",\n        \"frontmatter\": { \($0) }" } ?? ""
+    let frontmatterQueryBlock = frontmatterQuery.map { ",\n        \"frontmatterQuery\": { \($0) }" } ?? ""
     let documentBlock = document.map { ",\n        \"document\": { \($0) }" } ?? ""
+    let fileBlock = file.map { ",\n        \"file\": { \($0) }" } ?? ""
     return """
       {
         "name": "\(name)",
         "match": {
-          "paths": [\(quotedPaths)]\(frontmatterBlock)\(documentBlock)
+          "paths": [\(quotedPaths)]\(frontmatterBlock)\(frontmatterQueryBlock)\(documentBlock)\(fileBlock)
         },
         "checks": [
           \(checks.joined(separator: ",\n"))
