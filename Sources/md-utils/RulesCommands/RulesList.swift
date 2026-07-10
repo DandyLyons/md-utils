@@ -37,7 +37,9 @@ enum RulesListFormatter {
     }
 
     if !verbose {
-      var lines = config.schemaRules.map { CLIStyle.heading($0.name) }
+      var lines = config.schemaRules
+        .sorted(by: { $0.name < $1.name })
+        .map { CLIStyle.heading($0.name) }
       lines.append(CLIStyle.muted("Hint: Use --verbose to show rule details."))
       return lines.joined(separator: "\n")
     }
