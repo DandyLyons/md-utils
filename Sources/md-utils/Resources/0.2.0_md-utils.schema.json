@@ -54,6 +54,7 @@
     "ruleMatch": {
       "type": "object",
       "additionalProperties": false,
+      "description": "A file matches this rule only when all configured match groups pass: path includes, path excludes, and frontmatter predicates. The paths array is any-of; excludePaths is none-of; frontmatter predicates are all-of. The anyOf below is JSON Schema validation for requiring paths or frontmatter, not runtime OR matching.",
       "properties": {
         "paths": {
           "type": "array",
@@ -61,7 +62,7 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "Glob patterns matched against project-relative Markdown file paths."
+          "description": "Any-of glob patterns matched against project-relative Markdown file paths. If present, a file path must match at least one pattern."
         },
         "excludePaths": {
           "type": "array",
@@ -69,11 +70,11 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "Glob patterns excluded after paths match."
+          "description": "None-of glob patterns checked after paths match. If a file path matches any exclude pattern, the rule is skipped."
         },
         "frontmatter": {
           "type": "object",
-          "description": "Frontmatter field matchers. Each key is a frontmatter key.",
+          "description": "All-of frontmatter field matchers. Each key is a frontmatter key, and every configured key matcher must pass.",
           "additionalProperties": {
             "$ref": "#/$defs/frontmatterMatcher"
           }
@@ -87,6 +88,7 @@
     "frontmatterMatcher": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Predicates for one frontmatter key. If multiple operators are specified, all operators must pass.",
       "properties": {
         "includes": {
           "description": "Matches when the frontmatter value is an array containing this JSON value."
