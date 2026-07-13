@@ -98,25 +98,52 @@ public enum TableNormalizer {
         return true
     }
 
-    /// Splits a table row into trimmed cell strings by splitting on `|`
-    /// and stripping the leading/trailing `|` delimiters.
+    /// Splits a table row into trimmed cell strings by splitting on unescaped `|`
+    /// characters and stripping the leading/trailing `|` delimiters.
     private static func splitCells(from line: String) -> [String] {
-        var stripped = line
         let trimmed = line.trimmingCharacters(in: .whitespaces)
+        let characters = Array(trimmed)
+        guard !characters.isEmpty else { return [] }
 
-        // Remove leading and trailing pipes
-        if trimmed.hasPrefix("|") {
-            stripped = String(trimmed.dropFirst())
+        let start = characters.first == "|" ? 1 : 0
+        let end: Int
+        if characters.last == "|", !isPipeEscaped(in: characters, at: characters.count - 1) {
+            end = characters.count - 1
         } else {
-            stripped = trimmed
-        }
-        if stripped.hasSuffix("|") {
-            stripped = String(stripped.dropLast())
+            end = characters.count
         }
 
-        return stripped.components(separatedBy: "|").map {
-            $0.trimmingCharacters(in: .whitespaces)
+        var cells: [String] = []
+        var cell: [Character] = []
+        var index = start
+        while index < end {
+            let character = characters[index]
+            if character == "|", !isPipeEscaped(in: characters, at: index) {
+                cells.append(String(cell).trimmingCharacters(in: .whitespaces))
+                cell.removeAll(keepingCapacity: true)
+            } else {
+                cell.append(character)
+            }
+            index += 1
         }
+
+        cells.append(String(cell).trimmingCharacters(in: .whitespaces))
+        return cells
+    }
+
+    /// Returns true when a pipe is preceded by an odd number of backslashes.
+    private static func isPipeEscaped(in characters: [Character], at pipeIndex: Int) -> Bool {
+        guard pipeIndex > 0 else { return false }
+
+        var backslashCount = 0
+        var index = pipeIndex - 1
+        while index >= 0, characters[index] == "\\" {
+            backslashCount += 1
+            if index == 0 { break }
+            index -= 1
+        }
+
+        return !backslashCount.isMultiple(of: 2)
     }
 
     /// Computes the maximum trimmed cell content width per column across all rows,

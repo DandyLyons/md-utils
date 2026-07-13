@@ -335,6 +335,26 @@ struct TableNormalizerTests {
         #expect(defaultResult == explicitResult)
     }
 
+    @Test("Preserves escaped pipes inside table cells")
+    func preservesEscapedPipesInsideCells() {
+        let input = #"""
+            | Target  | Syntax                           | Example                         |
+            | ------- | -------------------------------- | ------------------------------- |
+            | Book    | `[[BookName]]`                   | `[[Genesis]]`, `[[Psalm]]`      |
+            | Chapter | `[[BookName \|Display Text]]`                 | `[[Genesis 1\|Genesis 1]]`   |
+            | Verse   | `[[BookName N#vN\|Display Text]]`                 | `[[Hebrews 1#v1\|Hebrews 1:1]]` |
+            """#
+        let expected = #"""
+            | Target  | Syntax                            | Example                         |
+            | ------- | --------------------------------- | ------------------------------- |
+            | Book    | `[[BookName]]`                    | `[[Genesis]]`, `[[Psalm]]`      |
+            | Chapter | `[[BookName \|Display Text]]`     | `[[Genesis 1\|Genesis 1]]`      |
+            | Verse   | `[[BookName N#vN\|Display Text]]` | `[[Hebrews 1#v1\|Hebrews 1:1]]` |
+            """#
+
+        #expect(TableNormalizer.normalize(input) == expected)
+    }
+
     @Test("Output is idempotent (second pass does not change result)")
     func idempotent() {
         let input = """
