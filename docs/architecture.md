@@ -88,6 +88,10 @@ if let heading = ast.children.first as? Heading {
   - `okf doctor` - Run validation plus advisory health diagnostics
   - `okf type set` - Set an explicit OKF concept `type` value on matching files
 - `section` / `sect` (SectionCommands) - Manipulate sections in Markdown documents
+  - `section get` - Extract a section and output it
+  - `section set` - Replace a section body while preserving its heading
+  - `section insert` - Insert a new contained section before or after another section
+  - `section remove` - Remove a section and all descendant content
   - `section move-up` - Move a section up among siblings
   - `section move-down` - Move a section down among siblings
   - `section move-to` - Move a section to a specific position

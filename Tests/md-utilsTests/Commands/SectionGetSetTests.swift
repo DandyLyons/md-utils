@@ -24,7 +24,7 @@ struct SectionGetSetTests {
   func `Section command group includes get and set`() {
     let config = CLIEntry.SectionCommands.configuration
 
-    #expect(config.subcommands.count == 6)
+    #expect(config.subcommands.count == 8)
     #expect(config.subcommands[1] is CLIEntry.GetSection.Type)
     #expect(config.subcommands[2] is CLIEntry.SetSection.Type)
   }

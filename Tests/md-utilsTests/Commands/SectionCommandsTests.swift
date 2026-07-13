@@ -25,13 +25,15 @@ struct SectionCommandsTests {
     let config = CLIEntry.SectionCommands.configuration
 
     #expect(config.commandName == "section")
-    #expect(config.subcommands.count == 6)
+    #expect(config.subcommands.count == 8)
     #expect(config.subcommands[0] is CLIEntry.ListSections.Type)
     #expect(config.subcommands[1] is CLIEntry.GetSection.Type)
     #expect(config.subcommands[2] is CLIEntry.SetSection.Type)
-    #expect(config.subcommands[3] is CLIEntry.MoveSectionUp.Type)
-    #expect(config.subcommands[4] is CLIEntry.MoveSectionDown.Type)
-    #expect(config.subcommands[5] is CLIEntry.MoveSectionTo.Type)
+    #expect(config.subcommands[3] is CLIEntry.InsertSection.Type)
+    #expect(config.subcommands[4] is CLIEntry.RemoveSection.Type)
+    #expect(config.subcommands[5] is CLIEntry.MoveSectionUp.Type)
+    #expect(config.subcommands[6] is CLIEntry.MoveSectionDown.Type)
+    #expect(config.subcommands[7] is CLIEntry.MoveSectionTo.Type)
   }
 
   @Test

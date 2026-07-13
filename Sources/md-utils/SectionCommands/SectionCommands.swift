@@ -21,6 +21,8 @@ extension CLIEntry {
         - list: List headings/sections in document order
         - get: Extract a section and output it
         - set: Replace a section with new content
+        - insert: Insert a new contained section
+        - remove: Remove a section and its descendants
         - move-up: Move a section up by one position
         - move-down: Move a section down by one position
         - move-to: Move a section to a specific position
@@ -33,6 +35,8 @@ extension CLIEntry {
         ListSections.self,
         GetSection.self,
         SetSection.self,
+        InsertSection.self,
+        RemoveSection.self,
         MoveSectionUp.self,
         MoveSectionDown.self,
         MoveSectionTo.self,

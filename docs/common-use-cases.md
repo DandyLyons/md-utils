@@ -14,6 +14,23 @@ md-utils extract --name "Introduction" document.md
 md-utils extract --index 2 document.md --output section.md
 ```
 
+### Insert a new section from inline content
+```bash
+md-utils section insert --name "New Section" --into README.md --after "Old Section" --contents "Body text." --in-place
+```
+
+### Insert a new section from a file
+```bash
+md-utils section insert --name "New Section" --into README.md --after "Old Section" --from-file new-section.txt --in-place
+```
+
+The inserted content can be body-only or can start with a heading matching `--name`. Heading levels are normalized so the inserted content remains one contained section.
+
+### Remove a section
+```bash
+md-utils section remove --into README.md --name "Deprecated" --in-place
+```
+
 ### Extract specific line range from a file
 ```bash
 md-utils lines document.md --start 10 --end 20
