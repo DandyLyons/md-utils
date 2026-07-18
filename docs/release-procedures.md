@@ -13,7 +13,7 @@ Before releasing, complete every item:
 - [ ] `swift test` passes (all tests green)
 - [ ] New public API has documentation comments
 - [ ] Breaking changes (if any) are noted for the release description
-- [ ] `CLAUDE.md` and docs are up to date with any new commands or features
+- [ ] `AGENTS.md` and docs are up to date with any new commands or features
 - [ ] You are on the `main` branch with a clean working tree (`git status` shows nothing)
 - [ ] `main` is up to date with the remote (`git pull`)
 - [ ] `README.md` is updated with any new features or usage instructions

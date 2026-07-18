@@ -15,44 +15,13 @@ The `markdown-utilities` Agent Skill teaches AI coding assistants how to use `md
 
 > **Prerequisite:** Install the `md-utils` CLI first (see [CLI Installation](#cli-installation) below).
 
-### Option A: skills.sh (Recommended)
+### Install from skills.sh
 
 ```bash
 npx skills add https://github.com/DandyLyons/md-utils --skill markdown-utilities
 ```
 
 Visit the [skills.sh page](https://skills.sh/dandylyons/md-utils/markdown-utilities) for more details.
-
-### Option B: Claude Code Plugin
-
-**Personal usage** — install the skill just for yourself:
-
-```
-/plugin marketplace add DandyLyons/md-utils
-/plugin install markdown-utilities@md-utils
-```
-
-**Project-wide** — share the skill with your whole team automatically:
-
-Add to `.claude/settings.json` in your project:
-
-```json
-{
-  "enabledPlugins": {
-    "markdown-utilities@md-utils": true
-  },
-  "extraKnownMarketplaces": {
-    "md-utils": {
-      "source": {
-        "source": "github",
-        "repo": "DandyLyons/md-utils"
-      }
-    }
-  }
-}
-```
-
-Team members will be prompted to install the skill when they open the project in Claude Code.
 
 ---
 

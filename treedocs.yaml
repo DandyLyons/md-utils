@@ -6,16 +6,6 @@ project:
   version: 0.0.0
 signature: sha256:949a559f9503b5dcd3b329efb9b0e1bb97ed69d2191bfb06c182ec75e0650a6e
 tree:
-  .claude:
-    _doc: Claude-specific project configuration, commands, rules, and agent instructions.
-    skills:
-      _doc: Claude Code skill definitions used while developing this package.
-      update-claude-md:
-        _doc: Skill for updating the repository CLAUDE.md agent instructions.
-        SKILL.md: Instructions for maintaining CLAUDE.md with project-specific guidance.
-  .claude-plugin:
-    _doc: Claude Code plugin marketplace metadata for distributing the bundled skill.
-    marketplace.json: Config Claude plugins
   .github:
     _doc: GitHub repository automation, including Pages deployment and schema publication
       validation workflows.
@@ -26,7 +16,7 @@ tree:
       schema-publication.yml: Validates bundled and public JSON Schema publication
         files stay synchronized.
   .gitignore: Git ignore rules for generated files, local settings, and build artifacts.
-  CLAUDE.md: Agent-facing project instructions, architecture notes, and workflow rules.
+  AGENTS.md: Agent-facing project instructions, architecture notes, and workflow rules.
   Package.resolved: SwiftPM dependency lockfile generated from package resolution.
   Package.swift: Swift package manifest defining library, CLI, dependencies, resources,
     and tests.
@@ -472,9 +462,6 @@ tree:
     _doc: Packaged markdown-utilities agent skill distribution files.
     markdown-utilities:
       _doc: Skill package that teaches agents to use the md-utils CLI.
-      .claude-plugin:
-        _doc: Claude Code plugin metadata for the markdown-utilities skill package.
-        plugin.json: Plugin manifest for distributing the markdown-utilities skill.
       skills:
         _doc: Skills directory containing installable agent skill definitions.
         markdown-utilities:

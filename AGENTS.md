@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 md-utils is a Swift package for parsing and manipulating Markdown files. It consists of three layers, each built on the previous:
 
@@ -19,7 +19,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 - **Build Command**: `swift build`
 - **Test Command**: `swift test`
 - **Formatter/Linter**: No dedicated formatter or linter is configured in-package
-- **Documentation**: README.md, CLAUDE.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
+- **Documentation**: README.md, AGENTS.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
 - **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/JSON parsing failures as user-visible errors
 - **CI/Coverage**: No project-specific CI or coverage command is documented in this repo
 

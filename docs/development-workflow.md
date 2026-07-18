@@ -7,7 +7,7 @@ When adding new features:
 1. Start with library implementation in MarkdownUtilities
 2. Add comprehensive tests using Swift Testing
 3. Add CLI command in md-utils (if user-facing)
-4. Update CLAUDE.md or relevant docs if architecture changes
+4. Update `AGENTS.md` or relevant docs if architecture changes
 
 ## Before Committing
 

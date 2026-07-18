@@ -2,8 +2,6 @@
 //  FrontMatterParser.swift
 //  MarkdownUtilities
 //
-//  Created by Claude Code
-//
 
 import Foundation
 import Parsing
