@@ -7,7 +7,7 @@
 
 import ArgumentParser
 import Foundation
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import Yams
 
 /// Output format options for CLI commands

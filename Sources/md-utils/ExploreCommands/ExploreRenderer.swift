@@ -1,4 +1,4 @@
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 
 struct ExploreRenderer {
   let document: ExploreDocument

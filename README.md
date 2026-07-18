@@ -1,11 +1,12 @@
 # md-utils
 [![Certified Shovelware](https://justin.searls.co/img/shovelware.svg)](https://justin.searls.co/shovelware/)
 
-A collection of utilities for working with Markdown files — from Swift library, to CLI tool, to Agent Skill. Each layer is built on top of the previous one.
+A collection of utilities for working with Markdown files — from portable Swift library, to native integrations, CLI tool, and Agent Skill. Each layer is built on top of the previous one.
 
-1. **`MarkdownUtilities`** — A Swift library for parsing and manipulating Markdown content.
-2. **`md-utils`** — A command-line tool, built on top of `MarkdownUtilities`, for performing operations on Markdown files.
-3. **`markdown-utilities`** — An Agent Skill for AI coding assistants, built on top of the `md-utils` CLI.
+1. **`MarkdownUtilitiesCore`** — Portable Markdown parsing and transformations for Apple platforms and Linux.
+2. **`MarkdownUtilities`** — Core plus native filesystem, path, and metadata integrations.
+3. **`md-utils`** — A command-line tool built on `MarkdownUtilities`.
+4. **`markdown-utilities`** — An Agent Skill for AI coding assistants built on the `md-utils` CLI.
 
 [`treedocs`](https://github.com/DandyLyons/treedocs) is a sister project of `md-utils`. Future integrations are planned between the two projects.
 
@@ -61,15 +62,42 @@ Add to your `Package.swift`:
 .package(url: "https://github.com/DandyLyons/md-utils.git", from: "0.1.0")
 ```
 
-Then add `"MarkdownUtilities"` to your target's dependencies:
+Add `MarkdownUtilitiesCore` when the target only needs content operations:
+
+```swift
+.target(
+    name: "PortableTarget",
+    dependencies: [
+        .product(name: "MarkdownUtilitiesCore", package: "md-utils"),
+    ]
+)
+```
+
+Add both products when the target combines portable content operations with filesystem, path, CSV path-metadata, or file-metadata APIs:
 
 ```swift
 .target(
     name: "YourTarget",
     dependencies: [
+        .product(name: "MarkdownUtilitiesCore", package: "md-utils"),
         .product(name: "MarkdownUtilities", package: "md-utils"),
     ]
 ),
+```
+
+Import each module explicitly where its APIs are used:
+
+```swift
+import MarkdownUtilitiesCore
+import MarkdownUtilities
+```
+
+### Linux Validation
+
+Core is tested with Swift 6.2 on Linux in Docker:
+
+```bash
+docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
 ```
 
 ---
@@ -371,6 +399,8 @@ When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_
 ## Architecture
 
 - **Swift 6.2** or later
+- **MarkdownUtilitiesCore** for portable content operations on Apple platforms and Linux
+- **MarkdownUtilities** for native filesystem and metadata integrations
 - All testing uses the native Swift Testing framework
 
 ### Dependencies
@@ -384,14 +414,13 @@ When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_
 - [jmespath.swift](https://github.com/nicktmro/jmespath.swift) — JMESPath query language for JSON
 
 ## Platform Compatibility
+**macOS** is the primary development and testing platform. Core, native integrations, and the CLI are covered by the full Swift test suite.
 
-**macOS** is the primary development and testing platform. All features are fully supported on macOS.
-
-**Linux**: All dependencies are reported as buildable on Linux ([Swift Package Index](https://swiftpackageindex.com)). The code avoids Apple-only frameworks and the one Darwin-specific feature (extended attributes) is cleanly stubbed out on non-Darwin platforms via `#if canImport(Darwin)`. Some `FileMetadata` fields (e.g. creation date, access date, owner) may return `nil` on Linux due to differences in `swift-corelibs-foundation`. The project has **not been tested on Linux**.
+**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.2 using `Dockerfile.core-linux`. The container builds Core and runs an isolated parsing, AST, frontmatter, and rendering smoke executable. The complete native `MarkdownUtilities` and `md-utils` CLI layers are not covered by this Core guarantee.
 
 **Windows**: Not currently tested or verified. Compatibility is unknown.
 
-I don't have a Linux or Windows machine to test on, but I'm happy to accept PRs that improve compatibility on other platforms.
+See the [portability audit](docs/portability-audit.md) for the source boundary, dependency assessment, and remaining WebAssembly work.
 
 ## Contributing
 

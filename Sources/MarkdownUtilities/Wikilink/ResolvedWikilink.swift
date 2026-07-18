@@ -3,6 +3,7 @@
 //  MarkdownUtilities
 //
 
+import MarkdownUtilitiesCore
 import PathKit
 
 /// A wikilink combined with its resolution result, suitable for JSON serialization.
@@ -28,7 +29,7 @@ public struct ResolvedWikilink: Sendable, Codable, Equatable {
   /// Candidate paths when the resolution is ambiguous.
   public let candidates: [String]?
 
-  /// Creates a ``ResolvedWikilink`` from a ``Wikilink`` and its ``WikilinkResolution``.
+  /// Creates a ``ResolvedWikilink`` from a `Wikilink` and its ``WikilinkResolution``.
   public init(wikilink: Wikilink, resolution: WikilinkResolution) {
     self.target = wikilink.target
     self.displayText = wikilink.displayText

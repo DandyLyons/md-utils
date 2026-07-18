@@ -5,7 +5,7 @@
 
 import ArgumentParser
 import Foundation
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import PathKit
 import Yams
 /// Adds command implementations to ``CLIEntry``.

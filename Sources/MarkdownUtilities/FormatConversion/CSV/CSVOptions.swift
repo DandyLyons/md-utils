@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownUtilitiesCore
 
 /// Configuration options for converting Markdown to CSV format.
 ///

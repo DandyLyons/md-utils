@@ -7,7 +7,7 @@
 
 import ArgumentParser
 import Foundation
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import PathKit
 import Yams
 /// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.

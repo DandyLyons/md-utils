@@ -5,7 +5,7 @@
 
 import ArgumentParser
 import Foundation
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import PathKit
 import Yams
 /// Adds command implementations to ``CLIEntry``.
@@ -121,7 +121,7 @@ extension CLIEntry {
     /// See <doc:ContentSelectionCommands> for workflow details.
     private func processFile(_ path: Path) async throws {
       let content: String = try path.read()
-      let doc = try MarkdownUtilities.MarkdownDocument(content: content)
+      let doc = try MarkdownDocument(content: content)
 
       let result: MarkdownDocument
       do {

@@ -2,7 +2,7 @@ import Testing
 import Foundation
 import PathKit
 @testable import md_utils
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 
 @Suite("explore command")
 struct ExploreTests {

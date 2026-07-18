@@ -5,6 +5,7 @@
 
 import Testing
 import Foundation
+import MarkdownUtilitiesCore
 import PathKit
 @testable import MarkdownUtilities
 

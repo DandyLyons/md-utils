@@ -1,27 +1,16 @@
 # ``MarkdownUtilities``
 
-Parse, inspect, transform, and export Markdown content from Swift code.
+Use portable Markdown operations together with native platform integrations.
 
 ## Overview
 
-`MarkdownUtilities` provides a small set of focused APIs around `MarkdownDocument`. A document separates YAML frontmatter from body content, exposes MarkdownSyntax parsing for the body, and offers workflow-specific helpers for common Markdown automation tasks.
-
-Use this target when you want library-level access to Markdown operations without invoking the `md-utils` command-line tool.
+`MarkdownUtilities` adds APIs that interact with files, paths, metadata, and extended attributes. Import `MarkdownUtilitiesCore` separately when using portable document and transformation APIs alongside these integrations.
 
 ## Topics
 
-### Documents
+### Native integrations
 
-- <doc:WorkingWithMarkdownDocuments>
-
-### Frontmatter
-
-- <doc:FrontmatterWorkflows>
-
-### Sections
-
-- <doc:SectionWorkflows>
-
-### Conversion
-
-- <doc:FormatConversionWorkflows>
+- ``FileMetadataReader``
+- ``WikilinkResolver``
+- ``CSVConverter``
+- <doc:CSVConversion>

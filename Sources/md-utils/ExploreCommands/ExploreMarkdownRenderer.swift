@@ -1,4 +1,4 @@
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 
 extension ExploreRenderer {
   func renderMarkdown(includeCollapsedStubs: Bool) -> String {

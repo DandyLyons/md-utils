@@ -1,10 +1,11 @@
 # AGENTS.md
 
-md-utils is a Swift package for parsing and manipulating Markdown files. It consists of three layers, each built on the previous:
+md-utils is a Swift package for parsing and manipulating Markdown files. It consists of four layers, each built on the previous:
 
-1. **`MarkdownUtilities`** — A Swift library for parsing and manipulating Markdown content.
-2. **`md-utils`** — A CLI tool built on `MarkdownUtilities`.
-3. **`markdown-utilities`** — An Agent Skill for AI coding assistants, distributed from `skill/markdown-utilities/`, built on the `md-utils` CLI.
+1. **`MarkdownUtilitiesCore`** — Portable Markdown parsing and transformations for Apple platforms and Linux.
+2. **`MarkdownUtilities`** — Core plus native filesystem, path, and metadata integrations.
+3. **`md-utils`** — A CLI tool built on `MarkdownUtilities`.
+4. **`markdown-utilities`** — An Agent Skill for AI coding assistants, distributed from `skill/markdown-utilities/`, built on the `md-utils` CLI.
 
 [`treedocs`](https://github.com/DandyLyons/treedocs) is a sister project of `md-utils`. Future integrations are planned between the two projects.
 
@@ -14,7 +15,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 - **Frameworks/Libraries**: Foundation, MarkdownSyntax, swift-parsing, PathKit, Yams, JMESPath, JSONSchema.swift, swift-argument-parser, Rainbow
 - **Package Manager / Build Tool**: Swift Package Manager
 - **CLI Target**: `md-utils`
-- **Library Target**: `MarkdownUtilities`
+- **Library Targets**: `MarkdownUtilitiesCore`, `MarkdownUtilities`
 - **Test Framework**: Swift Testing, not XCTest
 - **Build Command**: `swift build`
 - **Test Command**: `swift test`
@@ -37,6 +38,9 @@ swift build
 
 # Test
 swift test
+
+# Build and test Core on Linux
+docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
 
 # Run CLI
 swift run md-utils <command>
@@ -71,6 +75,7 @@ Force unwrapping optionals with `!` is absolutely prohibited. Use safe alternati
 Detailed guidance organized by topic:
 
 - **[Architecture](docs/architecture.md)** - Project structure, core types, dependencies, features
+- **[Portability Audit](docs/portability-audit.md)** - Target boundary, Linux validation, and WebAssembly blockers
 - **[Testing Standards](docs/testing-standards.md)** - Swift Testing conventions and patterns
 - **[Swift Coding Standards](docs/swift-coding-standards.md)** - Language-specific rules and safe practices
 - **[CLI Patterns](docs/cli-patterns.md)** - Command structure and argument parsing

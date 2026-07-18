@@ -2,7 +2,7 @@ import Testing
 import Foundation
 import PathKit
 @testable import md_utils
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 
 @Suite("SectionCommands CLI Tests")
 struct SectionCommandsTests {

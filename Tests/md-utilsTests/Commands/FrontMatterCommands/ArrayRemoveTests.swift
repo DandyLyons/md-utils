@@ -7,7 +7,7 @@ import Testing
 import Foundation
 import PathKit
 @testable import md_utils
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import Yams
 
 @Suite("fm array remove command")

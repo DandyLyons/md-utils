@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownUtilitiesCore
 import PathKit
 import Yams
 
@@ -68,7 +69,7 @@ public struct CSVConverter {
         let type: ColumnType
         /// Groups ColumnType cases and related behavior.
         ///
-        /// See <doc:FormatConversionWorkflows> for workflow details.
+        /// See <doc:CSVConversion> for workflow details.
         enum ColumnType {
             case metadata(CSVOptions.MetadataColumn)
             case body

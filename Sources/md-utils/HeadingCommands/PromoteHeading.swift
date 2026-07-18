@@ -5,7 +5,7 @@
 
 import ArgumentParser
 import Foundation
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import PathKit
 import Yams
 /// Adds command implementations to ``CLIEntry``.
@@ -71,7 +71,7 @@ extension CLIEntry {
       let content: String = try path.read()
 
       // Parse document
-      let doc = try MarkdownUtilities.MarkdownDocument(content: content)
+      let doc = try MarkdownDocument(content: content)
 
       // Promote heading
       let result: MarkdownDocument

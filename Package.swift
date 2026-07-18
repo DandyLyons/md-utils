@@ -10,6 +10,10 @@ let package = Package(
   ],
   products: [
     .library(
+      name: "MarkdownUtilitiesCore",
+      targets: ["MarkdownUtilitiesCore"]
+    ),
+    .library(
       name: "MarkdownUtilities",
       targets: ["MarkdownUtilities"]
     ),
@@ -30,12 +34,29 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
-    // MARK: MarkdownUtilities
+    // MARK: MarkdownUtilitiesCore
     .target(
-      name: "MarkdownUtilities",
+      name: "MarkdownUtilitiesCore",
       dependencies: [
         .product(name: "MarkdownSyntax", package: "MarkdownSyntax"),
         .product(name: "Parsing", package: "swift-parsing"),
+        "Yams",
+      ]
+    ),
+    .testTarget(
+      name: "MarkdownUtilitiesCoreTests",
+      dependencies: [
+        "MarkdownUtilitiesCore",
+        .product(name: "MarkdownSyntax", package: "MarkdownSyntax"),
+        "Yams",
+      ]
+    ),
+
+    // MARK: MarkdownUtilities (native integrations)
+    .target(
+      name: "MarkdownUtilities",
+      dependencies: [
+        "MarkdownUtilitiesCore",
         .product(name: "PathKit", package: "PathKit"),
         "Yams",
       ]
@@ -43,7 +64,9 @@ let package = Package(
     .testTarget(
       name: "MarkdownUtilitiesTests",
       dependencies: [
+        "MarkdownUtilitiesCore",
         "MarkdownUtilities",
+        .product(name: "PathKit", package: "PathKit"),
       ]
     ),
 
@@ -51,6 +74,7 @@ let package = Package(
     .executableTarget(
       name: "md-utils",
       dependencies: [
+        "MarkdownUtilitiesCore",
         "MarkdownUtilities",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "JSONSchema", package: "JSONSchema.swift"),
@@ -69,6 +93,7 @@ let package = Package(
     .testTarget(
       name: "md-utilsTests",
       dependencies: [
+        "MarkdownUtilitiesCore",
         .target(name: "md-utils"),
       ]
     ),

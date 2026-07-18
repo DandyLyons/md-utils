@@ -5,6 +5,7 @@
 
 import Foundation
 import MarkdownUtilities
+import MarkdownUtilitiesCore
 import Testing
 
 @Suite("CSVConverter Tests")

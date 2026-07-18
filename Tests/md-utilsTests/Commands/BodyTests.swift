@@ -9,7 +9,7 @@ import Foundation
 import PathKit
 import Testing
 @testable import md_utils
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 
 @Suite("body command")
 struct BodyTests {

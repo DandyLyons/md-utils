@@ -5,7 +5,7 @@
 
 import ArgumentParser
 import Foundation
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import PathKit
 
 /// Adds command implementations to ``CLIEntry``.

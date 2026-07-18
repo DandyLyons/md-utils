@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import MarkdownUtilitiesCore
 import PathKit
 
 /// The result of resolving a wikilink target to a file on disk.

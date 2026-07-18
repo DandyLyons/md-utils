@@ -4,11 +4,19 @@
 
 The proposed native and Cloudflare server architecture, WebAssembly target split, Markdown type-system prerequisite, and storage direction are documented in [MarkdownUtilities Server Architecture](server-architecture.md).
 
-## Core Library (MarkdownUtilities)
+## Library Layers
+
+`MarkdownUtilitiesCore` owns content-only parsing and transformations. It accepts strings, document models, and explicit context; it does not scan the filesystem or inspect host metadata. The target is supported on Apple platforms and Linux.
+
+`MarkdownUtilities` depends on Core and adds filesystem-backed wikilink resolution, CSV path metadata, and file metadata including extended attributes. Consumers import `MarkdownUtilitiesCore` and `MarkdownUtilities` explicitly according to the APIs each source file uses.
+
+The full source and dependency classification is recorded in the [portability audit](portability-audit.md).
+
+## Core Library (MarkdownUtilitiesCore)
 
 ### MarkdownDocument
 
-**Location**: Sources/MarkdownUtilities/MarkdownDocument.swift
+**Location**: `Sources/MarkdownUtilitiesCore/MarkdownDocument.swift`
 
 Central data structure representing a Markdown document:
 - Separates YAML frontmatter from body content
@@ -255,203 +263,25 @@ The following features are **NOT YET IMPLEMENTED**:
 - **swift-cmark** - CommonMark C library (from MarkdownSyntax)
 
 ## Project Structure
-
-```
+```text
 md-utils/
 ├── Package.swift
-├── AGENTS.md
-├── docs/                          # Documentation
+├── Dockerfile.core-linux
+├── docs/
 │   ├── architecture.md
-│   ├── testing-standards.md
-│   ├── swift-coding-standards.md
-│   ├── cli-patterns.md
-│   ├── common-use-cases.md
+│   ├── portability-audit.md
 │   └── development-workflow.md
 ├── Sources/
-│   ├── MarkdownUtilities/         # Core library
-│   │   ├── MarkdownDocument.swift
-│   │   ├── FrontMatter/
-│   │   │   ├── FrontMatterParser.swift
-│   │   │   ├── YAMLConversion.swift
-│   │   │   ├── MarkdownDocument+FrontMatter.swift
-│   │   │   └── MarkdownDocument+FrontMatterMutation.swift
-│   │   ├── TOC/
-│   │   │   ├── TOCEntry.swift
-│   │   │   ├── TableOfContents.swift
-│   │   │   ├── HeadingTextExtractor.swift
-│   │   │   ├── TOCGenerator.swift
-│   │   │   ├── TOCRenderer.swift
-│   │   │   └── MarkdownDocument+TOC.swift
-│   │   ├── FormatConversion/
-│   │   │   ├── Protocols/
-│   │   │   │   ├── FormatConverter.swift
-│   │   │   │   └── ConversionOptions.swift
-│   │   │   ├── Shared/
-│   │   │   │   ├── PhrasingContentTextExtractor.swift
-│   │   │   │   └── BlockContentTextExtractor.swift
-│   │   │   ├── PlainText/
-│   │   │   │   ├── PlainTextOptions.swift
-│   │   │   │   └── PlainTextConverter.swift
-│   │   │   ├── CSV/
-│   │   │   │   ├── CSVConverter.swift
-│   │   │   │   └── CSVOptions.swift
-│   │   │   └── MarkdownDocument+FormatConversion.swift
-│   │   ├── HeadingAdjustment/
-│   │   │   ├── HeadingAdjuster.swift
-│   │   │   ├── HeadingAdjusterError.swift
-│   │   │   ├── HeadingReconstructor.swift
-│   │   │   ├── HeadingScope.swift
-│   │   │   └── MarkdownDocument+HeadingAdjustment.swift
-│   │   ├── SectionExtraction/
-│   │   │   ├── SectionExtractor.swift
-│   │   │   ├── SectionBoundaryDetector.swift
-│   │   │   ├── SectionContent.swift
-│   │   │   ├── SectionExtractorError.swift
-│   │   │   └── MarkdownDocument+SectionExtraction.swift
-│   │   ├── SectionReordering/
-│   │   │   ├── SectionReorderer.swift
-│   │   │   ├── SectionReordererError.swift
-│   │   │   ├── SectionSiblingFinder.swift
-│   │   │   └── MarkdownDocument+SectionReordering.swift
-│   │   ├── Helpers/
-│   │   │   └── LineNumbers.swift
-│   │   ├── FileMetadata/
-│   │   │   ├── FileMetadata.swift
-│   │   │   ├── FileMetadataReader.swift
-│   │   │   ├── FileMetadataError.swift
-│   │   │   └── ExtendedAttributes.swift
-│   │   └── Wikilink/
-│   │       ├── Wikilink.swift
-│   │       ├── WikilinkAnchor.swift
-│   │       ├── WikilinkScanner.swift
-│   │       ├── WikilinkParser.swift
-│   │       ├── MarkdownDocument+Wikilink.swift
-│   │       ├── WikilinkResolver.swift
-│   │       └── ResolvedWikilink.swift
-│   └── md-utils/                  # CLI tool
-│       ├── CLIEntry.swift
-│       ├── GlobalOptions.swift
-│       ├── OutputFormat.swift
-│       ├── Commands/
-│       │   ├── Body.swift
-│       │   ├── ExtractSection.swift
-│       │   ├── GenerateTOC.swift
-│       │   └── Lines.swift
-│       ├── FrontMatterCommands/
-│       │   ├── FrontMatterCommands.swift
-│       │   ├── Get.swift
-│       │   ├── Set.swift
-│       │   ├── Has.swift
-│       │   ├── Remove.swift
-│       │   ├── Rename.swift
-│       │   ├── Replace.swift
-│       │   ├── List.swift
-│       │   ├── Dump.swift
-│       │   ├── Search.swift
-│       │   ├── SortKeys.swift
-│       │   ├── Touch.swift
-│       │   ├── ArrayCommands.swift
-│       │   ├── ArrayAppend.swift
-│       │   ├── ArrayContains.swift
-│       │   ├── ArrayPrepend.swift
-│       │   ├── ArrayRemove.swift
-│       │   └── ArrayHelpers.swift
-│       ├── HeadingCommands/
-│       │   ├── HeadingCommands.swift
-│       │   ├── PromoteHeading.swift
-│       │   └── DemoteHeading.swift
-│       ├── SectionCommands/
-│       │   ├── SectionCommands.swift
-│       │   ├── MoveSectionUp.swift
-│       │   ├── MoveSectionDown.swift
-│       │   └── MoveSectionTo.swift
-│       ├── ConvertCommands/
-│       │   ├── ConvertCommands.swift
-│       │   ├── ToText.swift
-│       │   └── ToCSV.swift
-│       ├── FileMetadataCommands/
-│       │   ├── FileMetadataCommands.swift
-│       │   └── ReadMetadata.swift
-│       └── LinkCommands/
-│           ├── LinkCommands.swift
-│           ├── ListLinks.swift
-│           ├── Check.swift
-│           └── Backlinks.swift
+│   ├── MarkdownUtilitiesCore/     # Portable content operations
+│   ├── MarkdownUtilities/         # Native filesystem and metadata integrations
+│   └── md-utils/                  # CLI orchestration and presentation
 └── Tests/
+    ├── MarkdownUtilitiesCoreTests/
     ├── MarkdownUtilitiesTests/
-    │   ├── MarkdownDocumentTests.swift
-    │   ├── MarkdownASTTests.swift
-    │   ├── FrontMatter/
-    │   │   ├── FrontMatterParsingTests.swift
-    │   │   ├── FrontMatterSeparationTests.swift
-    │   │   ├── FrontMatterEdgeCasesTests.swift
-    │   │   └── FrontMatterMutationTests.swift
-    │   ├── TOC/
-    │   │   ├── TOCEntryTests.swift
-    │   │   ├── TableOfContentsTests.swift
-    │   │   ├── HeadingTextExtractorTests.swift
-    │   │   ├── TOCGeneratorTests.swift
-    │   │   └── TOCRendererTests.swift
-    │   ├── FormatConversion/
-    │   │   ├── Shared/
-    │   │   │   ├── PhrasingContentTextExtractorTests.swift
-    │   │   │   └── BlockContentTextExtractorTests.swift
-    │   │   ├── PlainText/
-    │   │   │   └── PlainTextConverterTests.swift
-    │   │   └── CSV/
-    │   │       └── CSVConverterTests.swift
-    │   ├── HeadingAdjustment/
-    │   │   ├── HeadingAdjusterTests.swift
-    │   │   ├── HeadingReconstructorTests.swift
-    │   │   ├── HeadingScopeTests.swift
-    │   │   ├── EdgeCaseTests.swift
-    │   │   └── MarkdownDocumentIntegrationTests.swift
-    │   ├── SectionExtraction/
-    │   │   ├── SectionExtractorTests.swift
-    │   │   ├── SectionBoundaryDetectorTests.swift
-    │   │   └── MarkdownDocumentSectionExtractionTests.swift
-    │   ├── SectionReordering/
-    │   │   ├── SectionReordererTests.swift
-    │   │   ├── SectionSiblingFinderTests.swift
-    │   │   └── MarkdownDocumentSectionReorderingTests.swift
-    │   ├── Helpers/
-    │   │   └── LineNumbersTests.swift
-    │   ├── FileMetadata/
-    │   │   ├── FileMetadataTests.swift
-    │   │   ├── FileMetadataReaderTests.swift
-    │   │   └── ExtendedAttributesTests.swift
-    │   └── Wikilink/
-    │       ├── WikilinkScannerTests.swift
-    │       ├── WikilinkParserTests.swift
-    │       ├── WikilinkResolverTests.swift
-    │       ├── ResolvedWikilinkTests.swift
-    │       └── MarkdownDocumentWikilinkTests.swift
     └── md-utilsTests/
-        ├── CLIEntryTests.swift
-        ├── GlobalOptionsTests.swift
-        └── Commands/
-            ├── BodyTests.swift
-            ├── ExtractSectionTests.swift
-            ├── LinesTests.swift
-            ├── SectionCommandsTests.swift
-            ├── ToCSVTests.swift
-            ├── FileMetadataCommandsTests.swift
-            ├── LinkCommandsTests.swift
-            └── FrontMatterCommands/
-                ├── GetTests.swift
-                ├── HasTests.swift
-                ├── SetTests.swift
-                ├── RemoveTests.swift
-                ├── RenameTests.swift
-                ├── ReplaceTests.swift
-                ├── ListTests.swift
-                ├── SearchTests.swift
-                ├── SortKeysTests.swift
-                ├── ArrayAppendTests.swift
-                ├── ArrayContainsTests.swift
-                ├── ArrayPrependTests.swift
-                └── ArrayRemoveTests.swift
 ```
+
+The two library targets mirror their test targets. Portable features and tests belong in the Core directories; filesystem- or host-dependent behavior belongs in the native directories.
 
 ## Naming Conventions
 

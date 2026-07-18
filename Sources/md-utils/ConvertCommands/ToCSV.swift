@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilitiesCore
 import MarkdownUtilities
 import PathKit
 /// Adds Markdown document behavior to ``CLIEntry.ConvertCommands``.

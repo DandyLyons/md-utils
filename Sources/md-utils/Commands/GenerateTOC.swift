@@ -5,7 +5,7 @@
 
 import ArgumentParser
 import Foundation
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import PathKit
 /// Adds command implementations to ``CLIEntry``.
 extension CLIEntry {
@@ -86,7 +86,7 @@ extension CLIEntry {
       let content: String = try path.read()
 
       // Parse document
-      let doc = try MarkdownUtilities.MarkdownDocument(content: content)
+      let doc = try MarkdownDocument(content: content)
 
       // Generate TOC
       let tocOptions = TOCGenerator.Options(

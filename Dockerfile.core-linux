@@ -1,0 +1,13 @@
+FROM swift:6.2-noble
+
+WORKDIR /workspace/
+
+COPY Package.swift Package.resolved ./
+RUN swift package resolve
+
+COPY . .
+
+RUN swift build --target MarkdownUtilitiesCore
+
+WORKDIR /workspace/IntegrationTests/LinuxCoreSmoke/
+RUN swift run LinuxCoreSmoke

@@ -7,7 +7,7 @@ import ArgumentParser
 import Foundation
 import JMESPath
 import JSONSchema
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import PathKit
 import Yams
 /// Stores project-level md-utils rules validation configuration.

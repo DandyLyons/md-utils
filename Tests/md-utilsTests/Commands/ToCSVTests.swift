@@ -10,7 +10,7 @@ import Foundation
 import PathKit
 import Testing
 @testable import md_utils
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 
 @Suite("convert to-csv command")
 struct ToCSVTests {

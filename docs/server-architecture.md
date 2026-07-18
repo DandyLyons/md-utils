@@ -1,6 +1,6 @@
 # MarkdownUtilities Server Architecture
 
-**Status:** Proposed architecture; implementation has not started  
+**Status:** Core/native target boundary implemented; server implementation has not started
 **Last updated:** 2026-07-18
 
 This document records the architectural direction for exposing Markdown-backed data through conventional HTTP APIs. It distinguishes decisions already made from promising ideas that still require validation.
@@ -32,7 +32,7 @@ The native Swift server should investigate [Swift OpenAPI Generator](https://git
 
 The Workers distribution should use the same OpenAPI contract. It may use TypeScript-oriented generation for routing and transport if the Swift-generated OpenAPI runtime is not WebAssembly-compatible. Contract tests should ensure that both distributions implement the same API behavior.
 
-### Introduce a WebAssembly-Compatible Core Library
+### Use a Portable Core Library
 
 The package should evolve toward three library/application layers:
 
@@ -58,13 +58,13 @@ md-utils
 └── Process exit behavior
 ```
 
-`MarkdownUtilitiesCore` must be designed to compile to WebAssembly. It should avoid direct filesystem access, process execution, CLI dependencies, and platform-specific APIs.
+`MarkdownUtilitiesCore` must run on Linux and be designed to compile to WebAssembly. It avoids direct filesystem access, process execution, CLI dependencies, and platform-specific APIs. Linux support is verified with `Dockerfile.core-linux`; WebAssembly compilation remains a separate validation step.
 
 `MarkdownUtilities` will contain functionality that is appropriate for native platforms but unavailable or unsuitable in WebAssembly. `md-utils` remains the executable CLI and is not expected to run inside WebAssembly.
 
 Swift can run natively on Linux, so the conventional server does not require WebAssembly. WebAssembly is specifically a portability mechanism for runtimes such as Cloudflare Workers.
 
-All current dependencies must be audited and tested before finalizing the target split. A small WebAssembly compilation spike should verify the proposed boundary early.
+The current split and dependency assessment are recorded in [the portability audit](portability-audit.md). A small WebAssembly compilation spike must verify the boundary before treating it as WebAssembly-compatible.
 
 ### Make Types and Rules Library Concepts
 
@@ -219,9 +219,9 @@ The following questions remain intentionally unresolved:
 
 ## Implementation Order
 
-1. Design and implement the Markdown type system.
-2. Elevate reusable rules functionality into the library.
-3. Establish and validate the `MarkdownUtilitiesCore` WebAssembly boundary.
+1. Maintain the established `MarkdownUtilitiesCore` Linux boundary and validate its WebAssembly dependencies.
+2. Design and implement the Markdown type system.
+3. Elevate reusable rules functionality into the library.
 4. Define a storage-neutral `MarkdownRecord` and `RecordStore` abstraction.
 5. Prototype SQLite storage, extracted JSON querying, and lossless import/export.
 6. Define an OpenAPI example application and generate the native Swift contract.

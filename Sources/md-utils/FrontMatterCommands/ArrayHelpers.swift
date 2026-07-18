@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 import PathKit
 import Yams
 

@@ -1,4 +1,4 @@
-import MarkdownUtilities
+import MarkdownUtilitiesCore
 
 extension ExploreRenderer {
   func makeExpansion(treeTargets: TreeTargets) -> Expansion {
