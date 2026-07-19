@@ -10,6 +10,8 @@ The proposed native and Cloudflare server architecture, WebAssembly target split
 
 `MarkdownUtilities` depends on Core and adds filesystem-backed wikilink resolution, CSV path metadata, and file metadata including extended attributes. Consumers import `MarkdownUtilitiesCore` and `MarkdownUtilities` explicitly according to the APIs each source file uses.
 
+The Markdown type system follows the same boundary. Core owns canonical `MarkdownRecord` values, parsed `MarkdownDocument` values, type and rule models, schema-graph compilation, portable predicate evaluation, diagnostics, and in-memory fix application. `MarkdownUtilities` loads `.md-utils/types/`, resolves filesystem schema resources, constructs logical record paths, and performs atomic record writes. The executable owns command parsing, prompts, formatting, and exit status.
+
 The full source and dependency classification is recorded in the [portability audit](portability-audit.md).
 
 ## Core Library (MarkdownUtilitiesCore)
@@ -24,6 +26,21 @@ Central data structure representing a Markdown document:
 - Body available as `String` for text processing
 - Supports parsing body into Markdown AST via `parseAST()` method
 - AST parsing uses MarkdownSyntax library returning `Root` structure
+
+A document is a successfully parsed content view and deliberately has no persistent identity, logical path, revision, or storage location. `MarkdownRecord` is the separate canonical resource model. It remains representable when parsing fails, allowing type and rule assessment to return invalid YAML as a structured diagnostic.
+
+### Markdown Types and Rules
+
+**Locations**: `Sources/MarkdownUtilitiesCore/Types/`, `Sources/MarkdownUtilitiesCore/Rules/`, and `Sources/MarkdownUtilities/Types/`
+
+- `MarkdownTypeDefinition` models the `frontmatter`, `body`, and `context` conformance domains.
+- `MarkdownTypeRegistry` validates definitions, resolves and caches external JSON Schema graphs, and rejects duplicates, cycles, and conflicting schema identifiers.
+- `MarkdownTypeChecker` analyzes one canonical record once and supports named assessment, overlap queries, and type-hint verification.
+- `MarkdownRuleDefinition` keeps applicability separate from requirements while reusing portable predicates and type conformance.
+- `MarkdownDiagnostic` distinguishes errors from advisories and can carry structured fix-its.
+- `MarkdownTypeFixer` applies selected edits in memory; native and CLI layers own persistence and interaction.
+
+Types are structural and non-exclusive. Rules and types remain distinct domain models even where they share analysis and predicate evaluation.
 
 **Frontmatter Handling:**
 - Uses `FrontMatterParser` to separate `---` delimited YAML frontmatter
@@ -97,6 +114,10 @@ if let heading = ast.children.first as? Heading {
   - `okf report` - Report bundle inventory, type distribution, and advisory diagnostics
   - `okf doctor` - Run validation plus advisory health diagnostics
   - `okf type set` - Set an explicit OKF concept `type` value on matching files
+- `types` (TypesCommands) - Work with Markdown type definitions and typed records
+  - `types init`, `create`, `list`, `describe`, `doctor`, and `schema` - Manage and inspect definitions
+  - `types check`, `verify`, `identify`, and `find` - Assess conformance and type hints
+  - `types fix` - Preview and apply structured conformance fixes
 - `section` / `sect` (SectionCommands) - Manipulate sections in Markdown documents
   - `section get` - Extract a section and output it
   - `section set` - Replace a section body while preserving its heading
@@ -239,7 +260,7 @@ Select content by heading or line range.
 
 The following features are **NOT YET IMPLEMENTED**:
 
-1. **Validation** - Link validation, Markdown flavor compliance (AST foundation ready)
+1. **Additional Validation** - Markdown flavor compliance and future predicate vocabulary
 2. **Additional Format Conversions** - HTML, RTF, XML (infrastructure ready, plain text and CSV implemented)
 3. **File Metadata Writing** - Write/update file metadata (read operations implemented)
 4. **`treedocs` Integration** - Integration with the sister project [`treedocs`](https://github.com/DandyLyons/treedocs)

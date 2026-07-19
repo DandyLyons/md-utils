@@ -4,9 +4,10 @@ project:
   last_updated: "2026-07-18"
   name: md-utils
   version: 0.0.0
-signature: sha256:42d0c9685f03adb1d867ad8e895f78f0f6d96c85dc346e6b43810139ebcdd3c0
+signature: sha256:1b16df8f17a39cb335927137c8eab382f6317123d10f49ae29b80f28ddf12da5
 tree:
-  .dockerignore: Docker build-context exclusions for local build artifacts and repository metadata.
+  .dockerignore: Docker build-context exclusions for local build artifacts and repository
+    metadata.
   .github:
     _doc: GitHub repository automation, including Pages deployment and schema publication
       validation workflows.
@@ -17,6 +18,10 @@ tree:
       schema-publication.yml: Validates bundled and public JSON Schema publication
         files stay synchronized.
   .gitignore: Git ignore rules for generated files, local settings, and build artifacts.
+  .md-utils:
+    _doc: Project-local md-utils configuration and reusable validation resources.
+    types:
+      _doc: Project Markdown type definitions using the mdtype compound extensions.
   AGENTS.md: Agent-facing project instructions, architecture notes, and workflow rules.
   Dockerfile.core-linux: Swift 6.2 Linux build and smoke-test definition for MarkdownUtilitiesCore.
   IntegrationTests:
@@ -28,7 +33,8 @@ tree:
         _doc: Source code for integration-test executables.
         LinuxCoreSmoke:
           _doc: Executable target for validating portable Core APIs on Linux.
-          main.swift: Smoke test for Core frontmatter parsing, Markdown AST access, and rendering.
+          main.swift: Smoke test for Core frontmatter parsing, Markdown AST access,
+            and rendering.
   Package.resolved: SwiftPM dependency lockfile generated from package resolution.
   Package.swift: Swift package manifest defining library, CLI, dependencies, resources,
     and tests.
@@ -43,7 +49,8 @@ tree:
       Documentation.docc:
         _doc: DocC documentation catalog for the MarkdownUtilities library API and
           workflows.
-        CSVConversion.md: DocC article for CSV conversion through the native MarkdownUtilities layer.
+        CSVConversion.md: DocC article for CSV conversion through the native MarkdownUtilities
+          layer.
         MarkdownUtilities.md: DocC landing page for the MarkdownUtilities library.
       FileMetadata:
         _doc: Library types for reading filesystem metadata and extended attributes.
@@ -60,90 +67,160 @@ tree:
           _doc: CSV conversion implementation and options.
           CSVConverter.swift: Converts Markdown document content into CSV rows.
           CSVOptions.swift: Configuration for Markdown to CSV conversion.
+      Types:
+        _doc: Native filesystem adapters for loading type registries and reading or
+          writing Markdown records.
+        MarkdownTypeFileRegistryLoader.swift: Loads mdtype definitions and schema
+          resources, confines references to the project, and adapts filesystem records.
       Wikilink:
         _doc: Obsidian-style wikilink parsing, scanning, and resolution support.
         ResolvedWikilink.swift: Model describing a wikilink matched to a filesystem
           target.
         WikilinkResolver.swift: Resolves wikilinks against Markdown files and anchors.
     MarkdownUtilitiesCore:
-      _doc: Portable Swift library for parsing, inspecting, converting, and mutating Markdown documents.
+      _doc: Portable Swift library for parsing, inspecting, converting, and mutating
+        Markdown documents.
       Documentation.docc:
-        _doc: DocC documentation catalog for the portable MarkdownUtilitiesCore API and workflows.
-        FormatConversionWorkflows.md: DocC article for converting Markdown documents to plain text.
+        _doc: DocC documentation catalog for the portable MarkdownUtilitiesCore API
+          and workflows.
+        FormatConversionWorkflows.md: DocC article for converting Markdown documents
+          to plain text.
         FrontmatterWorkflows.md: DocC article for reading and modifying YAML frontmatter.
-        MarkdownUtilitiesCore.md: DocC landing page for the MarkdownUtilitiesCore library.
+        MarkdownRules.md: DocC article explaining portable rule applicability, checks,
+          and shared type predicates.
+        MarkdownTypes.md: DocC article explaining Markdown records, structural type
+          conformance, type hints, diagnostics, and fix-its.
+        MarkdownUtilitiesCore.md: DocC landing page for the MarkdownUtilitiesCore
+          library.
         Resources:
           _doc: Resource directory for MarkdownUtilitiesCore DocC assets.
-        SectionWorkflows.md: DocC article for extracting, inserting, replacing, and reordering Markdown sections.
-        WorkingWithMarkdownDocuments.md: DocC article introducing MarkdownDocument parsing and manipulation.
+        SectionWorkflows.md: DocC article for extracting, inserting, replacing, and
+          reordering Markdown sections.
+        WorkingWithMarkdownDocuments.md: DocC article introducing MarkdownDocument
+          parsing and manipulation.
       Explore:
-        _doc: Portable support for summarizing Markdown documents for exploration output.
-        ExploreDocument.swift: Model that captures document headings, metadata, and preview information.
+        _doc: Portable support for summarizing Markdown documents for exploration
+          output.
+        ExploreDocument.swift: Model that captures document headings, metadata, and
+          preview information.
       FormatConversion:
-        _doc: Portable Markdown conversion protocols, plain-text conversion, and shared extraction logic.
-        MarkdownDocument+FormatConversion.swift: Convenience APIs for converting MarkdownDocument values.
+        _doc: Portable Markdown conversion protocols, plain-text conversion, and shared
+          extraction logic.
+        MarkdownDocument+FormatConversion.swift: Convenience APIs for converting MarkdownDocument
+          values.
         PlainText:
           _doc: Plain-text conversion implementation and options.
-          PlainTextConverter.swift: Converts Markdown document content into readable plain text.
+          PlainTextConverter.swift: Converts Markdown document content into readable
+            plain text.
           PlainTextOptions.swift: Configuration for Markdown-to-plain-text conversion.
         Protocols:
           _doc: Shared protocols for conversion options and converter implementations.
-          ConversionOptions.swift: Marker protocol for format-specific conversion configuration.
-          FormatConverter.swift: Protocol for types that convert Markdown documents into another representation.
+          ConversionOptions.swift: Marker protocol for format-specific conversion
+            configuration.
+          FormatConverter.swift: Protocol for types that convert Markdown documents
+            into another representation.
         Shared:
           _doc: Shared Markdown AST text-extraction utilities used by converters.
-          BlockContentTextExtractor.swift: Extracts textual content from block-level Markdown nodes.
-          PhrasingContentTextExtractor.swift: Extracts textual content from inline Markdown phrasing nodes.
+          BlockContentTextExtractor.swift: Extracts textual content from block-level
+            Markdown nodes.
+          PhrasingContentTextExtractor.swift: Extracts textual content from inline
+            Markdown phrasing nodes.
       Formatting:
         _doc: Markdown formatting normalization utilities.
         BulletNormalizer.swift: Normalizes unordered-list bullet markers.
         ItalicNormalizer.swift: Normalizes italic-emphasis delimiters.
-        MarkdownDocument+Formatting.swift: Convenience APIs for applying formatting normalizers to documents.
+        MarkdownDocument+Formatting.swift: Convenience APIs for applying formatting
+          normalizers to documents.
         TableNormalizer.swift: Normalizes Markdown table spacing and alignment.
       FrontMatter:
         _doc: YAML frontmatter parsing, serialization, querying, and mutation support.
-        FrontMatterParser.swift: Parser that separates YAML frontmatter from Markdown body content.
-        MarkdownDocument+FrontMatter.swift: Read APIs for accessing MarkdownDocument frontmatter values.
-        MarkdownDocument+FrontMatterMutation.swift: Mutation APIs for setting, removing, and renaming frontmatter keys.
+        FrontMatterParser.swift: Parser that separates YAML frontmatter from Markdown
+          body content.
+        MarkdownDocument+FrontMatter.swift: Read APIs for accessing MarkdownDocument
+          frontmatter values.
+        MarkdownDocument+FrontMatterMutation.swift: Mutation APIs for setting, removing,
+          and renaming frontmatter keys.
         YAMLConversion.swift: Conversion helpers between Yams nodes and Swift values.
       HeadingAdjustment:
-        _doc: Heading promotion and demotion logic that preserves Markdown section structure.
+        _doc: Heading promotion and demotion logic that preserves Markdown section
+          structure.
         HeadingAdjuster.swift: Applies heading-level changes within selected scopes.
         HeadingAdjusterError.swift: Error cases for invalid heading-adjustment operations.
         HeadingReconstructor.swift: Rebuilds Markdown text after heading levels change.
         HeadingScope.swift: Defines the range of headings affected by an adjustment.
-        MarkdownDocument+HeadingAdjustment.swift: Convenience APIs for promoting and demoting document headings.
+        MarkdownDocument+HeadingAdjustment.swift: Convenience APIs for promoting and
+          demoting document headings.
       Helpers:
         _doc: Small shared helper utilities for MarkdownUtilitiesCore.
-        LineNumbers.swift: Helpers for mapping Markdown content to line numbers and ranges.
-      MarkdownDocument.swift: Core Markdown document model with parsed frontmatter and body content.
+        LineNumbers.swift: Helpers for mapping Markdown content to line numbers and
+          ranges.
+      MarkdownDocument.swift: Core Markdown document model with parsed frontmatter
+        and body content.
+      Rules:
+        _doc: Portable Markdown rule models and check evaluation shared by library
+          and CLI clients.
+        MarkdownRuleCheckEvaluator.swift: Evaluates portable frontmatter-schema, heading,
+          line, and word-count rule checks.
+        MarkdownRuleDefinition.swift: Defines rule applicability, requirements, recommendations,
+          and type-conformance predicates.
       SectionExtraction:
-        _doc: Logic for finding, extracting, inserting, and replacing heading-delimited Markdown sections.
-        MarkdownDocument+SectionExtraction.swift: Convenience APIs for retrieving sections from a MarkdownDocument.
-        MarkdownDocument+SectionInsertion.swift: Convenience APIs for inserting sections into a MarkdownDocument.
-        MarkdownDocument+SectionReplacement.swift: Convenience APIs for replacing sections in a MarkdownDocument.
-        SectionBoundaryDetector.swift: Detects section start and end boundaries from Markdown headings.
+        _doc: Logic for finding, extracting, inserting, and replacing heading-delimited
+          Markdown sections.
+        MarkdownDocument+SectionExtraction.swift: Convenience APIs for retrieving
+          sections from a MarkdownDocument.
+        MarkdownDocument+SectionInsertion.swift: Convenience APIs for inserting sections
+          into a MarkdownDocument.
+        MarkdownDocument+SectionReplacement.swift: Convenience APIs for replacing
+          sections in a MarkdownDocument.
+        SectionBoundaryDetector.swift: Detects section start and end boundaries from
+          Markdown headings.
         SectionContent.swift: Value type representing extracted section text and metadata.
         SectionExtractor.swift: Extracts section content by heading name or index.
-        SectionExtractorError.swift: Error cases for missing or ambiguous section-extraction requests.
+        SectionExtractorError.swift: Error cases for missing or ambiguous section-extraction
+          requests.
         SectionInsertionError.swift: Error cases for invalid section-insertion requests.
       SectionReordering:
         _doc: Logic for moving Markdown sections among sibling headings.
-        MarkdownDocument+SectionReordering.swift: Convenience APIs for reordering sections in a MarkdownDocument.
+        MarkdownDocument+SectionReordering.swift: Convenience APIs for reordering
+          sections in a MarkdownDocument.
         SectionReorderer.swift: Moves sections up, down, or to a target position.
         SectionReordererError.swift: Error cases for invalid section-reordering operations.
         SectionSiblingFinder.swift: Finds sibling sections at the same heading level.
       TOC:
         _doc: Table-of-contents generation, representation, and rendering.
-        HeadingTextExtractor.swift: Extracts plain heading text from Markdown heading nodes.
-        MarkdownDocument+TOC.swift: Convenience APIs for generating a document table of contents.
+        HeadingTextExtractor.swift: Extracts plain heading text from Markdown heading
+          nodes.
+        MarkdownDocument+TOC.swift: Convenience APIs for generating a document table
+          of contents.
         TOCEntry.swift: Model for a single table-of-contents entry.
         TOCGenerator.swift: Builds table-of-contents entries from Markdown headings.
         TOCRenderer.swift: Renders table-of-contents data into supported output formats.
         TableOfContents.swift: Container type for generated table-of-contents entries.
+      Types:
+        _doc: Portable models and services for defining, compiling, assessing, and
+          repairing typed Markdown records.
+        JSONValue.swift: Sendable JSON value representation used by schemas, frontmatter,
+          and diagnostics.
+        MarkdownDiagnostic.swift: Structured conformance diagnostics, severity, locations,
+          and fix-it models.
+        MarkdownRecord.swift: Canonical Markdown record identity, revision, context,
+          logical path, and type-hint models.
+        MarkdownRecordAnalyzer.swift: Parses canonical record content once into reusable
+          frontmatter, body, AST, and outline analysis.
+        MarkdownTypeChecker.swift: Assesses records against named types, predicates,
+          recommendations, and declared type hints.
+        MarkdownTypeDefinition.swift: Defines named versioned type contracts across
+          frontmatter, body, and context domains.
+        MarkdownTypeDefinitionDecoder.swift: Decodes and validates YAML or JSON Markdown
+          type-definition envelopes and constraints.
+        MarkdownTypeFixer.swift: Applies selected structured conformance edits to
+          in-memory Markdown records.
+        MarkdownTypeRegistry.swift: Validates type definitions and compiles cached
+          inline and referenced JSON Schema graphs.
       Wikilink:
         _doc: Portable Obsidian-style wikilink parsing and scanning support.
-        MarkdownDocument+Wikilink.swift: Convenience APIs for scanning wikilinks in MarkdownDocument content.
+        MarkdownDocument+Wikilink.swift: Convenience APIs for scanning wikilinks in
+          MarkdownDocument content.
         Wikilink.swift: Model for a parsed wikilink target, anchor, and display text.
         WikilinkAnchor.swift: Model for heading or block anchors inside wikilinks.
         WikilinkParser.swift: Parser for Obsidian-style double-bracket wikilink syntax.
@@ -177,7 +254,8 @@ tree:
         ConfigCommands.swift: Parent command for configuration-related subcommands.
         ConfigInfo.swift: Command that reports md-utils CLI and configuration schema
           information.
-        ConfigMigrate.swift: Command that migrates older md-utils configuration files to the current schema.
+        ConfigMigrate.swift: Command that migrates older md-utils configuration files
+          to the current schema.
         ConfigSchema.swift: Embedded schema model for md-utils configuration files.
         ConfigSchemaPrinter.swift: Formatter for printing configuration schema information.
       ConvertCommands:
@@ -196,6 +274,8 @@ tree:
           _doc: Resource directory for md-utils DocC assets.
         RulesValidationCommands.md: DocC article for rules initialization, matching,
           and validation commands.
+        TypesCommands.md: DocC article for creating, inspecting, assessing, finding,
+          verifying, and fixing typed Markdown records.
         WikilinkCommands.md: DocC article for wikilink listing, checking, and backlink
           commands.
         md-utils.md: DocC landing page for the md-utils CLI.
@@ -270,6 +350,8 @@ tree:
           0.1.0.
         0.2.0_md-utils.schema.json: Bundled JSON Schema for md-utils rules config
           version 0.2.0.
+        1_md-utils-type.schema.json: Bundled JSON Schema for Markdown type-definition
+          format version 1.
         OKF-concept.schema.json: Bundled JSON Schema for OKF concept metadata validation.
         SKILL.md: Embedded copy of the markdown-utilities agent skill instructions.
       RulesCommands:
@@ -293,7 +375,8 @@ tree:
         _doc: CLI commands for listing, retrieving, replacing, and moving Markdown
           sections.
         GetSection.swift: Command that prints a selected Markdown section.
-        InsertSection.swift: Command that inserts a Markdown section relative to an existing section.
+        InsertSection.swift: Command that inserts a Markdown section relative to an
+          existing section.
         ListSections.swift: Command that lists sections found in a Markdown document.
         MoveSectionDown.swift: Command that moves a section after its next sibling.
         MoveSectionTo.swift: Command that moves a section to a specific sibling position.
@@ -302,11 +385,21 @@ tree:
         SectionCommands.swift: Parent command for section manipulation subcommands.
         SetSection.swift: Command that replaces the content of a selected Markdown
           section.
+      TypesCommands:
+        _doc: CLI commands and support for managing type definitions and assessing
+          or repairing Markdown records.
+        TypesCommands.swift: Parent command registering the md-utils types subcommand
+          group.
+        TypesSubcommands.swift: Implements type initialization, inspection, assessment,
+          discovery, verification, fixing, and schema output commands.
+        TypesSupport.swift: Provides type project scaffolding, runners, renderers,
+          fix selection, and shared CLI helpers.
   Tests:
     _doc: Swift Testing test suites for the library and CLI targets.
     MarkdownUtilitiesCoreTests:
       _doc: Unit tests for the portable MarkdownUtilitiesCore library target.
-      CoreImportTests.swift: Verifies public Core APIs are available through a direct module import.
+      CoreImportTests.swift: Verifies public Core APIs are available through a direct
+        module import.
       Explore:
         _doc: Tests for portable document-exploration models.
         ExploreDocumentTests.swift: Tests ExploreDocument summary extraction behavior.
@@ -317,52 +410,80 @@ tree:
           PlainTextConverterTests.swift: Tests Markdown-to-plain-text conversion behavior.
         Shared:
           _doc: Tests for shared Markdown text-extraction utilities.
-          BlockContentTextExtractorTests.swift: Tests block-level text extraction from Markdown AST nodes.
-          PhrasingContentTextExtractorTests.swift: Tests inline phrasing-text extraction from Markdown AST nodes.
+          BlockContentTextExtractorTests.swift: Tests block-level text extraction
+            from Markdown AST nodes.
+          PhrasingContentTextExtractorTests.swift: Tests inline phrasing-text extraction
+            from Markdown AST nodes.
       Formatting:
         _doc: Tests for Markdown formatting normalization.
         FormattingTests.swift: Tests bullet, italic, and table-formatting normalization.
       FrontMatter:
         _doc: Tests for YAML frontmatter parsing, separation, conversion, and mutation.
-        FrontMatterEdgeCasesTests.swift: Tests frontmatter edge cases and malformed inputs.
-        FrontMatterMutationTests.swift: Tests setting, removing, and renaming frontmatter values.
-        FrontMatterParsingTests.swift: Tests YAML frontmatter parsing into structured values.
-        FrontMatterSeparationTests.swift: Tests separation of frontmatter from Markdown body text.
-        SafeNodeToSwiftValueTests.swift: Tests safe conversion from Yams nodes to Swift values.
+        FrontMatterEdgeCasesTests.swift: Tests frontmatter edge cases and malformed
+          inputs.
+        FrontMatterMutationTests.swift: Tests setting, removing, and renaming frontmatter
+          values.
+        FrontMatterParsingTests.swift: Tests YAML frontmatter parsing into structured
+          values.
+        FrontMatterSeparationTests.swift: Tests separation of frontmatter from Markdown
+          body text.
+        SafeNodeToSwiftValueTests.swift: Tests safe conversion from Yams nodes to
+          Swift values.
       HeadingAdjustment:
         _doc: Tests for heading promotion, demotion, reconstruction, and scopes.
         EdgeCaseTests.swift: Tests heading-adjustment edge cases.
         HeadingAdjusterTests.swift: Tests HeadingAdjuster level changes.
-        HeadingReconstructorTests.swift: Tests reconstruction of Markdown after heading changes.
+        HeadingReconstructorTests.swift: Tests reconstruction of Markdown after heading
+          changes.
         HeadingScopeTests.swift: Tests heading-scope selection rules.
-        MarkdownDocumentIntegrationTests.swift: Tests MarkdownDocument heading-adjustment integration.
+        MarkdownDocumentIntegrationTests.swift: Tests MarkdownDocument heading-adjustment
+          integration.
       Helpers:
         _doc: Tests for shared Core helpers.
         LineNumbersTests.swift: Tests line-number and range helper behavior.
       MarkdownASTTests.swift: Tests MarkdownSyntax AST parsing integration.
-      MarkdownDocumentTests.swift: Tests MarkdownDocument initialization, parsing, and stored components.
+      MarkdownDocumentTests.swift: Tests MarkdownDocument initialization, parsing,
+        and stored components.
+      Rules:
+        _doc: Tests for portable Markdown rule applicability and check evaluation.
+        MarkdownRuleCheckerTests.swift: Verifies rule matching, type predicates, checks,
+          and advisory semantics.
       SectionExtraction:
         _doc: Tests for section boundary detection, extraction, insertion, and replacement.
-        MarkdownDocumentSectionExtractionTests.swift: Tests MarkdownDocument section-extraction convenience APIs.
-        MarkdownDocumentSectionInsertionTests.swift: Tests MarkdownDocument section-insertion convenience APIs.
-        MarkdownDocumentSectionReplacementTests.swift: Tests MarkdownDocument section-replacement convenience APIs.
+        MarkdownDocumentSectionExtractionTests.swift: Tests MarkdownDocument section-extraction
+          convenience APIs.
+        MarkdownDocumentSectionInsertionTests.swift: Tests MarkdownDocument section-insertion
+          convenience APIs.
+        MarkdownDocumentSectionReplacementTests.swift: Tests MarkdownDocument section-replacement
+          convenience APIs.
         SectionBoundaryDetectorTests.swift: Tests heading-based section-boundary detection.
         SectionExtractorTests.swift: Tests section extraction by heading or index.
       SectionReordering:
         _doc: Tests for section movement and sibling discovery.
-        MarkdownDocumentSectionReorderingTests.swift: Tests MarkdownDocument section-reordering convenience APIs.
+        MarkdownDocumentSectionReorderingTests.swift: Tests MarkdownDocument section-reordering
+          convenience APIs.
         SectionReordererTests.swift: Tests moving sections up, down, and to positions.
-        SectionSiblingFinderTests.swift: Tests discovery of sibling sections at heading levels.
+        SectionSiblingFinderTests.swift: Tests discovery of sibling sections at heading
+          levels.
       TOC:
         _doc: Tests for table-of-contents generation and rendering.
-        HeadingTextExtractorTests.swift: Tests extraction of plain text from heading nodes.
+        HeadingTextExtractorTests.swift: Tests extraction of plain text from heading
+          nodes.
         TOCEntryTests.swift: Tests table-of-contents entry data and anchors.
         TOCGeneratorTests.swift: Tests generation of TOC entries from headings.
         TOCRendererTests.swift: Tests rendering TOCs in supported formats.
         TableOfContentsTests.swift: Tests table-of-contents container behavior.
+      Types:
+        _doc: Tests for portable Markdown type definitions, assessment, diagnostics,
+          hints, and fixes.
+        MarkdownTypeCheckerTests.swift: Verifies structural conformance, schema checks,
+          body and context predicates, diagnostics, hints, and fixes.
+        MarkdownTypeDefinitionTests.swift: Verifies YAML and JSON definition decoding,
+          validation, registry behavior, and schema resources.
       Wikilink:
         _doc: Tests for portable wikilink parsing and scanning.
-        MarkdownDocumentWikilinkTests.swift: Tests MarkdownDocument wikilink-scanning APIs.
+        MarkdownDocumentWikilinkTests.swift: Tests MarkdownDocument wikilink-scanning
+          APIs.
         WikilinkParserTests.swift: Tests parsing double-bracket wikilink syntax.
         WikilinkScannerTests.swift: Tests scanning Markdown text for wikilinks.
     MarkdownUtilitiesTests:
@@ -377,6 +498,10 @@ tree:
         CSV:
           _doc: Tests for CSV conversion.
           CSVConverterTests.swift: Tests Markdown to CSV conversion behavior.
+      Types:
+        _doc: Tests for native Markdown type registry and filesystem record adapters.
+        MarkdownTypeFileRegistryLoaderTests.swift: Verifies mdtype discovery, schema
+          reference security and caching, and logical record paths.
       Wikilink:
         _doc: Tests for wikilink parsing, scanning, and resolution.
         ResolvedWikilinkTests.swift: Tests resolved wikilink model behavior.
@@ -416,8 +541,11 @@ tree:
           and document checks.
         SectionCommandsTests.swift: Tests section listing and movement commands.
         SectionGetSetTests.swift: Tests section get and set command behavior.
-        SectionInsertRemoveTests.swift: Tests section insertion and removal command behavior.
+        SectionInsertRemoveTests.swift: Tests section insertion and removal command
+          behavior.
         ToCSVTests.swift: Tests Markdown to CSV command behavior.
+        TypesCommandsTests.swift: Verifies type command registration, scaffolding,
+          assessment, fix behavior, and mdtype filenames.
       GlobalOptionsTests.swift: Tests shared global command-line options.
       TestHelpers:
         _doc: Shared test support code for md-utils CLI tests.
@@ -428,9 +556,11 @@ tree:
     cli-patterns.md: Command design and implementation patterns for md-utils.
     common-use-cases.md: Example workflows and recipes for common Markdown operations.
     development-workflow.md: Guidance for adding features and preparing changes.
-    portability-audit.md: Audit of Core portability boundaries, platform dependencies, and Linux validation.
+    portability-audit.md: Audit of Core portability boundaries, platform dependencies,
+      and Linux validation.
     release-procedures.md: Versioning and release process documentation.
-    server-architecture.md: Proposed architecture for server-side and embedded md-utils integrations.
+    server-architecture.md: Proposed architecture for server-side and embedded md-utils
+      integrations.
     swift-coding-standards.md: Swift style and safety rules used in this package.
     testing-standards.md: Swift Testing conventions and test organization guidance.
   scripts:

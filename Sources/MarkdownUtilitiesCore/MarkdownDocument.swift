@@ -8,7 +8,13 @@ import MarkdownSyntax
 import Parsing
 import Yams
 
-/// A representation of a Markdown document.
+/// A parsed representation of Markdown content.
+///
+/// A document contains only concepts encoded in the Markdown text: parsed YAML
+/// frontmatter, body text, and a derived Markdown AST. It has no persistent
+/// identity, logical path, revision, or storage context. Use ``MarkdownRecord``
+/// for canonical, addressable content that must remain representable even when
+/// its YAML is invalid.
 public struct MarkdownDocument: @unchecked Sendable {
   /// The YAML frontmatter as a parsed mapping.
   ///

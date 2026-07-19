@@ -15,6 +15,8 @@
 | Portable Core | `MarkdownDocument.swift`; every Swift file under `Explore/`, `Formatting/`, `FrontMatter/`, `HeadingAdjustment/`, `Helpers/`, `SectionExtraction/`, `SectionReordering/`, and `TOC/` | Operates on strings, YAML nodes, or Markdown AST models without discovering host state. |
 | Portable Core | `FormatConversion/Protocols/`; `FormatConversion/Shared/`; `FormatConversion/PlainText/`; `FormatConversion/MarkdownDocument+FormatConversion.swift` | Pure conversion contracts and Markdown-to-text transformations. |
 | Portable Core | `Wikilink/Wikilink.swift`, `WikilinkAnchor.swift`, `WikilinkParser.swift`, `WikilinkScanner.swift`, and `MarkdownDocument+Wikilink.swift` | Parses supplied content without resolving against a filesystem. |
+| Portable Core | Every Swift file under `Types/` and `Rules/` | Operates on canonical record strings, explicit logical context, supplied definitions, and host-provided schema resources. It does not discover or mutate host state. |
+| Native integration | Every Swift file under `Types/` | Loads definitions and schema resources from native paths, adapts files to records, and performs atomic filesystem writes. |
 | Native integration | Every Swift file under `FileMetadata/` | Reads filesystem attributes and, on Darwin, extended attributes. |
 | Native integration | `FormatConversion/CSV/CSVConverter.swift` and `CSVOptions.swift` | Absolute and relative metadata columns currently use PathKit and implicit current-working-directory context. |
 | Native integration | `Wikilink/WikilinkResolver.swift` and `ResolvedWikilink.swift` | Scans directories and exposes PathKit paths in the public API. |
@@ -30,10 +32,13 @@ Directory paths in the table are relative to `Sources/MarkdownUtilitiesCore/`, `
 | MarkdownSyntax and swift-cmark | Core | Verified by the Linux container build and Core tests. | The C-backed swift-cmark dependency is unverified and is a potential blocker. |
 | swift-parsing | Core | Verified by the Linux container build and parser tests. | Unverified with this package's selected version and SDK. |
 | Yams and libYAML | Core | Verified by the Linux container build and frontmatter tests. | The C-backed libYAML dependency is unverified and is a potential blocker. |
+| JSONSchema | Core | Draft 2020-12 validation, external graph compilation, and the Linux Core build are verified. | Pure Swift, but compilation and behavior remain unverified with a selected WebAssembly SDK. |
 | PathKit | Native only | Supported by the native package; excluded from Core. | Out of scope because it is not a Core dependency. |
-| ArgumentParser, JSONSchema, JMESPath, Rainbow | CLI only | Outside the Core boundary. | Out of scope because the CLI is not a WebAssembly target. |
+| ArgumentParser, JMESPath, Rainbow | CLI only | Outside the Core boundary. | Out of scope because the CLI is not a WebAssembly target. |
 
 Linux verification uses Swift 6.2 in `Dockerfile.core-linux`. A successful image build runs `swift build --target MarkdownUtilitiesCore`, then runs the isolated `IntegrationTests/LinuxCoreSmoke/` executable against Core. The full focused `MarkdownUtilitiesCoreTests` target remains part of `swift test`; SwiftPM test filtering cannot avoid compiling unrelated package test targets.
+
+The Core schema adapter performs no implicit retrieval. A caller supplies `MarkdownSchemaResourceProvider`; registry construction resolves and caches the immutable graph, rewrites external references to canonical resource identifiers, and rejects missing resources, cycles, and conflicting `$id` values before assessment. The current JSONSchema dependency passes the package's draft 2020-12 `const`, `contains`, `allOf`, required-property, and nested-reference coverage on macOS and compiles in the Linux Core container. WebAssembly remains explicitly unverified.
 
 ## Placement Rules
 

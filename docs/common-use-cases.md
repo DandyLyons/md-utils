@@ -165,6 +165,43 @@ md-utils fm dump document.md
 md-utils convert to-text document.md
 ```
 
+## Markdown Type Operations
+
+### Initialize and create a type
+
+```bash
+md-utils types init
+md-utils types create Book --version 1.0.0
+```
+
+Type definitions are stored under `.md-utils/types/` and use the compound extensions `.mdtype.yaml`, `.mdtype.yml`, or `.mdtype.json`.
+
+### Check and find conforming records
+
+```bash
+md-utils types check Book books/
+md-utils types find Book books/
+```
+
+`types find` prints only records that pass complete assessment. A matching logical path alone is not treated as conformance.
+
+### Verify type hints
+
+```bash
+md-utils types verify books/ --include-confirmed
+```
+
+Type hints live under `$md-utils.typeHints` in frontmatter. They accelerate candidate assessment and improve diagnostics, but they are always verified against the named contract.
+
+### Preview and apply conformance fixes
+
+```bash
+md-utils types fix Book books/ --dry-run
+md-utils types fix Book books/dune.md --yes --set title=Dune
+```
+
+Noninteractive fixes never invent required values. Recommendations are unchanged unless `--include-recommendations` is explicit.
+
 ## Open Knowledge Format Operations
 
 `md-utils okf` currently targets the Open Knowledge Format (OKF) v0.1 draft. The draft spec is readable at https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md.

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dandylyons.github.io/md-utils/schemas/types/1/md-utils-type.schema.json",
+  "title": "md-utils Markdown Type Definition",
+  "type": "object",
+  "required": ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context"],
+  "properties": {
+    "md-utils-type-schema": { "const": "1" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "minLength": 1 },
+    "frontmatter": { "$ref": "#/$defs/frontmatter" },
+    "body": { "$ref": "#/$defs/constraintGroup" },
+    "context": { "$ref": "#/$defs/constraintGroup" }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "frontmatter": {
+      "type": "object",
+      "properties": {
+        "presence": { "enum": ["required", "optional"] },
+        "schemas": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["ref"],
+                "properties": { "ref": { "type": "string", "minLength": 1 } },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["inline"],
+                "properties": { "inline": { "type": "object" } },
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "constraintGroup": {
+      "type": "object",
+      "required": ["requirements", "recommendations"],
+      "properties": {
+        "requirements": { "type": "array", "items": { "$ref": "#/$defs/constraint" } },
+        "recommendations": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
+      },
+      "additionalProperties": false
+    },
+    "heading": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "level": { "type": "integer", "minimum": 1, "maximum": 6 }
+      },
+      "additionalProperties": false
+    },
+    "constraint": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "heading": { "$ref": "#/$defs/heading" },
+        "headingRelationship": {
+          "type": "object",
+          "required": ["parent", "child", "relationship"],
+          "properties": {
+            "parent": { "$ref": "#/$defs/heading" },
+            "child": { "$ref": "#/$defs/heading" },
+            "relationship": { "enum": ["directChild", "descendant"] }
+          },
+          "additionalProperties": false
+        },
+        "section": {
+          "type": "object",
+          "required": ["heading"],
+          "properties": {
+            "heading": { "$ref": "#/$defs/heading" },
+            "content": { "enum": ["any", "nonEmpty"] }
+          },
+          "additionalProperties": false
+        },
+        "path": {
+          "type": "object",
+          "required": ["glob"],
+          "properties": { "glob": { "type": "string", "minLength": 1 } },
+          "additionalProperties": false
+        },
+        "maxBodyLines": { "type": "integer", "minimum": 0 },
+        "maxBodyWords": { "type": "integer", "minimum": 0 }
+      },
+      "minProperties": 2,
+      "maxProperties": 2,
+      "additionalProperties": false
+    }
+  }
+}

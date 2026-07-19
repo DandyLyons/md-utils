@@ -1441,11 +1441,11 @@ enum RulesValidatorRunner {
     document: MarkdownDocument?,
     loadedSchemas: inout [String: [String: Any]]
   ) throws -> [RuleValidationErrorDetail] {
-    var errors: [RuleValidationErrorDetail] = []
-    for check in rule.checks {
+    var portableChecks: [MarkdownUtilitiesCore.MarkdownRuleCheck] = []
+    for (index, check) in rule.checks.enumerated() {
       switch check {
       case .frontmatterSchema(let schemaFilename, _):
-        guard let parsedFrontmatter else { continue }
+        guard parsedFrontmatter != nil else { continue }
         let schemaRule = Rule(name: rule.name, schema: schemaFilename, match: rule.match)
         let schemaPath = RulesPaths.schemaFile(rule: schemaRule, config: config, root: root)
         let schemaKey = schemaPath.absolute().string
@@ -1457,30 +1457,38 @@ enum RulesValidatorRunner {
           loadedSchemas[schemaKey] = schema
         }
 
-        let validationResult = try JSONSchema.validate(jsonCompatibleValue(parsedFrontmatter), schema: schema)
-        if !validationResult.valid {
-          errors.append(contentsOf: validationResult.errors?.map { error in
-            RuleValidationErrorDetail(path: pointerDisplayPath(error.instanceLocation.path), message: error.description)
-          } ?? [RuleValidationErrorDetail(path: "frontmatter", message: "schema validation failed")])
-        }
+        portableChecks.append(.frontmatterSchema(
+          id: "\(rule.name).check[\(index)]",
+          schema: try JSONValue(any: schema)
+        ))
       case .requiredHeading(let heading):
-        let headings = headingTexts(in: document?.body ?? "")
-        if !headings.contains(heading) {
-          errors.append(RuleValidationErrorDetail(path: "heading", message: "required heading \"\(heading)\" not found"))
-        }
+        portableChecks.append(.requiredHeading(
+          id: "\(rule.name).check[\(index)]",
+          heading: heading
+        ))
       case .maxBodyLines(let max):
-        let count = bodyLineCount(document?.body ?? "")
-        if count > max {
-          errors.append(RuleValidationErrorDetail(path: "body.lines", message: "line count \(count) exceeds maximum \(max)"))
-        }
+        portableChecks.append(.maxBodyLines(
+          id: "\(rule.name).check[\(index)]",
+          maximum: max
+        ))
       case .maxBodyWords(let max):
-        let count = bodyWordCount(document?.body ?? "")
-        if count > max {
-          errors.append(RuleValidationErrorDetail(path: "body.words", message: "word count \(count) exceeds maximum \(max)"))
-        }
+        portableChecks.append(.maxBodyWords(
+          id: "\(rule.name).check[\(index)]",
+          maximum: max
+        ))
       }
     }
-    return errors
+    let frontmatter = try parsedFrontmatter.map { try JSONValue(any: jsonCompatibleValue($0)) }
+    let diagnostics = try MarkdownRuleCheckEvaluator.evaluate(
+      portableChecks,
+      input: MarkdownRuleCheckInput(
+        frontmatter: frontmatter,
+        body: document?.body ?? ""
+      )
+    )
+    return diagnostics.map { diagnostic in
+      RuleValidationErrorDetail(path: diagnostic.location, message: diagnostic.message)
+    }
   }
 
   private static func hasOnlyOptionalFrontmatterSchemaChecks(_ rule: Rule) -> Bool {

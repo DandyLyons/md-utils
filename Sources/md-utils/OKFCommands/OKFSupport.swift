@@ -680,5 +680,9 @@ func directoryDisplayPath(_ path: Path) -> String {
   if path == .current { return "." }
   let string = path.string
   guard ![".", "..", "~"].contains(string) else { return string }
-  return string.hasSuffix("/") ? string : string + "/"
+  var normalized = string
+  while normalized.count > 1, normalized.hasSuffix("/") {
+    normalized.removeLast()
+  }
+  return normalized == "/" ? normalized : normalized + "/"
 }
