@@ -4,7 +4,7 @@ project:
   last_updated: "2026-07-18"
   name: md-utils
   version: 0.0.0
-signature: sha256:1b16df8f17a39cb335927137c8eab382f6317123d10f49ae29b80f28ddf12da5
+signature: sha256:32d6338411c68d542a0609a72b07b00ae07cc4841b0255f2c272175700d0a2fd
 tree:
   .dockerignore: Docker build-context exclusions for local build artifacts and repository
     metadata.
@@ -17,6 +17,8 @@ tree:
         GitHub Pages.
       schema-publication.yml: Validates bundled and public JSON Schema publication
         files stay synchronized.
+      webassembly.yml: Builds and runs the MarkdownUtilitiesCore WebAssembly smoke
+        executable with the official Swift WASM SDK.
   .gitignore: Git ignore rules for generated files, local settings, and build artifacts.
   .md-utils:
     _doc: Project-local md-utils configuration and reusable validation resources.
@@ -35,6 +37,11 @@ tree:
           _doc: Executable target for validating portable Core APIs on Linux.
           main.swift: Smoke test for Core frontmatter parsing, Markdown AST access,
             and rendering.
+    WasmCoreSmoke:
+      _doc: WebAssembly integration executable that validates portable Core behavior
+        under WASI.
+      main.swift: Smoke test for Markdown parsing, YAML frontmatter, rendering, and
+        JSON Schema assessment under WebAssembly.
   Package.resolved: SwiftPM dependency lockfile generated from package resolution.
   Package.swift: Swift package manifest defining library, CLI, dependencies, resources,
     and tests.
@@ -563,10 +570,23 @@ tree:
       integrations.
     swift-coding-standards.md: Swift style and safety rules used in this package.
     testing-standards.md: Swift Testing conventions and test organization guidance.
+    webassembly.md: WebAssembly build requirements, compatibility patches, verification
+      workflow, and current platform limitations.
   scripts:
     _doc: Project maintenance scripts for validation and release support.
+    build-wasm.sh: Applies version-guarded WASI dependency patches, builds Core, and
+      runs the WebAssembly smoke executable.
     validate-schema-publication.py: Checks bundled and public md-utils config schemas
       are synchronized and correctly versioned.
+    wasm-patches:
+      _doc: Temporary source compatibility patches applied to pinned SwiftPM dependencies
+        for WASI builds.
+      README.md: Explains why the WASI dependency patches exist, how they are applied,
+        their upstream status, and when to remove them.
+      jsonschema-0.6.0-wasi.patch: Extends JSONSchema.swift's Linux NSNumber compatibility
+        path to WASI.
+      yams-6.2.0-wasi.patch: Supplies the IEEE 754 decimal precision constant unavailable
+        from WASI libc headers.
   site:
     _doc: Static GitHub Pages site content and published JSON Schema files.
     index.html: Landing page for the md-utils GitHub Pages site.

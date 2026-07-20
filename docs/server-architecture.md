@@ -58,13 +58,13 @@ md-utils
 └── Process exit behavior
 ```
 
-`MarkdownUtilitiesCore` must run on Linux and be designed to compile to WebAssembly. It avoids direct filesystem access, process execution, CLI dependencies, and platform-specific APIs. Linux support is verified with `Dockerfile.core-linux`; WebAssembly compilation remains a separate validation step.
+`MarkdownUtilitiesCore` runs on Linux and compiles to WebAssembly. It avoids direct filesystem access, process execution, CLI dependencies, and platform-specific APIs. Linux support is verified with `Dockerfile.core-linux`; WASI compilation and representative runtime behavior are verified with `scripts/build-wasm.sh`.
 
 `MarkdownUtilities` will contain functionality that is appropriate for native platforms but unavailable or unsuitable in WebAssembly. `md-utils` remains the executable CLI and is not expected to run inside WebAssembly.
 
 Swift can run natively on Linux, so the conventional server does not require WebAssembly. WebAssembly is specifically a portability mechanism for runtimes such as Cloudflare Workers.
 
-The current split and dependency assessment are recorded in [the portability audit](portability-audit.md). A small WebAssembly compilation spike must verify the boundary before treating it as WebAssembly-compatible.
+The current split and dependency assessment are recorded in [the portability audit](portability-audit.md). The supported SDK, dependency compatibility patches, and WASI smoke workflow are documented in [WebAssembly Support](webassembly.md).
 
 ### Make Types and Rules Library Concepts
 

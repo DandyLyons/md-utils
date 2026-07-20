@@ -1,0 +1,18 @@
+diff --git a/Sources/Yams/Representer.swift b/Sources/Yams/Representer.swift
+index f1580aa..3e5829d 100644
+--- a/Sources/Yams/Representer.swift
++++ b/Sources/Yams/Representer.swift
+@@ -335,7 +335,13 @@ private extension FloatingPoint where Self: CVarArg {
+     var formattedStringForCodable: String {
+         // Since `NumberFormatter` creates a string with insufficient precision for Decode,
+         // it uses with `String(format:...)`
++#if os(WASI)
++        // WASI libc does not expose DBL_DECIMAL_DIG. Seventeen significant
++        // digits preserve round-trip precision for an IEEE 754 binary64 value.
++        let string = String(format: "%.*g", 17, self)
++#else
+         let string = String(format: "%.*g", DBL_DECIMAL_DIG, self)
++#endif
+         // "%*.g" does not use scientific notation if the exponent is less than –4.
+         // So fallback to using `NumberFormatter` if string does not uses scientific notation.
+         guard string.lazy.suffix(5).contains("e") else {

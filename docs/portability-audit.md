@@ -28,17 +28,17 @@ Directory paths in the table are relative to `Sources/MarkdownUtilitiesCore/`, `
 
 | Dependency | Layer | Linux status | WebAssembly status |
 |---|---|---|---|
-| Swift standard library and Foundation | Core | Verified by the Linux container build and Core tests. | Requires a Swift WebAssembly SDK compilation spike. |
-| MarkdownSyntax and swift-cmark | Core | Verified by the Linux container build and Core tests. | The C-backed swift-cmark dependency is unverified and is a potential blocker. |
-| swift-parsing | Core | Verified by the Linux container build and parser tests. | Unverified with this package's selected version and SDK. |
-| Yams and libYAML | Core | Verified by the Linux container build and frontmatter tests. | The C-backed libYAML dependency is unverified and is a potential blocker. |
-| JSONSchema | Core | Draft 2020-12 validation, external graph compilation, and the Linux Core build are verified. | Pure Swift, but compilation and behavior remain unverified with a selected WebAssembly SDK. |
+| Swift standard library and Foundation | Core | Verified by the Linux container build and Core tests. | Verified with the official Swift 6.3.1 WASI SDK. CoreFoundation requires the WASI signal and memory-mapping emulation definitions and libraries. |
+| MarkdownSyntax and swift-cmark | Core | Verified by the Linux container build and Core tests. | MarkdownSyntax 1.3.0 and swift-cmark 0.7.1 compile and run under WASI, including GFM task lists and tables. |
+| swift-parsing | Core | Verified by the Linux container build and parser tests. | Verified while building and running the Core WASI smoke target. |
+| Yams and libYAML | Core | Verified by the Linux container build and frontmatter tests. | libYAML and Yams compile and run under WASI. Yams 6.2.0 requires the version-checked `DBL_DECIMAL_DIG` compatibility patch described in [WebAssembly Support](webassembly.md). |
+| JSONSchema | Core | Draft 2020-12 validation, external graph compilation, and the Linux Core build are verified. | Draft 2020-12 assessment runs under WASI. JSONSchema.swift 0.6.0 requires the version-checked WASI `NSNumber` compatibility patch described in [WebAssembly Support](webassembly.md). |
 | PathKit | Native only | Supported by the native package; excluded from Core. | Out of scope because it is not a Core dependency. |
 | ArgumentParser, JMESPath, Rainbow | CLI only | Outside the Core boundary. | Out of scope because the CLI is not a WebAssembly target. |
 
 Linux verification uses Swift 6.2 in `Dockerfile.core-linux`. A successful image build runs `swift build --target MarkdownUtilitiesCore`, then runs the isolated `IntegrationTests/LinuxCoreSmoke/` executable against Core. The full focused `MarkdownUtilitiesCoreTests` target remains part of `swift test`; SwiftPM test filtering cannot avoid compiling unrelated package test targets.
 
-The Core schema adapter performs no implicit retrieval. A caller supplies `MarkdownSchemaResourceProvider`; registry construction resolves and caches the immutable graph, rewrites external references to canonical resource identifiers, and rejects missing resources, cycles, and conflicting `$id` values before assessment. The current JSONSchema dependency passes the package's draft 2020-12 `const`, `contains`, `allOf`, required-property, and nested-reference coverage on macOS and compiles in the Linux Core container. WebAssembly remains explicitly unverified.
+The Core schema adapter performs no implicit retrieval. A caller supplies `MarkdownSchemaResourceProvider`; registry construction resolves and caches the immutable graph, rewrites external references to canonical resource identifiers, and rejects missing resources, cycles, and conflicting `$id` values before assessment. The current JSONSchema dependency passes the package's draft 2020-12 `const`, `contains`, `allOf`, required-property, and nested-reference coverage on macOS, compiles in the Linux Core container, and performs representative draft 2020-12 assessment in the WASI smoke target.
 
 ## Placement Rules
 
@@ -52,6 +52,6 @@ The Core schema adapter performs no implicit retrieval. A caller supplies `Markd
 
 Portable types formerly declared by `MarkdownUtilities`, including `MarkdownDocument`, now belong to the `MarkdownUtilitiesCore` module. Source files using those APIs must import Core explicitly. Files that combine portable document operations with native resolvers, CSV path metadata, or file metadata import both modules.
 
-## Remaining WebAssembly Work
+## WebAssembly Verification
 
-Linux support does not establish WebAssembly support. Issue 76 must install a Swift WebAssembly SDK, compile Core for the selected WASI target, test MarkdownSyntax/swift-cmark and Yams/libYAML, and replace or isolate any dependency that cannot cross that boundary.
+Run `scripts/build-wasm.sh` to compile Core and execute the WASI smoke target with the official Swift 6.3.1 WebAssembly SDK. Detailed installation, dependency patching, smoke coverage, artifact location, and remaining host-interface work are documented in [WebAssembly Support](webassembly.md).

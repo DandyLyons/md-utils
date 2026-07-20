@@ -52,6 +52,15 @@ let package = Package(
         "Yams",
       ]
     ),
+    .executableTarget(
+      name: "MarkdownUtilitiesCoreWasmSmoke",
+      dependencies: ["MarkdownUtilitiesCore"],
+      path: "IntegrationTests/WasmCoreSmoke/",
+      linkerSettings: [
+        .linkedLibrary("wasi-emulated-signal", .when(platforms: [.wasi])),
+        .linkedLibrary("wasi-emulated-mman", .when(platforms: [.wasi])),
+      ]
+    ),
 
     // MARK: MarkdownUtilities (native integrations)
     .target(

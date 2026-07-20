@@ -2,7 +2,7 @@
 
 `md-utils` is part of a broader Markdown tooling ecosystem. [`treedocs`](https://github.com/DandyLyons/treedocs) is a sister project, and future integrations are planned between the two projects.
 
-The proposed native and Cloudflare server architecture, WebAssembly target split, Markdown type-system prerequisite, and storage direction are documented in [MarkdownUtilities Server Architecture](server-architecture.md).
+The proposed native and Cloudflare server architecture, WebAssembly target split, Markdown type-system prerequisite, and storage direction are documented in [MarkdownUtilities Server Architecture](server-architecture.md). The supported WASI toolchain and repeatable Core verification workflow are documented in [WebAssembly Support](webassembly.md).
 
 ## Library Layers
 
