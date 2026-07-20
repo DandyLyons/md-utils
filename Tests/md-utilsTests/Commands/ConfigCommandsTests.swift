@@ -15,10 +15,34 @@ struct ConfigCommandsTests {
     let config = CLIEntry.ConfigCommands.configuration
 
     #expect(config.commandName == "config")
-    #expect(config.subcommands.count == 3)
-    #expect(config.subcommands[0] is CLIEntry.ConfigCommands.Schema.Type)
-    #expect(config.subcommands[1] is CLIEntry.ConfigCommands.Info.Type)
-    #expect(config.subcommands[2] is CLIEntry.ConfigCommands.Migrate.Type)
+    #expect(config.subcommands.count == 4)
+    #expect(config.subcommands[0] is CLIEntry.ConfigCommands.Init.Type)
+    #expect(config.subcommands[1] is CLIEntry.ConfigCommands.Schema.Type)
+    #expect(config.subcommands[2] is CLIEntry.ConfigCommands.Info.Type)
+    #expect(config.subcommands[3] is CLIEntry.ConfigCommands.Migrate.Type)
+  }
+
+  @Test
+  func `config init creates an empty config and is idempotent`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+
+    let parsed = try CLIEntry.parseAsRoot(["config", "init", "--root", project.string])
+    var command = try #require(parsed as? CLIEntry.ConfigCommands.Init)
+    try await command.run()
+
+    let configPath = project + ".md-utils/md-utils.json"
+    let schemaPath = project + ".md-utils/md-utils.schema.json"
+    #expect(configPath.exists)
+    #expect(schemaPath.exists)
+    #expect((project + ".md-utils/schemas/").isDirectory)
+    #expect((project + ".md-utils/types/").isDirectory)
+    #expect(try MdUtilsConfig.load(from: configPath).schemaRules.isEmpty)
+
+    let originalConfig = try configPath.read(.utf8)
+    let result = try RulesConfigBootstrapper.ensureProjectFiles(root: project)
+    #expect(result.configCreated == false)
+    #expect(try configPath.read(.utf8) == originalConfig)
   }
 
   @Test

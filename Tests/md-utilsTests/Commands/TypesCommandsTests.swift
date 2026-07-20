@@ -15,40 +15,35 @@ struct TypesCommandsTests {
   }
 
   @Test
-  func `types init is inert after the types directory exists`() async throws {
-    let project = Path(NSTemporaryDirectory()) + "types-init-command-\(UUID().uuidString)"
-    defer { try? project.delete() }
-
-    let first = try TypesProject.initialize(root: project)
-    let second = try TypesProject.initialize(root: project)
-
-    #expect(first.created)
-    #expect(second.created == false)
-    #expect(first.directory == second.directory)
-    #expect(TypesProject.initializationMessage(first).hasPrefix("Initialized Markdown types directory: "))
-    #expect(TypesProject.initializationMessage(second) == ".md-utils/types/ has already been initialized.")
-  }
-
-  @Test
   func `types command group registers complete surface`() async throws {
     let configuration = CLIEntry.TypesCommands.configuration
 
     #expect(configuration.commandName == "types")
-    #expect(configuration.subcommands.count == 11)
-    #expect(configuration.subcommands[0] is CLIEntry.TypesCommands.Init.Type)
-    #expect(configuration.subcommands[4] is CLIEntry.TypesCommands.Doctor.Type)
-    #expect(configuration.subcommands[5] is CLIEntry.TypesCommands.Check.Type)
-    #expect(configuration.subcommands[6] is CLIEntry.TypesCommands.Verify.Type)
-    #expect(configuration.subcommands[9] is CLIEntry.TypesCommands.Fix.Type)
-    #expect(configuration.subcommands[10] is CLIEntry.TypesCommands.Schema.Type)
+    #expect(configuration.subcommands.count == 10)
+    #expect(configuration.subcommands[0] is CLIEntry.TypesCommands.Add.Type)
+    #expect(configuration.subcommands[3] is CLIEntry.TypesCommands.Doctor.Type)
+    #expect(configuration.subcommands[4] is CLIEntry.TypesCommands.Check.Type)
+    #expect(configuration.subcommands[5] is CLIEntry.TypesCommands.Verify.Type)
+    #expect(configuration.subcommands[8] is CLIEntry.TypesCommands.Fix.Type)
+    #expect(configuration.subcommands[9] is CLIEntry.TypesCommands.Schema.Type)
   }
 
   @Test
-  func `types create parses definition options`() async throws {
+  func `removed types setup commands are no longer accepted`() {
+    #expect(throws: Error.self) {
+      try CLIEntry.parseAsRoot(["types", "init"])
+    }
+    #expect(throws: Error.self) {
+      try CLIEntry.parseAsRoot(["types", "create", "Book"])
+    }
+  }
+
+  @Test
+  func `types add parses definition options`() async throws {
     let parsed = try CLIEntry.parseAsRoot([
-      "types", "create", "Book", "--version", "draft-3", "--format", "json"
+      "types", "add", "Book", "--version", "draft-3", "--format", "json"
     ])
-    let command = try #require(parsed as? CLIEntry.TypesCommands.Create)
+    let command = try #require(parsed as? CLIEntry.TypesCommands.Add)
 
     #expect(command.name == "Book")
     #expect(command.version == "draft-3")
@@ -88,7 +83,7 @@ struct TypesCommandsTests {
     let project = Path(NSTemporaryDirectory()) + "types-command-\(UUID().uuidString)"
     defer { try? project.delete() }
 
-    let destination = try TypesProject.createDefinition(
+    let destination = try TypesProject.addDefinition(
       name: "Book",
       version: "1.0.0",
       format: .yaml,
@@ -108,7 +103,7 @@ struct TypesCommandsTests {
     defer { try? project.delete() }
 
     #expect(throws: ValidationError.self) {
-      try TypesProject.createDefinition(
+      try TypesProject.addDefinition(
         name: "Book",
         version: "1.0.0",
         format: .yaml,

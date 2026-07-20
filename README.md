@@ -357,7 +357,8 @@ Predicate semantics:
 Rules commands:
 
 ```bash
-md-utils rules init books --path "Books/**/*.md" --tag Book
+md-utils config init
+md-utils rules add books --path "Books/**/*.md" --tag Book
 md-utils rules add published --path "Books/**/*.md" --no-frontmatter-required
 md-utils rules list
 md-utils rules describe books
@@ -369,7 +370,7 @@ md-utils rules remove books
 md-utils rules remove books --delete-schema
 ```
 
-`rules init` bootstraps `.md-utils/` and adds an initial frontmatter schema rule. `rules add` adds another frontmatter schema rule to existing config. `rules describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema when the rule has one; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `rules remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
+`config init` bootstraps `.md-utils/`, including empty `.md-utils/schemas/` and `.md-utils/types/` directories, without adding a rule or type. `rules add` adds a frontmatter schema rule to existing config. `rules describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema when the rule has one; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `rules remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
 
 If a file matches multiple rules, all matching checks apply. Files matching no rules are ignored. Invalid YAML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed.
 

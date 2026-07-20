@@ -7,8 +7,7 @@ extension CLIEntry {
       commandName: "types",
       abstract: "Work with structural Markdown record types",
       subcommands: [
-        Init.self,
-        Create.self,
+        Add.self,
         List.self,
         Describe.self,
         Doctor.self,

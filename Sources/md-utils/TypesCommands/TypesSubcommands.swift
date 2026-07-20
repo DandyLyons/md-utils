@@ -6,28 +6,13 @@ import PathKit
 import Yams
 
 extension CLIEntry.TypesCommands {
-  struct Init: AsyncParsableCommand {
+  struct Add: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-      commandName: "init",
-      abstract: "Initialize the .md-utils/types/ directory"
+      commandName: "add",
+      abstract: "Add a Markdown type definition to the project"
     )
 
-    @Option(name: .long, help: "Project root directory", completion: .directory, transform: { Path($0) })
-    var root: Path = .current
-
-    mutating func run() async throws {
-      let result = try TypesProject.initialize(root: root)
-      print(TypesProject.initializationMessage(result))
-    }
-  }
-
-  struct Create: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(
-      commandName: "create",
-      abstract: "Create a Markdown type-definition scaffold"
-    )
-
-    @Argument(help: "Stable, case-sensitive type name")
+    @Argument(help: "Type name to add; names are stable and case-sensitive")
     var name: String
 
     @Option(name: .long, help: "Type contract version; Semantic Versioning is recommended")
@@ -43,14 +28,15 @@ extension CLIEntry.TypesCommands {
     var root: Path = .current
 
     mutating func run() async throws {
-      let destination = try TypesProject.createDefinition(
+      let destination = try TypesProject.addDefinition(
         name: name,
         version: version,
         format: format,
         root: root,
         output: output
       )
-      print("Created Markdown type \"\(name)\": \(destination.string)")
+      print("\(CLIStyle.success("Created type")) \"\(name)\"")
+      print("\(CLIStyle.metadata("Definition:")) \(CLIStyle.path(destination.string))")
     }
   }
 

@@ -167,11 +167,10 @@ md-utils convert to-text document.md
 
 ## Markdown Type Operations
 
-### Initialize and create a type
+### Add a type
 
 ```bash
-md-utils types init
-md-utils types create Book --version 1.0.0
+md-utils types add Book --version 1.0.0
 ```
 
 Type definitions are stored under `.md-utils/types/` and use the compound extensions `.mdtype.yaml`, `.mdtype.yml`, or `.mdtype.json`.

@@ -17,11 +17,6 @@ enum TypesDefinitionFormat: String, ExpressibleByArgument {
   case json
 }
 
-struct TypesInitializationResult {
-  var directory: Path
-  var created: Bool
-}
-
 enum TypesProject {
   static let directory = ".md-utils/types/"
 
@@ -29,26 +24,19 @@ enum TypesProject {
     root.absolute() + Path(directory)
   }
 
-  static func initialize(root: Path) throws -> TypesInitializationResult {
+  static func ensureDirectory(root: Path) throws -> Path {
     let directory = typesDirectory(root: root)
     if directory.exists {
       guard directory.isDirectory else {
         throw ValidationError("Markdown types path is not a directory: \(directory.string)")
       }
-      return TypesInitializationResult(directory: directory, created: false)
+      return directory
     }
     try directory.mkpath()
-    return TypesInitializationResult(directory: directory, created: true)
+    return directory
   }
 
-  static func initializationMessage(_ result: TypesInitializationResult) -> String {
-    if result.created {
-      return "Initialized Markdown types directory: \(directoryDisplayPath(result.directory))"
-    }
-    return ".md-utils/types/ has already been initialized."
-  }
-
-  static func createDefinition(
+  static func addDefinition(
     name: String,
     version: String,
     format: TypesDefinitionFormat,
@@ -61,7 +49,7 @@ enum TypesProject {
     guard version.isEmpty == false else {
       throw ValidationError("Type version cannot be empty")
     }
-    let directory = try initialize(root: root).directory
+    let directory = try ensureDirectory(root: root)
     let filename = slug(name) + ".mdtype." + format.rawValue
     let destination = output ?? (directory + filename)
     let destinationName = destination.lastComponent.lowercased()

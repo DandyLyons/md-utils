@@ -115,7 +115,7 @@ if let heading = ast.children.first as? Heading {
   - `okf doctor` - Run validation plus advisory health diagnostics
   - `okf type set` - Set an explicit OKF concept `type` value on matching files
 - `types` (TypesCommands) - Work with Markdown type definitions and typed records
-  - `types init`, `create`, `list`, `describe`, `doctor`, and `schema` - Manage and inspect definitions
+  - `types add`, `list`, `describe`, `doctor`, and `schema` - Manage and inspect definitions
   - `types check`, `verify`, `identify`, and `find` - Assess conformance and type hints
   - `types fix` - Preview and apply structured conformance fixes
 - `section` / `sect` (SectionCommands) - Manipulate sections in Markdown documents

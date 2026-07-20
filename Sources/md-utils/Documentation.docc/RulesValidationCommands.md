@@ -6,12 +6,15 @@ Validate Markdown files against project-level rules.
 
 The `rules` command group manages `.md-utils/` project configuration and validates Markdown files. Configuration is read from the current working directory; `md-utils` does not search parent directories for a project root.
 
+Use `md-utils config init` to create the project configuration along with empty `.md-utils/schemas/` and `.md-utils/types/` directories. Initialization does not add a rule or type.
+
 Rules match Markdown files by project-relative glob patterns, optional file metadata conditions, optional frontmatter conditions, optional whole-frontmatter queries, and optional document conditions. Files can match more than one rule, in which case every matching check applies.
 
 Version `0.2.0` configs use a `rules` array. Version `0.1.0` configs using `schemaRules` still load as legacy configs.
 
 ```bash
-md-utils rules init books --path "Books/**/*.md" --tag Book
+md-utils config init
+md-utils rules add books --path "Books/**/*.md" --tag Book
 md-utils rules validate
 md-utils rules validate books
 md-utils rules list

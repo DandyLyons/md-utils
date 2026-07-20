@@ -14,7 +14,6 @@ extension CLIEntry {
       commandName: "rules",
       abstract: "Validate Markdown files with configured rules",
       subcommands: [
-        Init.self,
         Add.self,
         Remove.self,
         List.self,

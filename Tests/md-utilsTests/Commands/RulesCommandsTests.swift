@@ -17,15 +17,21 @@ struct RulesCommandsTests {
     let config = CLIEntry.RulesCommands.configuration
 
     #expect(config.commandName == "rules")
-    #expect(config.subcommands.count == 8)
-    #expect(config.subcommands[0] is CLIEntry.RulesCommands.Init.Type)
-    #expect(config.subcommands[1] is CLIEntry.RulesCommands.Add.Type)
-    #expect(config.subcommands[2] is CLIEntry.RulesCommands.Remove.Type)
-    #expect(config.subcommands[3] is CLIEntry.RulesCommands.List.Type)
-    #expect(config.subcommands[4] is CLIEntry.RulesCommands.FilesMatching.Type)
-    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Matching.Type)
-    #expect(config.subcommands[6] is CLIEntry.RulesCommands.Describe.Type)
-    #expect(config.subcommands[7] is CLIEntry.RulesCommands.Validate.Type)
+    #expect(config.subcommands.count == 7)
+    #expect(config.subcommands[0] is CLIEntry.RulesCommands.Add.Type)
+    #expect(config.subcommands[1] is CLIEntry.RulesCommands.Remove.Type)
+    #expect(config.subcommands[2] is CLIEntry.RulesCommands.List.Type)
+    #expect(config.subcommands[3] is CLIEntry.RulesCommands.FilesMatching.Type)
+    #expect(config.subcommands[4] is CLIEntry.RulesCommands.Matching.Type)
+    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Describe.Type)
+    #expect(config.subcommands[6] is CLIEntry.RulesCommands.Validate.Type)
+  }
+
+  @Test
+  func `rules init is no longer accepted`() {
+    #expect(throws: Error.self) {
+      try CLIEntry.parseAsRoot(["rules", "init"])
+    }
   }
 
   @Test
@@ -177,37 +183,6 @@ struct RulesCommandsTests {
     #expect(output.contains("  ERROR Books/broken.md"))
     #expect(output.contains("  OK Books/dune.md"))
     #expect(output.contains("  SKIP Books/plain.md"))
-  }
-
-  @Test
-  func `rules init creates config schema and rule`() async throws {
-    let project = try createTempProject()
-    defer { try? project.delete() }
-
-    try await withCurrentDirectory(project) {
-      let parsed = try CLIEntry.parseAsRoot([
-        "rules", "init", "books", "--path", "Books/**/*.md", "--tag", "Book",
-      ])
-      var command = try #require(parsed as? CLIEntry.RulesCommands.Init)
-      try await command.run()
-
-      #expect((project + ".md-utils/md-utils.json").exists)
-      #expect((project + ".md-utils/md-utils.schema.json").exists)
-      #expect((project + ".md-utils/schemas/books.schema.json").exists)
-
-      let config = try MdUtilsConfig.load()
-      #expect(config.configVersion == "0.2.0")
-      #expect(config.schemaReference == "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json")
-      #expect(config.schemaRules.count == 1)
-      #expect(config.schemaRules.first?.name == "books")
-      #expect(config.schemaRules.first?.match.paths == ["Books/**/*.md"])
-
-      let configData = try Data(contentsOf: URL(fileURLWithPath: (project + ".md-utils/md-utils.json").string))
-      let configObject = try #require(JSONSerialization.jsonObject(with: configData) as? [String: Any])
-      #expect(configObject["configVersion"] as? String == "0.2.0")
-      #expect(configObject["$schema"] as? String == "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json")
-      #expect(configObject["rules"] != nil)
-    }
   }
 
   @Test
@@ -504,8 +479,11 @@ struct RulesCommandsTests {
       let parsed = try CLIEntry.parseAsRoot(["rules", "add", "books"])
       var command = try #require(parsed as? CLIEntry.RulesCommands.Add)
 
-      await #expect(throws: Error.self) {
+      do {
         try await command.run()
+        Issue.record("Expected rules add without config to throw")
+      } catch {
+        #expect(String(describing: error).contains("Run md-utils config init first"))
       }
     }
   }

@@ -40,7 +40,7 @@ struct MdUtilsConfig {
   /// See <doc:RulesValidationCommands> for workflow details.
   static func load(from path: Path = RulesPaths.configFile) throws -> MdUtilsConfig {
     guard path.exists else {
-      throw ValidationError("Project config not found: \(path.string). Run md-utils rules init first.")
+      throw ValidationError("Project config not found: \(path.string). Run md-utils config init first.")
     }
 
     let data = try Data(contentsOf: URL(fileURLWithPath: path.string))
@@ -809,6 +809,12 @@ enum RulesPaths {
   static var projectDirectory: Path { Path(".md-utils") }
   static var configFile: Path { projectDirectory + "md-utils.json" }
   static let bundledConfigSchemaFileName = "md-utils.schema.json"
+  static func projectDirectory(root: Path) -> Path {
+    root.absolute() + projectDirectory
+  }
+  static func configFile(root: Path) -> Path {
+    projectDirectory(root: root) + "md-utils.json"
+  }
   /// Returns the directory that stores md-utils project configuration.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
@@ -840,6 +846,11 @@ enum RulesPaths {
     return root + directory + rule.schema
   }
 }
+struct ConfigInitializationResult {
+  var configFile: Path
+  var configSchemaFile: Path
+  var configCreated: Bool
+}
 /// Bootstraps the `.md-utils` project configuration files.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
@@ -847,20 +858,31 @@ enum RulesConfigBootstrapper {
   /// Creates the project configuration directory and bundled schema file when needed.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  static func ensureProjectFiles() throws {
-    try RulesPaths.projectDirectory.mkpath()
-    try Path(MdUtilsConfig.defaultSchemaDirectory).mkpath()
-    try copyBundledConfigSchema()
+  static func ensureProjectFiles(root: Path = .current) throws -> ConfigInitializationResult {
+    let projectDirectory = RulesPaths.projectDirectory(root: root)
+    let configFile = RulesPaths.configFile(root: root)
+    let schemaDirectory = root.absolute() + Path(MdUtilsConfig.defaultSchemaDirectory)
+    let typesDirectory = projectDirectory + "types"
+    let configSchemaFile = projectDirectory + RulesPaths.bundledConfigSchemaFileName
+    try projectDirectory.mkpath()
+    try schemaDirectory.mkpath()
+    try typesDirectory.mkpath()
+    try copyBundledConfigSchema(to: configSchemaFile)
 
-    if !RulesPaths.configFile.exists {
-      try MdUtilsConfig().save()
+    let configCreated = configFile.exists == false
+    if configCreated {
+      try MdUtilsConfig().save(to: configFile)
     }
+    return ConfigInitializationResult(
+      configFile: configFile,
+      configSchemaFile: configSchemaFile,
+      configCreated: configCreated
+    )
   }
   /// Copies the bundled md-utils configuration schema into the project directory.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  private static func copyBundledConfigSchema() throws {
-    let destination = RulesPaths.projectDirectory + RulesPaths.bundledConfigSchemaFileName
+  private static func copyBundledConfigSchema(to destination: Path) throws {
     try destination.write(try ConfigSchemaRegistry.schemaContent())
   }
 }
