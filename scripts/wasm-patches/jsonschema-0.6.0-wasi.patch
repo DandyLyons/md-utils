@@ -1,0 +1,14 @@
+diff --git a/Sources/Validators.swift b/Sources/Validators.swift
+index 5e5ee86..f9061f3 100644
+--- a/Sources/Validators.swift
++++ b/Sources/Validators.swift
+@@ -55,6 +55,8 @@ func type(context: Context, type: Any, instance: Any, schema: [String: Any]) -> A
+ func isInteger(_ instance: Any) -> Bool {
+   guard let number = instance as? NSNumber else { return false }
+-#if os(Linux)
++#if os(Linux) || os(WASI)
++  // CFNumberIsFloatType is unavailable on these CoreFoundation overlays, so
++  // detect integer-valued numbers by conversion while still excluding Bool.
+   return CFGetTypeID(number) != CFBooleanGetTypeID() && NSNumber(value: number.intValue) == number
+ #else
+   return CFGetTypeID(number) != CFBooleanGetTypeID() && (!CFNumberIsFloatType(number) || NSNumber(value: number.intValue) == number)

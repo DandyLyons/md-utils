@@ -400,7 +400,7 @@ When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_
 ## Architecture
 
 - **Swift 6.2** or later
-- **MarkdownUtilitiesCore** for portable content operations on Apple platforms and Linux
+- **MarkdownUtilitiesCore** for portable content operations on Apple platforms, Linux, and WebAssembly
 - **MarkdownUtilities** for native filesystem and metadata integrations
 - All testing uses the native Swift Testing framework
 
@@ -419,9 +419,11 @@ When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_
 
 **Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.2 using `Dockerfile.core-linux`. The container builds Core and runs an isolated parsing, AST, frontmatter, and rendering smoke executable. The complete native `MarkdownUtilities` and `md-utils` CLI layers are not covered by this Core guarantee.
 
+**WebAssembly**: `MarkdownUtilitiesCore` is supported with the official Swift 6.3.1 WASI SDK. Run `scripts/build-wasm.sh` to compile Core and execute the root-package smoke target under WasmKit. See [WebAssembly Support](docs/webassembly.md) for SDK installation, dependency compatibility patches, artifact location, and current scope.
+
 **Windows**: Not currently tested or verified. Compatibility is unknown.
 
-See the [portability audit](docs/portability-audit.md) for the source boundary, dependency assessment, and remaining WebAssembly work.
+See the [portability audit](docs/portability-audit.md) for the source boundary and dependency assessment.
 
 ## Contributing
 
