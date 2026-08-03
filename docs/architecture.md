@@ -42,6 +42,8 @@ A document is a successfully parsed content view and deliberately has no persist
 
 Types are structural and non-exclusive. Rules and types remain distinct domain models even where they share analysis and predicate evaluation.
 
+The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
+
 **Frontmatter Handling:**
 - Uses `FrontMatterParser` to separate `---` delimited YAML frontmatter
 - Frontmatter parsed into `Yams.Node.Mapping` during initialization

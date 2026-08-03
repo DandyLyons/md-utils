@@ -118,6 +118,7 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 - **Format Conversion** — Convert Markdown to plain text or CSV
 - **File Metadata** — Read file metadata including standard and extended attributes (xattr)
 - **Wikilink Parsing & Resolution** — Parse Obsidian-flavored wikilinks, resolve against a vault directory, detect broken/ambiguous links, find backlinks
+- **Markdown Types** — Assess records against non-exclusive structural contracts spanning frontmatter, body, and context; see [RFC 0001](docs/rfcs/0001-mdtype.md)
 - **OKF v0.1 Draft Tooling** — Initialize, validate, report on, doctor, and batch-update Open Knowledge Format bundles
 
 ### Planned
