@@ -14,6 +14,7 @@ Use this target for content-only Markdown operations that must run on Apple plat
 
 - <doc:WorkingWithMarkdownDocuments>
 - <doc:MarkdownTypes>
+- <doc:RecordIdentity>
 
 ### Rules
 
