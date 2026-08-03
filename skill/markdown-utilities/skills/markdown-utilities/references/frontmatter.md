@@ -91,6 +91,34 @@ md-utils fm search "author" posts/
 md-utils fm search "status == 'draft'" posts/ | xargs md-utils fm set --key reviewed --value false
 ```
 
+## Check Unique Frontmatter Values
+
+`fm unique` evaluates one JMESPath expression per note and checks that the
+selected scalar value is unique. Strings, numbers, and booleans are supported.
+
+```bash
+# Check every ID in a directory
+md-utils fm unique 'id' notes/
+
+# Select a nested value
+md-utils fm unique 'metadata.id' notes/
+
+# Check one note's ID against a directory
+md-utils fm unique 'id' --reference foo.md notes/
+
+# Require every note to have an ID
+md-utils fm unique 'id' --require-value notes/
+```
+
+Missing and null values are skipped unless `--require-value` is supplied. Arrays,
+objects, and array projections such as `authors[].id` are unsupported; there is
+currently no `--each` option.
+
+Simple selectors such as `id` work without shell quoting, but single-quote the
+entire JMESPath expression so Bash and Zsh preserve it exactly. In particular,
+never double-quote an expression containing JMESPath backtick literals because
+the shell interprets backticks as command substitution.
+
 ## Array Operations
 
 For frontmatter keys that hold arrays (e.g. `tags: [swift, ios]`):

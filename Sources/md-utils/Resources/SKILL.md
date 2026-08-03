@@ -12,7 +12,7 @@ The `md-utils` CLI provides structured operations on Markdown files. Add `--help
 
 | Command | Purpose |
 |---------|---------|
-| `md-utils fm` | YAML frontmatter: get, set, search, array ops, dump |
+| `md-utils fm` | YAML frontmatter: get, set, search, uniqueness checks, array ops, dump |
 | `md-utils explore` | Progressively inspect large Markdown files by tree, heading, and line |
 | `md-utils toc` | Generate table of contents |
 | `md-utils headings` | Promote or demote heading levels |
@@ -42,6 +42,9 @@ md-utils fm get --key title post.md
 
 # Find files with a specific tag
 md-utils fm array contains --key tags --value swift posts/
+
+# Check that every frontmatter ID is unique
+md-utils fm unique 'id' posts/
 
 # Generate a table of contents
 md-utils toc document.md

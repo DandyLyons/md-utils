@@ -108,34 +108,11 @@ extension CLIEntry.FrontMatterCommands {
       // Compile the JMESPath expression once
       let expression: JMESExpression
       do {
-        expression = try JMESExpression.compile(query)
+        expression = try FrontMatterJMESPath.compile(query)
       } catch {
-        // Extract the actual error message from JMESPathError
-        let errorDescription = String(describing: error)
-        let errorMessage: String
-
-        // Try to extract the message from patterns like: compileTime("message") or runtime("message")
-        let patterns = [
-          #"compileTime\("([^"]+)"\)"#,
-          #"runtime\("([^"]+)"\)"#,
-        ]
-
-        var extractedMessage: String?
-        for pattern in patterns {
-          if let match = errorDescription.range(of: pattern, options: .regularExpression),
-            let captureRange = errorDescription.range(
-              of: #""([^"]+)""#, options: .regularExpression, range: match)
-          {
-            extractedMessage = String(errorDescription[captureRange].dropFirst().dropLast())
-            break
-          }
-        }
-
-        errorMessage = extractedMessage ?? error.localizedDescription
-
         throw ValidationError("""
           Invalid JMESPath expression: "\(query)"
-          \(errorMessage)
+          \(FrontMatterJMESPath.message(for: error))
 
           See https://jmespath.org for syntax reference
           """)
@@ -252,7 +229,7 @@ extension CLIEntry.FrontMatterCommands {
         // Convert Yams.Node.Mapping to Swift dictionary for JMESPath
         let frontMatterDict: Any
         do {
-          frontMatterDict = try YAMLConversion.safeNodeToSwiftValue(.mapping(doc.frontMatter))
+          frontMatterDict = try FrontMatterJMESPath.object(from: doc)
         } catch {
           CLIStyle.writeWarning("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hadErrors = true

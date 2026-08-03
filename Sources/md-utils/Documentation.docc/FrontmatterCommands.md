@@ -6,7 +6,31 @@ Read, search, and mutate YAML frontmatter from the `frontmatter` command group.
 
 The `frontmatter` command group, also available as `fm`, provides CRUD operations for Markdown YAML frontmatter. Commands can operate on one file, several files, or directories resolved through the shared global path options.
 
-Common operations include reading values, setting values, checking for keys, removing or renaming keys, replacing an entire frontmatter block, dumping frontmatter in multiple formats, searching with JMESPath, sorting keys, touching empty keys, and mutating array values.
+Common operations include reading values, setting values, checking for keys, removing or renaming keys, replacing an entire frontmatter block, dumping frontmatter in multiple formats, searching with JMESPath, checking uniqueness, sorting keys, touching empty keys, and mutating array values.
+
+## Uniqueness Checks
+
+Use `fm unique` to check that a scalar selected by JMESPath is unique across a
+directory or explicit list of paths:
+
+```bash
+md-utils fm unique 'id' notes/
+md-utils fm unique 'metadata.id' notes/
+md-utils fm unique 'id' --reference foo.md notes/
+```
+
+Collection mode reports every collision. `--reference` instead checks only the
+reference note's selected value and ignores unrelated collisions. Missing and
+null results are skipped by default; use `--require-value` to reject them.
+
+The expression must produce one string, number, or boolean for each note. Arrays,
+objects, and projections such as `authors[].id` are unsupported. A future
+`--each` option is outside the current command's scope.
+
+Simple selectors such as `id` are safe unquoted, but single-quoting the complete
+expression is recommended. Richer JMESPath syntax may contain characters that
+Bash or Zsh interpret. Double-quoted expressions do not protect JMESPath backtick
+literals from shell command substitution.
 
 ## Output Semantics
 

@@ -31,6 +31,7 @@ extension CLIEntry {
         Set.self,
         SortKeys.self,
         Touch.self,
+        Unique.self,
       ],
       aliases: ["fm"]
     )
