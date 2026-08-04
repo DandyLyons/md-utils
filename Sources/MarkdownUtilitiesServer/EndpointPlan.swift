@@ -3,6 +3,9 @@ import MarkdownUtilitiesCore
 
 /// A validated, collection-relative directory used to narrow type selection.
 public struct MarkdownSearchRoot: RawRepresentable, Codable, Equatable, Hashable, Sendable {
+  /// The root of the configured record collection.
+  public static let collectionRoot = MarkdownSearchRoot(validated: ".")
+
   /// Canonical collection-relative directory, including its trailing slash, or `.` for the root.
   public let rawValue: String
 
@@ -14,6 +17,10 @@ public struct MarkdownSearchRoot: RawRepresentable, Codable, Equatable, Hashable
   /// - Parameter rawValue: Authored directory path, or `.` for the collection root.
   public init?(rawValue: String) {
     guard Self.isValid(rawValue) else { return nil }
+    self.rawValue = rawValue
+  }
+
+  private init(validated rawValue: String) {
     self.rawValue = rawValue
   }
 

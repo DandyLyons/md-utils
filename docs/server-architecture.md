@@ -29,6 +29,7 @@ The original type-system prerequisite has been met. The project now has enough p
 - mdtype definitions are loaded recursively from `.md-utils/types/` by the native integration.
 - reusable rule definitions, applicability, type-based selection, checking, and structured assessments are available in `MarkdownUtilitiesCore`.
 - native adapters can read filesystem records, construct logical paths, resolve project-confined schema resources, and write records atomically.
+- `MarkdownUtilitiesServer` defines the asynchronous, storage-neutral `RecordStore` contract and actor-backed `InMemoryRecordStore` reference implementation.
 
 The normative type design is documented in [RFC 0001: mdtype](rfcs/0001-mdtype.md). The portable dependency and runtime status is documented in [WebAssembly Support](webassembly.md).
 
@@ -36,12 +37,11 @@ The normative type design is documented in [RFC 0001: mdtype](rfcs/0001-mdtype.m
 
 The following pieces do not yet exist:
 
-- a storage-neutral `RecordStore` protocol;
 - a typed repository that composes a store, type registry, rules, and resource projection;
 - a domain-resource projection and encoding contract;
 - a public schema-introspection API suitable for generators outside `MarkdownUtilitiesCore`;
 - OpenAPI generation from exposed resources;
-- server request semantics, error mapping, concurrency control, pagination, and query behavior;
+- server request semantics, HTTP error mapping, resource pagination, and query behavior;
 - native HTTP or Cloudflare Workers distributions; and
 - persistent type indexes or a production storage backend.
 
@@ -108,6 +108,7 @@ MarkdownUtilities
 
 MarkdownUtilitiesServer
 ├── MarkdownUtilitiesCore
+├── Storage-neutral RecordStore and InMemoryRecordStore
 ├── Explicit versioned resource configuration
 ├── Deterministic EndpointPlan compilation
 ├── Transport-neutral route descriptions
@@ -186,7 +187,7 @@ MarkdownRecord
 └── optional revision or content hash
 ```
 
-The remaining persistence abstraction should operate on records rather than assuming direct filesystem paths:
+The persistence abstraction operates on records rather than assuming direct filesystem paths:
 
 ```text
 RecordStore
@@ -314,23 +315,19 @@ Create and update endpoints require additional semantics:
 
 The first endpoint-generation prototype should therefore be read-only. Mutation should be a separate milestone after the resource codec and store contracts are accepted.
 
-## RecordStore Requirements
+## RecordStore Contract
 
-The first storage RFC should define an asynchronous, `Sendable`, storage-neutral protocol with semantic operations rather than backend-specific query syntax.
-
-At minimum, it should address:
+The implemented `RecordStore` is asynchronous, `Sendable`, and storage-neutral. It exposes semantic operations rather than backend-specific query syntax:
 
 - fetch by stable record identity;
-- enumerate records or candidate records;
-- create only when identity is absent;
-- replace or update only when an expected revision matches;
-- delete only when an expected revision matches;
-- stable mapping between identity and logical path;
-- deterministic error categories such as not found, conflict, and unavailable;
-- cancellation and bounded resource use; and
-- atomicity expectations for canonical content and derived indexes.
+- deterministic bounded enumeration by logical search root, limit, and opaque continuation token;
+- create only when identity is absent, with a store-assigned opaque revision;
+- replace or delete only when an expected revision atomically matches; and
+- stable not-found, conflict, invalid-record, invalid-query, and unavailable errors.
 
-An `InMemoryRecordStore` should be the first implementation because it enables portable repository and contract tests without deciding the production database. A `FileRecordStore` should follow to validate ordinary folder-backed operation. SQLite should be evaluated after repository semantics are stable.
+Logical paths narrow enumeration but are not universal storage keys. The collection root retains pathless records. Cancellation is checked before work, during enumeration, and immediately before commits, and is propagated without wrapping. Paging is deterministic while store contents remain unchanged; immutable cross-mutation snapshots belong to the read-snapshot layer.
+
+`InMemoryRecordStore` is the first implementation because it enables portable repository and contract tests without deciding the production database. A `FileRecordStore` should follow to validate ordinary folder-backed operation. SQLite should be evaluated after repository semantics are stable.
 
 The initial repository may enumerate candidates and assess types on demand. Persistent type indexes are an optimization and must never become the source of truth.
 
@@ -455,26 +452,26 @@ Completed prerequisites:
 3. **Complete:** Design and implement mdtype v1.
 4. **Complete:** Elevate reusable type and rule assessment into Core.
 5. **Complete:** Define storage-neutral `MarkdownRecord`, context, revision, and logical path values.
+6. **Complete:** Implement the storage-neutral `RecordStore` protocol and in-memory reference store.
 
 Recommended next work:
 
 1. Write an RFC for exposed resources, resource projection, immutable `EndpointPlan`, OpenAPI 3.1 output, and HTTP error semantics.
 2. Add the public, read-only mdtype schema introspection required by the resource and OpenAPI generator.
-3. Write and implement the storage-neutral `RecordStore` protocol with an in-memory reference store.
-4. Implement the read-only `TypedMarkdownRepository` and correctness-first type queries.
-5. Build the `Book` read-only vertical slice with generic Hummingbird 2 handlers registered from the plan.
-6. Generate OpenAPI 3.1 from the same plan and prove route/contract parity.
-7. Specify resource codecs, create templates, revision preconditions, and rule enforcement for mutations.
-8. Add create, update, and delete operations with reassessment before commit.
-9. Implement `FileRecordStore` and prototype SQLite storage and derived indexes.
-10. Ship the conventional native server distribution with contract, concurrency, and migration tests.
-11. Define the JavaScript/WebAssembly ABI and prototype the Workers repository adapter.
-12. Prototype Durable Object storage and sharding.
-13. Run shared HTTP contract tests across native and Workers distributions.
+3. Implement the read-only `TypedMarkdownRepository` and correctness-first type queries.
+4. Build the `Book` read-only vertical slice with generic Hummingbird 2 handlers registered from the plan.
+5. Generate OpenAPI 3.1 from the same plan and prove route/contract parity.
+6. Specify resource codecs, create templates, revision preconditions, and rule enforcement for mutations.
+7. Add create, update, and delete operations with reassessment before commit.
+8. Implement `FileRecordStore` and prototype SQLite storage and derived indexes.
+9. Ship the conventional native server distribution with contract, concurrency, and migration tests.
+10. Define the JavaScript/WebAssembly ABI and prototype the Workers repository adapter.
+11. Prototype Durable Object storage and sharding.
+12. Run shared HTTP contract tests across native and Workers distributions.
 
 ## Non-Goals of This Document
 
-This document does not select a final database, Durable Object topology, authentication system, or deployment provider. It does not define the resource-exposure configuration or `RecordStore` API; those should be separate RFCs with testable acceptance criteria.
+This document does not select a final database, Durable Object topology, authentication system, or deployment provider. Resource-exposure configuration and the `RecordStore` API are implemented library contracts with their own testable acceptance criteria.
 
 Swift OpenAPI Generator, generated server protocols, build plugins, and resource-specific generated Swift code are not part of the server design.
 

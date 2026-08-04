@@ -8,7 +8,7 @@ The proposed native and Cloudflare server architecture, WebAssembly target split
 
 `MarkdownUtilitiesCore` owns content-only parsing and transformations. It accepts strings, document models, and explicit context; it does not scan the filesystem or inspect host metadata. The target is supported on Apple platforms and Linux.
 
-`MarkdownUtilities` depends on Core and adds filesystem-backed wikilink resolution, CSV path metadata, and file metadata including extended attributes. `MarkdownUtilitiesServer` also depends only on Core and compiles explicit server resources into transport-neutral endpoint plans. Consumers import the products explicitly according to the APIs each source file uses.
+`MarkdownUtilities` depends on Core and adds filesystem-backed wikilink resolution, CSV path metadata, and file metadata including extended attributes. `MarkdownUtilitiesServer` also depends only on Core, defines storage-neutral canonical-record persistence, and compiles explicit server resources into transport-neutral endpoint plans. Consumers import the products explicitly according to the APIs each source file uses.
 
 The Markdown type system follows the same boundary. Core owns canonical `MarkdownRecord` values, parsed `MarkdownDocument` values, type and rule models, schema-graph compilation, portable predicate evaluation, diagnostics, and in-memory fix application. `MarkdownUtilities` loads `.md-utils/types/`, resolves filesystem schema resources, constructs logical record paths, and performs atomic record writes. The executable owns command parsing, prompts, formatting, and exit status.
 
@@ -46,7 +46,9 @@ The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
 
 ## Server Planning Library (MarkdownUtilitiesServer)
 
-`MarkdownUtilitiesServer` owns the versioned resource-configuration model, selection and identity policies, immutable `EndpointPlan`, transport-neutral route descriptions, and structured startup diagnostics. It has no Hummingbird or filesystem dependency.
+`MarkdownUtilitiesServer` owns the storage-neutral `RecordStore` contract, actor-backed `InMemoryRecordStore`, versioned resource-configuration model, selection and identity policies, immutable `EndpointPlan`, transport-neutral route descriptions, and structured startup diagnostics. It has no Hummingbird or filesystem dependency.
+
+The store contract fetches canonical records by stable identity, enumerates deterministic bounded pages under optional logical search roots, and defines store-owned revisions for atomic create, replace, and delete operations. Logical paths remain portable metadata rather than filesystem keys. Parsed representations, type membership, and other indexes remain rebuildable derived state.
 
 Server resources are explicit and opt-in. Configuration supports rule selection, type selection within a collection-relative search root, and rule selection with an expected type. Compilation resolves only referenced definitions, rejects unsafe or ambiguous routes, and derives stable operation IDs. Equivalent inputs produce identical plans regardless of authoring order.
 

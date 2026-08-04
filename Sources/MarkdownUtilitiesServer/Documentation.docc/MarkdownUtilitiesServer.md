@@ -1,12 +1,16 @@
 # ``MarkdownUtilitiesServer``
 
-Compile explicit Markdown-backed resources into one deterministic endpoint plan.
+Persist canonical Markdown records and compile explicit resources into one deterministic endpoint plan.
 
 ## Overview
 
 `MarkdownUtilitiesServer` defines the transport-neutral contract shared by runtime
 route registration and OpenAPI generation. It does not load configuration files,
 start an HTTP application, or depend on Hummingbird.
+
+The module also defines the storage-neutral ``RecordStore`` contract. Stores persist
+canonical `MarkdownRecord` values without treating filesystem paths, SQL, parsed
+frontmatter, or type indexes as universal storage concepts.
 
 Server resources are opt-in. A loaded rule or mdtype is never exposed unless a
 ``MarkdownResourceConfiguration`` references it explicitly.
@@ -34,6 +38,39 @@ let configuration = MarkdownServerConfiguration(resources: [
 ])
 let plan = try EndpointPlanCompiler(typeRegistry: registry).compile(configuration)
 ```
+
+## Canonical record storage
+
+``RecordStore`` fetches records by stable identity, enumerates bounded pages, and
+performs revision-checked mutations. Revisions are opaque and store-owned: create
+and replace return the canonical stored record with its assigned revision, while
+replace and delete atomically compare an expected revision.
+
+```swift
+let proposed = MarkdownRecord(
+  identity: MarkdownRecordIdentity(rawValue: "dune"),
+  content: "# Dune"
+)
+let store = try InMemoryRecordStore()
+let created = try await store.create(proposed)
+
+let page = try await store.records(matching: RecordStoreQuery(limit: 100))
+```
+
+Enumeration is ordered deterministically by stable identity. ``MarkdownSearchRoot``
+narrows records by their collection-relative logical paths; the collection root
+also retains records without a logical path. ``RecordStoreContinuationToken`` is
+opaque and scoped to the query that produced it. Paging is bounded but does not
+provide snapshot isolation across mutations.
+
+``RecordStoreError`` exposes stable not-found, conflict, invalid-record,
+invalid-query, and unavailable categories. Cancellation propagates as
+`CancellationError`. Canonical Markdown is not parsed or assessed at this boundary,
+so malformed YAML or nonconforming content remains representable. Parsed views,
+conformance indexes, and resource projections are derived state that can be rebuilt.
+
+``InMemoryRecordStore`` is the portable reference implementation. It is intended
+for tests and composition work, not as a production persistence selection.
 
 ## Selection modes
 
