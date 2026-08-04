@@ -1,16 +1,20 @@
 import Foundation
 import MarkdownSyntax
 
-struct AnalyzedMarkdownRecord {
-  var record: MarkdownRecord
-  var body: String
-  var hasFrontmatter: Bool
-  var userFrontmatter: [String: JSONValue]?
-  var systemTypeHints: [MarkdownTypeHint]
-  var headings: [AnalyzedMarkdownHeading]
-  var parseDiagnostics: [MarkdownDiagnostic]
+/// Parsed record state shared by rule, type, identity, and server assessment.
+///
+/// Package visibility keeps parser implementation details out of the public API while
+/// allowing sibling targets to guarantee that one snapshot build parses each record once.
+package struct AnalyzedMarkdownRecord: Sendable {
+  package var record: MarkdownRecord
+  package var body: String
+  package var hasFrontmatter: Bool
+  package var userFrontmatter: [String: JSONValue]?
+  package var systemTypeHints: [MarkdownTypeHint]
+  package var headings: [AnalyzedMarkdownHeading]
+  package var parseDiagnostics: [MarkdownDiagnostic]
 
-  var allTypeHints: [MarkdownTypeHint] {
+  package var allTypeHints: [MarkdownTypeHint] {
     var result: [MarkdownTypeHint] = []
     var seen: Set<MarkdownTypeHint> = []
     for hint in systemTypeHints + record.context.typeHints where seen.insert(hint).inserted {
@@ -20,16 +24,19 @@ struct AnalyzedMarkdownRecord {
   }
 }
 
-struct AnalyzedMarkdownHeading {
-  var text: String
-  var level: Int
-  var line: Int
-  var parentIndex: Int?
-  var directContentIsEmpty: Bool
+/// Heading facts retained after one Markdown syntax-tree traversal.
+package struct AnalyzedMarkdownHeading: Sendable {
+  package var text: String
+  package var level: Int
+  package var line: Int
+  package var parentIndex: Int?
+  package var directContentIsEmpty: Bool
 }
 
-enum MarkdownRecordAnalyzer {
-  static func analyze(_ record: MarkdownRecord) async -> AnalyzedMarkdownRecord {
+/// Produces reusable structured state from canonical Markdown content.
+package enum MarkdownRecordAnalyzer {
+  /// Separates frontmatter, parses safe YAML, and walks Markdown headings once.
+  package static func analyze(_ record: MarkdownRecord) async -> AnalyzedMarkdownRecord {
     let parser = FrontMatterParser()
     var input = Substring(record.content)
     let parts: (rawFrontMatter: String, body: String)

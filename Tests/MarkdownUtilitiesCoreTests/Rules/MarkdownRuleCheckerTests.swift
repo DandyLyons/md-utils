@@ -4,6 +4,57 @@ import Testing
 @Suite("Markdown Rule Checker Tests")
 struct MarkdownRuleCheckerTests {
   @Test
+  func `Path includes use any-of semantics and exclusions take precedence`() async throws {
+    let rule = MarkdownRuleDefinition(
+      name: "published",
+      applicability: MarkdownRuleApplicability(
+        paths: ["books/**/*.md", "articles/**/*.md"],
+        excludePaths: ["**/drafts/**"]
+      )
+    )
+    let checker = MarkdownRuleChecker()
+
+    #expect(try await checker.isApplicable(record(path: "books/dune.md"), to: rule))
+    #expect(try await checker.isApplicable(record(path: "articles/news.md"), to: rule))
+    #expect(try await checker.isApplicable(record(path: "books/drafts/dune.md"), to: rule) == false)
+    #expect(try await checker.isApplicable(record(path: "notes/dune.md"), to: rule) == false)
+    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Pathless"), to: rule) == false)
+  }
+
+  @Test
+  func `Exclusion-only applicability admits pathless and nonexcluded records`() async throws {
+    let rule = MarkdownRuleDefinition(
+      name: "not-archive",
+      applicability: MarkdownRuleApplicability(excludePaths: ["archive/**"])
+    )
+    let checker = MarkdownRuleChecker()
+
+    #expect(try await checker.isApplicable(record(path: "notes/current.md"), to: rule))
+    #expect(try await checker.isApplicable(record(path: "archive/old.md"), to: rule) == false)
+    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Pathless"), to: rule))
+  }
+
+  @Test
+  func `Path globs remain conjunctive with applicability predicates`() async throws {
+    let rule = MarkdownRuleDefinition(
+      name: "book-notes",
+      applicability: MarkdownRuleApplicability(
+        paths: ["books/**"],
+        predicates: [
+          MarkdownConstraint(
+            id: "notes",
+            predicate: .path(MarkdownPathPredicate(glob: "**/notes/*.md"))
+          )
+        ]
+      )
+    )
+    let checker = MarkdownRuleChecker()
+
+    #expect(try await checker.isApplicable(record(path: "books/notes/dune.md"), to: rule))
+    #expect(try await checker.isApplicable(record(path: "books/dune.md"), to: rule) == false)
+  }
+
+  @Test
   func `Rule applicability is distinct from checks`() async throws {
     let rule = MarkdownRuleDefinition(
       name: "published-books",
@@ -78,5 +129,13 @@ struct MarkdownRuleCheckerTests {
     #expect(assessment.passes)
     #expect(assessment.diagnostics.count == 1)
     #expect(assessment.diagnostics[0].severity == .advisory)
+  }
+
+  /// Creates a canonical record with a portable logical path.
+  private func record(path: String) throws -> MarkdownRecord {
+    MarkdownRecord(
+      content: "# Record",
+      context: MarkdownRecordContext(path: try MarkdownRecordPath(path))
+    )
   }
 }

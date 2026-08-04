@@ -12,6 +12,11 @@ The module also defines the storage-neutral ``RecordStore`` contract. Stores per
 canonical `MarkdownRecord` values without treating filesystem paths, SQL, parsed
 frontmatter, or type indexes as universal storage concepts.
 
+``MarkdownServerReadSnapshotBuilder`` composes that storage boundary with an
+``EndpointPlan``, compiled rules, and a type registry. It performs selection and
+assessment once at startup and returns immutable ``MarkdownServerReadSnapshot``
+state for concurrent request handling. See <doc:ReadSnapshots>.
+
 Server resources are opt-in. A loaded rule or mdtype is never exposed unless a
 ``MarkdownResourceConfiguration`` references it explicitly.
 
@@ -112,8 +117,8 @@ duplicate names or operations, route ambiguity, and operation-ID collisions in o
 locations and are deterministically ordered.
 
 Equivalent resource and operation orderings produce the same immutable,
-`Sendable` plan. The read snapshot tracked by issue #89 consumes the plan's
-selection, identity, and projection policies.
+`Sendable` plan. The read snapshot consumes the plan's selection, identity, and
+projection policies without mutating the plan.
 
 ## Configuration boundary
 
@@ -121,3 +126,9 @@ selection, identity, and projection policies.
 `1`. The `md-utils-server` executable introduced by issue #77 will own JSON or YAML
 file discovery and decoding. Server configuration is separate from the md-utils CLI
 configuration and does not extend `.md-utils.json`.
+
+## Topics
+
+### Read-side composition
+
+- <doc:ReadSnapshots>

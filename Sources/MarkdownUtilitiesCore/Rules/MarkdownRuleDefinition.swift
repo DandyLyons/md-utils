@@ -2,15 +2,41 @@ import Foundation
 
 /// Selects records by portable predicates and confirmed Markdown types.
 public struct MarkdownRuleApplicability: Equatable, Sendable {
+  /// Any-of logical-path globs used to include candidates before content parsing.
+  public var paths: [String]
+
+  /// Logical-path globs that exclude candidates even when an include glob matches.
+  public var excludePaths: [String]
+
+  /// Portable content and context predicates that every applicable record must satisfy.
   public var predicates: [MarkdownConstraint]
+
+  /// Markdown types of which an applicable record must conform to at least one.
   public var anyTypes: [MarkdownTypeName]
+
+  /// Markdown types to which an applicable record must conform in full.
   public var allTypes: [MarkdownTypeName]
 
+  /// Creates a rule-selection policy.
+  ///
+  /// `paths` has any-of semantics, while `excludePaths` has none-of semantics and
+  /// takes precedence. Empty include paths impose no path restriction.
+  ///
+  /// - Parameters:
+  ///   - paths: Portable include globs matched against complete logical paths.
+  ///   - excludePaths: Portable exclusion globs evaluated after includes.
+  ///   - predicates: Additional constraints that must all match.
+  ///   - anyTypes: Types of which at least one must conform.
+  ///   - allTypes: Types that must all conform.
   public init(
+    paths: [String] = [],
+    excludePaths: [String] = [],
     predicates: [MarkdownConstraint] = [],
     anyTypes: [MarkdownTypeName] = [],
     allTypes: [MarkdownTypeName] = []
   ) {
+    self.paths = paths
+    self.excludePaths = excludePaths
     self.predicates = predicates
     self.anyTypes = anyTypes
     self.allTypes = allTypes
@@ -73,7 +99,21 @@ public struct MarkdownRuleChecker: Sendable {
     _ record: MarkdownRecord,
     against rule: MarkdownRuleDefinition
   ) async throws -> MarkdownRuleAssessment {
-    let applicability = try await assessApplicability(record, rule: rule)
+    guard isPathCandidate(record.context.path, for: rule) else {
+      return MarkdownRuleAssessment(ruleName: rule.name, applicable: false)
+    }
+    return try assess(await MarkdownRecordAnalyzer.analyze(record), against: rule)
+  }
+
+  /// Assesses a rule using parsed state shared with other package subsystems.
+  package func assess(
+    _ record: AnalyzedMarkdownRecord,
+    against rule: MarkdownRuleDefinition
+  ) throws -> MarkdownRuleAssessment {
+    guard isPathCandidate(record.record.context.path, for: rule) else {
+      return MarkdownRuleAssessment(ruleName: rule.name, applicable: false)
+    }
+    let applicability = try assessApplicability(record, rule: rule)
     guard applicability.matches else {
       return MarkdownRuleAssessment(
         ruleName: rule.name,
@@ -90,7 +130,7 @@ public struct MarkdownRuleChecker: Sendable {
       context: MarkdownConstraintGroup()
     )
     let registry = try MarkdownTypeRegistry(definitions: [checkDefinition])
-    let assessment = try await MarkdownTypeChecker(registry: registry).assess(record, as: checkDefinition.name)
+    let assessment = try MarkdownTypeChecker(registry: registry).assess(record, as: checkDefinition.name)
     return MarkdownRuleAssessment(
       ruleName: rule.name,
       applicable: true,
@@ -102,13 +142,31 @@ public struct MarkdownRuleChecker: Sendable {
     _ record: MarkdownRecord,
     to rule: MarkdownRuleDefinition
   ) async throws -> Bool {
-    try await assessApplicability(record, rule: rule).matches
+    guard isPathCandidate(record.context.path, for: rule) else { return false }
+    return try assessApplicability(await MarkdownRecordAnalyzer.analyze(record), rule: rule).matches
   }
 
+  /// Performs path-only narrowing without parsing record content.
+  package func isPathCandidate(
+    _ path: MarkdownRecordPath?,
+    for rule: MarkdownRuleDefinition
+  ) -> Bool {
+    if rule.applicability.paths.isEmpty == false {
+      guard let path, rule.applicability.paths.contains(where: path.matches(glob:)) else {
+        return false
+      }
+    }
+    if let path, rule.applicability.excludePaths.contains(where: path.matches(glob:)) {
+      return false
+    }
+    return true
+  }
+
+  /// Evaluates non-path applicability against reusable analyzed content.
   private func assessApplicability(
-    _ record: MarkdownRecord,
+    _ record: AnalyzedMarkdownRecord,
     rule: MarkdownRuleDefinition
-  ) async throws -> (matches: Bool, diagnostics: [MarkdownDiagnostic]) {
+  ) throws -> (matches: Bool, diagnostics: [MarkdownDiagnostic]) {
     var diagnostics: [MarkdownDiagnostic] = []
 
     if rule.applicability.predicates.isEmpty == false {
@@ -127,7 +185,7 @@ public struct MarkdownRuleChecker: Sendable {
         context: MarkdownConstraintGroup(requirements: contextPredicates)
       )
       let registry = try MarkdownTypeRegistry(definitions: [definition])
-      let assessment = try await MarkdownTypeChecker(registry: registry).assess(record, as: definition.name)
+      let assessment = try MarkdownTypeChecker(registry: registry).assess(record, as: definition.name)
       diagnostics.append(contentsOf: assessment.errors.filter { diagnostic in
         diagnostic.code != "record.frontmatter.invalid-yaml"
       })
@@ -138,7 +196,7 @@ public struct MarkdownRuleChecker: Sendable {
         throw MarkdownRuleCheckerError.typeRegistryRequired(rule.name)
       }
       let checker = MarkdownTypeChecker(registry: typeRegistry)
-      let assessments = await checker.assessAll(record)
+      let assessments = checker.assessAll(record)
       let conforming = Set(assessments.filter(\.conforms).map(\.type))
       if rule.applicability.anyTypes.isEmpty == false,
          rule.applicability.anyTypes.contains(where: conforming.contains) == false {

@@ -10,12 +10,18 @@ A type asks whether a record conforms to a named structural contract. A rule fir
 
 ## Portable Rule Assessment
 
-`MarkdownRuleApplicability` can select records with body or context predicates and can require conformance to any or all named Markdown types. Supply a `MarkdownTypeRegistry` to `MarkdownRuleChecker` when applicability references types.
+`MarkdownRuleApplicability` can narrow records by logical-path globs, select records with body or context predicates, and require conformance to any or all named Markdown types. Supply a `MarkdownTypeRegistry` to `MarkdownRuleChecker` when applicability references types.
+
+Path includes and exclusions intentionally match the `paths` and `excludePaths` fields in the md-utils rules configuration. Includes use any-of semantics. An empty `paths` array imposes no inclusion restriction, while a nonempty array requires a logical path matching at least one glob. Exclusions use none-of semantics and take precedence over includes. A pathless record therefore cannot match a nonempty include list, but it remains eligible for an exclusion-only rule.
+
+Path filtering is conjunctive with `predicates`, `anyTypes`, and `allTypes`. Hosts such as ``MarkdownRuleChecker`` and the server read-snapshot builder can apply the explicit path filters before parsing YAML or Markdown. A path predicate in `predicates` remains a required portable constraint and must also pass.
 
 ```swift
 let rule = MarkdownRuleDefinition(
   name: "published-books",
   applicability: MarkdownRuleApplicability(
+    paths: ["books/**/*.md"],
+    excludePaths: ["books/drafts/**"],
     allTypes: [MarkdownTypeName(rawValue: "Book")]
   ),
   requirements: MarkdownConstraintGroup(requirements: [

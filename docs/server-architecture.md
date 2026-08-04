@@ -30,6 +30,7 @@ The original type-system prerequisite has been met. The project now has enough p
 - reusable rule definitions, applicability, type-based selection, checking, and structured assessments are available in `MarkdownUtilitiesCore`.
 - native adapters can read filesystem records, construct logical paths, resolve project-confined schema resources, and write records atomically.
 - `MarkdownUtilitiesServer` defines the asynchronous, storage-neutral `RecordStore` contract and actor-backed `InMemoryRecordStore` reference implementation.
+- `MarkdownServerReadSnapshotBuilder` performs one bounded scan, reuses one analysis per candidate, and builds immutable generic record, membership, validity, identity, and lookup indexes.
 
 The normative type design is documented in [RFC 0001: mdtype](rfcs/0001-mdtype.md). The portable dependency and runtime status is documented in [WebAssembly Support](webassembly.md).
 
@@ -37,7 +38,6 @@ The normative type design is documented in [RFC 0001: mdtype](rfcs/0001-mdtype.m
 
 The following pieces do not yet exist:
 
-- a typed repository that composes a store, type registry, rules, and resource projection;
 - a domain-resource projection and encoding contract;
 - a public schema-introspection API suitable for generators outside `MarkdownUtilitiesCore`;
 - OpenAPI generation from exposed resources;
@@ -45,7 +45,7 @@ The following pieces do not yet exist:
 - native HTTP or Cloudflare Workers distributions; and
 - persistent type indexes or a production storage backend.
 
-The next blocker is therefore not Markdown validation. It is the boundary between a conforming `MarkdownRecord` and a public API resource.
+The next blocker is native HTTP adaptation of the accepted generic read representation.
 
 ## Decisions
 
@@ -453,21 +453,20 @@ Completed prerequisites:
 4. **Complete:** Elevate reusable type and rule assessment into Core.
 5. **Complete:** Define storage-neutral `MarkdownRecord`, context, revision, and logical path values.
 6. **Complete:** Implement the storage-neutral `RecordStore` protocol and in-memory reference store.
+7. **Complete:** Implement the immutable generic read snapshot and collision-safe resource indexes.
 
 Recommended next work:
 
-1. Write an RFC for exposed resources, resource projection, immutable `EndpointPlan`, OpenAPI 3.1 output, and HTTP error semantics.
-2. Add the public, read-only mdtype schema introspection required by the resource and OpenAPI generator.
-3. Implement the read-only `TypedMarkdownRepository` and correctness-first type queries.
-4. Build the `Book` read-only vertical slice with generic Hummingbird 2 handlers registered from the plan.
-5. Generate OpenAPI 3.1 from the same plan and prove route/contract parity.
-6. Specify resource codecs, create templates, revision preconditions, and rule enforcement for mutations.
-7. Add create, update, and delete operations with reassessment before commit.
-8. Implement `FileRecordStore` and prototype SQLite storage and derived indexes.
-9. Ship the conventional native server distribution with contract, concurrency, and migration tests.
-10. Define the JavaScript/WebAssembly ABI and prototype the Workers repository adapter.
-11. Prototype Durable Object storage and sharding.
-12. Run shared HTTP contract tests across native and Workers distributions.
+1. Build the `Book` read-only vertical slice with generic Hummingbird 2 handlers registered from the plan.
+2. Add the public, read-only mdtype schema introspection required by the OpenAPI generator.
+3. Generate OpenAPI 3.1 from the same plan and prove route/contract parity.
+4. Specify resource codecs, create templates, revision preconditions, and rule enforcement for mutations.
+5. Add create, update, and delete operations with reassessment before commit.
+6. Implement `FileRecordStore` and prototype SQLite storage and derived indexes.
+7. Ship the conventional native server distribution with contract, concurrency, and migration tests.
+8. Define the JavaScript/WebAssembly ABI and prototype the Workers repository adapter.
+9. Prototype Durable Object storage and sharding.
+10. Run shared HTTP contract tests across native and Workers distributions.
 
 ## Non-Goals of This Document
 

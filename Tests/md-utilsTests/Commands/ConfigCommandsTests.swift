@@ -269,6 +269,26 @@ struct ConfigCommandsTests {
     #expect(schema["required"] as? [String] == ["configVersion", "schemaDirectory", "rules"])
   }
 
+  @Test
+  func `current schema accepts rule include and exclude path globs`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    let configPath = project + ".md-utils/md-utils.json"
+    try configPath.parent().mkpath()
+    let expected = RuleMatch(
+      paths: ["Books/**/*.md", "Articles/**/*.md"],
+      excludePaths: ["**/Drafts/**"]
+    )
+    try MdUtilsConfig(schemaRules: [
+      Rule(name: "published", schema: "published.schema.json", match: expected),
+    ]).save(to: configPath)
+
+    let loaded = try MdUtilsConfig.load(from: configPath)
+
+    #expect(loaded.schemaRules.first?.match.paths == expected.paths)
+    #expect(loaded.schemaRules.first?.match.excludePaths == expected.excludePaths)
+  }
+
   private func repoRoot() -> URL {
     let testFile = URL(filePath: #filePath)
     return testFile

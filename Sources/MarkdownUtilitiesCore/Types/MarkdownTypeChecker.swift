@@ -13,11 +13,8 @@ public struct MarkdownTypeChecker: Sendable {
     _ record: MarkdownRecord,
     as type: MarkdownTypeName
   ) async throws -> MarkdownTypeAssessment {
-    guard let definition = registry.definition(named: type) else {
-      throw MarkdownTypeCheckerError.unknownType(type.rawValue)
-    }
     let analyzed = await MarkdownRecordAnalyzer.analyze(record)
-    return assess(analyzed, as: definition)
+    return try assess(analyzed, as: type)
   }
 
   public func assess(
@@ -29,7 +26,7 @@ public struct MarkdownTypeChecker: Sendable {
 
   public func assessAll(_ record: MarkdownRecord) async -> [MarkdownTypeAssessment] {
     let analyzed = await MarkdownRecordAnalyzer.analyze(record)
-    return registry.definitions.map { assess(analyzed, as: $0) }
+    return assessAll(analyzed)
   }
 
   public func conformingTypes(for record: MarkdownRecord) async -> Set<MarkdownTypeName> {
@@ -53,6 +50,22 @@ public struct MarkdownTypeChecker: Sendable {
         assessment: assessment
       )
     }
+  }
+
+  /// Assesses already analyzed content without repeating Markdown or YAML parsing.
+  package func assess(
+    _ record: AnalyzedMarkdownRecord,
+    as type: MarkdownTypeName
+  ) throws -> MarkdownTypeAssessment {
+    guard let definition = registry.definition(named: type) else {
+      throw MarkdownTypeCheckerError.unknownType(type.rawValue)
+    }
+    return assess(record, as: definition)
+  }
+
+  /// Assesses already analyzed content against every definition in registry order.
+  package func assessAll(_ record: AnalyzedMarkdownRecord) -> [MarkdownTypeAssessment] {
+    registry.definitions.map { assess(record, as: $0) }
   }
 
   private func assess(

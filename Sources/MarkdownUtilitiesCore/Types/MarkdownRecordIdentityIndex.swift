@@ -166,10 +166,24 @@ public struct MarkdownRecordIdentityIndex: Equatable, Sendable {
     records: [MarkdownRecord],
     policy: MarkdownRecordIdentityPolicy
   ) async -> MarkdownRecordIdentityIndex {
-    var assessments: [MarkdownRecordIdentityAssessment] = []
-    assessments.reserveCapacity(records.count)
+    var analyzedRecords: [AnalyzedMarkdownRecord] = []
+    analyzedRecords.reserveCapacity(records.count)
     for record in records {
-      var assessment = await assess(record, policy: policy)
+      analyzedRecords.append(await MarkdownRecordAnalyzer.analyze(record))
+    }
+    return await build(analyzedRecords: analyzedRecords, policy: policy)
+  }
+
+  /// Builds an identity index from analysis shared with sibling package targets.
+  package static func build(
+    analyzedRecords: [AnalyzedMarkdownRecord],
+    policy: MarkdownRecordIdentityPolicy
+  ) async -> MarkdownRecordIdentityIndex {
+    var assessments: [MarkdownRecordIdentityAssessment] = []
+    assessments.reserveCapacity(analyzedRecords.count)
+    for analyzedRecord in analyzedRecords {
+      let record = analyzedRecord.record
+      var assessment = assess(analyzedRecord, policy: policy)
       if policy.logicalPathFallbackEnabled,
         record.context.path == nil,
         assessment.diagnostics.contains(where: { $0.code == .missingLogicalPath }) == false
@@ -282,9 +296,10 @@ public struct MarkdownRecordIdentityIndex: Equatable, Sendable {
   }
 
   private static func assess(
-    _ record: MarkdownRecord,
+    _ analyzed: AnalyzedMarkdownRecord,
     policy: MarkdownRecordIdentityPolicy
-  ) async -> MarkdownRecordIdentityAssessment {
+  ) -> MarkdownRecordIdentityAssessment {
+    let record = analyzed.record
     let fallback = policy.logicalPathFallbackEnabled ? record.context.path : nil
     switch policy.source {
     case .existingIdentity:
@@ -325,7 +340,6 @@ public struct MarkdownRecordIdentityIndex: Equatable, Sendable {
           message: "A frontmatter identity path must contain only nonempty components"
         )
       }
-      let analyzed = await MarkdownRecordAnalyzer.analyze(record)
       if let parseDiagnostic = analyzed.parseDiagnostics.first(where: { $0.domain == .frontmatter }) {
         return invalidAssessment(
           record: record,

@@ -46,13 +46,13 @@ The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
 
 ## Server Planning Library (MarkdownUtilitiesServer)
 
-`MarkdownUtilitiesServer` owns the storage-neutral `RecordStore` contract, actor-backed `InMemoryRecordStore`, versioned resource-configuration model, selection and identity policies, immutable `EndpointPlan`, transport-neutral route descriptions, and structured startup diagnostics. It has no Hummingbird or filesystem dependency.
+`MarkdownUtilitiesServer` owns the storage-neutral `RecordStore` contract, actor-backed `InMemoryRecordStore`, versioned resource-configuration model, selection and identity policies, immutable `EndpointPlan`, generic read snapshot, transport-neutral route descriptions, and structured startup diagnostics. It has no Hummingbird or filesystem dependency.
 
 The store contract fetches canonical records by stable identity, enumerates deterministic bounded pages under optional logical search roots, and defines store-owned revisions for atomic create, replace, and delete operations. Logical paths remain portable metadata rather than filesystem keys. Parsed representations, type membership, and other indexes remain rebuildable derived state.
 
 Server resources are explicit and opt-in. Configuration supports rule selection, type selection within a collection-relative search root, and rule selection with an expected type. Compilation resolves only referenced definitions, rejects unsafe or ambiguous routes, and derives stable operation IDs. Equivalent inputs produce identical plans regardless of authoring order.
 
-The standalone server work in issue #77 will load its own configuration outside `.md-utils.json`, add Hummingbird 2, and register adapters from the plan. The read snapshot in issue #89 and OpenAPI generator in issue #84 consume the same accepted plan.
+The read snapshot scans canonical storage in bounded pages, applies path narrowing before parsing, reuses one record analysis across rule, type, and identity assessment, and publishes immutable generic envelopes with collision-safe primary-ID and logical-path lookup. The standalone server work in issue #77 will load its own configuration outside `.md-utils.json`, add Hummingbird 2, and register adapters from the plan and snapshot. The OpenAPI generator in issue #84 consumes the same accepted plan.
 
 **Frontmatter Handling:**
 - Uses `FrontMatterParser` to separate `---` delimited YAML frontmatter
