@@ -17,6 +17,10 @@ let package = Package(
       name: "MarkdownUtilities",
       targets: ["MarkdownUtilities"]
     ),
+    .library(
+      name: "MarkdownUtilitiesServer",
+      targets: ["MarkdownUtilitiesServer"]
+    ),
     .executable(
       name: "md-utils",
       targets: ["md-utils"]
@@ -77,6 +81,19 @@ let package = Package(
         "MarkdownUtilitiesCore",
         "MarkdownUtilities",
         .product(name: "PathKit", package: "PathKit"),
+      ]
+    ),
+
+    // MARK: MarkdownUtilitiesServer
+    .target(
+      name: "MarkdownUtilitiesServer",
+      dependencies: ["MarkdownUtilitiesCore"]
+    ),
+    .testTarget(
+      name: "MarkdownUtilitiesServerTests",
+      dependencies: [
+        "MarkdownUtilitiesCore",
+        "MarkdownUtilitiesServer",
       ]
     ),
 

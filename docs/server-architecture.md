@@ -39,9 +39,8 @@ The following pieces do not yet exist:
 - a storage-neutral `RecordStore` protocol;
 - a typed repository that composes a store, type registry, rules, and resource projection;
 - a domain-resource projection and encoding contract;
-- explicit configuration describing which mdtypes are exposed as server resources;
 - a public schema-introspection API suitable for generators outside `MarkdownUtilitiesCore`;
-- deterministic `EndpointPlan` construction and OpenAPI generation from exposed resources;
+- OpenAPI generation from exposed resources;
 - server request semantics, error mapping, concurrency control, pagination, and query behavior;
 - native HTTP or Cloudflare Workers distributions; and
 - persistent type indexes or a production storage backend.
@@ -75,7 +74,7 @@ rules + mdtype definitions + explicit resource configuration
                     shared contract tests
 ```
 
-The plan contains resource names, routes, operations, selection policy, expected types, projection policy, and stable operation identifiers. Plan construction must reject duplicate or ambiguous routes and other invalid configuration before the server begins accepting requests.
+The implemented plan contains resource names, routes, read operations, selection policy, expected types, projection policy, identity policy, and stable operation identifiers. `MarkdownUtilitiesServer` compiles the versioned `Codable` configuration into immutable, `Sendable` values and reports invalid references, unsafe paths, duplicate or ambiguous routes, and operation-ID collisions before a server begins accepting requests.
 
 The OpenAPI document is inspectable, versionable output from the plan. It is not an input to Swift source generation. Resource-specific Swift code, Swift OpenAPI Generator, build plugins, and generated server protocols are explicit non-goals. Native and Workers transports use generic handlers backed by the same endpoint semantics.
 
@@ -107,6 +106,13 @@ MarkdownUtilities
 ├── Extended attributes
 └── Other native integrations
 
+MarkdownUtilitiesServer
+├── MarkdownUtilitiesCore
+├── Explicit versioned resource configuration
+├── Deterministic EndpointPlan compilation
+├── Transport-neutral route descriptions
+└── Structured startup diagnostics
+
 md-utils
 ├── MarkdownUtilities
 ├── ArgumentParser commands
@@ -118,7 +124,7 @@ md-utils
 
 `MarkdownUtilities` contains functionality appropriate for native platforms but unavailable or unsuitable in WebAssembly. The `md-utils` executable is not a server runtime and must not be spawned by server code.
 
-A future storage-neutral service layer may warrant its own target, but target naming and placement should follow the resource and store RFC rather than precede it.
+The standalone `md-utils-server` executable will own configuration-file loading and Hummingbird 2 application composition. Its server configuration remains separate from the md-utils CLI configuration and `.md-utils.json`.
 
 ### Treat Types and Rules as Distinct Server Inputs
 
@@ -262,9 +268,9 @@ Inferring these choices from a type name or path glob would create unstable APIs
 
 ### Require explicit resource exposure
 
-Server resources must be opt-in. A future server configuration should associate a stable resource name with an mdtype and explicitly define its HTTP and projection behavior.
+Server resources are opt-in. The versioned `MarkdownServerConfiguration` associates a stable resource name with explicit selection, route, read operations, identity, and projection behavior.
 
-The following is illustrative design input, not an implemented format:
+The following remains illustrative file syntax; issue #77 owns file-format decoding into the implemented `Codable` model:
 
 ```yaml
 resources:
@@ -420,7 +426,7 @@ Before adopting SQLite, a prototype should test round-trip fidelity, index rebui
 
 The following questions remain intentionally unresolved:
 
-- The resource-exposure configuration format and its versioning.
+- The standalone server configuration file syntax and location; the transport-neutral model is versioned independently at version `1`.
 - Whether OpenAPI is generated as a complete document or composed with maintainer-authored operations.
 - The public resource representation and section-to-field projection model.
 - Whether the first general representation is domain-specific, generic JSON, or both.

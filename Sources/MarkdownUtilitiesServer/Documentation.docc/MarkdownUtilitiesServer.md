@@ -1,0 +1,86 @@
+# ``MarkdownUtilitiesServer``
+
+Compile explicit Markdown-backed resources into one deterministic endpoint plan.
+
+## Overview
+
+`MarkdownUtilitiesServer` defines the transport-neutral contract shared by runtime
+route registration and OpenAPI generation. It does not load configuration files,
+start an HTTP application, or depend on Hummingbird.
+
+Server resources are opt-in. A loaded rule or mdtype is never exposed unless a
+``MarkdownResourceConfiguration`` references it explicitly.
+
+```swift
+import MarkdownUtilitiesCore
+import MarkdownUtilitiesServer
+
+let book = MarkdownTypeDefinition(
+  name: MarkdownTypeName(rawValue: "Book"),
+  version: "1"
+)
+let registry = try MarkdownTypeRegistry(definitions: [book])
+let configuration = MarkdownServerConfiguration(resources: [
+  MarkdownResourceConfiguration(
+    name: "books",
+    route: "/books",
+    operations: [.list, .get],
+    selection: .type(
+      name: MarkdownTypeName(rawValue: "Book"),
+      searchRoot: "books/"
+    ),
+    identityPolicy: MarkdownRecordIdentityPolicy(source: .existingIdentity)
+  )
+])
+let plan = try EndpointPlanCompiler(typeRegistry: registry).compile(configuration)
+```
+
+## Selection modes
+
+``MarkdownResourceSelection`` keeps three behaviors distinct:
+
+- Rule selection includes records for which a named rule is applicable.
+- Type selection includes conforming records beneath an explicit collection-relative
+  directory such as `books/`; `.` selects the collection root.
+- Rule selection with an expected type preserves rule-selected candidates even when
+  they fail the expected type, allowing the read snapshot to expose validity and
+  diagnostics.
+
+Type conformance is non-exclusive. Multiple planned resources may reference the
+same type, and one canonical record may appear through each resource without
+creating a route or identity collision.
+
+## Routes and operation identifiers
+
+The initial read-only operations are `list` and `get`. They produce `GET /books`
+and `GET /books/{id}` respectively. Operation identifiers default to
+`books.list` and `books.get`; ``MarkdownOperationIDOverride`` provides an explicit
+override when required.
+
+When at least one configured `get` operation enables logical-path fallback, the
+plan includes one reserved `GET /_md-utils/path/{path...}` route. Resource routes
+cannot use the `/_md-utils` namespace.
+
+``EndpointRouteDescription`` values contain only an HTTP method, canonical path
+template, semantic route kind, optional resource name, and stable operation ID.
+Issue #77 adapts these descriptions to Hummingbird 2. Issue #84 generates OpenAPI
+3.1 from the same ``EndpointPlan``.
+
+## Startup validation
+
+``EndpointPlanCompiler`` validates all resources before a server accepts requests.
+It reports unsupported versions, missing or ambiguous references, unsafe paths,
+duplicate names or operations, route ambiguity, and operation-ID collisions in one
+``EndpointPlanCompilationError``. Diagnostics have stable codes and configuration
+locations and are deterministically ordered.
+
+Equivalent resource and operation orderings produce the same immutable,
+`Sendable` plan. The read snapshot tracked by issue #89 consumes the plan's
+selection, identity, and projection policies.
+
+## Configuration boundary
+
+``MarkdownServerConfiguration`` is a versioned `Codable` model, currently version
+`1`. The `md-utils-server` executable introduced by issue #77 will own JSON or YAML
+file discovery and decoding. Server configuration is separate from the md-utils CLI
+configuration and does not extend `.md-utils.json`.
