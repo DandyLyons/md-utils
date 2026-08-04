@@ -279,8 +279,6 @@ public struct MarkdownServerReadSnapshot: Equatable, Sendable {
 public enum MarkdownServerReadSnapshotBuildError: Error, Equatable, Sendable, LocalizedError {
   /// The plan references a rule absent from the supplied definitions.
   case missingRule(String)
-  /// More than one supplied rule has the referenced name.
-  case ambiguousRule(String)
   /// The plan references a type absent from the supplied registry.
   case missingType(MarkdownTypeName)
   /// A store repeated a continuation token and could not make forward progress.
@@ -291,8 +289,6 @@ public enum MarkdownServerReadSnapshotBuildError: Error, Equatable, Sendable, Lo
     switch self {
     case .missingRule(let name):
       return "Endpoint plan references missing rule \"\(name)\""
-    case .ambiguousRule(let name):
-      return "Endpoint plan references ambiguous rule \"\(name)\""
     case .missingType(let name):
       return "Endpoint plan references missing Markdown type \"\(name.rawValue)\""
     case .repeatedContinuationToken(let token):
@@ -308,7 +304,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
 
   private let store: any RecordStore
   private let plan: EndpointPlan
-  private let rules: [MarkdownRuleDefinition]
+  private let ruleRegistry: MarkdownRuleRegistry
   private let typeRegistry: MarkdownTypeRegistry
   private let pageSize: Int
   private let analyzer: @Sendable (MarkdownRecord) async -> AnalyzedMarkdownRecord
@@ -318,31 +314,33 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
   /// - Parameters:
   ///   - store: Source of canonical Markdown records.
   ///   - plan: Validated resource and route plan.
-  ///   - rules: The same compiled rules used to create the plan.
+  ///   - ruleRegistry: The same compiled rule registry used to create the plan.
   ///   - typeRegistry: The same validated type registry used to create the plan.
   ///   - pageSize: Positive bound for each store enumeration request.
   /// - Throws: ``RecordStoreError/invalidQuery(_:)`` when `pageSize` is not positive.
   public init(
     store: any RecordStore,
     plan: EndpointPlan,
-    rules: [MarkdownRuleDefinition] = [],
+    ruleRegistry: MarkdownRuleRegistry,
     typeRegistry: MarkdownTypeRegistry,
     pageSize: Int = MarkdownServerReadSnapshotBuilder.defaultPageSize
   ) throws {
     _ = try RecordStoreQuery(limit: pageSize)
     self.store = store
     self.plan = plan
-    self.rules = rules
+    self.ruleRegistry = ruleRegistry
     self.typeRegistry = typeRegistry
     self.pageSize = pageSize
-    self.analyzer = MarkdownRecordAnalyzer.analyze
+    self.analyzer = { record in
+      await MarkdownRecordAnalyzer.analyze(record)
+    }
   }
 
   /// Creates a builder with an observable analyzer for package-level correctness tests.
   package init(
     store: any RecordStore,
     plan: EndpointPlan,
-    rules: [MarkdownRuleDefinition],
+    ruleRegistry: MarkdownRuleRegistry,
     typeRegistry: MarkdownTypeRegistry,
     pageSize: Int,
     analyzer: @escaping @Sendable (MarkdownRecord) async -> AnalyzedMarkdownRecord
@@ -350,7 +348,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
     _ = try RecordStoreQuery(limit: pageSize)
     self.store = store
     self.plan = plan
-    self.rules = rules
+    self.ruleRegistry = ruleRegistry
     self.typeRegistry = typeRegistry
     self.pageSize = pageSize
     self.analyzer = analyzer
@@ -465,17 +463,10 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
 
   /// Resolves plan references once and rejects composition drift before scanning storage.
   private func resolveDependencies() throws -> ResolvedDependencies {
-    var rulesByName: [String: MarkdownRuleDefinition] = [:]
-    for rule in rules {
-      if rulesByName[rule.name] != nil {
-        throw MarkdownServerReadSnapshotBuildError.ambiguousRule(rule.name)
-      }
-      rulesByName[rule.name] = rule
-    }
     for resource in plan.resources {
       switch resource.selection {
       case .rule(let name):
-        guard rulesByName[name] != nil else {
+        guard ruleRegistry.rule(named: name) != nil else {
           throw MarkdownServerReadSnapshotBuildError.missingRule(name)
         }
       case .type(let name, _):
@@ -483,7 +474,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
           throw MarkdownServerReadSnapshotBuildError.missingType(name)
         }
       case .ruleWithExpectedType(let rule, let expectedType):
-        guard rulesByName[rule] != nil else {
+        guard ruleRegistry.rule(named: rule) != nil else {
           throw MarkdownServerReadSnapshotBuildError.missingRule(rule)
         }
         guard typeRegistry.definition(named: expectedType) != nil else {
@@ -491,7 +482,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
         }
       }
     }
-    return ResolvedDependencies(rulesByName: rulesByName)
+    return ResolvedDependencies()
   }
 
   /// Enumerates the collection root in bounded pages and rejects token cycles.
@@ -530,7 +521,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
   ) -> Bool {
     switch resource.selection {
     case .rule(let name):
-      guard let rule = dependencies.rulesByName[name] else { return false }
+      guard let rule = ruleRegistry.rule(named: name) else { return false }
       return rulePathCandidate(record.context.path, rule: rule)
     case .type(let name, let searchRoot):
       guard isUnderSearchRoot(record.context.path, searchRoot: searchRoot),
@@ -540,7 +531,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
         record.context.path?.matches(glob: predicate.glob) == true
       }
     case .ruleWithExpectedType(let name, _):
-      guard let rule = dependencies.rulesByName[name] else { return false }
+      guard let rule = ruleRegistry.rule(named: name) else { return false }
       return rulePathCandidate(record.context.path, rule: rule)
     }
   }
@@ -548,12 +539,12 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
   /// Combines explicit rule globs with legacy path predicates for cheap narrowing.
   private func rulePathCandidate(
     _ path: MarkdownRecordPath?,
-    rule: MarkdownRuleDefinition
+    rule: CompiledMarkdownRule
   ) -> Bool {
-    let checker = MarkdownRuleChecker(typeRegistry: typeRegistry)
+    let checker = MarkdownRuleChecker(registry: ruleRegistry)
     guard checker.isPathCandidate(path, for: rule) else { return false }
-    return rule.applicability.predicates.allSatisfy { constraint in
-      guard case .path(let predicate) = constraint.predicate else { return true }
+    return rule.definition.applicability.requirements.allSatisfy { requirement in
+      guard case .markdown(.path(let predicate)) = requirement.predicate else { return true }
       return path?.matches(glob: predicate.glob) == true
     }
   }
@@ -585,7 +576,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
     analyzedRecords: [AnalyzedMarkdownRecord],
     typeAssessments: [[MarkdownTypeAssessment]]
   ) throws -> [SelectedRecord] {
-    let ruleChecker = MarkdownRuleChecker(typeRegistry: typeRegistry)
+    let ruleChecker = MarkdownRuleChecker(registry: ruleRegistry)
     return try analyzedRecords.indices.compactMap { index in
       let analyzed = analyzedRecords[index]
       guard isPathCandidate(
@@ -595,7 +586,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
       ) else { return nil }
       switch resource.selection {
       case .rule(let name):
-        guard let rule = dependencies.rulesByName[name] else { return nil }
+        guard let rule = ruleRegistry.rule(named: name) else { return nil }
         let assessment = try ruleChecker.assess(analyzed, against: rule)
         guard assessment.applicable else { return nil }
         return SelectedRecord(
@@ -615,7 +606,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
           valid: true
         )
       case .ruleWithExpectedType(let ruleName, let expectedType):
-        guard let rule = dependencies.rulesByName[ruleName],
+        guard let rule = ruleRegistry.rule(named: ruleName),
               let typeAssessment = typeAssessments[index].first(where: { $0.type == expectedType })
         else { return nil }
         let ruleAssessment = try ruleChecker.assess(analyzed, against: rule)
@@ -724,9 +715,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
 }
 
 /// Resolved definitions retained for one build pass.
-private struct ResolvedDependencies {
-  let rulesByName: [String: MarkdownRuleDefinition]
-}
+private struct ResolvedDependencies {}
 
 /// Selection facts retained until resource-local identity assessment completes.
 private struct SelectedRecord {

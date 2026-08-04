@@ -19,6 +19,9 @@ Use this target for content-only Markdown operations that must run on Apple plat
 ### Rules
 
 - <doc:MarkdownRules>
+- <doc:CompilingMarkdownRules>
+- <doc:RuleRuntimeCapabilities>
+- <doc:RuleConfigurationVersions>
 
 ### Frontmatter
 

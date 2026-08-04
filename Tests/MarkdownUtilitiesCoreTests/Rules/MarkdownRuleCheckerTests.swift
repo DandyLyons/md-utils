@@ -5,73 +5,69 @@ import Testing
 struct MarkdownRuleCheckerTests {
   @Test
   func `Path includes use any-of semantics and exclusions take precedence`() async throws {
-    let rule = MarkdownRuleDefinition(
+    let checker = try checker(for: MarkdownRuleDefinition(
       name: "published",
       applicability: MarkdownRuleApplicability(
         paths: ["books/**/*.md", "articles/**/*.md"],
         excludePaths: ["**/drafts/**"]
       )
-    )
-    let checker = MarkdownRuleChecker()
+    ))
 
-    #expect(try await checker.isApplicable(record(path: "books/dune.md"), to: rule))
-    #expect(try await checker.isApplicable(record(path: "articles/news.md"), to: rule))
-    #expect(try await checker.isApplicable(record(path: "books/drafts/dune.md"), to: rule) == false)
-    #expect(try await checker.isApplicable(record(path: "notes/dune.md"), to: rule) == false)
-    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Pathless"), to: rule) == false)
+    #expect(try await checker.isApplicable(record(path: "books/dune.md"), toRuleNamed: "published"))
+    #expect(try await checker.isApplicable(record(path: "articles/news.md"), toRuleNamed: "published"))
+    #expect(try await checker.isApplicable(record(path: "books/drafts/dune.md"), toRuleNamed: "published") == false)
+    #expect(try await checker.isApplicable(record(path: "notes/dune.md"), toRuleNamed: "published") == false)
+    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Pathless"), toRuleNamed: "published") == false)
   }
 
   @Test
   func `Exclusion-only applicability admits pathless and nonexcluded records`() async throws {
-    let rule = MarkdownRuleDefinition(
+    let checker = try checker(for: MarkdownRuleDefinition(
       name: "not-archive",
       applicability: MarkdownRuleApplicability(excludePaths: ["archive/**"])
-    )
-    let checker = MarkdownRuleChecker()
+    ))
 
-    #expect(try await checker.isApplicable(record(path: "notes/current.md"), to: rule))
-    #expect(try await checker.isApplicable(record(path: "archive/old.md"), to: rule) == false)
-    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Pathless"), to: rule))
+    #expect(try await checker.isApplicable(record(path: "notes/current.md"), toRuleNamed: "not-archive"))
+    #expect(try await checker.isApplicable(record(path: "archive/old.md"), toRuleNamed: "not-archive") == false)
+    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Pathless"), toRuleNamed: "not-archive"))
   }
 
   @Test
   func `Path globs remain conjunctive with applicability predicates`() async throws {
-    let rule = MarkdownRuleDefinition(
+    let checker = try checker(for: MarkdownRuleDefinition(
       name: "book-notes",
       applicability: MarkdownRuleApplicability(
         paths: ["books/**"],
-        predicates: [
-          MarkdownConstraint(
+        requirements: [
+          MarkdownRuleRequirement(
             id: "notes",
-            predicate: .path(MarkdownPathPredicate(glob: "**/notes/*.md"))
+            predicate: .markdown(.path(MarkdownPathPredicate(glob: "**/notes/*.md")))
           )
         ]
       )
-    )
-    let checker = MarkdownRuleChecker()
+    ))
 
-    #expect(try await checker.isApplicable(record(path: "books/notes/dune.md"), to: rule))
-    #expect(try await checker.isApplicable(record(path: "books/dune.md"), to: rule) == false)
+    #expect(try await checker.isApplicable(record(path: "books/notes/dune.md"), toRuleNamed: "book-notes"))
+    #expect(try await checker.isApplicable(record(path: "books/dune.md"), toRuleNamed: "book-notes") == false)
   }
 
   @Test
   func `Rule applicability is distinct from checks`() async throws {
-    let rule = MarkdownRuleDefinition(
+    let checker = try checker(for: MarkdownRuleDefinition(
       name: "published-books",
-      applicability: MarkdownRuleApplicability(predicates: [
-        MarkdownConstraint(
+      applicability: MarkdownRuleApplicability(requirements: [
+        MarkdownRuleRequirement(
           id: "books-path",
-          predicate: .path(MarkdownPathPredicate(glob: "books/**/*.md"))
+          predicate: .markdown(.path(MarkdownPathPredicate(glob: "books/**/*.md")))
         )
       ]),
-      requirements: MarkdownConstraintGroup(requirements: [
-        MarkdownConstraint(
+      checks: [
+        MarkdownRuleCheck(
           id: "synopsis",
-          predicate: .heading(MarkdownHeadingPredicate(text: "Synopsis"))
+          predicate: .markdown(.heading(MarkdownHeadingPredicate(text: "Synopsis")))
         )
-      ])
-    )
-    let checker = MarkdownRuleChecker()
+      ]
+    ))
     let selected = MarkdownRecord(
       content: "# Book\n",
       context: MarkdownRecordContext(path: try MarkdownRecordPath("books/dune.md"))
@@ -81,12 +77,14 @@ struct MarkdownRuleCheckerTests {
       context: MarkdownRecordContext(path: try MarkdownRecordPath("notes/dune.md"))
     )
 
-    let selectedAssessment = try await checker.assess(selected, against: rule)
-    let skippedAssessment = try await checker.assess(skipped, against: rule)
+    let selectedAssessment = try await checker.assess(selected, ruleNamed: "published-books")
+    let skippedAssessment = try await checker.assess(skipped, ruleNamed: "published-books")
 
+    #expect(selectedAssessment.status == .failed)
     #expect(selectedAssessment.applicable)
     #expect(selectedAssessment.passes == false)
     #expect(selectedAssessment.diagnostics.contains { $0.constraintID == "synopsis" })
+    #expect(skippedAssessment.status == .notApplicable)
     #expect(skippedAssessment.applicable == false)
     #expect(skippedAssessment.diagnostics.isEmpty)
   }
@@ -100,35 +98,49 @@ struct MarkdownRuleCheckerTests {
         MarkdownConstraint(id: "book-heading", predicate: .heading(MarkdownHeadingPredicate(text: "Book")))
       ])
     )
-    let registry = try MarkdownTypeRegistry(definitions: [book])
-    let rule = MarkdownRuleDefinition(
-      name: "book-policy",
-      applicability: MarkdownRuleApplicability(anyTypes: [MarkdownTypeName(rawValue: "Book")])
+    let typeRegistry = try MarkdownTypeRegistry(definitions: [book])
+    let checker = try checker(
+      for: MarkdownRuleDefinition(
+        name: "book-policy",
+        applicability: MarkdownRuleApplicability(anyTypes: [MarkdownTypeName(rawValue: "Book")])
+      ),
+      typeRegistry: typeRegistry
     )
-    let checker = MarkdownRuleChecker(typeRegistry: registry)
 
-    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Book\n"), to: rule))
-    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Note\n"), to: rule) == false)
+    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Book\n"), toRuleNamed: "book-policy"))
+    #expect(try await checker.isApplicable(MarkdownRecord(content: "# Note\n"), toRuleNamed: "book-policy") == false)
   }
 
   @Test
   func `Rule recommendations do not fail a passing policy`() async throws {
-    let rule = MarkdownRuleDefinition(
+    let checker = try checker(for: MarkdownRuleDefinition(
       name: "book-quality",
-      requirements: MarkdownConstraintGroup(recommendations: [
-        MarkdownConstraint(id: "reviews", predicate: .heading(MarkdownHeadingPredicate(text: "Reviews")))
-      ])
-    )
+      checks: [
+        MarkdownRuleCheck(
+          id: "reviews",
+          severity: .advisory,
+          predicate: .markdown(.heading(MarkdownHeadingPredicate(text: "Reviews")))
+        )
+      ]
+    ))
 
-    let assessment = try await MarkdownRuleChecker().assess(
+    let assessment = try await checker.assess(
       MarkdownRecord(content: "# Book\n"),
-      against: rule
+      ruleNamed: "book-quality"
     )
 
+    #expect(assessment.status == .passed)
     #expect(assessment.applicable)
     #expect(assessment.passes)
     #expect(assessment.diagnostics.count == 1)
     #expect(assessment.diagnostics[0].severity == .advisory)
+  }
+
+  private func checker(
+    for rule: MarkdownRuleDefinition,
+    typeRegistry: MarkdownTypeRegistry? = nil
+  ) throws -> MarkdownRuleChecker {
+    MarkdownRuleChecker(registry: try MarkdownRuleCompiler(typeRegistry: typeRegistry).compile([rule]))
   }
 
   /// Creates a canonical record with a portable logical path.

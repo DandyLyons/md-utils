@@ -21,7 +21,7 @@ The snapshot is intentionally rebuilt rather than updated in place. Hot reload a
 let snapshot = try await MarkdownServerReadSnapshotBuilder(
   store: store,
   plan: plan,
-  rules: rules,
+  ruleRegistry: ruleRegistry,
   typeRegistry: registry
 ).build()
 
@@ -57,4 +57,4 @@ Repeated occurrences of an identical canonical value during paging are removed. 
 
 ## Failure Boundaries
 
-Definition drift and repeated continuation tokens produce `MarkdownServerReadSnapshotBuildError` before a snapshot is published. Store failures remain `RecordStoreError`, and cancellation remains `CancellationError`. Invalid YAML, failed rule checks, nonconforming expected types, and identity problems are record diagnostics rather than snapshot-build failures.
+Compile rules before creating the endpoint plan or snapshot. Missing capabilities, invalid JMESPath syntax, and unresolved schema resources are `MarkdownRuleCompilationError` startup failures. Definition drift and repeated continuation tokens produce `MarkdownServerReadSnapshotBuildError` before a snapshot is published. Store failures remain `RecordStoreError`, and cancellation remains `CancellationError`. Invalid YAML, failed rule checks, nonconforming expected types, and identity problems are record diagnostics rather than snapshot-build failures.

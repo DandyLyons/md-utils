@@ -35,7 +35,11 @@ struct EndpointPlanCompilerTests {
       ),
     ])
 
-    let plan = try EndpointPlanCompiler(rules: rules, typeRegistry: registry).compile(configuration)
+    let ruleRegistry = try MarkdownRuleCompiler(typeRegistry: registry).compile(rules)
+    let plan = try EndpointPlanCompiler(
+      ruleRegistry: ruleRegistry,
+      typeRegistry: registry
+    ).compile(configuration)
 
     #expect(plan.serverConfigVersion == "1")
     #expect(plan.resources.map(\.name) == ["books", "published", "reviews"])
@@ -137,7 +141,10 @@ struct EndpointPlanCompilerTests {
       ),
     ]
 
-    let plan = try EndpointPlanCompiler(typeRegistry: registry).compile(
+    let plan = try EndpointPlanCompiler(
+      ruleRegistry: try MarkdownRuleCompiler(typeRegistry: registry).compile([]),
+      typeRegistry: registry
+    ).compile(
       MarkdownServerConfiguration(resources: resources)
     )
 
@@ -147,14 +154,9 @@ struct EndpointPlanCompilerTests {
   // MARK: Structured validation failures
 
   @Test
-  func `Missing and ambiguous references produce structured diagnostics`() async throws {
+  func `Missing references produce structured diagnostics`() async throws {
     let resources = [
       makeResource(name: "missing-rule", route: "/missing-rule", selection: .rule(name: "absent")),
-      makeResource(
-        name: "ambiguous-rule",
-        route: "/ambiguous-rule",
-        selection: .rule(name: "duplicate")
-      ),
       makeResource(
         name: "missing-type",
         route: "/missing-type",
@@ -164,14 +166,12 @@ struct EndpointPlanCompilerTests {
     let diagnostics = try compilationDiagnostics(
       configuration: MarkdownServerConfiguration(resources: resources),
       compiler: EndpointPlanCompiler(
-        rules: [makeRule("duplicate"), makeRule("duplicate")],
+        ruleRegistry: try MarkdownRuleCompiler(typeRegistry: makeRegistry("Book")).compile([]),
         typeRegistry: makeRegistry("Book")
       )
     )
 
-    #expect(Set(diagnostics.map(\.code)) == [.missingRule, .ambiguousRule, .missingType])
-    let ambiguous = try #require(diagnostics.first { $0.code == .ambiguousRule })
-    #expect(ambiguous.conflictingLocations == ["rules[0]", "rules[1]"])
+    #expect(Set(diagnostics.map(\.code)) == [.missingRule, .missingType])
   }
 
   @Test
@@ -337,9 +337,12 @@ struct EndpointPlanCompilerTests {
 
   /// Creates the common compiler fixture used by successful and failing scenarios.
   private func compiler() throws -> EndpointPlanCompiler {
-    EndpointPlanCompiler(
-      rules: [makeRule("published")],
-      typeRegistry: try makeRegistry("Book")
+    let typeRegistry = try makeRegistry("Book")
+    return EndpointPlanCompiler(
+      ruleRegistry: try MarkdownRuleCompiler(typeRegistry: typeRegistry).compile([
+        makeRule("published")
+      ]),
+      typeRegistry: typeRegistry
     )
   }
 

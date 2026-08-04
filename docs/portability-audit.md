@@ -34,7 +34,9 @@ Directory paths in the table are relative to `Sources/MarkdownUtilitiesCore/`, `
 | Yams and libYAML | Core | Verified by the Linux container build and frontmatter tests. | libYAML and Yams compile and run under WASI. Yams 6.2.0 requires the version-checked `DBL_DECIMAL_DIG` compatibility patch described in [WebAssembly Support](webassembly.md). |
 | JSONSchema | Core | Draft 2020-12 validation, external graph compilation, and the Linux Core build are verified. | Draft 2020-12 assessment runs under WASI. JSONSchema.swift 0.6.0 requires the version-checked WASI `NSNumber` compatibility patch described in [WebAssembly Support](webassembly.md). |
 | PathKit | Native only | Supported by the native package; excluded from Core. | Out of scope because it is not a Core dependency. |
-| ArgumentParser, JMESPath, Rainbow | CLI only | Outside the Core boundary. | Out of scope because the CLI is not a WebAssembly target. |
+| ArgumentParser, JMESPath, Rainbow | CLI only | Outside the Core boundary. JMESPath is exposed to Core only through a serialized runtime capability provider; result truthiness remains a Core semantic. | Out of scope because the CLI is not a WebAssembly target. |
+
+Rule modification dates are explicit `MarkdownRecordContext` input. Native adapters may acquire them from a filesystem, but Core never reads host metadata. A server or WebAssembly host must supply the capability and per-record timestamp or rule compilation/assessment fails explicitly.
 
 Linux verification uses Swift 6.2 in `Dockerfile.core-linux`. A successful image build runs `swift build --target MarkdownUtilitiesCore`, then runs the isolated `IntegrationTests/LinuxCoreSmoke/` executable against Core. The full focused `MarkdownUtilitiesCoreTests` target remains part of `swift test`; SwiftPM test filtering cannot avoid compiling unrelated package test targets.
 

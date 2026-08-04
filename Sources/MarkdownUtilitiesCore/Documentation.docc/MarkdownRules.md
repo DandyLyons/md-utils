@@ -1,41 +1,59 @@
 # Markdown Rules
 
-Apply reusable policies while keeping applicability separate from validation.
+Apply reusable policies with one normalized, compiled rule model.
 
-## Types and Rules
+## Overview
 
-A type asks whether a record conforms to a named structural contract. A rule first asks whether a policy applies and then evaluates its checks. Matching a rule is not the same as passing it.
+A Markdown type asks whether a record conforms to a named structural contract. A rule first selects records through ``MarkdownRuleApplicability`` and then evaluates its ``MarkdownRuleCheck`` values. Applicability, successful policy validation, and unavailable runtime context remain distinct outcomes in ``MarkdownRuleAssessmentStatus``.
 
-`MarkdownRuleDefinition` and `MarkdownTypeDefinition` remain separate public models. They share record analysis, normalized Markdown predicates, diagnostics, and type assessment without giving them the same semantics.
-
-## Portable Rule Assessment
-
-`MarkdownRuleApplicability` can narrow records by logical-path globs, select records with body or context predicates, and require conformance to any or all named Markdown types. Supply a `MarkdownTypeRegistry` to `MarkdownRuleChecker` when applicability references types.
-
-Path includes and exclusions intentionally match the `paths` and `excludePaths` fields in the md-utils rules configuration. Includes use any-of semantics. An empty `paths` array imposes no inclusion restriction, while a nonempty array requires a logical path matching at least one glob. Exclusions use none-of semantics and take precedence over includes. A pathless record therefore cannot match a nonempty include list, but it remains eligible for an exclusion-only rule.
-
-Path filtering is conjunctive with `predicates`, `anyTypes`, and `allTypes`. Hosts such as ``MarkdownRuleChecker`` and the server read-snapshot builder can apply the explicit path filters before parsing YAML or Markdown. A path predicate in `predicates` remains a required portable constraint and must also pass.
+``MarkdownRuleDefinition`` is the sole executable rule definition. Decode configurations into definitions, compile all definitions before processing records, and give the resulting ``MarkdownRuleRegistry`` to ``MarkdownRuleChecker``. This prevents configuration validation and runtime evaluation from drifting between hosts.
 
 ```swift
-let rule = MarkdownRuleDefinition(
+let definition = MarkdownRuleDefinition(
   name: "published-books",
   applicability: MarkdownRuleApplicability(
     paths: ["books/**/*.md"],
     excludePaths: ["books/drafts/**"],
-    allTypes: [MarkdownTypeName(rawValue: "Book")]
+    requirements: [
+      MarkdownRuleRequirement(
+        id: "published",
+        predicate: .frontmatterField(
+          key: "published",
+          operation: .equals(.boolean(true))
+        )
+      )
+    ]
   ),
-  requirements: MarkdownConstraintGroup(requirements: [
-    MarkdownConstraint(
-      id: "reviews",
-      predicate: .section(MarkdownSectionPredicate(
-        heading: MarkdownHeadingPredicate(text: "Reviews")
-      ))
+  checks: [
+    MarkdownRuleCheck(
+      id: "summary",
+      predicate: .markdown(.heading(MarkdownHeadingPredicate(text: "Summary")))
     )
-  ])
+  ]
 )
 
-let checker = MarkdownRuleChecker(typeRegistry: registry)
-let result = try await checker.assess(record, against: rule)
+let registry = try MarkdownRuleCompiler().compile([definition])
+let assessment = try await MarkdownRuleChecker(registry: registry).assess(
+  record,
+  ruleNamed: "published-books"
+)
 ```
 
-Portable APIs do not scan directories, load configuration, or print terminal output. Native and command-line adapters supply records and present `MarkdownRuleAssessment` results.
+Includes use any-of semantics, exclusions take precedence, and applicability requirements use all-of semantics. ``MarkdownRulePredicateEvidence`` retains their deterministic evaluation order for explanation output.
+
+## Topics
+
+### Lifecycle
+
+- <doc:CompilingMarkdownRules>
+- <doc:RuleRuntimeCapabilities>
+- <doc:RuleConfigurationVersions>
+
+### Definitions and results
+
+- ``MarkdownRuleDefinition``
+- ``MarkdownRuleApplicability``
+- ``MarkdownRulePredicate``
+- ``MarkdownRuleCheck``
+- ``MarkdownRuleAssessment``
+- ``MarkdownRuleAssessmentStatus``

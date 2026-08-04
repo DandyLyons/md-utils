@@ -65,7 +65,7 @@ At startup, the server must compile loaded rules, mdtypes, and explicit resource
 The authoring and startup flow is:
 
 ```text
-rules + mdtype definitions + explicit resource configuration
+normalized rule definitions + runtime capabilities + mdtype definitions + explicit resource configuration
                               ↓
                   immutable EndpointPlan
                          ↙             ↘
@@ -74,7 +74,7 @@ rules + mdtype definitions + explicit resource configuration
                     shared contract tests
 ```
 
-The implemented plan contains resource names, routes, read operations, selection policy, expected types, projection policy, identity policy, and stable operation identifiers. `MarkdownUtilitiesServer` compiles the versioned `Codable` configuration into immutable, `Sendable` values and reports invalid references, unsafe paths, duplicate or ambiguous routes, and operation-ID collisions before a server begins accepting requests.
+The implemented plan contains resource names, routes, read operations, selection policy, expected types, projection policy, identity policy, and stable operation identifiers. Rules are first compiled by Core into one `MarkdownRuleRegistry`; endpoint planning and read snapshots consume that same registry. `MarkdownUtilitiesServer` compiles the versioned `Codable` resource configuration into immutable, `Sendable` values and reports invalid references, unsafe paths, duplicate or ambiguous routes, and operation-ID collisions before a server begins accepting requests. Missing rule capabilities, invalid JMESPath, and unresolved schemas fail during rule compilation at startup.
 
 The OpenAPI document is inspectable, versionable output from the plan. It is not an input to Swift source generation. Resource-specific Swift code, Swift OpenAPI Generator, build plugins, and generated server protocols are explicit non-goals. Native and Workers transports use generic handlers backed by the same endpoint semantics.
 

@@ -15,13 +15,14 @@ readonly JSONSCHEMA_REVISION="d14de4b2d9205068c9db89c00d097ca43c897000"
 # CI uses the default SDK store, while local verification can point Swift at an
 # isolated SDK installation through SWIFT_WASM_SDKS_PATH.
 swift_sdk_arguments=(--swift-sdk "${SWIFT_WASM_SDK}")
-swift_sdk_list_arguments=()
 if [[ -n "${SWIFT_WASM_SDKS_PATH:-}" ]]; then
   swift_sdk_arguments=(
     --swift-sdks-path "${SWIFT_WASM_SDKS_PATH}"
     "${swift_sdk_arguments[@]}"
   )
-  swift_sdk_list_arguments=(--swift-sdks-path "${SWIFT_WASM_SDKS_PATH}")
+  swift_sdk_list_command=(swift sdk list --swift-sdks-path "${SWIFT_WASM_SDKS_PATH}")
+else
+  swift_sdk_list_command=(swift sdk list)
 fi
 
 apply_dependency_patch() {
@@ -56,7 +57,7 @@ apply_dependency_patch() {
 cd "${REPOSITORY_ROOT}"
 
 # Fail with an actionable message before dependency resolution or compilation.
-if ! swift sdk list "${swift_sdk_list_arguments[@]}" | grep --fixed-strings --line-regexp "${SWIFT_WASM_SDK}" >/dev/null; then
+if ! "${swift_sdk_list_command[@]}" | grep --fixed-strings --line-regexp "${SWIFT_WASM_SDK}" >/dev/null; then
   echo "error: Swift WebAssembly SDK '${SWIFT_WASM_SDK}' is not installed" >&2
   exit 1
 fi

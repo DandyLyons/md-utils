@@ -97,17 +97,24 @@ public struct MarkdownTypeHint: Codable, Equatable, Hashable, Sendable {
 /// External information about where or how a Markdown record is held.
 public struct MarkdownRecordContext: Codable, Equatable, Sendable {
   public var path: MarkdownRecordPath?
+  /// Host-supplied modification time used by rules that explicitly require it.
+  ///
+  /// Core never reads this value from a filesystem. Native adapters may populate it
+  /// when their runtime declares the corresponding rule capability.
+  public var modificationDate: Date?
   public var storage: JSONValue?
   public var typeHints: [MarkdownTypeHint]
   public var attributes: [String: JSONValue]
 
   public init(
     path: MarkdownRecordPath? = nil,
+    modificationDate: Date? = nil,
     storage: JSONValue? = nil,
     typeHints: [MarkdownTypeHint] = [],
     attributes: [String: JSONValue] = [:]
   ) {
     self.path = path
+    self.modificationDate = modificationDate
     self.storage = storage
     self.typeHints = typeHints
     self.attributes = attributes

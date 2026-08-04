@@ -24,12 +24,12 @@ struct MarkdownServerReadSnapshotTests {
         paths: ["books/**"],
         excludePaths: ["books/drafts/**"]
       ),
-      requirements: MarkdownConstraintGroup(requirements: [
-        MarkdownConstraint(
+      checks: [
+        MarkdownRuleCheck(
           id: "summary",
-          predicate: .heading(MarkdownHeadingPredicate(text: "Summary"))
+          predicate: .markdown(.heading(MarkdownHeadingPredicate(text: "Summary")))
         )
-      ])
+      ]
     )
     let review = MarkdownRuleDefinition(
       name: "review",
@@ -70,7 +70,7 @@ struct MarkdownServerReadSnapshotTests {
     let snapshot = try await MarkdownServerReadSnapshotBuilder(
       store: store,
       plan: plan,
-      rules: rules,
+      ruleRegistry: try makeRuleRegistry(rules, typeRegistry: registry),
       typeRegistry: registry,
       pageSize: 1
     ).build()
@@ -133,7 +133,7 @@ struct MarkdownServerReadSnapshotTests {
     let snapshot = try await MarkdownServerReadSnapshotBuilder(
       store: store,
       plan: plan,
-      rules: [rule],
+      ruleRegistry: try makeRuleRegistry([rule], typeRegistry: registry),
       typeRegistry: registry
     ).build()
     let resource = try #require(snapshot.resource(named: "records"))
@@ -182,7 +182,7 @@ struct MarkdownServerReadSnapshotTests {
     let builder = try MarkdownServerReadSnapshotBuilder(
       store: store,
       plan: plan,
-      rules: [rule],
+      ruleRegistry: try makeRuleRegistry([rule], typeRegistry: registry),
       typeRegistry: registry,
       pageSize: 1,
       analyzer: { record in
@@ -217,7 +217,7 @@ struct MarkdownServerReadSnapshotTests {
     let snapshot = try await MarkdownServerReadSnapshotBuilder(
       store: FixtureRecordStore(pages: [[malformed]]),
       plan: plan,
-      rules: [rule],
+      ruleRegistry: try makeRuleRegistry([rule], typeRegistry: registry),
       typeRegistry: registry
     ).build()
     let projected = try #require(snapshot.resource(named: "all")?.records.first)
@@ -243,6 +243,7 @@ struct MarkdownServerReadSnapshotTests {
       try await MarkdownServerReadSnapshotBuilder(
         store: emptyStore,
         plan: rulePlan,
+        ruleRegistry: try makeRuleRegistry([], typeRegistry: registry),
         typeRegistry: registry
       ).build()
     }
@@ -261,6 +262,7 @@ struct MarkdownServerReadSnapshotTests {
       try await MarkdownServerReadSnapshotBuilder(
         store: emptyStore,
         plan: typePlan,
+        ruleRegistry: try makeRuleRegistry([], typeRegistry: emptyRegistry),
         typeRegistry: emptyRegistry
       ).build()
     }
@@ -271,7 +273,7 @@ struct MarkdownServerReadSnapshotTests {
       try await MarkdownServerReadSnapshotBuilder(
         store: cyclingStore,
         plan: rulePlan,
-        rules: [rule],
+        ruleRegistry: try makeRuleRegistry([rule], typeRegistry: registry),
         typeRegistry: registry
       ).build()
     }
@@ -291,7 +293,7 @@ struct MarkdownServerReadSnapshotTests {
       try await MarkdownServerReadSnapshotBuilder(
         store: UnavailableStore(),
         plan: plan,
-        rules: [rule],
+        ruleRegistry: try makeRuleRegistry([rule], typeRegistry: registry),
         typeRegistry: registry
       ).build()
     }
@@ -299,7 +301,7 @@ struct MarkdownServerReadSnapshotTests {
     let builder = try MarkdownServerReadSnapshotBuilder(
       store: FixtureRecordStore(pages: [[]]),
       plan: plan,
-      rules: [rule],
+      ruleRegistry: try makeRuleRegistry([rule], typeRegistry: registry),
       typeRegistry: registry
     )
     let task = Task {
@@ -354,9 +356,20 @@ struct MarkdownServerReadSnapshotTests {
     rules: [MarkdownRuleDefinition],
     resources: [MarkdownResourceConfiguration]
   ) throws -> EndpointPlan {
-    try EndpointPlanCompiler(rules: rules, typeRegistry: registry).compile(
+    try EndpointPlanCompiler(
+      ruleRegistry: makeRuleRegistry(rules, typeRegistry: registry),
+      typeRegistry: registry
+    ).compile(
       MarkdownServerConfiguration(resources: resources)
     )
+  }
+
+  /// Compiles rules once for both endpoint planning and snapshot evaluation.
+  private func makeRuleRegistry(
+    _ rules: [MarkdownRuleDefinition],
+    typeRegistry: MarkdownTypeRegistry
+  ) throws -> MarkdownRuleRegistry {
+    try MarkdownRuleCompiler(typeRegistry: typeRegistry).compile(rules)
   }
 
   /// Creates one list-and-get resource with configurable selection and identity.

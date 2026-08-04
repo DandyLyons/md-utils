@@ -14,3 +14,4 @@ Use portable Markdown operations together with native platform integrations.
 - ``WikilinkResolver``
 - ``CSVConverter``
 - <doc:CSVConversion>
+- <doc:LoadingRuleContext>

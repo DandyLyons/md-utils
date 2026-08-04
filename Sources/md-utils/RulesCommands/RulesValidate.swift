@@ -27,7 +27,7 @@ extension CLIEntry.RulesCommands {
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
-      let summary = try RulesValidatorRunner.validate(ruleName: ruleName)
+      let summary = try await RulesValidatorRunner.validate(ruleName: ruleName)
       print(RuleValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk))
       timer.writeStatus("Validated \(summary.matchedFiles) file(s)")
       if summary.hasFailures {

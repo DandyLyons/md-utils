@@ -23,8 +23,6 @@ public enum EndpointPlanDiagnosticCode: String, Codable, Equatable, Sendable {
   case duplicateOperationID = "endpoint.operation-id.duplicate"
   /// A selection refers to a rule that was not supplied to the compiler.
   case missingRule = "endpoint.reference.rule-missing"
-  /// A selected rule name resolves to more than one supplied definition.
-  case ambiguousRule = "endpoint.reference.rule-ambiguous"
   /// A selection refers to an mdtype absent from the validated registry.
   case missingType = "endpoint.reference.type-missing"
   /// Type selection declares an unsafe or non-directory search root.
@@ -93,20 +91,20 @@ public struct EndpointPlanCompiler: Sendable {
   /// Stable operation identifier associated with ``logicalPathRoute``.
   public static let logicalPathOperationID = "md-utils.path.get"
 
-  /// Loaded definitions remain private so compilation exposes only explicit references.
-  private let rules: [MarkdownRuleDefinition]
+  /// Compiled rules remain private so planning exposes only explicit references.
+  private let ruleRegistry: MarkdownRuleRegistry
   private let typeRegistry: MarkdownTypeRegistry
 
   /// Creates a compiler backed by reusable rules and a validated mdtype registry.
   ///
   /// - Parameters:
-  ///   - rules: Reusable rule definitions available for explicit selection.
+  ///   - ruleRegistry: Compiled rules available for explicit selection.
   ///   - typeRegistry: Validated mdtypes available for explicit selection and expected-type checks.
   public init(
-    rules: [MarkdownRuleDefinition] = [],
+    ruleRegistry: MarkdownRuleRegistry,
     typeRegistry: MarkdownTypeRegistry
   ) {
-    self.rules = rules
+    self.ruleRegistry = ruleRegistry
     self.typeRegistry = typeRegistry
   }
 
@@ -378,27 +376,17 @@ public struct EndpointPlanCompiler: Sendable {
     }
   }
 
-  /// Confirms that a rule reference resolves to exactly one supplied definition.
+  /// Confirms that a rule reference resolves in the compiled registry.
   private func validateRule(
     _ name: String,
     location: String,
     diagnostics: inout [EndpointPlanDiagnostic]
   ) -> Bool {
-    let matches = rules.enumerated().filter { $0.element.name == name }
-    if matches.isEmpty {
+    if ruleRegistry.rule(named: name) == nil {
       diagnostics.append(EndpointPlanDiagnostic(
         code: .missingRule,
         location: location,
         message: "Referenced rule \"\(name)\" was not loaded"
-      ))
-      return false
-    }
-    if matches.count > 1 {
-      diagnostics.append(EndpointPlanDiagnostic(
-        code: .ambiguousRule,
-        location: location,
-        message: "Referenced rule \"\(name)\" is defined more than once",
-        conflictingLocations: matches.map { "rules[\($0.offset)]" }
       ))
       return false
     }

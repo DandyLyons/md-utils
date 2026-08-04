@@ -7,6 +7,7 @@ import ArgumentParser
 import Foundation
 import JMESPath
 import JSONSchema
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 import Yams
@@ -21,6 +22,7 @@ struct MdUtilsConfig {
   var schemaReference: String?
   var schemaDirectory: String
   var schemaRules: [Rule]
+  private var normalizedRules: [MarkdownRuleDefinition]?
   /// Creates a configured instance.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
@@ -34,6 +36,7 @@ struct MdUtilsConfig {
     self.schemaReference = schemaReference
     self.schemaDirectory = schemaDirectory
     self.schemaRules = schemaRules
+    self.normalizedRules = nil
   }
   /// Loads the requested data from disk.
   ///
@@ -57,51 +60,65 @@ struct MdUtilsConfig {
       throw ValidationError("Project config is invalid for configVersion \"\(configVersion)\": \(message)")
     }
 
-    let schemaReference = object["$schema"] as? String
-    let schemaDirectory = object["schemaDirectory"] as? String ?? Self.defaultSchemaDirectory
-    let rawRules = if configVersion == "0.1.0" {
-      object["schemaRules"] as? [[String: Any]] ?? []
-    } else {
-      object["rules"] as? [[String: Any]] ?? []
-    }
-    let rules = try rawRules.map { try Rule(json: $0, configVersion: configVersion) }
-    let names = rules.map(\.name)
-    if Set(names).count != names.count {
-      throw ValidationError("Rule names must be unique")
+    let normalized = try MarkdownRuleConfigurationDecoder.decode(
+      String(decoding: data, as: UTF8.self)
+    )
+    let rules = try normalized.rules.map { definition in
+      let object = try MarkdownRuleConfigurationEncoder.ruleObject(definition)
+      return try Rule(json: object, configVersion: MarkdownRuleConfigurationSchemaVersion.current)
     }
 
-    return MdUtilsConfig(
-      configVersion: configVersion,
-      schemaReference: schemaReference,
-      schemaDirectory: schemaDirectory,
+    var config = MdUtilsConfig(
+      configVersion: normalized.configVersion,
+      schemaReference: normalized.schemaReference,
+      schemaDirectory: normalized.schemaDirectory,
       schemaRules: rules
     )
+    config.normalizedRules = normalized.rules
+    return config
   }
   /// Saves the current data to disk.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
   func save(to path: Path = RulesPaths.configFile) throws {
-    var object: [String: Any] = [
-      "configVersion": configVersion,
-      "schemaDirectory": schemaDirectory,
-    ]
-    if configVersion == "0.1.0" {
-      object["schemaRules"] = schemaRules.map { $0.legacyJsonObject }
-    } else {
-      object["rules"] = schemaRules.map { $0.jsonObject }
-    }
-    if let schemaReference {
-      object["$schema"] = schemaReference
-    }
-
-    let data = try JSONSerialization.data(
-      withJSONObject: object,
-      options: [.prettyPrinted, .sortedKeys]
+    let definitions = try schemaRules.map { try $0.normalizedDefinition() }
+    let configuration = MarkdownRuleConfiguration(
+      configVersion: configVersion,
+      schemaReference: schemaReference,
+      schemaDirectory: schemaDirectory,
+      rules: definitions
     )
-    guard let json = String(data: data, encoding: .utf8) else {
-      throw ValidationError("Failed to encode md-utils config")
-    }
-    try path.write(json + "\n")
+    try path.write(try MarkdownRuleConfigurationEncoder.encode(configuration))
+  }
+}
+
+extension MdUtilsConfig {
+  /// Compiles the normalized project rules for the native CLI runtime.
+  func compiledRuleRegistry(root: Path) throws -> MarkdownRuleRegistry {
+    let absoluteRoot = root.absolute().normalize()
+    let schemaDirectoryPath = Path(schemaDirectory).isAbsolute
+      ? Path(schemaDirectory)
+      : absoluteRoot + Path(schemaDirectory)
+    let source = URL(
+      fileURLWithPath: (schemaDirectoryPath + "__md-utils-rule-source.json").string
+    ).absoluteString
+    let definitions = try (normalizedRules ?? schemaRules.map { try $0.normalizedDefinition() })
+      .map { definition in
+        var definition = definition
+        definition.source = source
+        return definition
+      }
+    let typesDirectory = absoluteRoot + Path(MarkdownTypeFileRegistryLoader.relativeTypesDirectory)
+    let typeRegistry = typesDirectory.exists
+      ? try MarkdownTypeFileRegistryLoader.load(projectRoot: absoluteRoot)
+      : try MarkdownTypeRegistry(definitions: [])
+    let queryProvider = JMESPathRuleCapabilityProvider()
+    return try MarkdownRuleCompiler(
+      capabilities: [.modificationDate, .frontmatterJMESPath],
+      typeRegistry: typeRegistry,
+      schemaProvider: FileMarkdownSchemaResourceProvider(projectRoot: absoluteRoot),
+      queryProvider: queryProvider
+    ).compile(definitions)
   }
 }
 
@@ -252,6 +269,192 @@ struct Rule {
       "frontmatterRequired": frontmatterRequired,
       "match": match.jsonObject,
     ]
+  }
+}
+
+extension Rule {
+  /// Normalizes the project configuration DTO into the shared Core rule model.
+  func normalizedDefinition(source: String? = nil) throws -> MarkdownRuleDefinition {
+    var requirements: [MarkdownRuleRequirement] = []
+    for (key, matcher) in match.frontmatter.sorted(by: { $0.key < $1.key }) {
+      for (operatorName, operand) in matcher.operators.sorted(by: { $0.key < $1.key }) {
+        requirements.append(MarkdownRuleRequirement(
+          id: "\(name).match.frontmatter.\(key).\(operatorName)",
+          predicate: .frontmatterField(
+            key: key,
+            operation: try normalizedFrontmatterOperation(operatorName, operand: operand)
+          )
+        ))
+      }
+    }
+    if let expression = match.frontmatterQuery.jmespath {
+      requirements.append(MarkdownRuleRequirement(
+        id: "\(name).match.frontmatterQuery.jmespath",
+        predicate: .frontmatterJMESPath(expression)
+      ))
+    }
+    requirements.append(contentsOf: normalizedDocumentRequirements())
+    requirements.append(contentsOf: try normalizedFileRequirements())
+
+    let normalizedChecks = checks.enumerated().map { index, check in
+      let id = "\(name).check[\(index)]"
+      switch check {
+      case .frontmatterSchema(let schema, let required):
+        return MarkdownRuleCheck(
+          id: id,
+          predicate: .frontmatterSchema(
+            source: .reference(schema),
+            presence: required ? .required : .optional
+          )
+        )
+      case .requiredHeading(let heading):
+        return MarkdownRuleCheck(
+          id: id,
+          predicate: .markdown(.heading(MarkdownHeadingPredicate(text: heading)))
+        )
+      case .maxBodyLines(let maximum):
+        return MarkdownRuleCheck(id: id, predicate: .markdown(.maxBodyLines(maximum)))
+      case .maxBodyWords(let maximum):
+        return MarkdownRuleCheck(id: id, predicate: .markdown(.maxBodyWords(maximum)))
+      }
+    }
+    return MarkdownRuleDefinition(
+      name: name,
+      applicability: MarkdownRuleApplicability(
+        paths: match.paths,
+        excludePaths: match.excludePaths,
+        requirements: requirements
+      ),
+      checks: normalizedChecks,
+      source: source
+    )
+  }
+
+  private func normalizedDocumentRequirements() -> [MarkdownRuleRequirement] {
+    var requirements: [MarkdownRuleRequirement] = []
+    func append(_ key: String, _ predicate: MarkdownRulePredicate) {
+      requirements.append(MarkdownRuleRequirement(
+        id: "\(name).match.document.\(key)",
+        predicate: predicate
+      ))
+    }
+    if let value = match.document.hasHeading {
+      append("hasHeading", .heading(MarkdownHeadingPredicate(text: value)))
+    }
+    if let value = match.document.headingRegex { append("headingRegex", .headingRegularExpression(value)) }
+    if let value = match.document.hasHeadingAtLevel {
+      append("hasHeadingAtLevel", .heading(MarkdownHeadingPredicate(text: value.heading, level: value.level)))
+    }
+    if let value = match.document.hasSection { append("hasSection", .section(value)) }
+    if let value = match.document.bodyContains { append("bodyContains", .bodyContains(value)) }
+    if let value = match.document.bodyRegex { append("bodyRegex", .bodyRegularExpression(value)) }
+    if let value = match.document.hasWikilink { append("hasWikilink", .wikilink(target: value.target)) }
+    if let value = match.document.lineCount {
+      append("lineCount", .bodyLineCount(MarkdownRuleIntegerRange(minimum: value.min, maximum: value.max)))
+    }
+    if let value = match.document.wordCount {
+      append("wordCount", .bodyWordCount(MarkdownRuleIntegerRange(minimum: value.min, maximum: value.max)))
+    }
+    return requirements
+  }
+
+  private func normalizedFileRequirements() throws -> [MarkdownRuleRequirement] {
+    var requirements: [MarkdownRuleRequirement] = []
+    func append(_ key: String, _ predicate: MarkdownRulePredicate) {
+      requirements.append(MarkdownRuleRequirement(
+        id: "\(name).match.file.\(key)",
+        predicate: predicate
+      ))
+    }
+    if let value = match.file.pathRegex { append("pathRegex", .pathRegularExpression(value)) }
+    if let value = match.file.filenameEquals { append("filenameEquals", .filenameEquals(value)) }
+    if match.file.extensionIn.isEmpty == false { append("extensionIn", .extensionIn(match.file.extensionIn)) }
+    if let value = match.file.modifiedAfter {
+      guard let literal = MarkdownRuleDateTimeLiteral(value.rawValue) else {
+        throw ValidationError("Invalid modifiedAfter date/time \"\(value.rawValue)\"")
+      }
+      append("modifiedAfter", .modifiedAfter(literal))
+    }
+    if let value = match.file.modifiedBefore {
+      guard let literal = MarkdownRuleDateTimeLiteral(value.rawValue) else {
+        throw ValidationError("Invalid modifiedBefore date/time \"\(value.rawValue)\"")
+      }
+      append("modifiedBefore", .modifiedBefore(literal))
+    }
+    return requirements
+  }
+
+  private func normalizedFrontmatterOperation(
+    _ name: String,
+    operand: Any
+  ) throws -> MarkdownFrontmatterRuleOperator {
+    switch name {
+    case "equals": return .equals(try JSONValue(any: jsonCompatibleValue(operand)))
+    case "doesntEqual": return .doesNotEqual(try JSONValue(any: jsonCompatibleValue(operand)))
+    case "includes": return .includes(try JSONValue(any: jsonCompatibleValue(operand)))
+    case "notIncludes": return .doesNotInclude(try JSONValue(any: jsonCompatibleValue(operand)))
+    case "hasKey": return .hasKey
+    case "doesntHaveKey": return .doesNotHaveKey
+    case "regex": return .regularExpression(try normalizedString(operand, name: name))
+    case "startsWith": return .startsWith(try normalizedString(operand, name: name))
+    case "endsWith": return .endsWith(try normalizedString(operand, name: name))
+    case "contains": return .contains(try normalizedString(operand, name: name))
+    case "empty": return .empty
+    case "emptyString": return .emptyString
+    case "emptyArray": return .emptyArray
+    case "emptyObject": return .emptyObject
+    case "notEmpty": return .notEmpty
+    case "in": return .isIn(try normalizedArray(operand, name: name))
+    case "notIn": return .isNotIn(try normalizedArray(operand, name: name))
+    case "greaterThan": return .greaterThan(try normalizedNumber(operand, name: name))
+    case "greaterThanOrEqual": return .greaterThanOrEqual(try normalizedNumber(operand, name: name))
+    case "lessThan": return .lessThan(try normalizedNumber(operand, name: name))
+    case "lessThanOrEqual": return .lessThanOrEqual(try normalizedNumber(operand, name: name))
+    case "after": return .after(try normalizedDate(operand, name: name))
+    case "onOrAfter": return .onOrAfter(try normalizedDate(operand, name: name))
+    case "before": return .before(try normalizedDate(operand, name: name))
+    case "onOrBefore": return .onOrBefore(try normalizedDate(operand, name: name))
+    case "between":
+      guard let object = operand as? [String: Any], let from = object["from"], let to = object["to"] else {
+        throw ValidationError("between requires from and to")
+      }
+      if let fromNumber = numericValue(from), let toNumber = numericValue(to) {
+        return .between(.number(from: fromNumber, through: toNumber))
+      }
+      return .between(.dateTime(
+        from: try normalizedDate(from, name: "between.from"),
+        through: try normalizedDate(to, name: "between.to")
+      ))
+    case "typeIs":
+      let value = try normalizedString(operand, name: name)
+      guard let type = MarkdownRuleJSONType(rawValue: value) else {
+        throw ValidationError("Unsupported JSON type \"\(value)\"")
+      }
+      return .typeIs(type)
+    default: throw ValidationError("Unsupported frontmatter operator \"\(name)\"")
+    }
+  }
+
+  private func normalizedString(_ value: Any, name: String) throws -> String {
+    guard let value = value as? String else { throw ValidationError("\(name) requires a string") }
+    return value
+  }
+
+  private func normalizedArray(_ value: Any, name: String) throws -> [JSONValue] {
+    guard let values = value as? [Any] else { throw ValidationError("\(name) requires an array") }
+    return try values.map { try JSONValue(any: jsonCompatibleValue($0)) }
+  }
+
+  private func normalizedNumber(_ value: Any, name: String) throws -> Double {
+    guard let value = numericValue(value) else { throw ValidationError("\(name) requires a number") }
+    return value
+  }
+
+  private func normalizedDate(_ value: Any, name: String) throws -> MarkdownRuleDateTimeLiteral {
+    guard let value = value as? String, let literal = MarkdownRuleDateTimeLiteral(value) else {
+      throw ValidationError("\(name) requires a date or date-time")
+    }
+    return literal
   }
 }
 enum RuleCheck: Equatable {
@@ -1030,18 +1233,18 @@ enum RuleFileScanner {
 /// Describes one JSON Schema validation issue for a Markdown file.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
-struct RuleValidationErrorDetail {
+struct RuleValidationErrorDetail: Sendable {
   var path: String
   var message: String
 }
 /// Records the validation status for one file and one rule.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
-struct RuleValidationResult {
+struct RuleValidationResult: Sendable {
   /// Indicates whether a file-rule validation passed, failed, or was skipped.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  enum Status {
+  enum Status: Sendable {
     case ok
     case error
     case skipped
@@ -1052,6 +1255,46 @@ struct RuleValidationResult {
   var filePath: String
   var status: Status
   var errors: [RuleValidationErrorDetail]
+}
+
+private struct RuleValidationJob: Sendable {
+  var file: String
+  var rules: [CompiledMarkdownRule]
+  var analysisRequirements: MarkdownRecordAnalysisRequirements
+}
+
+private func boundedConcurrentMap<Input: Sendable, Output: Sendable>(
+  _ inputs: [Input],
+  maximumConcurrency: Int = min(ProcessInfo.processInfo.activeProcessorCount, 8),
+  transform: @escaping @Sendable (Input) async throws -> Output
+) async throws -> [Output] {
+  guard inputs.isEmpty == false else { return [] }
+  let limit = max(1, min(maximumConcurrency, inputs.count))
+  return try await withThrowingTaskGroup(
+    of: (Int, Output).self,
+    returning: [Output].self
+  ) { group in
+    var nextIndex = 0
+    for _ in 0..<limit {
+      let index = nextIndex
+      let input = inputs[index]
+      group.addTask { (index, try await transform(input)) }
+      nextIndex += 1
+    }
+
+    var completed: [(Int, Output)] = []
+    completed.reserveCapacity(inputs.count)
+    while let result = try await group.next() {
+      completed.append(result)
+      if nextIndex < inputs.count {
+        let index = nextIndex
+        let input = inputs[index]
+        group.addTask { (index, try await transform(input)) }
+        nextIndex += 1
+      }
+    }
+    return completed.sorted { $0.0 < $1.0 }.map(\.1)
+  }
 }
 /// Records whether one configured rule matches a specific Markdown file.
 ///
@@ -1101,7 +1344,7 @@ enum RulesValidatorRunner {
     ruleName: String? = nil,
     root: Path = .current,
     configPath: Path = RulesPaths.configFile
-  ) throws -> RuleValidationSummary {
+  ) async throws -> RuleValidationSummary {
     let config = try MdUtilsConfig.load(from: configPath)
     let rules: [Rule]
     if let ruleName {
@@ -1113,517 +1356,161 @@ enum RulesValidatorRunner {
       rules = config.schemaRules
     }
 
+    let registry = try config.compiledRuleRegistry(root: root)
+    let checker = MarkdownRuleChecker(registry: registry)
+    let compiledRules: [(rule: Rule, compiled: CompiledMarkdownRule)] = rules.compactMap { rule in
+      guard let compiled = registry.rule(named: rule.name) else { return nil }
+      return (rule, compiled)
+    }
     let files = try RuleFileScanner.markdownFiles(root: root)
-    var results: [RuleValidationResult] = []
-    var loadedSchemas: [String: [String: Any]] = [:]
+    let rootString = root.absolute().normalize().string
+    let schemaPaths = Dictionary(uniqueKeysWithValues: rules.map { rule in
+      (
+        rule.name,
+        rule.schema.isEmpty
+          ? ""
+          : RulesPaths.schemaFile(rule: rule, config: config, root: root).string
+      )
+    })
+    var jobs: [RuleValidationJob] = []
+    jobs.reserveCapacity(files.count)
 
     for file in files {
-      let relativePath = relativePath(from: root, to: file)
-      let pathMatchedRules = rules.filter {
-        rulePathConditionsMatch(rule: $0, relativePath: relativePath)
-          && ruleFileConditionsMatch(rule: $0, file: file, relativePath: relativePath)
+      let logicalPath = try MarkdownRecordPath(relativePath(from: root, to: file))
+      let candidates = compiledRules.filter {
+        checker.isPathCandidate(logicalPath, for: $0.compiled)
       }
-      guard !pathMatchedRules.isEmpty else { continue }
-
-      let content = try file.read(.utf8)
-      let frontmatterPresence = frontmatterPresence(in: content)
-      var parsedFrontmatter: Any?
-      var yamlError: Error?
-
-      if frontmatterPresence.hasFrontmatter {
-        do {
-          let document = try MarkdownDocument(content: content)
-          parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
-        } catch {
-          yamlError = error
-        }
+      guard candidates.isEmpty == false else { continue }
+      let analysisRequirements = candidates.reduce(
+        into: MarkdownRecordAnalysisRequirements(rawValue: 0)
+      ) { requirements, candidate in
+        requirements.formUnion(checker.analysisRequirements(for: candidate.compiled))
       }
-
-      let document = try? MarkdownDocument(content: content)
-
-      for rule in pathMatchedRules {
-        if let yamlError {
-          results.append(errorResult(
-            rule: rule,
-            schemaPath: "",
-            filePath: relativePath,
-            path: "frontmatter",
-            message: "invalid YAML: \(yamlError.localizedDescription)"
-          ))
-          continue
-        }
-
-        if !frontmatterPresence.hasFrontmatter {
-          if !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty {
-            continue
-          } else if rule.checks.contains(where: { $0.requiresFrontmatter }) {
-            results.append(errorResult(
-              rule: rule,
-              schemaPath: "",
-              filePath: relativePath,
-              path: "frontmatter",
-              message: "required by rule \"\(rule.name)\""
-            ))
-            continue
-          } else if hasOnlyOptionalFrontmatterSchemaChecks(rule) {
-            results.append(RuleValidationResult(
-              ruleName: rule.name,
-              schemaPath: rule.schema.isEmpty ? "" : RulesPaths.schemaFile(rule: rule, config: config, root: root).string,
-              filePath: relativePath,
-              status: .skipped,
-              errors: [RuleValidationErrorDetail(path: "frontmatter", message: "not present")]
-            ))
-            continue
-          }
-        }
-
-        if frontmatterPresence.hasFrontmatter {
-          guard let parsedFrontmatter else { continue }
-          guard frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
-          guard frontmatterQueryConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
-        }
-        guard documentConditionsMatch(rule: rule, document: document) else { continue }
-
-        let checkErrors = try validateChecks(
-          rule: rule,
-          config: config,
-          root: root,
-          parsedFrontmatter: parsedFrontmatter,
-          document: document,
-          loadedSchemas: &loadedSchemas
-        )
-        if checkErrors.isEmpty {
-          results.append(RuleValidationResult(
-            ruleName: rule.name,
-            schemaPath: rule.schema.isEmpty ? "" : RulesPaths.schemaFile(rule: rule, config: config, root: root).string,
-            filePath: relativePath,
-            status: .ok,
-            errors: []
-          ))
-        } else {
-          results.append(RuleValidationResult(
-            ruleName: rule.name,
-            schemaPath: rule.schema.isEmpty ? "" : RulesPaths.schemaFile(rule: rule, config: config, root: root).string,
-            filePath: relativePath,
-            status: .error,
-            errors: checkErrors
-          ))
-        }
-      }
+      jobs.append(RuleValidationJob(
+        file: file.string,
+        rules: candidates.map(\.compiled),
+        analysisRequirements: analysisRequirements
+      ))
     }
 
-    return RuleValidationSummary(results: results, totalMarkdownFiles: files.count)
+    let groupedResults = try await boundedConcurrentMap(jobs) { job in
+      let file = Path(job.file)
+      let projectRoot = Path(rootString)
+      let record = try MarkdownRecordFileAdapter.read(file, projectRoot: projectRoot)
+      let analyzed = await MarkdownRecordAnalyzer.analyze(
+        record,
+        requirements: job.analysisRequirements
+      )
+      var results: [RuleValidationResult] = []
+      for compiled in job.rules {
+        let assessment = try checker.assess(analyzed, against: compiled)
+        guard assessment.status != .notApplicable else { continue }
+        let ruleName = compiled.definition.name
+        let errors = (assessment.applicabilityDiagnostics + assessment.diagnostics).map {
+          RuleValidationErrorDetail(
+            path: $0.location,
+            message: $0.code == "record.frontmatter.invalid-yaml"
+              ? $0.message.replacingOccurrences(of: "Invalid YAML:", with: "invalid YAML:")
+              : $0.message
+          )
+        }
+        let status: RuleValidationResult.Status
+        switch assessment.status {
+        case .notApplicable: continue
+        case .skipped: status = .skipped
+        case .passed: status = .ok
+        case .failed: status = .error
+        }
+        results.append(RuleValidationResult(
+          ruleName: ruleName,
+          schemaPath: schemaPaths[ruleName] ?? "",
+          filePath: record.context.path?.rawValue ?? relativePath(from: projectRoot, to: file),
+          status: status,
+          errors: assessment.status == .skipped
+            ? [RuleValidationErrorDetail(path: "frontmatter", message: "not present")]
+            : errors
+        ))
+      }
+      return results
+    }
+    return RuleValidationSummary(
+      results: groupedResults.flatMap { $0 },
+      totalMarkdownFiles: files.count
+    )
   }
 
   static func filesMatching(
     ruleName: String,
     root: Path = .current,
     configPath: Path = RulesPaths.configFile
-  ) throws -> [Path] {
+  ) async throws -> [Path] {
     let config = try MdUtilsConfig.load(from: configPath)
-    guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
+    guard config.schemaRules.contains(where: { $0.name == ruleName }) else {
       throw ValidationError("Rule not found: \"\(ruleName)\"")
     }
 
+    let registry = try config.compiledRuleRegistry(root: root)
+    guard let compiled = registry.rule(named: ruleName) else { return [] }
+    let checker = MarkdownRuleChecker(registry: registry)
     let files = try RuleFileScanner.markdownFiles(root: root)
-    var matches: [Path] = []
-    for file in files {
-      let relativePath = relativePath(from: root, to: file)
-      guard rulePathConditionsMatch(rule: rule, relativePath: relativePath) else { continue }
-      guard ruleFileConditionsMatch(rule: rule, file: file, relativePath: relativePath) else { continue }
-      guard !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty || !rule.match.document.isEmpty else {
-        matches.append(file)
-        continue
-      }
-
-      let content = try file.read(.utf8)
-      let frontmatterPresence = frontmatterPresence(in: content)
-      do {
-        let document = try MarkdownDocument(content: content)
-        if !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty {
-          guard frontmatterPresence.hasFrontmatter else { continue }
-          let parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
-          guard frontmatterConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
-          guard frontmatterQueryConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else { continue }
-        }
-        if documentConditionsMatch(rule: rule, document: document) {
-          matches.append(file)
-        }
-      } catch {
-        continue
-      }
+    let rootString = root.absolute().normalize().string
+    let candidates = try files.compactMap { file -> String? in
+      let logicalPath = try MarkdownRecordPath(relativePath(from: root, to: file))
+      return checker.isPathCandidate(logicalPath, for: compiled) ? file.string : nil
     }
-    return matches
+    let matches = try await boundedConcurrentMap(candidates) { fileString -> String? in
+      let file = Path(fileString)
+      let record = try MarkdownRecordFileAdapter.read(file, projectRoot: Path(rootString))
+      let analyzed = await MarkdownRecordAnalyzer.analyze(
+        record,
+        requirements: checker.analysisRequirements(for: compiled)
+      )
+      let assessment = try checker.assess(analyzed, against: compiled)
+      return assessment.status != .notApplicable ? fileString : nil
+    }
+    return matches.compactMap { path in
+      path.map { Path($0) }
+    }
   }
 
   static func rulesMatching(
     fileName: String,
     root: Path = .current,
     configPath: Path = RulesPaths.configFile
-  ) throws -> [RuleMatchEvaluation] {
+  ) async throws -> [RuleMatchEvaluation] {
     let config = try MdUtilsConfig.load(from: configPath)
     let file = Path(fileName)
     guard file.exists else {
       throw ValidationError("Markdown file not found: \(fileName)")
     }
 
-    let relativePath = relativePath(from: root, to: file)
+    let registry = try config.compiledRuleRegistry(root: root)
+    let checker = MarkdownRuleChecker(registry: registry)
+    let record = try MarkdownRecordFileAdapter.read(file, projectRoot: root)
+    let analysisRequirements = config.schemaRules.reduce(
+      into: MarkdownRecordAnalysisRequirements(rawValue: 0)
+    ) { requirements, rule in
+      guard let compiled = registry.rule(named: rule.name) else { return }
+      requirements.formUnion(checker.analysisRequirements(for: compiled))
+    }
+    let analyzed = await MarkdownRecordAnalyzer.analyze(
+      record,
+      requirements: analysisRequirements
+    )
     return try config.schemaRules.map { rule in
-      try evaluateRuleMatch(rule: rule, file: file, relativePath: relativePath)
-    }
-  }
-
-  private static func evaluateRuleMatch(rule: Rule, file: Path, relativePath: String) throws -> RuleMatchEvaluation {
-    var reasons: [String] = []
-
-    if let excluded = rule.match.excludePaths.first(where: { matchesGlob(relativePath, glob: $0) }) {
+      guard let compiled = registry.rule(named: rule.name) else {
+        return RuleMatchEvaluation(rule: rule, matched: false, reasons: ["compiled rule is unavailable"])
+      }
+      let assessment = try checker.assess(analyzed, against: compiled)
       return RuleMatchEvaluation(
         rule: rule,
-        matched: false,
-        reasons: ["path \"\(relativePath)\" is excluded by \"\(excluded)\""]
+        matched: assessment.status != .notApplicable && assessment.applicabilityDiagnostics.isEmpty,
+        reasons: assessment.evidence.map(\.message)
+          + assessment.applicabilityDiagnostics.map(\.message)
       )
     }
-
-    if rule.match.paths.isEmpty {
-      reasons.append("no path patterns configured")
-    } else if let matchedPath = rule.match.paths.first(where: { matchesGlob(relativePath, glob: $0) }) {
-      reasons.append("path \"\(relativePath)\" matched \"\(matchedPath)\"")
-    } else {
-      return RuleMatchEvaluation(
-        rule: rule,
-        matched: false,
-        reasons: ["path \"\(relativePath)\" did not match any configured path pattern"]
-      )
-    }
-
-    guard ruleFileConditionsMatch(rule: rule, file: file, relativePath: relativePath) else {
-      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons + ["file metadata did not match"])
-    }
-
-    guard !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty || !rule.match.document.isEmpty else {
-      return RuleMatchEvaluation(rule: rule, matched: true, reasons: reasons)
-    }
-
-    let content = try file.read(.utf8)
-    let frontmatterPresence = frontmatterPresence(in: content)
-    let document: MarkdownDocument
-    do {
-      document = try MarkdownDocument(content: content)
-    } catch {
-      reasons.append("document invalid: \(error.localizedDescription)")
-      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-    }
-
-    if !rule.match.frontmatter.isEmpty || !rule.match.frontmatterQuery.isEmpty {
-      guard frontmatterPresence.hasFrontmatter else {
-        reasons.append("frontmatter not present")
-        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-      }
-
-      let parsedFrontmatter: Any
-      do {
-        parsedFrontmatter = try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
-      } catch {
-        reasons.append("frontmatter invalid: \(error.localizedDescription)")
-        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-      }
-
-      guard let object = parsedFrontmatter as? [String: Any] else {
-        reasons.append("frontmatter is not an object")
-        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-      }
-
-      for (key, matcher) in rule.match.frontmatter.sorted(by: { $0.key < $1.key }) {
-        guard frontmatterValue(object[key], matches: matcher, keyExists: object.keys.contains(key)) else {
-          if object[key] == nil {
-            reasons.append("frontmatter \"\(key)\" is missing")
-          } else {
-            reasons.append("frontmatter \"\(key)\" did not match \(frontmatterMatcherDescription(matcher))")
-          }
-          return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-        }
-        reasons.append("frontmatter \"\(key)\" matched \(frontmatterMatcherDescription(matcher))")
-      }
-
-      guard frontmatterQueryConditionsMatch(rule: rule, frontmatter: parsedFrontmatter) else {
-        reasons.append("frontmatterQuery did not match")
-        return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-      }
-      if !rule.match.frontmatterQuery.isEmpty {
-        reasons.append("frontmatterQuery matched")
-      }
-    }
-
-    guard documentConditionsMatch(rule: rule, document: document) else {
-      reasons.append("document predicates did not match")
-      return RuleMatchEvaluation(rule: rule, matched: false, reasons: reasons)
-    }
-
-    return RuleMatchEvaluation(rule: rule, matched: true, reasons: reasons)
   }
 
-  /// Returns whether file metadata satisfies a rule file condition.
-  private static func ruleFileConditionsMatch(rule: Rule, file: Path, relativePath: String) -> Bool {
-    let matcher = rule.match.file
-    guard !matcher.isEmpty else { return true }
-
-    if let pathRegex = matcher.pathRegex, !regexMatches(relativePath, pattern: pathRegex) { return false }
-    if let filenameEquals = matcher.filenameEquals, file.lastComponent != filenameEquals { return false }
-    if !matcher.extensionIn.isEmpty {
-      guard let ext = file.extension?.lowercased(), matcher.extensionIn.contains(ext) else { return false }
-    }
-    if matcher.modifiedAfter != nil || matcher.modifiedBefore != nil {
-      guard let modified = fileModificationDate(file) else { return false }
-      let literal = DateTimeLiteral(date: modified, precision: .dateTime)
-      if let modifiedAfter = matcher.modifiedAfter,
-         dateTimeCompare(literal, modifiedAfter, precision: modifiedAfter.precision) != .orderedDescending {
-        return false
-      }
-      if let modifiedBefore = matcher.modifiedBefore,
-         dateTimeCompare(literal, modifiedBefore, precision: modifiedBefore.precision) != .orderedAscending {
-        return false
-      }
-    }
-    return true
-  }
-
-  /// Returns whether a project-relative path matches a rule path condition.
-  ///
-  /// See <doc:RulesValidationCommands> for workflow details.
-  private static func rulePathConditionsMatch(rule: Rule, relativePath: String) -> Bool {
-    if rule.match.excludePaths.contains(where: { matchesGlob(relativePath, glob: $0) }) {
-      return false
-    }
-    if rule.match.paths.isEmpty {
-      return true
-    }
-    return rule.match.paths.contains { matchesGlob(relativePath, glob: $0) }
-  }
-  /// Returns whether parsed frontmatter satisfies a rule frontmatter condition.
-  ///
-  /// See <doc:RulesValidationCommands> for workflow details.
-  private static func frontmatterConditionsMatch(rule: Rule, frontmatter: Any) -> Bool {
-    guard !rule.match.frontmatter.isEmpty else { return true }
-    guard let object = frontmatter as? [String: Any] else { return false }
-
-    for (key, matcher) in rule.match.frontmatter {
-      if !frontmatterValue(object[key], matches: matcher, keyExists: object.keys.contains(key)) {
-        return false
-      }
-    }
-    return true
-  }
-
-  private static func frontmatterQueryConditionsMatch(rule: Rule, frontmatter: Any) -> Bool {
-    guard let query = rule.match.frontmatterQuery.jmespath else { return true }
-    guard let expression = try? compileJMESPath(query, ruleName: rule.name) else { return false }
-    guard let result = try? expression.search(object: frontmatter) else { return false }
-    return isTruthy(result)
-  }
-
-  private static func documentConditionsMatch(rule: Rule, document: MarkdownDocument?) -> Bool {
-    let matcher = rule.match.document
-    let body = document?.body ?? ""
-    let headings = parsedHeadings(in: body)
-    if let hasHeading = matcher.hasHeading {
-      guard headings.contains(where: { $0.text == hasHeading }) else { return false }
-    }
-    if let headingRegex = matcher.headingRegex {
-      guard headings.contains(where: { regexMatches($0.text, pattern: headingRegex) }) else { return false }
-    }
-    if let hasHeadingAtLevel = matcher.hasHeadingAtLevel {
-      guard headings.contains(where: { $0.text == hasHeadingAtLevel.heading && $0.level == hasHeadingAtLevel.level }) else { return false }
-    }
-    if let hasSection = matcher.hasSection {
-      guard sectionExists(heading: hasSection, in: body) else { return false }
-    }
-    if let bodyContains = matcher.bodyContains {
-      guard body.contains(bodyContains) else { return false }
-    }
-    if let bodyRegex = matcher.bodyRegex {
-      guard regexMatches(body, pattern: bodyRegex) else { return false }
-    }
-    if let hasWikilink = matcher.hasWikilink {
-      guard wikilinkMatches(body: body, matcher: hasWikilink) else { return false }
-    }
-    if let lineCount = matcher.lineCount {
-      guard lineCount.contains(bodyLineCount(body)) else { return false }
-    }
-    if let wordCount = matcher.wordCount {
-      guard wordCount.contains(bodyWordCount(body)) else { return false }
-    }
-    return true
-  }
-
-  private static func validateChecks(
-    rule: Rule,
-    config: MdUtilsConfig,
-    root: Path,
-    parsedFrontmatter: Any?,
-    document: MarkdownDocument?,
-    loadedSchemas: inout [String: [String: Any]]
-  ) throws -> [RuleValidationErrorDetail] {
-    var portableChecks: [MarkdownUtilitiesCore.MarkdownRuleCheck] = []
-    for (index, check) in rule.checks.enumerated() {
-      switch check {
-      case .frontmatterSchema(let schemaFilename, _):
-        guard parsedFrontmatter != nil else { continue }
-        let schemaRule = Rule(name: rule.name, schema: schemaFilename, match: rule.match)
-        let schemaPath = RulesPaths.schemaFile(rule: schemaRule, config: config, root: root)
-        let schemaKey = schemaPath.absolute().string
-        let schema: [String: Any]
-        if let loaded = loadedSchemas[schemaKey] {
-          schema = loaded
-        } else {
-          schema = try SchemaDocumentLoader.load(path: schemaPath)
-          loadedSchemas[schemaKey] = schema
-        }
-
-        portableChecks.append(.frontmatterSchema(
-          id: "\(rule.name).check[\(index)]",
-          schema: try JSONValue(any: schema)
-        ))
-      case .requiredHeading(let heading):
-        portableChecks.append(.requiredHeading(
-          id: "\(rule.name).check[\(index)]",
-          heading: heading
-        ))
-      case .maxBodyLines(let max):
-        portableChecks.append(.maxBodyLines(
-          id: "\(rule.name).check[\(index)]",
-          maximum: max
-        ))
-      case .maxBodyWords(let max):
-        portableChecks.append(.maxBodyWords(
-          id: "\(rule.name).check[\(index)]",
-          maximum: max
-        ))
-      }
-    }
-    let frontmatter = try parsedFrontmatter.map { try JSONValue(any: jsonCompatibleValue($0)) }
-    let diagnostics = try MarkdownRuleCheckEvaluator.evaluate(
-      portableChecks,
-      input: MarkdownRuleCheckInput(
-        frontmatter: frontmatter,
-        body: document?.body ?? ""
-      )
-    )
-    return diagnostics.map { diagnostic in
-      RuleValidationErrorDetail(path: diagnostic.location, message: diagnostic.message)
-    }
-  }
-
-  private static func hasOnlyOptionalFrontmatterSchemaChecks(_ rule: Rule) -> Bool {
-    !rule.checks.isEmpty && rule.checks.allSatisfy { check in
-      if case .frontmatterSchema(_, let frontmatterRequired) = check {
-        return !frontmatterRequired
-      }
-      return false
-    }
-  }
-
-  private static func frontmatterValue(_ value: Any?, matches matcher: FrontmatterMatcher, keyExists: Bool = true) -> Bool {
-    for (operatorName, operand) in matcher.operators {
-      switch operatorName {
-      case "hasKey":
-        guard keyExists else { return false }
-      case "doesntHaveKey":
-        guard !keyExists else { return false }
-      default:
-        guard keyExists, let value else { return false }
-        if !frontmatterExistingValue(value, matches: operatorName, operand: operand) { return false }
-      }
-    }
-    return true
-  }
-
-  private static func frontmatterExistingValue(_ value: Any, matches operatorName: String, operand: Any) -> Bool {
-    switch operatorName {
-      case "includes":
-        guard let array = value as? [Any], array.contains(where: { jsonValuesEqual($0, operand) }) else { return false }
-      case "notIncludes":
-        guard let array = value as? [Any], !array.contains(where: { jsonValuesEqual($0, operand) }) else { return false }
-      case "equals":
-        guard jsonValuesEqual(value, operand) else { return false }
-      case "doesntEqual":
-        guard !jsonValuesEqual(value, operand) else { return false }
-      case "regex":
-        guard let string = value as? String, let pattern = operand as? String, regexMatches(string, pattern: pattern) else { return false }
-      case "startsWith":
-        guard let string = value as? String, let prefix = operand as? String, string.hasPrefix(prefix) else { return false }
-      case "endsWith":
-        guard let string = value as? String, let suffix = operand as? String, string.hasSuffix(suffix) else { return false }
-      case "contains":
-        guard let string = value as? String, let substring = operand as? String, string.contains(substring) else { return false }
-      case "empty":
-        guard isEmptyValue(value) else { return false }
-      case "emptyString":
-        guard let string = value as? String, string.isEmpty else { return false }
-      case "emptyArray":
-        guard let array = value as? [Any], array.isEmpty else { return false }
-      case "emptyObject":
-        guard let object = value as? [String: Any], object.isEmpty else { return false }
-      case "notEmpty":
-        guard !isEmptyValue(value) else { return false }
-      case "in":
-        guard let array = operand as? [Any], array.contains(where: { jsonValuesEqual(value, $0) }) else { return false }
-      case "notIn":
-        guard let array = operand as? [Any], !array.contains(where: { jsonValuesEqual(value, $0) }) else { return false }
-      case "greaterThan":
-        guard compareNumbers(value, operand) == .orderedDescending else { return false }
-      case "greaterThanOrEqual":
-        let comparison = compareNumbers(value, operand)
-        guard comparison == .orderedDescending || comparison == .orderedSame else { return false }
-      case "lessThan":
-        guard compareNumbers(value, operand) == .orderedAscending else { return false }
-      case "lessThanOrEqual":
-        let comparison = compareNumbers(value, operand)
-        guard comparison == .orderedAscending || comparison == .orderedSame else { return false }
-      case "after":
-        guard compareDateTime(value, operand: operand) == .orderedDescending else { return false }
-      case "onOrAfter":
-        let comparison = compareDateTime(value, operand: operand)
-        guard comparison == .orderedDescending || comparison == .orderedSame else { return false }
-      case "before":
-        guard compareDateTime(value, operand: operand) == .orderedAscending else { return false }
-      case "onOrBefore":
-        let comparison = compareDateTime(value, operand: operand)
-        guard comparison == .orderedAscending || comparison == .orderedSame else { return false }
-      case "between":
-        guard betweenMatches(value: value, range: operand) else { return false }
-      case "typeIs":
-        guard let expectedType = operand as? String, jsonTypeName(value) == expectedType else { return false }
-      case "hasKey", "doesntHaveKey":
-        break
-      default:
-        return false
-      }
-    return true
-  }
-
-  private static func frontmatterMatcherDescription(_ matcher: FrontmatterMatcher) -> String {
-    matcher.operators.sorted(by: { $0.key < $1.key }).map { operatorName, operand in
-      "\(operatorName) \(jsonValueDescription(operand))"
-    }.joined(separator: ", ")
-  }
-  /// Builds a validation result for an error that prevents rule validation.
-  ///
-  /// See <doc:RulesValidationCommands> for workflow details.
-  private static func errorResult(
-    rule: Rule,
-    schemaPath: String,
-    filePath: String,
-    path: String,
-    message: String
-  ) -> RuleValidationResult {
-    RuleValidationResult(
-      ruleName: rule.name,
-      schemaPath: schemaPath,
-      filePath: filePath,
-      status: .error,
-      errors: [RuleValidationErrorDetail(path: path, message: message)]
-    )
-  }
 }
 /// Detects whether Markdown content contains a frontmatter block and returns its raw YAML.
 ///
@@ -1640,90 +1527,6 @@ func frontmatterPresence(in content: String) -> (hasFrontmatter: Bool, raw: Stri
     return (false, nil)
   }
   return (true, String(content[searchStart..<closingRange.lowerBound]))
-}
-/// Returns a normalized project-relative path for matching and reporting.
-///
-/// See <doc:RulesValidationCommands> for workflow details.
-func projectRelativePath(_ path: Path) -> String {
-  let root = Path.current.absolute().string
-  let absolute = path.absolute().string
-  let normalizedRoot = root.hasSuffix("/") ? root : root + "/"
-  if absolute.hasPrefix(normalizedRoot) {
-    return String(absolute.dropFirst(normalizedRoot.count))
-  }
-  return path.string
-}
-/// Returns whether a value matches a simple glob pattern.
-///
-/// See <doc:RulesValidationCommands> for workflow details.
-func matchesGlob(_ value: String, glob: String) -> Bool {
-  let regex = globToRegex(glob)
-  guard let expression = try? NSRegularExpression(pattern: regex) else {
-    return false
-  }
-  let range = NSRange(value.startIndex..., in: value)
-  return expression.firstMatch(in: value, range: range) != nil
-}
-/// Converts a simple glob pattern into a regular expression string.
-///
-/// See <doc:RulesValidationCommands> for workflow details.
-func globToRegex(_ glob: String) -> String {
-  var result = "^"
-  var index = glob.startIndex
-
-  while index < glob.endIndex {
-    let character = glob[index]
-    let nextIndex = glob.index(after: index)
-
-    switch character {
-    case "*":
-      if nextIndex < glob.endIndex && glob[nextIndex] == "*" {
-        let afterStars = glob.index(after: nextIndex)
-        if afterStars < glob.endIndex && glob[afterStars] == "/" {
-          result += "([^/]+/)*"
-          index = glob.index(after: afterStars)
-        } else {
-          result += ".*"
-          index = afterStars
-        }
-      } else {
-        result += "[^/]*"
-        index = nextIndex
-      }
-    case "?":
-      result += "[^/]"
-      index = nextIndex
-    default:
-      result += NSRegularExpression.escapedPattern(for: String(character))
-      index = nextIndex
-    }
-  }
-
-  return result + "$"
-}
-/// Compares two JSON-compatible values for semantic equality.
-///
-/// See <doc:RulesValidationCommands> for workflow details.
-func jsonValuesEqual(_ lhs: Any, _ rhs: Any) -> Bool {
-  let left = jsonCompatibleValue(lhs)
-  let right = jsonCompatibleValue(rhs)
-
-  switch (left, right) {
-  case (let left as String, let right as String):
-    return left == right
-  case (let left as Bool, let right as Bool):
-    return left == right
-  case (let left as Int, let right as Int):
-    return left == right
-  case (let left as Double, let right as Double):
-    return left == right
-  case (let left as NSNumber, let right as NSNumber):
-    return left == right
-  case (_ as NSNull, _ as NSNull):
-    return true
-  default:
-    return false
-  }
 }
 /// Normalizes a value into a JSON-compatible representation for comparison.
 ///
@@ -1745,34 +1548,6 @@ func jsonCompatibleValue(_ value: Any) -> Any {
     return formatter.string(from: date)
   }
   return value
-}
-/// Returns a compact display representation for JSON-compatible values.
-func jsonValueDescription(_ value: Any) -> String {
-  let normalized = jsonCompatibleValue(value)
-  if JSONSerialization.isValidJSONObject([normalized]),
-     let data = try? JSONSerialization.data(withJSONObject: [normalized], options: [.sortedKeys]),
-     let json = String(data: data, encoding: .utf8),
-     json.hasPrefix("["), json.hasSuffix("]") {
-    let start = json.index(after: json.startIndex)
-    let end = json.index(before: json.endIndex)
-    return String(json[start..<end])
-  }
-  return String(describing: normalized)
-}
-/// Returns a normalized YYYY-MM-DD date string when a value can participate in date comparisons.
-func comparableDateString(_ value: Any) -> String? {
-  if let string = value as? String {
-    return string.count >= 10 ? String(string.prefix(10)) : nil
-  }
-  if let date = value as? Date {
-    let formatter = DateFormatter()
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-    formatter.dateFormat = "yyyy-MM-dd"
-    return formatter.string(from: date)
-  }
-  return nil
 }
 /// Date/time precision used by rules predicates.
 enum DateTimePrecision: Comparable {
@@ -1844,30 +1619,6 @@ struct DateTimeLiteral: Equatable {
   }
 }
 
-extension DateTimeLiteral {
-  static func parse(_ value: Any) -> DateTimeLiteral? {
-    if let string = value as? String {
-      return DateTimeLiteral(string)
-    }
-    if let date = value as? Date {
-      return DateTimeLiteral(date: date)
-    }
-    return nil
-  }
-}
-
-extension TimeZone {
-  fileprivate static var gmt: TimeZone {
-    TimeZone(secondsFromGMT: 0) ?? TimeZone.current
-  }
-}
-
-/// Returns whether a string matches a configured regular expression.
-func regexMatches(_ value: String, pattern: String) -> Bool {
-  guard let expression = try? NSRegularExpression(pattern: pattern) else { return false }
-  let range = NSRange(value.startIndex..., in: value)
-  return expression.firstMatch(in: value, range: range) != nil
-}
 
 /// Validates a regular expression at config load time.
 func validateRegex(_ pattern: String, context: String) throws {
@@ -1887,15 +1638,6 @@ func compileJMESPath(_ query: String, ruleName: String) throws -> JMESExpression
   }
 }
 
-/// Returns truthiness using the same rules as `fm search`.
-func isTruthy(_ value: Any?) -> Bool {
-  guard let value else { return false }
-  if let bool = value as? Bool { return bool }
-  if let string = value as? String { return !string.isEmpty }
-  if let array = value as? [Any] { return !array.isEmpty }
-  if let dict = value as? [String: Any] { return !dict.isEmpty }
-  return true
-}
 
 /// Returns a numeric value for JSON/YAML scalar comparisons.
 func numericValue(_ value: Any) -> Double? {
@@ -1906,13 +1648,6 @@ func numericValue(_ value: Any) -> Double? {
   return nil
 }
 
-/// Compares two numeric values.
-func compareNumbers(_ lhs: Any, _ rhs: Any) -> ComparisonResult? {
-  guard let left = numericValue(lhs), let right = numericValue(rhs) else { return nil }
-  if left < right { return .orderedAscending }
-  if left > right { return .orderedDescending }
-  return .orderedSame
-}
 
 /// Compares two date/time literals at the requested precision.
 func dateTimeCompare(_ lhs: DateTimeLiteral, _ rhs: DateTimeLiteral, precision: DateTimePrecision) -> ComparisonResult {
@@ -1922,128 +1657,4 @@ func dateTimeCompare(_ lhs: DateTimeLiteral, _ rhs: DateTimeLiteral, precision: 
   case .dateTime:
     return lhs.date.compare(rhs.date)
   }
-}
-
-/// Compares a frontmatter value against a date/time predicate operand.
-func compareDateTime(_ value: Any, operand: Any) -> ComparisonResult? {
-  guard let left = DateTimeLiteral.parse(value), let right = DateTimeLiteral.parse(operand) else { return nil }
-  guard left.precision >= right.precision else { return nil }
-  return dateTimeCompare(left, right, precision: right.precision)
-}
-
-/// Returns whether a value falls inside an inclusive numeric or date/time range.
-func betweenMatches(value: Any, range: Any) -> Bool {
-  guard let range = range as? [String: Any], let from = range["from"], let to = range["to"] else { return false }
-  if let valueNumber = numericValue(value), let fromNumber = numericValue(from), let toNumber = numericValue(to) {
-    return valueNumber >= fromNumber && valueNumber <= toNumber
-  }
-  guard let valueDate = DateTimeLiteral.parse(value), let fromDate = DateTimeLiteral.parse(from), let toDate = DateTimeLiteral.parse(to) else {
-    return false
-  }
-  let precision = min(fromDate.precision, toDate.precision)
-  guard valueDate.precision >= precision else { return false }
-  return dateTimeCompare(valueDate, fromDate, precision: precision) != .orderedAscending
-    && dateTimeCompare(valueDate, toDate, precision: precision) != .orderedDescending
-}
-
-/// Returns whether a JSON/YAML value is one of the supported empty values.
-func isEmptyValue(_ value: Any) -> Bool {
-  if let string = value as? String { return string.isEmpty }
-  if let array = value as? [Any] { return array.isEmpty }
-  if let object = value as? [String: Any] { return object.isEmpty }
-  return false
-}
-
-/// Returns a JSON/YAML type name for predicate matching.
-func jsonTypeName(_ value: Any) -> String {
-  if value is NSNull { return "null" }
-  if value is Bool { return "boolean" }
-  if numericValue(value) != nil { return "number" }
-  if value is String { return "string" }
-  if value is [Any] { return "array" }
-  if value is [String: Any] { return "object" }
-  return "object"
-}
-
-/// Returns a file modification date when available.
-func fileModificationDate(_ path: Path) -> Date? {
-  let attributes = try? FileManager.default.attributesOfItem(atPath: path.string)
-  return attributes?[.modificationDate] as? Date
-}
-
-/// Extracts ATX headings and their levels from Markdown body.
-func parsedHeadings(in body: String) -> [(level: Int, text: String)] {
-  body.split(separator: "\n", omittingEmptySubsequences: false).compactMap { line in
-    let trimmed = line.trimmingCharacters(in: .whitespaces)
-    guard trimmed.hasPrefix("#") else { return nil }
-    let hashes = trimmed.prefix { $0 == "#" }
-    guard (1...6).contains(hashes.count) else { return nil }
-    let afterHashes = trimmed.dropFirst(hashes.count)
-    guard afterHashes.first == " " else { return nil }
-    return (hashes.count, String(afterHashes.dropFirst()).trimmingCharacters(in: .whitespaces))
-  }
-}
-
-/// Returns whether a heading starts a non-empty section.
-func sectionExists(heading: String, in body: String) -> Bool {
-  let lines = body.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-  var inSection = false
-  var sectionLevel = 0
-  for line in lines {
-    if let parsed = parsedHeadings(in: line).first {
-      if inSection && parsed.level <= sectionLevel { return false }
-      if parsed.text == heading {
-        inSection = true
-        sectionLevel = parsed.level
-        continue
-      }
-    }
-    if inSection && !line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-      return true
-    }
-  }
-  return false
-}
-
-/// Returns whether raw Markdown body has any wikilink or a specific wikilink target.
-func wikilinkMatches(body: String, matcher: WikilinkMatcher) -> Bool {
-  guard let expression = try? NSRegularExpression(pattern: #"\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]"#) else { return false }
-  let range = NSRange(body.startIndex..., in: body)
-  let matches = expression.matches(in: body, range: range)
-  guard let target = matcher.target else { return !matches.isEmpty }
-  return matches.contains { match in
-    guard let targetRange = Range(match.range(at: 1), in: body) else { return false }
-    return String(body[targetRange]) == target
-  }
-}
-/// Extracts ATX heading text from Markdown body without requiring a full AST parse.
-func headingTexts(in body: String) -> [String] {
-  body.split(separator: "\n", omittingEmptySubsequences: false).compactMap { line in
-    let trimmed = line.trimmingCharacters(in: .whitespaces)
-    guard trimmed.hasPrefix("#") else { return nil }
-    let hashes = trimmed.prefix { $0 == "#" }
-    guard (1...6).contains(hashes.count) else { return nil }
-    let afterHashes = trimmed.dropFirst(hashes.count)
-    guard afterHashes.first == " " else { return nil }
-    return String(afterHashes.dropFirst()).trimmingCharacters(in: .whitespaces)
-  }
-}
-/// Counts body lines, treating an empty body as zero lines.
-func bodyLineCount(_ body: String) -> Int {
-  guard !body.isEmpty else { return 0 }
-  return body.split(separator: "\n", omittingEmptySubsequences: false).count
-}
-/// Counts whitespace-delimited words in Markdown body content.
-func bodyWordCount(_ body: String) -> Int {
-  body.split(whereSeparator: { $0.isWhitespace }).count
-}
-/// Converts a JSON Pointer into a user-facing display path.
-///
-/// See <doc:RulesValidationCommands> for workflow details.
-func pointerDisplayPath(_ pointer: String) -> String {
-  if pointer.isEmpty || pointer == "/" {
-    return "frontmatter"
-  }
-  let trimmed = pointer.hasPrefix("/") ? String(pointer.dropFirst()) : pointer
-  return trimmed.replacingOccurrences(of: "/", with: ".")
 }

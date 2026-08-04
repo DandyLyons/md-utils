@@ -1,6 +1,43 @@
 import Foundation
 import MarkdownSyntax
 
+/// Expensive derived record state needed by a specific assessment plan.
+package struct MarkdownRecordAnalysisRequirements: OptionSet, Sendable {
+  package let rawValue: UInt8
+
+  package init(rawValue: UInt8) {
+    self.rawValue = rawValue
+  }
+
+  /// Parse the Markdown syntax tree and retain heading relationships.
+  package static let headings = Self(rawValue: 1 << 0)
+  /// Preserve the historical eager-analysis behavior.
+  package static let all: Self = [.headings]
+
+  package static func required(by predicate: MarkdownPredicate) -> Self {
+    switch predicate {
+    case .heading, .headingRelationship, .section:
+      return .headings
+    case .path, .maxBodyLines, .maxBodyWords:
+      return []
+    }
+  }
+
+  package static func required(by predicate: MarkdownRulePredicate) -> Self {
+    switch predicate {
+    case .markdown(let predicate):
+      return required(by: predicate)
+    case .heading, .headingRegularExpression, .section:
+      return .headings
+    case .pathRegularExpression, .filenameEquals, .extensionIn,
+         .modifiedAfter, .modifiedBefore, .frontmatterField,
+         .frontmatterJMESPath, .bodyContains, .bodyRegularExpression,
+         .wikilink, .bodyLineCount, .bodyWordCount:
+      return []
+    }
+  }
+}
+
 /// Parsed record state shared by rule, type, identity, and server assessment.
 ///
 /// Package visibility keeps parser implementation details out of the public API while
@@ -35,8 +72,11 @@ package struct AnalyzedMarkdownHeading: Sendable {
 
 /// Produces reusable structured state from canonical Markdown content.
 package enum MarkdownRecordAnalyzer {
-  /// Separates frontmatter, parses safe YAML, and walks Markdown headings once.
-  package static func analyze(_ record: MarkdownRecord) async -> AnalyzedMarkdownRecord {
+  /// Separates frontmatter, parses safe YAML, and derives requested document state.
+  package static func analyze(
+    _ record: MarkdownRecord,
+    requirements: MarkdownRecordAnalysisRequirements = .all
+  ) async -> AnalyzedMarkdownRecord {
     let parser = FrontMatterParser()
     var input = Substring(record.content)
     let parts: (rawFrontMatter: String, body: String)
@@ -49,7 +89,7 @@ package enum MarkdownRecordAnalyzer {
         hasFrontmatter: containsFrontmatterBlock(record.content),
         userFrontmatter: nil,
         systemTypeHints: [],
-        headings: await analyzeHeadings(in: record.content),
+        headings: await analyzeHeadings(in: record.content, when: requirements),
         parseDiagnostics: [parseDiagnostic(error.localizedDescription)]
       )
     }
@@ -83,9 +123,17 @@ package enum MarkdownRecordAnalyzer {
       hasFrontmatter: hasPhysicalFrontmatter,
       userFrontmatter: userFrontmatter,
       systemTypeHints: hints,
-      headings: await analyzeHeadings(in: parts.body),
+      headings: await analyzeHeadings(in: parts.body, when: requirements),
       parseDiagnostics: diagnostics
     )
+  }
+
+  private static func analyzeHeadings(
+    in body: String,
+    when requirements: MarkdownRecordAnalysisRequirements
+  ) async -> [AnalyzedMarkdownHeading] {
+    guard requirements.contains(.headings) else { return [] }
+    return await analyzeHeadings(in: body)
   }
 
   private static func analyzeHeadings(in body: String) async -> [AnalyzedMarkdownHeading] {

@@ -318,13 +318,13 @@ struct OKFCommandsTests {
   }
 
   @Test
-  func `schema exclude paths skip reserved okf files`() throws {
+  func `schema exclude paths skip reserved okf files`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     _ = try OKFInitializer.initialize(options: OKFInitOptions(bundlePath: project, withLog: true))
     try writeFile(project + "books/dune.md", content: concept(type: "Book"))
 
-    let summary = try RulesValidatorRunner.validate(
+    let summary = try await RulesValidatorRunner.validate(
       ruleName: "okf-concepts",
       root: project,
       configPath: project + ".md-utils/md-utils.json"

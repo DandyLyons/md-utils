@@ -10,7 +10,7 @@ The proposed native and Cloudflare server architecture, WebAssembly target split
 
 `MarkdownUtilities` depends on Core and adds filesystem-backed wikilink resolution, CSV path metadata, and file metadata including extended attributes. `MarkdownUtilitiesServer` also depends only on Core, defines storage-neutral canonical-record persistence, and compiles explicit server resources into transport-neutral endpoint plans. Consumers import the products explicitly according to the APIs each source file uses.
 
-The Markdown type system follows the same boundary. Core owns canonical `MarkdownRecord` values, parsed `MarkdownDocument` values, type and rule models, schema-graph compilation, portable predicate evaluation, diagnostics, and in-memory fix application. `MarkdownUtilities` loads `.md-utils/types/`, resolves filesystem schema resources, constructs logical record paths, and performs atomic record writes. The executable owns command parsing, prompts, formatting, and exit status.
+The Markdown type system follows the same boundary. Core owns canonical `MarkdownRecord` values, parsed `MarkdownDocument` values, normalized rule configuration, rule and type compilation, portable predicate evaluation, diagnostics, and in-memory fix application. `MarkdownUtilities` loads `.md-utils/types/`, resolves filesystem schema resources, constructs logical record paths, acquires modification timestamps, and performs atomic record writes. The executable owns command parsing, the serialized JMESPath capability provider, prompts, formatting, and exit status.
 
 The full source and dependency classification is recorded in the [portability audit](portability-audit.md).
 
@@ -36,11 +36,12 @@ A document is a successfully parsed content view and deliberately has no persist
 - `MarkdownTypeDefinition` models the `frontmatter`, `body`, and `context` conformance domains.
 - `MarkdownTypeRegistry` validates definitions, resolves and caches external JSON Schema graphs, and rejects duplicates, cycles, and conflicting schema identifiers.
 - `MarkdownTypeChecker` analyzes one canonical record once and supports named assessment, overlap queries, and type-hint verification.
-- `MarkdownRuleDefinition` keeps applicability separate from requirements while reusing portable predicates and type conformance.
+- `MarkdownRuleDefinition` is the sole normalized rule model and keeps applicability separate from checks.
+- `MarkdownRuleCompiler` validates definitions and capabilities before records are processed, producing one immutable `MarkdownRuleRegistry` shared by CLI and server consumers.
 - `MarkdownDiagnostic` distinguishes errors from advisories and can carry structured fix-its.
 - `MarkdownTypeFixer` applies selected edits in memory; native and CLI layers own persistence and interaction.
 
-Types are structural and non-exclusive. Rules and types remain distinct domain models even where they share analysis and predicate evaluation.
+Types are structural and non-exclusive. Rules and types remain distinct domain models even where they share analysis and predicate evaluation. Config versions `0.1.0` and `0.2.0` normalize into the same Core definitions; there is no `0.3.0` grouping syntax.
 
 The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
 

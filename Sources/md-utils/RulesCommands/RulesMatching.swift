@@ -35,7 +35,7 @@ extension CLIEntry.RulesCommands {
       if explain && explainNoSkips {
         throw ValidationError("Use either --explain or --explain-no-skips, not both.")
       }
-      let evaluations = try RulesValidatorRunner.rulesMatching(fileName: fileName)
+      let evaluations = try await RulesValidatorRunner.rulesMatching(fileName: fileName)
       print(RulesMatchingFormatter.render(
         evaluations,
         fileName: fileName,

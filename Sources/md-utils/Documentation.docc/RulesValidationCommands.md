@@ -10,7 +10,7 @@ Use `md-utils config init` to create the project configuration along with empty 
 
 Rules match Markdown files by project-relative glob patterns, optional file metadata conditions, optional frontmatter conditions, optional whole-frontmatter queries, and optional document conditions. Files can match more than one rule, in which case every matching check applies.
 
-Version `0.2.0` configs use a `rules` array. Version `0.1.0` configs using `schemaRules` still load as legacy configs.
+Version `0.2.0` configs use a `rules` array. Version `0.1.0` configs using `schemaRules` still load as legacy configs. Both versions normalize through `MarkdownUtilitiesCore` into one compiled registry before files are scanned; unknown versions or fields fail without being discarded. There is no version `0.3.0` syntax.
 
 ```bash
 md-utils config init
@@ -40,7 +40,7 @@ Missing keys are distinct from value inequality. A missing key does not match `d
 
 Date/time predicates support date-only `YYYY-MM-DD` operands and RFC 3339 date-time operands with `Z` or numeric offsets, such as `2020-01-01T12:00:00Z` and `2020-01-01T07:00:00-05:00`. Date-only operands compare at date precision. Date-time operands compare at date-time precision. A value with more precision can match a less precise rule; a value with less precision does not match a more precise rule.
 
-Whole-frontmatter predicates live under `rules[].match.frontmatterQuery`. Version `0.2.0` supports `jmespath`, evaluated with the same truthiness behavior as `md-utils fm search`.
+Whole-frontmatter predicates live under `rules[].match.frontmatterQuery`. Version `0.2.0` supports `jmespath`, evaluated by the CLI's serialized capability provider with truthiness defined by Core. The JMESPath dependency is intentionally not linked into portable Core or server targets.
 
 Logical grouping predicates `all`, `any`, and `not` are deferred to config schema `0.3.0`.
 

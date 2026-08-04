@@ -29,7 +29,7 @@ extension CLIEntry.RulesCommands {
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      let files = try RulesValidatorRunner.filesMatching(ruleName: ruleName)
+      let files = try await RulesValidatorRunner.filesMatching(ruleName: ruleName)
       print(RulesFilesMatchingFormatter.render(files, ruleName: ruleName, absolute: absolute))
     }
   }

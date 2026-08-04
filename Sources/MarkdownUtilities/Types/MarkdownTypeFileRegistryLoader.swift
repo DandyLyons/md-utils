@@ -148,10 +148,14 @@ public enum MarkdownRecordFileAdapter {
     let root = projectRoot.absolute().normalize()
     let file = path.absolute().normalize()
     let logicalPath = try MarkdownRecordPath(relativePath(from: root, to: file))
+    let attributes = try FileManager.default.attributesOfItem(atPath: file.string)
+    guard let modificationDate = attributes[.modificationDate] as? Date else {
+      throw MarkdownTypeFileLoaderError.recordMetadataUnavailable(file.string)
+    }
     return MarkdownRecord(
       identity: MarkdownRecordIdentity(rawValue: logicalPath.rawValue),
       content: try file.read(.utf8),
-      context: MarkdownRecordContext(path: logicalPath)
+      context: MarkdownRecordContext(path: logicalPath, modificationDate: modificationDate)
     )
   }
 
@@ -183,6 +187,7 @@ public enum MarkdownTypeFileLoaderError: Error, Equatable, LocalizedError {
   case invalidSchema(String)
   case recordNotUTF8(String)
   case recordOutsideProject(String)
+  case recordMetadataUnavailable(String)
 
   public var errorDescription: String? {
     switch self {
@@ -204,6 +209,8 @@ public enum MarkdownTypeFileLoaderError: Error, Equatable, LocalizedError {
       return "Markdown record could not be encoded as UTF-8: \(path)"
     case .recordOutsideProject(let path):
       return "Markdown record must be inside the project root: \(path)"
+    case .recordMetadataUnavailable(let path):
+      return "Markdown record modification date is unavailable: \(path)"
     }
   }
 }

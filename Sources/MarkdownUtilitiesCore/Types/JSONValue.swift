@@ -33,6 +33,13 @@ public enum JSONValue: Equatable, Sendable {
       self = .number(value)
     } else if let value = value as? String {
       self = .string(value)
+    } else if let value = value as? Date {
+      let formatter = DateFormatter()
+      formatter.calendar = Calendar(identifier: .gregorian)
+      formatter.locale = Locale(identifier: "en_US_POSIX")
+      formatter.timeZone = TimeZone(secondsFromGMT: 0)
+      formatter.dateFormat = "yyyy-MM-dd"
+      self = .string(formatter.string(from: value))
     } else if let value = value as? [Any] {
       self = .array(try value.map { try JSONValue(any: $0) })
     } else if let value = value as? [String: Any] {

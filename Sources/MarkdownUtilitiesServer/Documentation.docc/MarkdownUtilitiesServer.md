@@ -41,7 +41,11 @@ let configuration = MarkdownServerConfiguration(resources: [
     identityPolicy: MarkdownRecordIdentityPolicy(source: .existingIdentity)
   )
 ])
-let plan = try EndpointPlanCompiler(typeRegistry: registry).compile(configuration)
+let ruleRegistry = try MarkdownRuleCompiler(typeRegistry: registry).compile([])
+let plan = try EndpointPlanCompiler(
+  ruleRegistry: ruleRegistry,
+  typeRegistry: registry
+).compile(configuration)
 ```
 
 ## Canonical record storage
@@ -111,7 +115,7 @@ Issue #77 adapts these descriptions to Hummingbird 2. Issue #84 generates OpenAP
 ## Startup validation
 
 ``EndpointPlanCompiler`` validates all resources before a server accepts requests.
-It reports unsupported versions, missing or ambiguous references, unsafe paths,
+It reports unsupported versions, missing references, unsafe paths,
 duplicate names or operations, route ambiguity, and operation-ID collisions in one
 ``EndpointPlanCompilationError``. Diagnostics have stable codes and configuration
 locations and are deterministically ordered.

@@ -579,7 +579,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `path and tags includes matching validates matching files only`() throws {
+  func `path and tags includes matching validates matching files only`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
@@ -587,8 +587,8 @@ struct RulesCommandsTests {
     try writeFile(project + "Books/note.md", content: bookMarkdown(title: "Note", tags: ["Note"]))
     try writeFile(project + "Other/book.md", content: bookMarkdown(title: "Other", tags: ["Book"]))
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(summary.fileRuleMatches == 1)
       #expect(summary.results.first?.filePath == "Books/dune.md")
@@ -597,7 +597,28 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `rules files matching returns project relative predicate matches without running checks`() throws {
+  func `path filtering skips irrelevant files before record loading`() async throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    try writeSchemaProject(project)
+    try writeFile(project + "Books/dune.md", content: bookMarkdown(title: "Dune", tags: ["Book"]))
+
+    let irrelevantFile = project + "Other/invalid-utf8.md"
+    try irrelevantFile.parent().mkpath()
+    try Data([0xFF, 0xFE]).write(to: URL(fileURLWithPath: irrelevantFile.string))
+
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "books")
+      let matches = try await RulesValidatorRunner.filesMatching(ruleName: "books")
+
+      #expect(summary.fileRuleMatches == 1)
+      #expect(summary.results.first?.filePath == "Books/dune.md")
+      #expect(matches.map(\.lastComponent) == ["dune.md"])
+    }
+  }
+
+  @Test
+  func `rules files matching returns project relative predicate matches without running checks`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
@@ -605,8 +626,8 @@ struct RulesCommandsTests {
     try writeFile(project + "Books/note.md", content: bookMarkdown(title: "Note", tags: ["Note"]))
     try writeFile(project + "Other/book.md", content: bookMarkdown(title: "Other", tags: ["Book"]))
 
-    try withCurrentDirectory(project) {
-      let files = try RulesValidatorRunner.filesMatching(ruleName: "books")
+    try await withCurrentDirectory(project) {
+      let files = try await RulesValidatorRunner.filesMatching(ruleName: "books")
       let output = RulesFilesMatchingFormatter.render(files, ruleName: "books")
 
       #expect(output == "Books/dune.md")
@@ -614,14 +635,14 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `rules files matching can render absolute paths`() throws {
+  func `rules files matching can render absolute paths`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
     try writeFile(project + "Books/dune.md", content: bookMarkdown(tags: ["Book"]))
 
-    try withCurrentDirectory(project) {
-      let files = try RulesValidatorRunner.filesMatching(ruleName: "books")
+    try await withCurrentDirectory(project) {
+      let files = try await RulesValidatorRunner.filesMatching(ruleName: "books")
       let output = RulesFilesMatchingFormatter.render(files, ruleName: "books", absolute: true)
 
       #expect(output == (project + "Books/dune.md").absolute().string)
@@ -636,7 +657,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `rules matching returns matching rules for one file`() throws {
+  func `rules matching returns matching rules for one file`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -644,12 +665,16 @@ struct RulesCommandsTests {
       rules: [
         ruleJSON(name: "books", schema: "book.schema.json", paths: ["Books/**/*.md"], frontmatter: "\"tags\": { \"includes\": \"Book\" }"),
         ruleJSON(name: "drafts", schema: "draft.schema.json", paths: ["Drafts/**/*.md"]),
+      ],
+      schemas: [
+        "book.schema.json": requiredStringSchema(required: "title"),
+        "draft.schema.json": requiredStringSchema(required: "title"),
       ]
     )
     try writeFile(project + "Books/dune.md", content: bookMarkdown(tags: ["Book"]))
 
-    try withCurrentDirectory(project) {
-      let evaluations = try RulesValidatorRunner.rulesMatching(fileName: "Books/dune.md")
+    try await withCurrentDirectory(project) {
+      let evaluations = try await RulesValidatorRunner.rulesMatching(fileName: "Books/dune.md")
       let output = RulesMatchingFormatter.render(evaluations, fileName: "Books/dune.md")
 
       #expect(output == "books")
@@ -732,7 +757,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `double star path rule matches files in descendant folders`() throws {
+  func `double star path rule matches files in descendant folders`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -749,8 +774,8 @@ struct RulesCommandsTests {
     try writeFile(project + "INTEGRATIONS/Child/grandchild.md", content: bookMarkdown(title: "Grandchild", tags: ["Integration"]))
     try writeFile(project + "INTEGRATIONS/Child/Grandchild/deep.md", content: bookMarkdown(title: "Deep", tags: ["Integration"]))
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate(ruleName: "integrations")
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "integrations")
       let files = Set(summary.results.map(\.filePath))
 
       #expect(files == [
@@ -763,7 +788,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `missing frontmatter does not match rule with frontmatter matcher`() throws {
+  func `missing frontmatter does not match rule with frontmatter matcher`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -779,8 +804,8 @@ struct RulesCommandsTests {
     try writeFile(project + "INTEGRATIONS/INTEGRATIONS_README.md", content: "# Integrations\n")
     try writeFile(project + "INTEGRATIONS/github.md", content: bookMarkdown(title: "GitHub", tags: ["Integration"]))
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate(ruleName: "integrations")
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "integrations")
 
       #expect(summary.fileRuleMatches == 1)
       #expect(summary.results.first?.filePath == "INTEGRATIONS/github.md")
@@ -789,7 +814,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `same file can be validated by multiple rules`() throws {
+  func `same file can be validated by multiple rules`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -814,8 +839,8 @@ struct RulesCommandsTests {
         """
     )
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(summary.matchedFiles == 1)
       #expect(summary.fileRuleMatches == 2)
@@ -824,14 +849,14 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `files matching no rules are ignored`() throws {
+  func `files matching no rules are ignored`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
     try writeFile(project + "Notes/plain.md", content: "# Plain\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(summary.results.isEmpty)
       #expect(!summary.hasFailures)
@@ -839,7 +864,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `missing frontmatter is an error when required`() throws {
+  func `missing frontmatter is an error when required`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -848,8 +873,8 @@ struct RulesCommandsTests {
     )
     try writeFile(project + "Books/plain.md", content: "# Plain\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(summary.hasFailures)
       #expect(summary.results.first?.status == .error)
@@ -858,7 +883,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `missing frontmatter is skipped when not required`() throws {
+  func `missing frontmatter is skipped when not required`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -872,8 +897,8 @@ struct RulesCommandsTests {
     )
     try writeFile(project + "Books/plain.md", content: "# Plain\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(!summary.hasFailures)
       #expect(summary.results.first?.status == .skipped)
@@ -882,7 +907,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `invalid YAML frontmatter fails validation`() throws {
+  func `invalid YAML frontmatter fails validation`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
@@ -896,8 +921,8 @@ struct RulesCommandsTests {
         """
     )
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(summary.hasFailures)
       #expect(summary.results.first?.errors.first?.path == "frontmatter")
@@ -906,14 +931,14 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `schema errors report JSON pointer path`() throws {
+  func `schema errors report JSON pointer path`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(project)
     try writeFile(project + "Books/dune.md", content: bookMarkdown(tags: ["Book"]))
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(summary.hasFailures)
       #expect(summary.results.first?.status == .error)
@@ -922,7 +947,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `YAML to JSON edge cases validate documented types`() throws {
+  func `YAML to JSON edge cases validate documented types`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -968,8 +993,8 @@ struct RulesCommandsTests {
         """
     )
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(!summary.hasFailures)
       #expect(summary.results.first?.status == .ok)
@@ -977,7 +1002,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `empty frontmatter validates as empty object`() throws {
+  func `empty frontmatter validates as empty object`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeSchemaProject(
@@ -994,8 +1019,8 @@ struct RulesCommandsTests {
         """
     )
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate()
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate()
 
       #expect(!summary.hasFailures)
       #expect(summary.results.first?.status == .ok)
@@ -1003,7 +1028,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 boolean equals matcher selects matching files`() throws {
+  func `v2 boolean equals matcher selects matching files`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [ruleV2JSON(
@@ -1015,8 +1040,8 @@ struct RulesCommandsTests {
     try writeFile(project + "Posts/live.md", content: "---\npublish: true\n---\n# Live\n")
     try writeFile(project + "Posts/draft.md", content: "---\npublish: false\n---\n# Draft\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate(ruleName: "published")
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "published")
 
       #expect(summary.fileRuleMatches == 1)
       #expect(summary.results.first?.filePath == "Posts/live.md")
@@ -1025,7 +1050,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 not includes matcher excludes arrays containing value`() throws {
+  func `v2 not includes matcher excludes arrays containing value`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [ruleV2JSON(
@@ -1037,8 +1062,8 @@ struct RulesCommandsTests {
     try writeFile(project + "Notes/current.md", content: "---\ntags: [Current]\n---\n# Current\n")
     try writeFile(project + "Notes/old.md", content: "---\ntags: [DEPRECATED]\n---\n# Old\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate(ruleName: "current")
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "current")
 
       #expect(summary.fileRuleMatches == 1)
       #expect(summary.results.first?.filePath == "Notes/current.md")
@@ -1046,7 +1071,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 after and between date matchers select dates`() throws {
+  func `v2 after and between date matchers select dates`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [
@@ -1067,9 +1092,9 @@ struct RulesCommandsTests {
     try writeFile(project + "Dates/mid.md", content: "---\ndate: 2010-06-01\n---\n# Mid\n")
     try writeFile(project + "Dates/new.md", content: "---\ndate: 2020-01-01\n---\n# New\n")
 
-    try withCurrentDirectory(project) {
-      let after = try RulesValidatorRunner.validate(ruleName: "after-2000")
-      let range = try RulesValidatorRunner.validate(ruleName: "range")
+    try await withCurrentDirectory(project) {
+      let after = try await RulesValidatorRunner.validate(ruleName: "after-2000")
+      let range = try await RulesValidatorRunner.validate(ruleName: "range")
 
       #expect(Set(after.results.map(\.filePath)) == ["Dates/mid.md", "Dates/new.md"])
       #expect(Set(range.results.map(\.filePath)) == ["Dates/mid.md"])
@@ -1077,7 +1102,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 missing frontmatter key does not match predicate`() throws {
+  func `v2 missing frontmatter key does not match predicate`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [ruleV2JSON(
@@ -1088,15 +1113,15 @@ struct RulesCommandsTests {
     )])
     try writeFile(project + "Posts/missing.md", content: "---\ntitle: Missing\n---\n# Missing\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate(ruleName: "published")
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "published")
 
       #expect(summary.results.isEmpty)
     }
   }
 
   @Test
-  func `v2 equals and has heading matchers select matching files`() throws {
+  func `v2 equals and has heading matchers select matching files`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [ruleV2JSON(
@@ -1110,8 +1135,8 @@ struct RulesCommandsTests {
     try writeFile(project + "Posts/draft.md", content: "---\npublish: false\n---\n# Title\n\n## Summary\n")
     try writeFile(project + "Posts/no-summary.md", content: "---\npublish: true\n---\n# Title\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate(ruleName: "published-with-summary")
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "published-with-summary")
 
       #expect(summary.fileRuleMatches == 1)
       #expect(summary.results.first?.filePath == "Posts/match.md")
@@ -1122,7 +1147,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 document checks report required heading and body limits`() throws {
+  func `v2 document checks report required heading and body limits`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [ruleV2JSON(
@@ -1136,8 +1161,8 @@ struct RulesCommandsTests {
     )])
     try writeFile(project + "Docs/bad.md", content: "# Title\n\nOne two three four five\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate(ruleName: "body")
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "body")
       let paths = Set(summary.results.flatMap { $0.errors.map(\.path) })
 
       #expect(summary.hasFailures)
@@ -1146,7 +1171,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 missing keys only match doesnt have key`() throws {
+  func `v2 missing keys only match doesnt have key`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [
@@ -1166,9 +1191,9 @@ struct RulesCommandsTests {
     try writeFile(project + "Posts/missing.md", content: "---\ntitle: Missing\n---\n# Missing\n")
     try writeFile(project + "Posts/false.md", content: "---\ndraft: false\n---\n# False\n")
 
-    try withCurrentDirectory(project) {
-      let notDraft = try RulesValidatorRunner.validate(ruleName: "not-draft")
-      let noDraftKey = try RulesValidatorRunner.validate(ruleName: "no-draft-key")
+    try await withCurrentDirectory(project) {
+      let notDraft = try await RulesValidatorRunner.validate(ruleName: "not-draft")
+      let noDraftKey = try await RulesValidatorRunner.validate(ruleName: "no-draft-key")
 
       #expect(Set(notDraft.results.map(\.filePath)) == ["Posts/false.md"])
       #expect(Set(noDraftKey.results.map(\.filePath)) == ["Posts/missing.md"])
@@ -1176,7 +1201,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 frontmatter predicate wishlist selects expected files`() throws {
+  func `v2 frontmatter predicate wishlist selects expected files`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [
@@ -1202,10 +1227,10 @@ struct RulesCommandsTests {
     try writeFile(project + "Notes/match.md", content: "---\ntitle: Hello World\nscore: 5\nsummary: \"\"\nitems: []\nmeta: {}\ndescription: present\n---\n# Match\n")
     try writeFile(project + "Notes/nope.md", content: "---\ntitle: Goodbye\nscore: 6\nsummary: text\nitems: [one]\nmeta:\n  key: value\ndescription: \"\"\n---\n# Nope\n")
 
-    try withCurrentDirectory(project) {
-      let strings = try RulesValidatorRunner.validate(ruleName: "strings")
-      let numbers = try RulesValidatorRunner.validate(ruleName: "numbers")
-      let emptyValues = try RulesValidatorRunner.validate(ruleName: "empty-values")
+    try await withCurrentDirectory(project) {
+      let strings = try await RulesValidatorRunner.validate(ruleName: "strings")
+      let numbers = try await RulesValidatorRunner.validate(ruleName: "numbers")
+      let emptyValues = try await RulesValidatorRunner.validate(ruleName: "empty-values")
 
       #expect(Set(strings.results.map(\.filePath)) == ["Notes/match.md"])
       #expect(Set(numbers.results.map(\.filePath)) == ["Notes/match.md"])
@@ -1214,7 +1239,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 date time predicates use operand precision`() throws {
+  func `v2 date time predicates use operand precision`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [
@@ -1241,10 +1266,10 @@ struct RulesCommandsTests {
     try writeFile(project + "Dates/time.md", content: "---\ndate: \"2020-01-01T13:00:00Z\"\n---\n# Time\n")
     try writeFile(project + "Dates/old.md", content: "---\ndate: \"2019-12-31T23:59:59Z\"\n---\n# Old\n")
 
-    try withCurrentDirectory(project) {
-      let dateOnly = try RulesValidatorRunner.validate(ruleName: "date-only")
-      let dateTime = try RulesValidatorRunner.validate(ruleName: "date-time")
-      let offset = try RulesValidatorRunner.validate(ruleName: "offset")
+    try await withCurrentDirectory(project) {
+      let dateOnly = try await RulesValidatorRunner.validate(ruleName: "date-only")
+      let dateTime = try await RulesValidatorRunner.validate(ruleName: "date-time")
+      let offset = try await RulesValidatorRunner.validate(ruleName: "offset")
 
       #expect(Set(dateOnly.results.map(\.filePath)) == ["Dates/date.md", "Dates/time.md"])
       #expect(Set(dateTime.results.map(\.filePath)) == ["Dates/time.md"])
@@ -1253,7 +1278,7 @@ struct RulesCommandsTests {
   }
 
   @Test
-  func `v2 query document and file predicates select expected files`() throws {
+  func `v2 query document and file predicates select expected files`() async throws {
     let project = try createTempProject()
     defer { try? project.delete() }
     try writeRulesProject(project, rules: [ruleV2JSON(
@@ -1267,8 +1292,8 @@ struct RulesCommandsTests {
     try writeFile(project + "Docs/match.md", content: "---\nstatus: ready\n---\n# Title\n\n## Summary\nDetails [[Target]]\n")
     try writeFile(project + "Docs/other.md", content: "---\nstatus: ready\n---\n# Title\n\n## Summary\nDetails [[Target]]\n")
 
-    try withCurrentDirectory(project) {
-      let summary = try RulesValidatorRunner.validate(ruleName: "rich")
+    try await withCurrentDirectory(project) {
+      let summary = try await RulesValidatorRunner.validate(ruleName: "rich")
 
       #expect(Set(summary.results.map(\.filePath)) == ["Docs/match.md"])
     }
