@@ -98,13 +98,15 @@ extension CLIEntry.FrontMatterCommands {
       name: [.short, .long],
       help: "File extensions to process (comma-separated, no spaces)"
     )
-    var extensions: String = "md,markdown"
+    var extensions: String?
+    @OptionGroup var frontmatterSource: FrontMatterSourceOptions
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       // Convert path strings to Path objects
       let paths = pathStrings.isEmpty ? [Path.current] : pathStrings.map { Path($0) }
+      let reader = try frontmatterSource.makeReader()
       // Compile the JMESPath expression once
       let expression: JMESExpression
       do {
@@ -124,7 +126,8 @@ extension CLIEntry.FrontMatterCommands {
       let (matchingFiles, hadErrors) = processBatches(
         processedPaths,
         batchSize: 500,
-        using: expression
+        using: expression,
+        reader: reader
       )
 
       // Output results based on format
@@ -166,12 +169,12 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       // Filter by extensions
-      let exts: [String] = self.extensions
+      let exts: [String] = (self.extensions ?? "md,markdown")
         .split(separator: ",")
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         .filter { !$0.isEmpty }
 
-      if !exts.isEmpty {
+      if (!frontmatterSource.includeNonMarkdown || extensions != nil) && !exts.isEmpty {
         allPaths = allPaths.filter { path in
           guard let fileExt = path.extension?.lowercased() else { return false }
           return exts.contains(fileExt)
@@ -186,7 +189,8 @@ extension CLIEntry.FrontMatterCommands {
     private func processBatches(
       _ paths: [Path],
       batchSize: Int = 500,
-      using expression: JMESExpression
+      using expression: JMESExpression,
+      reader: FrontMatterFileReader
     ) -> (matches: [String], hadErrors: Bool) {
       var allMatches: [String] = []
       var hadErrors = false
@@ -200,7 +204,7 @@ extension CLIEntry.FrontMatterCommands {
           CLIStyle.writeStderr(CLIStyle.metadata("Processing batch \(batchNumber)/\(totalBatches)..."))
         }
 
-        let (batchMatches, batchHadErrors) = processBatch(batch, using: expression)
+        let (batchMatches, batchHadErrors) = processBatch(batch, using: expression, reader: reader)
         allMatches.append(contentsOf: batchMatches)
         hadErrors = hadErrors || batchHadErrors
       }
@@ -209,17 +213,19 @@ extension CLIEntry.FrontMatterCommands {
     }
 
     /// Process a single batch of files
-    private func processBatch(_ paths: [Path], using expression: JMESExpression) -> (matches: [String], hadErrors: Bool) {
+    private func processBatch(
+      _ paths: [Path],
+      using expression: JMESExpression,
+      reader: FrontMatterFileReader
+    ) -> (matches: [String], hadErrors: Bool) {
       var matches: [String] = []
       var hadErrors = false
 
       for path in paths {
         // Parse the file
-        let content: String
         let doc: MarkdownDocument
         do {
-          content = try path.read(.utf8)
-          doc = try MarkdownDocument(content: content)
+          doc = try reader.document(at: path)
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hadErrors = true

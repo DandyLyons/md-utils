@@ -1,10 +1,10 @@
 # yaml-language-server: $schema=https://dandylyons.github.io/treedocs/schemas/0.2.0/treedocs.schema.json
 schema_version: 0.2.0
 project:
-  last_updated: "2026-07-18"
+  last_updated: "2026-08-05"
   name: md-utils
   version: 0.0.0
-signature: sha256:32d6338411c68d542a0609a72b07b00ae07cc4841b0255f2c272175700d0a2fd
+signature: sha256:cf6256ea41b64d89ae3e2bf748b49fe59055d90eb3a55aa02a51800fa7b15c2d
 tree:
   .dockerignore: Docker build-context exclusions for local build artifacts and repository
     metadata.
@@ -58,6 +58,8 @@ tree:
           workflows.
         CSVConversion.md: DocC article for CSV conversion through the native MarkdownUtilities
           layer.
+        LoadingRuleContext.md: DocC article for loading filesystem record metadata
+          and schema resources before portable rule evaluation.
         MarkdownUtilities.md: DocC landing page for the MarkdownUtilities library.
       FileMetadata:
         _doc: Library types for reading filesystem metadata and extended attributes.
@@ -90,6 +92,8 @@ tree:
       Documentation.docc:
         _doc: DocC documentation catalog for the portable MarkdownUtilitiesCore API
           and workflows.
+        CompilingMarkdownRules.md: DocC article for validating rule definitions and
+          compiling their dependencies into an immutable registry.
         FormatConversionWorkflows.md: DocC article for converting Markdown documents
           to plain text.
         FrontmatterWorkflows.md: DocC article for reading and modifying YAML frontmatter.
@@ -99,8 +103,14 @@ tree:
           conformance, type hints, diagnostics, and fix-its.
         MarkdownUtilitiesCore.md: DocC landing page for the MarkdownUtilitiesCore
           library.
+        RecordIdentity.md: DocC article for stable record identity policies, collision
+          diagnostics, and logical-path fallback lookup.
         Resources:
           _doc: Resource directory for MarkdownUtilitiesCore DocC assets.
+        RuleConfigurationVersions.md: DocC article for decoding and encoding supported
+          project configuration schema versions through one normalized rule model.
+        RuleRuntimeCapabilities.md: DocC article separating portable rule semantics
+          from filesystem metadata and query capabilities supplied by hosts.
         SectionWorkflows.md: DocC article for extracting, inserting, replacing, and
           reordering Markdown sections.
         WorkingWithMarkdownDocuments.md: DocC article introducing MarkdownDocument
@@ -147,6 +157,10 @@ tree:
           frontmatter values.
         MarkdownDocument+FrontMatterMutation.swift: Mutation APIs for setting, removing,
           and renaming frontmatter keys.
+        WrappedFrontMatterConfiguration.swift: Defines built-in and project-configured
+          wrapped-frontmatter syntaxes and extension mappings.
+        WrappedFrontMatterParser.swift: Discovers LF-delimited, comment-wrapped YAML
+          frontmatter blocks and reports duplicate-block source locations.
         YAMLConversion.swift: Conversion helpers between Yams nodes and Swift values.
       HeadingAdjustment:
         _doc: Heading promotion and demotion logic that preserves Markdown section
@@ -166,10 +180,14 @@ tree:
       Rules:
         _doc: Portable Markdown rule models and check evaluation shared by library
           and CLI clients.
-        MarkdownRuleCheckEvaluator.swift: Evaluates portable frontmatter-schema, heading,
-          line, and word-count rule checks.
-        MarkdownRuleDefinition.swift: Defines rule applicability, requirements, recommendations,
-          and type-conformance predicates.
+        MarkdownRuleChecker.swift: Evaluates compiled rule applicability and checks
+          against analyzed Markdown records.
+        MarkdownRuleCompiler.swift: Validates rule definitions, resolves schemas and
+          type references, and produces immutable compiled rule registries.
+        MarkdownRuleConfiguration.swift: Decodes and encodes supported md-utils config
+          schema versions into normalized Core rule definitions.
+        MarkdownRuleModel.swift: Defines portable rule predicates, applicability,
+          checks, evidence, assessments, and runtime capabilities.
       SectionExtraction:
         _doc: Logic for finding, extracting, inserting, and replacing heading-delimited
           Markdown sections.
@@ -214,6 +232,8 @@ tree:
           logical path, and type-hint models.
         MarkdownRecordAnalyzer.swift: Parses canonical record content once into reusable
           frontmatter, body, AST, and outline analysis.
+        MarkdownRecordIdentityIndex.swift: Derives configured record identities,
+          reports collisions, and provides primary and logical-path lookups.
         MarkdownTypeChecker.swift: Assesses records against named types, predicates,
           recommendations, and declared type hints.
         MarkdownTypeDefinition.swift: Defines named versioned type contracts across
@@ -232,6 +252,27 @@ tree:
         WikilinkAnchor.swift: Model for heading or block anchors inside wikilinks.
         WikilinkParser.swift: Parser for Obsidian-style double-bracket wikilink syntax.
         WikilinkScanner.swift: Scans Markdown text for wikilink occurrences.
+    MarkdownUtilitiesServer:
+      _doc: Transport-neutral endpoint planning, record storage contracts, and immutable
+        read snapshots for serving Markdown resources.
+      Documentation.docc:
+        _doc: DocC documentation catalog for the MarkdownUtilitiesServer library.
+        MarkdownUtilitiesServer.md: DocC landing page for transport-neutral Markdown
+          resource serving and record storage.
+        ReadSnapshots.md: DocC article for building immutable resource collections
+          and collision-safe record lookup snapshots.
+      EndpointConfiguration.swift: Codable configuration models for resources,
+        selection, projection, operations, and operation-ID overrides.
+      EndpointPlan.swift: Immutable compiled resource, route, search-root, and operation
+        models shared by serving and OpenAPI layers.
+      EndpointPlanCompiler.swift: Validates server resource configuration and compiles
+        deterministic endpoint plans with aggregated diagnostics.
+      InMemoryRecordStore.swift: Actor-backed in-memory RecordStore implementation
+        with revision-aware create, replace, delete, and paged queries.
+      MarkdownServerReadSnapshot.swift: Builds immutable analyzed resource snapshots,
+        memberships, assessments, identities, diagnostics, and lookups.
+      RecordStore.swift: Storage-neutral asynchronous contract and error models for
+        canonical Markdown record persistence and enumeration.
     md-utils:
       _doc: Command-line executable target built on the MarkdownUtilities library.
       AgentCommands:
@@ -261,6 +302,8 @@ tree:
         ConfigCommands.swift: Parent command for configuration-related subcommands.
         ConfigInfo.swift: Command that reports md-utils CLI and configuration schema
           information.
+        ConfigInit.swift: Command that initializes versioned project configuration,
+          local schemas, and supporting directories.
         ConfigMigrate.swift: Command that migrates older md-utils configuration files
           to the current schema.
         ConfigSchema.swift: Embedded schema model for md-utils configuration files.
@@ -314,6 +357,11 @@ tree:
         ArrayRemove.swift: Command that removes values from frontmatter arrays.
         Dump.swift: Command that dumps complete frontmatter in supported formats.
         FrontMatterCommands.swift: Parent command for frontmatter subcommands.
+        FrontMatterJMESPath.swift: Shared JMESPath compilation, conversion, and error
+          handling for CLI frontmatter queries.
+        FrontMatterReadSupport.swift: Resolves wrapped-frontmatter CLI options, project
+          configuration, presets, file selection, and read diagnostics for non-Markdown
+          files.
         Get.swift: Command that reads a frontmatter value by key.
         Has.swift: Command that checks whether a frontmatter key exists.
         List.swift: Command that lists frontmatter keys and values.
@@ -325,6 +373,8 @@ tree:
         SortKeys.swift: Command that sorts frontmatter keys.
         Touch.swift: Command that creates frontmatter if missing or updates document
           metadata.
+        Unique.swift: Command, analyzer, and renderers for checking uniqueness of
+          scalar values selected from frontmatter with JMESPath.
       GlobalOptions.swift: Shared command-line options used across md-utils commands.
       HeadingCommands:
         _doc: CLI commands for promoting and demoting Markdown heading levels.
@@ -357,19 +407,21 @@ tree:
           0.1.0.
         0.2.0_md-utils.schema.json: Bundled JSON Schema for md-utils rules config
           version 0.2.0.
+        0.2.1_md-utils.schema.json: Bundled JSON Schema for md-utils config version
+          0.2.1, including wrapped-frontmatter syntax and extension configuration.
         1_md-utils-type.schema.json: Bundled JSON Schema for Markdown type-definition
           format version 1.
         OKF-concept.schema.json: Bundled JSON Schema for OKF concept metadata validation.
         SKILL.md: Embedded copy of the markdown-utilities agent skill instructions.
       RulesCommands:
         _doc: CLI rules command group implementation for project-level Markdown validation.
+        JMESPathRuleCapabilityProvider.swift: Serialized CLI capability provider for
+          compiling and evaluating whole-frontmatter JMESPath rule predicates.
         RulesAdd.swift: Command that adds frontmatter schema-backed rules to configuration.
         RulesCommands.swift: Parent command for rules-related subcommands.
         RulesDescribe.swift: Command and renderers for describing configured rules
           and JSON Schema checks.
         RulesFilesMatching.swift: Command that lists files matched by configured rules.
-        RulesInit.swift: Command that bootstraps rules configuration and an initial
-          frontmatter schema check.
         RulesList.swift: Command that lists configured rules and checks.
         RulesMatching.swift: Command that reports which configured rules match a file.
         RulesRemove.swift: Command that removes configured rules and optionally deletes
@@ -436,6 +488,8 @@ tree:
           body text.
         SafeNodeToSwiftValueTests.swift: Tests safe conversion from Yams nodes to
           Swift values.
+        WrappedFrontMatterParserTests.swift: Tests LF-only wrapped-frontmatter extraction,
+          discovery throughout source files, incomplete candidates, and duplicate locations.
       HeadingAdjustment:
         _doc: Tests for heading promotion, demotion, reconstruction, and scopes.
         EdgeCaseTests.swift: Tests heading-adjustment edge cases.
@@ -455,6 +509,10 @@ tree:
         _doc: Tests for portable Markdown rule applicability and check evaluation.
         MarkdownRuleCheckerTests.swift: Verifies rule matching, type predicates, checks,
           and advisory semantics.
+        MarkdownRuleCompilerTests.swift: Tests rule compilation validation, capability
+          requirements, schema resolution, and registry construction.
+        MarkdownRuleConfigurationTests.swift: Tests normalization and round trips for
+          supported versioned rule and wrapped-frontmatter configuration.
       SectionExtraction:
         _doc: Tests for section boundary detection, extraction, insertion, and replacement.
         MarkdownDocumentSectionExtractionTests.swift: Tests MarkdownDocument section-extraction
@@ -483,6 +541,8 @@ tree:
       Types:
         _doc: Tests for portable Markdown type definitions, assessment, diagnostics,
           hints, and fixes.
+        MarkdownRecordIdentityIndexTests.swift: Tests record identity derivation,
+          collisions, diagnostics, fallback paths, lookup, and Codable behavior.
         MarkdownTypeCheckerTests.swift: Verifies structural conformance, schema checks,
           body and context predicates, diagnostics, hints, and fixes.
         MarkdownTypeDefinitionTests.swift: Verifies YAML and JSON definition decoding,
@@ -493,6 +553,15 @@ tree:
           APIs.
         WikilinkParserTests.swift: Tests parsing double-bracket wikilink syntax.
         WikilinkScannerTests.swift: Tests scanning Markdown text for wikilinks.
+    MarkdownUtilitiesServerTests:
+      _doc: Unit tests for endpoint planning, record storage, and read snapshots in
+        MarkdownUtilitiesServer.
+      EndpointPlanCompilerTests.swift: Tests deterministic route planning, configuration
+        validation, diagnostics, and dependency drift detection.
+      InMemoryRecordStoreTests.swift: Tests record-store revisions, paging, conflicts,
+        cancellation, and concurrency-safe mutations.
+      MarkdownServerReadSnapshotTests.swift: Tests record selection, shared analysis,
+        resource membership, identity indexes, diagnostics, and snapshot lookup.
     MarkdownUtilitiesTests:
       _doc: Unit tests for the MarkdownUtilities library target.
       FileMetadata:
@@ -532,6 +601,8 @@ tree:
           ArrayPrependTests.swift: Tests prepending values to frontmatter arrays.
           ArrayRemoveTests.swift: Tests removing values from frontmatter arrays.
           DumpTests.swift: Tests dumping frontmatter in supported formats.
+          FrontMatterReadSupportTests.swift: Tests non-Markdown frontmatter presets,
+            duplicate diagnostics, CLI options, and extension filtering.
           GetTests.swift: Tests reading frontmatter values.
           HasTests.swift: Tests frontmatter key existence checks.
           ListTests.swift: Tests listing frontmatter keys and values.
@@ -541,6 +612,8 @@ tree:
           SearchTests.swift: Tests JMESPath frontmatter searches.
           SetTests.swift: Tests setting frontmatter values.
           SortKeysTests.swift: Tests sorting frontmatter keys.
+          UniqueTests.swift: Tests frontmatter uniqueness analysis, reference mode,
+            typed scalars, missing values, diagnostics, rendering, and CLI behavior.
         LinesTests.swift: Tests line range extraction command behavior.
         LinkCommandsTests.swift: Tests wikilink command behavior.
         OKFCommandsTests.swift: Tests Open Knowledge Format command behavior.
@@ -566,6 +639,10 @@ tree:
     portability-audit.md: Audit of Core portability boundaries, platform dependencies,
       and Linux validation.
     release-procedures.md: Versioning and release process documentation.
+    rfcs:
+      _doc: Versioned design specifications for md-utils domain models and behavior.
+      0001-mdtype.md: Implemented RFC for structural, non-exclusive Markdown record
+        types spanning frontmatter, body, and host-provided context.
     server-architecture.md: Proposed architecture for server-side and embedded md-utils
       integrations.
     swift-coding-standards.md: Swift style and safety rules used in this package.
@@ -604,6 +681,14 @@ tree:
           config version 0.2.0.
         md-utils.schema.json: Public editor schema for md-utils rules config version
           0.2.0.
+      0.2.1:
+        _doc: Public JSON Schema files for md-utils config schema version 0.2.1.
+        md-utils-0.2.1.schema.json: Named immutable public schema copy for md-utils
+          config version 0.2.1.
+        md-utils.schema.json: Public editor schema for md-utils config version 0.2.1,
+          including wrapped-frontmatter configuration.
+      CHANGELOG.md: Reverse-chronological changes between published md-utils config
+        schema versions, with links to schemas and relevant implementation artifacts.
     styles.css: Stylesheet for the md-utils GitHub Pages site.
   skill:
     _doc: Packaged markdown-utilities agent skill distribution files.

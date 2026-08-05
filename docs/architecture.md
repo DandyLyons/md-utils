@@ -41,7 +41,7 @@ A document is a successfully parsed content view and deliberately has no persist
 - `MarkdownDiagnostic` distinguishes errors from advisories and can carry structured fix-its.
 - `MarkdownTypeFixer` applies selected edits in memory; native and CLI layers own persistence and interaction.
 
-Types are structural and non-exclusive. Rules and types remain distinct domain models even where they share analysis and predicate evaluation. Config versions `0.1.0` and `0.2.0` normalize into the same Core definitions; there is no `0.3.0` grouping syntax.
+Types are structural and non-exclusive. Rules and types remain distinct domain models even where they share analysis and predicate evaluation. Config versions `0.1.0`, `0.2.0`, and `0.2.1` normalize into the same Core rule definitions; `0.2.1` also carries wrapped-frontmatter settings. There is no `0.3.0` grouping syntax.
 
 The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
 

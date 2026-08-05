@@ -65,6 +65,7 @@ extension CLIEntry.FrontMatterCommands {
     var expression: String
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var frontmatterSource: FrontMatterSourceOptions
 
     @Option(
       name: .long,
@@ -93,7 +94,8 @@ extension CLIEntry.FrontMatterCommands {
           """)
       }
 
-      let resolved = try options.resolvedPaths()
+      let reader = try frontmatterSource.makeReader()
+      let resolved = try options.resolvedPaths(includeAllExtensions: frontmatterSource.includeNonMarkdown)
       guard resolved.isEmpty == false else {
         throw ValidationError("No Markdown files found to process")
       }
@@ -111,7 +113,8 @@ extension CLIEntry.FrontMatterCommands {
         expression: expression,
         compiledExpression: compiledExpression,
         files: comparisonFiles,
-        reference: referencePath
+        reference: referencePath,
+        reader: reader
       )
       print(try UniqueRenderer.render(report, format: format, requireValue: requireValue))
 
@@ -309,9 +312,10 @@ enum UniqueAnalyzer {
     expression: String,
     compiledExpression: JMESExpression,
     files: [Path],
-    reference: Path?
+    reference: Path?,
+    reader: FrontMatterFileReader? = nil
   ) -> UniqueReport {
-    let evaluations = files.map { evaluate($0, using: compiledExpression) }
+    let evaluations = files.map { evaluate($0, using: compiledExpression, reader: reader) }
     let missingPaths = evaluations.compactMap { evaluation in
       evaluation.isMissing ? evaluation.path : nil
     }
@@ -320,7 +324,7 @@ enum UniqueAnalyzer {
 
     let collisions: [UniqueCollision]
     if let reference {
-      let referenceEvaluation = evaluate(reference, using: compiledExpression)
+      let referenceEvaluation = evaluate(reference, using: compiledExpression, reader: reader)
       var combinedMissing = missingPaths
       var combinedDiagnostics = diagnostics
       if referenceEvaluation.isMissing {
@@ -384,9 +388,17 @@ enum UniqueAnalyzer {
     )
   }
 
-  private static func evaluate(_ path: Path, using expression: JMESExpression) -> UniqueFileEvaluation {
+  private static func evaluate(
+    _ path: Path,
+    using expression: JMESExpression,
+    reader: FrontMatterFileReader?
+  ) -> UniqueFileEvaluation {
     do {
-      let document = try MarkdownDocument(content: path.read(.utf8))
+      let document = if let reader {
+        try reader.document(at: path)
+      } else {
+        try MarkdownDocument(content: path.read(.utf8))
+      }
       let object = try FrontMatterJMESPath.object(from: document)
       let result = try expression.search(object: object)
       let scalar = try UniqueScalar.scalar(from: result)

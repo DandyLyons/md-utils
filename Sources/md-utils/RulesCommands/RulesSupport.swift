@@ -22,6 +22,7 @@ struct MdUtilsConfig {
   var schemaReference: String?
   var schemaDirectory: String
   var schemaRules: [Rule]
+  var frontmatter: WrappedFrontMatterProjectConfiguration?
   private var normalizedRules: [MarkdownRuleDefinition]?
   /// Creates a configured instance.
   ///
@@ -30,12 +31,14 @@ struct MdUtilsConfig {
     configVersion: String = Self.defaultConfigVersion,
     schemaReference: String? = ConfigSchemaRegistry.publicSchemaURL(for: ConfigSchemaRegistry.defaultVersion),
     schemaDirectory: String = Self.defaultSchemaDirectory,
-    schemaRules: [Rule] = []
+    schemaRules: [Rule] = [],
+    frontmatter: WrappedFrontMatterProjectConfiguration? = nil
   ) {
     self.configVersion = configVersion
     self.schemaReference = schemaReference
     self.schemaDirectory = schemaDirectory
     self.schemaRules = schemaRules
+    self.frontmatter = frontmatter
     self.normalizedRules = nil
   }
   /// Loads the requested data from disk.
@@ -72,7 +75,8 @@ struct MdUtilsConfig {
       configVersion: normalized.configVersion,
       schemaReference: normalized.schemaReference,
       schemaDirectory: normalized.schemaDirectory,
-      schemaRules: rules
+      schemaRules: rules,
+      frontmatter: normalized.frontmatter
     )
     config.normalizedRules = normalized.rules
     return config
@@ -86,7 +90,8 @@ struct MdUtilsConfig {
       configVersion: configVersion,
       schemaReference: schemaReference,
       schemaDirectory: schemaDirectory,
-      rules: definitions
+      rules: definitions,
+      frontmatter: frontmatter
     )
     try path.write(try MarkdownRuleConfigurationEncoder.encode(configuration))
   }
@@ -124,9 +129,9 @@ extension MdUtilsConfig {
 
 /// Selects bundled md-utils config schemas by config schema version.
 enum ConfigSchemaRegistry {
-  static let defaultVersion = "0.2.0"
+  static let defaultVersion = "0.2.1"
   static let legacyVersion = "0.1.0"
-  static let supportedVersions = ["0.1.0", "0.2.0"]
+  static let supportedVersions = ["0.1.0", "0.2.0", "0.2.1"]
 
   static func detectVersion(in object: [String: Any], path: Path) throws -> String {
     guard let rawVersion = object["configVersion"] else {

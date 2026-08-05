@@ -37,7 +37,7 @@ struct GlobalOptions: ParsableArguments {
     name: .long,
     help: "File extensions to process (comma-separated, default: md,markdown)"
   )
-  var extensions: String = "md,markdown"
+  var extensions: String?
 
   /// Disable alphabetical sorting of file paths.
   @Flag(
@@ -62,12 +62,15 @@ struct GlobalOptions: ParsableArguments {
   ///
   /// - Returns: Array of file paths to process
   /// - Throws: If a specified path doesn't exist
-  func resolvedPaths() throws -> [Path] {
+  func resolvedPaths(includeAllExtensions: Bool = false) throws -> [Path] {
     // If no paths specified, use current directory
     let pathsToProcess = paths.isEmpty ? [Path.current] : paths
 
     var resolvedFiles: [Path] = []
-    let allowedExtensions = Set(extensions.split(separator: ",").map(String.init))
+    let extensionSelection = extensions ?? "md,markdown"
+    let allowedExtensions = includeAllExtensions && extensions == nil
+      ? nil
+      : Set(extensionSelection.split(separator: ",").map(String.init))
     let excludePatterns = exclude.map { $0.absolute().string }
 
     for path in pathsToProcess {
@@ -108,7 +111,7 @@ struct GlobalOptions: ParsableArguments {
     _ directory: Path,
     recursive: Bool,
     includeHidden: Bool,
-    extensions: Set<String>,
+    extensions: Set<String>?,
     excludePatterns: [String]
   ) throws -> [Path] {
     var files: [Path] = []
@@ -150,7 +153,8 @@ struct GlobalOptions: ParsableArguments {
   }
 
   /// Check if a file matches the allowed extensions.
-  private func matchesExtension(_ path: Path, allowedExtensions: Set<String>) -> Bool {
+  private func matchesExtension(_ path: Path, allowedExtensions: Set<String>?) -> Bool {
+    guard let allowedExtensions else { return true }
     guard let ext = path.extension else {
       return false
     }

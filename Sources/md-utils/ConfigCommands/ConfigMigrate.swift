@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilitiesCore
 import PathKit
 
 /// Adds config migration support to ``CLIEntry.ConfigCommands``.
@@ -96,7 +97,12 @@ enum ConfigMigrator {
       )
     }
 
-    guard sourceVersion == ConfigSchemaRegistry.legacyVersion && targetVersion == ConfigSchemaRegistry.defaultVersion else {
+    let supportedUpgrade =
+      (sourceVersion == ConfigSchemaRegistry.legacyVersion
+        && targetVersion != ConfigSchemaRegistry.legacyVersion)
+      || (sourceVersion == MarkdownRuleConfigurationSchemaVersion.rules
+        && targetVersion == MarkdownRuleConfigurationSchemaVersion.current)
+    guard supportedUpgrade else {
       throw ValidationError("Unsupported config migration path: \(sourceVersion) -> \(targetVersion)")
     }
 

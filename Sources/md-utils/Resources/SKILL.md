@@ -58,7 +58,7 @@ md-utils rules validate
 
 ## Project Rules
 
-Use `md-utils rules` when a repository has `.md-utils/md-utils.json` or needs Markdown linting. Config schema `0.2.0` uses `rules[]` with path/file, frontmatter, whole-frontmatter JMESPath, and document predicates. Supported checks include `frontmatterSchema`, `requiredHeading`, `maxBodyLines`, and `maxBodyWords`.
+Use `md-utils rules` when a repository has `.md-utils/md-utils.json` or needs Markdown linting. Config schema `0.2.1` uses `rules[]` with path/file, frontmatter, whole-frontmatter JMESPath, and document predicates, and adds optional wrapped-frontmatter syntax and extension configuration. Supported checks include `frontmatterSchema`, `requiredHeading`, `maxBodyLines`, and `maxBodyWords`.
 
 Important predicate semantics: missing frontmatter keys are not inequality, so `doesntEqual`, `notIncludes`, and `notIn` do not match missing keys; use `doesntHaveKey` for absence. Date predicates support `YYYY-MM-DD` and RFC 3339 timestamps with `Z` or numeric offsets and compare at the operand's precision. Logical grouping predicates `all`, `any`, and `not`, plus `hasBrokenWikilink`, are not part of config schema `0.2.0`.
 

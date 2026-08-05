@@ -75,4 +75,53 @@ struct MarkdownRuleConfigurationTests {
     let encoded = try MarkdownRuleConfigurationEncoder.encode(configuration)
     #expect(try MarkdownRuleConfigurationDecoder.decode(encoded) == configuration)
   }
+
+  @Test
+  func `Current configuration round trips wrapped frontmatter settings`() throws {
+    let source = """
+      {
+        "configVersion": "0.2.1",
+        "schemaDirectory": ".md-utils/schemas/",
+        "rules": [],
+        "frontmatter": {
+          "useBuiltInPresets": false,
+          "syntaxes": {
+            "erb-comment": {
+              "commentOpen": "<%#",
+              "commentClose": "%>"
+            }
+          },
+          "extensionMappings": {
+            ".ERB": "erb-comment",
+            "swift": "c-block"
+          }
+        }
+      }
+      """
+
+    let configuration = try MarkdownRuleConfigurationDecoder.decode(source)
+    let frontmatter = try #require(configuration.frontmatter)
+    #expect(frontmatter.useBuiltInPresets == false)
+    #expect(frontmatter.extensionMappings == ["erb": "erb-comment", "swift": "c-block"])
+    #expect(frontmatter.syntax(named: "erb-comment")?.openingCommentDelimiter == "<%#")
+
+    let encoded = try MarkdownRuleConfigurationEncoder.encode(configuration)
+    #expect(try MarkdownRuleConfigurationDecoder.decode(encoded) == configuration)
+  }
+
+  @Test
+  func `Rules schema version rejects wrapped frontmatter settings`() {
+    let source = """
+      {
+        "configVersion": "0.2.0",
+        "schemaDirectory": ".md-utils/schemas/",
+        "rules": [],
+        "frontmatter": { "useBuiltInPresets": true }
+      }
+      """
+
+    #expect(throws: MarkdownRuleConfigurationError.self) {
+      try MarkdownRuleConfigurationDecoder.decode(source)
+    }
+  }
 }

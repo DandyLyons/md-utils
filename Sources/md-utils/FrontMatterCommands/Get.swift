@@ -43,6 +43,7 @@ extension CLIEntry.FrontMatterCommands {
     )
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var frontmatterSource: FrontMatterSourceOptions
 
     @Option(name: .long, help: "The frontmatter key to retrieve")
     var key: String
@@ -63,7 +64,8 @@ extension CLIEntry.FrontMatterCommands {
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
-      let files = try options.resolvedPaths()
+      let reader = try frontmatterSource.makeReader()
+      let files = try options.resolvedPaths(includeAllExtensions: frontmatterSource.includeNonMarkdown)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -76,8 +78,7 @@ extension CLIEntry.FrontMatterCommands {
         var results: [[String: Any]] = []
         for file in files {
           do {
-            let content: String = try file.read()
-            let doc = try MarkdownDocument(content: content)
+            let doc = try reader.document(at: file)
 
             if let value = doc.getValue(forKey: key) {
               // Key found — include "value" (NSNull if YAML value is null)
@@ -103,8 +104,7 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          let doc = try MarkdownDocument(content: content)
+          let doc = try reader.document(at: file)
           processedCount += 1
 
           guard let value = doc.getValue(forKey: key) else {

@@ -29,9 +29,11 @@ extension CLIEntry.FrontMatterCommands {
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var frontmatterSource: FrontMatterSourceOptions
 
     mutating func run() async throws {
-      let files = try options.resolvedPaths()
+      let reader = try frontmatterSource.makeReader()
+      let files = try options.resolvedPaths(includeAllExtensions: frontmatterSource.includeNonMarkdown)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -41,8 +43,7 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          let doc = try MarkdownDocument(content: content)
+          let doc = try reader.document(at: file)
 
           // Extract keys from frontmatter
           let keys = Array(doc.frontMatter.keys)

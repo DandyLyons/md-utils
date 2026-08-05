@@ -254,9 +254,9 @@ Compatibility:
 
 | CLI version | Supported config schema versions | Default generated config schema version |
 | --- | --- | --- |
-| 0.1.0-alpha | 0.1.0, 0.2.0 | 0.2.0 |
+| 0.1.0-alpha | 0.1.0, 0.2.0, 0.2.1 | 0.2.1 |
 
-The config schema is published at `https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json` for editor integration and IDE IntelliSense. The moving `https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json` alias points to the latest published schema, and `https://dandylyons.github.io/md-utils/md-utils.schema.json` is maintained as a root compatibility alias. Runtime config validation does not fetch these URLs; the CLI validates configs against bundled schemas selected by `configVersion`.
+The config schema is published at `https://dandylyons.github.io/md-utils/schemas/0.2.1/md-utils.schema.json` for editor integration and IDE IntelliSense. The moving `https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json` alias points to the latest published schema, and `https://dandylyons.github.io/md-utils/md-utils.schema.json` is maintained as a root compatibility alias. Runtime config validation does not fetch these URLs; the CLI validates configs against bundled schemas selected by `configVersion`.
 
 Treat the directory containing `.md-utils/` as the md-utils project root. Commands that use project configuration read `.md-utils/md-utils.json` relative to the current working directory; md-utils does not search parent directories for project configuration. Run rules/config commands from the directory that contains `.md-utils/`:
 
@@ -281,8 +281,8 @@ Example config:
 
 ```json
 {
-  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json",
-  "configVersion": "0.2.0",
+  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.2.1/md-utils.schema.json",
+  "configVersion": "0.2.1",
   "schemaDirectory": ".md-utils/schemas/",
   "rules": [
     {
@@ -334,6 +334,7 @@ Config fields:
 - `$schema`: Optional editor hint for autocomplete, validation, and IDE IntelliSense. Runtime behavior is not driven by this URL.
 - `configVersion`: md-utils config schema version. This is independent from the md-utils CLI version.
 - `schemaDirectory`: Directory for JSON Schema files. Defaults to `.md-utils/schemas/`.
+- `frontmatter`: Optional wrapped-frontmatter presets, named syntaxes, and extension mappings for explicitly opted-in non-Markdown scans.
 - `rules`: Rules that map Markdown files to one or more checks.
 - `rules[].name`: Unique rule name for `md-utils rules validate <rule-name>`.
 - `rules[].match.paths`: Glob patterns matched against project-relative Markdown paths.
@@ -392,9 +393,12 @@ site/
     0.2.0/
       md-utils.schema.json
       md-utils-0.2.0.schema.json
+    0.2.1/
+      md-utils.schema.json
+      md-utils-0.2.1.schema.json
 ```
 
-The bundled CLI schema in `Sources/md-utils/Resources/0.2.0_md-utils.schema.json` remains canonical for CLI behavior for config schema `0.2.0`. Public schema copies must match it exactly, so run `python3 scripts/validate-schema-publication.py` before publishing schema changes.
+The bundled CLI schema in `Sources/md-utils/Resources/0.2.1_md-utils.schema.json` is canonical for CLI behavior for config schema `0.2.1`. Public schema copies must match it exactly, so run `python3 scripts/validate-schema-publication.py` before publishing schema changes.
 
 When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json` to both `md-utils.schema.json` at the site root and `schemas/latest/md-utils.schema.json`. Versioned schema URLs are immutable after release. For future schema releases, add a new versioned folder under `site/schemas/`, update `CURRENT_MD_UTILS_JSONSCHEMA_VERSION` in `.github/workflows/pages.yml`, and keep the canonical bundled schema synchronized with the new published copy. Do not edit already-published versioned schema files; publish a new version instead.
 

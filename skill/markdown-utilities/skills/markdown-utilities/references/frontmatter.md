@@ -76,6 +76,28 @@ md-utils fm dump posts/ --cat-headers
 
 **Formats:** `json` (default), `yaml`, `raw`, `plist`
 
+## Read Wrapped Frontmatter from Non-Markdown Files
+
+The read-only `dump`, `get`, `has`, `list`, `search`, and `unique` commands can
+scan comment-wrapped YAML frontmatter in non-Markdown text files after explicit
+opt-in:
+
+```bash
+md-utils fm get --key title --include-non-md Sources/Example.swift
+md-utils fm search 'status == `"published"`' --include-non-md Sources/
+```
+
+Common file extensions infer built-in C-style block, HTML comment, Python
+triple-quoted string, PowerShell block, and Lua block wrappers. Override
+inference with `--frontmatter-syntax`, or supply both
+`--frontmatter-comment-open` and `--frontmatter-comment-close` for a one-off
+wrapper. `--no-frontmatter-presets` disables built-in extension inference;
+project-defined extension mappings can still apply.
+
+The YAML boundaries are always `---`. Place metadata near the beginning when
+practical. Pure CRLF input, `...` YAML closers, per-line comment envelopes, and
+wrapped-frontmatter mutation are unsupported.
+
 ## Search with JMESPath
 
 `fm search` filters files using a JMESPath expression evaluated against each file's frontmatter. Outputs matching file paths.

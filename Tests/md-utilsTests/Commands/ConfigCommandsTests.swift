@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import MarkdownUtilitiesCore
 import PathKit
 import Testing
 @testable import md_utils
@@ -54,7 +55,7 @@ struct ConfigCommandsTests {
 
   @Test
   func `config schema printer returns bundled schema`() throws {
-    let bundledURL = repoRoot().appending(path: "Sources/md-utils/Resources/0.2.0_md-utils.schema.json")
+    let bundledURL = repoRoot().appending(path: "Sources/md-utils/Resources/0.2.1_md-utils.schema.json")
     let expected = try String(contentsOf: bundledURL, encoding: .utf8)
 
     #expect(try ConfigSchemaPrinter.content() == expected)
@@ -187,7 +188,7 @@ struct ConfigCommandsTests {
     try writeCurrentConfig(project)
     let configPath = project + ".md-utils/md-utils.json"
 
-    let result = try ConfigMigrator.migrate(configPath: configPath, to: "0.2.0")
+    let result = try ConfigMigrator.migrate(configPath: configPath, to: ConfigSchemaRegistry.defaultVersion)
 
     #expect(!result.changed)
     #expect(!result.updatedSchemaReference)
@@ -222,8 +223,8 @@ struct ConfigCommandsTests {
 
     #expect(output.contains("You are using md-utils CLI version 0.1.0-alpha"))
     #expect(output.contains("Supported md-utils config schema versions:"))
-    #expect(output.contains("  0.2.0\n  0.1.0"))
-    #expect(output.contains("Default generated config schema version: 0.2.0"))
+    #expect(output.contains("  0.2.1\n  0.2.0\n  0.1.0"))
+    #expect(output.contains("Default generated config schema version: 0.2.1"))
   }
 
   @Test
@@ -232,16 +233,16 @@ struct ConfigCommandsTests {
     let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
     #expect(object["cliVersion"] as? String == "0.1.0-alpha")
-    #expect(object["defaultConfigVersion"] as? String == "0.2.0")
-    #expect(object["supportedConfigVersions"] as? [String] == ["0.1.0", "0.2.0"])
+    #expect(object["defaultConfigVersion"] as? String == "0.2.1")
+    #expect(object["supportedConfigVersions"] as? [String] == ["0.1.0", "0.2.0", "0.2.1"])
   }
 
   @Test
   func `public schema copies match bundled schema`() throws {
     let root = repoRoot()
-    let bundledURL = root.appending(path: "Sources/md-utils/Resources/0.2.0_md-utils.schema.json")
-    let versionedURL = root.appending(path: "site/schemas/0.2.0/md-utils.schema.json")
-    let namedVersionedURL = root.appending(path: "site/schemas/0.2.0/md-utils-0.2.0.schema.json")
+    let bundledURL = root.appending(path: "Sources/md-utils/Resources/0.2.1_md-utils.schema.json")
+    let versionedURL = root.appending(path: "site/schemas/0.2.1/md-utils.schema.json")
+    let namedVersionedURL = root.appending(path: "site/schemas/0.2.1/md-utils-0.2.1.schema.json")
     let bundled = try String(contentsOf: bundledURL, encoding: .utf8)
 
     #expect(try String(contentsOf: versionedURL, encoding: .utf8) == bundled)
@@ -250,22 +251,22 @@ struct ConfigCommandsTests {
 
   @Test
   func `bundled schema id uses immutable versioned public URL`() throws {
-    let bundledURL = repoRoot().appending(path: "Sources/md-utils/Resources/0.2.0_md-utils.schema.json")
+    let bundledURL = repoRoot().appending(path: "Sources/md-utils/Resources/0.2.1_md-utils.schema.json")
     let data = try Data(contentsOf: bundledURL)
     let schema = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
-    #expect(schema?["$id"] as? String == "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json")
+    #expect(schema?["$id"] as? String == "https://dandylyons.github.io/md-utils/schemas/0.2.1/md-utils.schema.json")
   }
 
   @Test
   func `bundled schema requires current config version for IDE validation`() throws {
-    let bundledURL = repoRoot().appending(path: "Sources/md-utils/Resources/0.2.0_md-utils.schema.json")
+    let bundledURL = repoRoot().appending(path: "Sources/md-utils/Resources/0.2.1_md-utils.schema.json")
     let data = try Data(contentsOf: bundledURL)
     let schema = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     let properties = try #require(schema["properties"] as? [String: Any])
     let configVersion = try #require(properties["configVersion"] as? [String: Any])
 
-    #expect(configVersion["enum"] as? [String] == ["0.2.0"])
+    #expect(configVersion["enum"] as? [String] == ["0.2.1"])
     #expect(schema["required"] as? [String] == ["configVersion", "schemaDirectory", "rules"])
   }
 
@@ -287,6 +288,29 @@ struct ConfigCommandsTests {
 
     #expect(loaded.schemaRules.first?.match.paths == expected.paths)
     #expect(loaded.schemaRules.first?.match.excludePaths == expected.excludePaths)
+  }
+
+  @Test
+  func `current schema accepts wrapped frontmatter configuration`() throws {
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    let configPath = project + ".md-utils/md-utils.json"
+    try configPath.parent().mkpath()
+    let syntax = try WrappedFrontMatterSyntax(
+      openingCommentDelimiter: "<%#",
+      closingCommentDelimiter: "%>"
+    )
+    let frontmatter = try WrappedFrontMatterProjectConfiguration(
+      useBuiltInPresets: false,
+      syntaxes: ["erb-comment": syntax],
+      extensionMappings: ["erb": "erb-comment"]
+    )
+    try MdUtilsConfig(frontmatter: frontmatter).save(to: configPath)
+
+    let loaded = try MdUtilsConfig.load(from: configPath)
+
+    #expect(loaded.configVersion == "0.2.1")
+    #expect(loaded.frontmatter == frontmatter)
   }
 
   private func repoRoot() -> URL {

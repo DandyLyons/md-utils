@@ -8,6 +8,40 @@ The `frontmatter` command group, also available as `fm`, provides CRUD operation
 
 Common operations include reading values, setting values, checking for keys, removing or renaming keys, replacing an entire frontmatter block, dumping frontmatter in multiple formats, searching with JMESPath, checking uniqueness, sorting keys, touching empty keys, and mutating array values.
 
+## Wrapped Frontmatter in Non-Markdown Files
+
+The read-only `dump`, `get`, `has`, `list`, `search`, and `unique` commands can
+scan non-Markdown text files after explicit opt-in with `--include-non-md`.
+Without that flag, their Markdown-only file selection and parsing behavior is
+unchanged.
+
+Wrapped metadata uses complete physical lines for the host-language wrapper and
+fixed `---` YAML boundaries. Place the block at or near the beginning when
+practical, although discovery works anywhere in the file. For example:
+
+```swift
+/*
+---
+title: Example
+---
+*/
+```
+
+The built-in `c-block`, `html-comment`, `python-docstring`,
+`powershell-block`, and `lua-block` presets are inferred from common file
+extensions. Select a preset or project-defined syntax with
+`--frontmatter-syntax`, or provide a one-off wrapper using both
+`--frontmatter-comment-open` and `--frontmatter-comment-close`. Use
+`--no-frontmatter-presets` to disable built-in extension inference. Project
+syntaxes and extension mappings live under `frontmatter` in config schema
+`0.2.1`; configuration never enables non-Markdown scanning by itself.
+
+Prefer multiline comment wrappers where the host language supports them.
+Python uses its conventional triple-quoted module string. Per-line comment
+frontmatter, Pandoc-style `...` closers, and pure CRLF input are not supported.
+If several complete blocks are discovered, the first YAML payload is the only
+one parsed, and the later opening lines are reported as an invalid duplicate.
+
 ## Uniqueness Checks
 
 Use `fm unique` to check that a scalar selected by JMESPath is unique across a

@@ -10,7 +10,7 @@ Use `md-utils config init` to create the project configuration along with empty 
 
 Rules match Markdown files by project-relative glob patterns, optional file metadata conditions, optional frontmatter conditions, optional whole-frontmatter queries, and optional document conditions. Files can match more than one rule, in which case every matching check applies.
 
-Version `0.2.0` configs use a `rules` array. Version `0.1.0` configs using `schemaRules` still load as legacy configs. Both versions normalize through `MarkdownUtilitiesCore` into one compiled registry before files are scanned; unknown versions or fields fail without being discarded. There is no version `0.3.0` syntax.
+Versions `0.2.0` and `0.2.1` use a `rules` array; `0.2.1` additionally supports wrapped-frontmatter configuration. Version `0.1.0` configs using `schemaRules` still load as legacy configs. All supported versions normalize through `MarkdownUtilitiesCore` into one compiled registry before files are scanned; unknown versions or fields fail without being discarded. There is no version `0.3.0` syntax.
 
 ```bash
 md-utils config init

@@ -6,8 +6,9 @@ import Foundation
 /// See <doc:RuleConfigurationVersions>.
 public enum MarkdownRuleConfigurationSchemaVersion {
   public static let legacy = "0.1.0"
-  public static let current = "0.2.0"
-  public static let supported = [legacy, current]
+  public static let rules = "0.2.0"
+  public static let current = "0.2.1"
+  public static let supported = [legacy, rules, current]
 }
 
 /// One versioned project configuration normalized into reusable rule definitions.
@@ -16,17 +17,20 @@ public struct MarkdownRuleConfiguration: Equatable, Sendable {
   public var schemaReference: String?
   public var schemaDirectory: String
   public var rules: [MarkdownRuleDefinition]
+  public var frontmatter: WrappedFrontMatterProjectConfiguration?
 
   public init(
     configVersion: String = MarkdownRuleConfigurationSchemaVersion.current,
     schemaReference: String? = nil,
     schemaDirectory: String = ".md-utils/schemas/",
-    rules: [MarkdownRuleDefinition] = []
+    rules: [MarkdownRuleDefinition] = [],
+    frontmatter: WrappedFrontMatterProjectConfiguration? = nil
   ) {
     self.configVersion = configVersion
     self.schemaReference = schemaReference
     self.schemaDirectory = schemaDirectory
     self.rules = rules
+    self.frontmatter = frontmatter
   }
 }
 
@@ -68,9 +72,15 @@ public enum MarkdownRuleConfigurationDecoder {
       throw MarkdownRuleConfigurationError.unsupportedVersion(version)
     }
 
-    let allowed = version == MarkdownRuleConfigurationSchemaVersion.legacy
-      ? Set(["$schema", "configVersion", "schemaDirectory", "schemaRules"])
-      : Set(["$schema", "configVersion", "schemaDirectory", "rules"])
+    let allowed: Set<String>
+    switch version {
+    case MarkdownRuleConfigurationSchemaVersion.legacy:
+      allowed = ["$schema", "configVersion", "schemaDirectory", "schemaRules"]
+    case MarkdownRuleConfigurationSchemaVersion.rules:
+      allowed = ["$schema", "configVersion", "schemaDirectory", "rules"]
+    default:
+      allowed = ["$schema", "configVersion", "schemaDirectory", "rules", "frontmatter"]
+    }
     try validateKeys(object, allowed: allowed, context: "configuration")
     let schemaDirectory = object["schemaDirectory"] as? String ?? ".md-utils/schemas/"
     let rawRules: [[String: Any]]
@@ -90,8 +100,99 @@ public enum MarkdownRuleConfigurationDecoder {
       configVersion: version,
       schemaReference: object["$schema"] as? String,
       schemaDirectory: schemaDirectory,
-      rules: rules
+      rules: rules,
+      frontmatter: try parseWrappedFrontMatterConfiguration(object["frontmatter"])
     )
+  }
+
+  private static func parseWrappedFrontMatterConfiguration(
+    _ value: Any?
+  ) throws -> WrappedFrontMatterProjectConfiguration? {
+    guard let value else { return nil }
+    guard let object = value as? [String: Any] else {
+      throw MarkdownRuleConfigurationError.invalidField("frontmatter must be an object")
+    }
+    try validateKeys(
+      object,
+      allowed: ["useBuiltInPresets", "syntaxes", "extensionMappings"],
+      context: "frontmatter"
+    )
+
+    let useBuiltInPresets: Bool
+    if let rawValue = object["useBuiltInPresets"] {
+      guard let value = rawValue as? Bool else {
+        throw MarkdownRuleConfigurationError.invalidField(
+          "frontmatter.useBuiltInPresets must be a boolean"
+        )
+      }
+      useBuiltInPresets = value
+    } else {
+      useBuiltInPresets = true
+    }
+
+    var syntaxes: [String: WrappedFrontMatterSyntax] = [:]
+    if let rawSyntaxes = object["syntaxes"] {
+      guard let syntaxObjects = rawSyntaxes as? [String: Any] else {
+        throw MarkdownRuleConfigurationError.invalidField("frontmatter.syntaxes must be an object")
+      }
+      for (name, rawSyntax) in syntaxObjects {
+        guard let syntax = rawSyntax as? [String: Any] else {
+          throw MarkdownRuleConfigurationError.invalidField(
+            "frontmatter.syntaxes.\(name) must be an object"
+          )
+        }
+        try validateKeys(
+          syntax,
+          allowed: ["commentOpen", "commentClose"],
+          context: "frontmatter.syntaxes.\(name)"
+        )
+        let opening = try requiredString(
+          syntax,
+          key: "commentOpen",
+          context: "frontmatter.syntaxes.\(name)"
+        )
+        let closing = try requiredString(
+          syntax,
+          key: "commentClose",
+          context: "frontmatter.syntaxes.\(name)"
+        )
+        do {
+          syntaxes[name] = try WrappedFrontMatterSyntax(
+            openingCommentDelimiter: opening,
+            closingCommentDelimiter: closing
+          )
+        } catch {
+          throw MarkdownRuleConfigurationError.invalidField(error.localizedDescription)
+        }
+      }
+    }
+
+    var extensionMappings: [String: String] = [:]
+    if let rawMappings = object["extensionMappings"] {
+      guard let mappings = rawMappings as? [String: Any] else {
+        throw MarkdownRuleConfigurationError.invalidField(
+          "frontmatter.extensionMappings must be an object"
+        )
+      }
+      for (pathExtension, rawName) in mappings {
+        guard let name = rawName as? String else {
+          throw MarkdownRuleConfigurationError.invalidField(
+            "frontmatter.extensionMappings.\(pathExtension) must be a syntax name"
+          )
+        }
+        extensionMappings[pathExtension] = name
+      }
+    }
+
+    do {
+      return try WrappedFrontMatterProjectConfiguration(
+        useBuiltInPresets: useBuiltInPresets,
+        syntaxes: syntaxes,
+        extensionMappings: extensionMappings
+      )
+    } catch {
+      throw MarkdownRuleConfigurationError.invalidField(error.localizedDescription)
+    }
   }
 
   private static func parseRule(
@@ -511,11 +612,35 @@ public enum MarkdownRuleConfigurationEncoder {
     } else {
       object["rules"] = rules
     }
+    if let frontmatter = configuration.frontmatter {
+      guard configuration.configVersion == MarkdownRuleConfigurationSchemaVersion.current else {
+        throw MarkdownRuleConfigurationError.unsupportedFeature(
+          "Wrapped frontmatter configuration requires configVersion \(MarkdownRuleConfigurationSchemaVersion.current)"
+        )
+      }
+      object["frontmatter"] = wrappedFrontMatterObject(frontmatter)
+    }
     let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
     guard let value = String(data: data, encoding: .utf8) else {
       throw MarkdownRuleConfigurationError.invalidSerialization("Could not encode UTF-8 JSON")
     }
     return value + "\n"
+  }
+
+  private static func wrappedFrontMatterObject(
+    _ configuration: WrappedFrontMatterProjectConfiguration
+  ) -> [String: Any] {
+    let syntaxes = configuration.syntaxes.mapValues { syntax in
+      [
+        "commentOpen": syntax.openingCommentDelimiter,
+        "commentClose": syntax.closingCommentDelimiter,
+      ]
+    }
+    return [
+      "useBuiltInPresets": configuration.useBuiltInPresets,
+      "syntaxes": syntaxes,
+      "extensionMappings": configuration.extensionMappings,
+    ]
   }
 
   /// Returns the JSON-compatible representation of one normalized rule.
