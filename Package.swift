@@ -123,6 +123,9 @@ let package = Package(
       dependencies: [
         "MarkdownUtilitiesCore",
         .target(name: "md-utils"),
+      ],
+      resources: [
+        .copy("Fixtures/NonMDFrontmatter"),
       ]
     ),
   ]

@@ -1,0 +1,5 @@
+---
+title: Updated Plain Text
+---
+
+Text files supplied explicitly require non-Markdown opt-in.
