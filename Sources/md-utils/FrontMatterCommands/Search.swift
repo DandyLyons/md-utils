@@ -18,7 +18,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "search",
       abstract: "Search for files matching a JMESPath query",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Search for files whose frontmatter matches a JMESPath expression.
 
         The query is evaluated against each file's YAML frontmatter.
@@ -79,7 +79,7 @@ extension CLIEntry.FrontMatterCommands {
 
           # Remove a key from matching files
           md-utils fm search 'deprecated == `true`' . | xargs md-utils fm remove --key temporary
-        """
+        """)
     )
 
     @Argument(help: "JMESPath expression to filter files")
@@ -99,6 +99,9 @@ extension CLIEntry.FrontMatterCommands {
       help: "File extensions to process (comma-separated, no spaces)"
     )
     var extensions: String = "md,markdown"
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
@@ -154,14 +157,41 @@ extension CLIEntry.FrontMatterCommands {
     /// Search command is always recursive
     private func expandPaths(paths: [Path]) throws -> [Path] {
       var allPaths: [Path] = []
+      let explicitSingleFile = paths.count == 1 && paths[0].isFile
 
       for path in paths {
         if path.isDirectory {
           // Always search recursively
           let recursiveChildren = try path.recursiveChildren()
-          allPaths.append(contentsOf: recursiveChildren)
+          allPaths.append(contentsOf: recursiveChildren.filter { candidate in
+            let fileExtension = candidate.extension?.lowercased() ?? ""
+            if fileExtension == "md" || fileExtension == "markdown" { return true }
+            if includeNonMD && fileExtension == "txt" { return true }
+            return includeNonMD && FrontMatterSyntax.shippedSyntax(forExtension: fileExtension) != nil
+          })
         } else {
-          allPaths.append(path)
+          let fileExtension = path.extension?.lowercased() ?? ""
+          if fileExtension == "md" || fileExtension == "markdown" {
+            allPaths.append(path)
+          } else if fileExtension == "txt" {
+            if includeNonMD {
+              allPaths.append(path)
+            } else {
+              CLIStyle.writeStderr(
+                "ignored non-Markdown file \(path.string); use --include-non-md to process mapped non-Markdown files"
+              )
+            }
+          } else if FrontMatterSyntax.shippedSyntax(forExtension: fileExtension) != nil {
+            if includeNonMD || explicitSingleFile {
+              allPaths.append(path)
+            } else {
+              CLIStyle.writeStderr(
+                "ignored non-Markdown file \(path.string); use --include-non-md to process mapped non-Markdown files"
+              )
+            }
+          } else if explicitSingleFile || includeNonMD {
+            throw ValidationError("No frontmatter syntax mapping for extension \"\(fileExtension)\"")
+          }
         }
       }
 
@@ -171,7 +201,7 @@ extension CLIEntry.FrontMatterCommands {
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
         .filter { !$0.isEmpty }
 
-      if !exts.isEmpty {
+      if extensions != "md,markdown", !exts.isEmpty {
         allPaths = allPaths.filter { path in
           guard let fileExt = path.extension?.lowercased() else { return false }
           return exts.contains(fileExt)
@@ -219,7 +249,15 @@ extension CLIEntry.FrontMatterCommands {
         let doc: MarkdownDocument
         do {
           content = try path.read(.utf8)
-          doc = try MarkdownDocument(content: content)
+          guard let syntax = FrontMatterFileSyntax.resolve(
+            for: path,
+            includeNonMarkdown: includeNonMD
+          ) else {
+            throw FrontMatterCommandError(
+              message: "no frontmatter syntax mapping for extension \"\(path.extension ?? "")\""
+            )
+          }
+          doc = try ParsedFrontMatterFile.parse(source: content, syntax: syntax).document
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hadErrors = true

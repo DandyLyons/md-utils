@@ -1,15 +1,44 @@
 import Foundation
+import MarkdownUtilitiesCore
 import PathKit
 import Testing
+@testable import md_utils
 
-@Suite("non-MD frontmatter CLI semantics", .serialized)
+@Suite("non-MD frontmatter CLI semantics")
 struct NonMDFrontmatterCLISemanticsTests {
+  @Test(arguments: [nil, "dump", "get", "has", "list", "search", "set", "unique"] as [String?])
+  func `relevant help pages explain valid wrapped frontmatter`(_ subcommand: String?) throws {
+    var arguments = ["fm"]
+    if let subcommand {
+      arguments.append(subcommand)
+    }
+    arguments.append("--help")
+
+    let result = try CLIProcessTestHelper.run(arguments)
+
+    #expect(result.status == 0)
+    #expect(result.standardOutput.contains("FRONTMATTER ON NON-MD FILES"))
+    #expect(result.standardOutput.contains("mapped opening wrapper"))
+    #expect(result.standardOutput.contains("matching mapped closing wrapper"))
+    #expect(result.standardOutput.contains("Incomplete blocks are treated as absent"))
+    #expect(result.standardOutput.contains("blocks are invalid"))
+  }
+
+  @Test
+  func `malformed YAML in the first wrapped block remains a YAML conversion error`() {
+    let source = "/*\n---\ninvalid: yaml: syntax:\n---\n*/\n"
+
+    #expect(throws: YAMLConversionError.self) {
+      _ = try ParsedFrontMatterFile.parse(source: source, syntax: .wrapped(.cBlock))
+    }
+  }
+
   @Test
   func `an explicit supported non-Markdown file infers its wrapper without opt-in`() throws {
     let workspace = try makeWorkspace(from: "single-existing-swift")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "Example.swift").path,
       "--key", "title",
       "--value", "Updated Swift",
@@ -24,7 +53,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "single-txt-ignored")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "notes.txt").path,
       "--key", "title",
       "--value", "Updated Plain Text",
@@ -41,7 +70,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "single-txt-included")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "notes.txt").path,
       "--key", "title",
       "--value", "Updated Plain Text",
@@ -57,7 +86,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "single-jsonc")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "settings.jsonc").path,
       "--key", "title",
       "--value", "Updated JSONC Configuration",
@@ -72,7 +101,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "single-unsupported-toml")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "settings.toml").path,
       "--key", "status",
       "--value", "approved",
@@ -88,14 +117,14 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "single-missing-confirmed")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "Example.swift").path,
       "--key", "status",
       "--value", "approved",
     ], standardInput: "y\n")
 
     #expect(result.status == 0)
-    #expect(result.standardError.contains("Create non-MD frontmatter using c-block (/* … */)? [y/N]"))
+    #expect(result.standardError.contains("Create wrapped frontmatter using c-block (/* … */)? [y/N]"))
     try expectWorkspace(workspace, matches: "single-missing-confirmed")
   }
 
@@ -104,7 +133,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "single-missing-declined")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "Example.swift").path,
       "--key", "status",
       "--value", "approved",
@@ -120,7 +149,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "single-missing-create-flag")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "Example.swift").path,
       "--key", "status",
       "--value", "approved",
@@ -137,7 +166,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "markdown-create-flag-ignored")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "note.md").path,
       "--key", "status",
       "--value", "approved",
@@ -154,7 +183,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "single-multiple-refused")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.appending(path: "Example.swift").path,
       "--key", "title",
       "--value", "Updated First Block",
@@ -171,7 +200,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "explicit-list-default")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set",
       workspace.appending(path: "note.md").path,
       workspace.appending(path: "Source.swift").path,
@@ -190,7 +219,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "explicit-list-included")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set",
       workspace.appending(path: "note.md").path,
       workspace.appending(path: "Source.swift").path,
@@ -209,7 +238,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "directory-default")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.path,
       "--key", "reviewed",
       "--value", "approved",
@@ -225,7 +254,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "directory-included")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.path,
       "--key", "reviewed",
       "--value", "approved",
@@ -241,7 +270,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "recursive-directory-default")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.path,
       "--key", "reviewed",
       "--value", "approved",
@@ -257,7 +286,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "recursive-directory-included")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set", workspace.path,
       "--key", "reviewed",
       "--value", "approved",
@@ -273,7 +302,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "batch-missing-without-create")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set",
       workspace.appending(path: "note.md").path,
       workspace.appending(path: "Source.swift").path,
@@ -293,7 +322,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     let workspace = try makeWorkspace(from: "batch-missing-with-create")
     defer { removeWorkspace(workspace) }
 
-    let result = try runCLI([
+    let result = try CLIProcessTestHelper.run([
       "fm", "set",
       workspace.appending(path: "note.md").path,
       workspace.appending(path: "Source.swift").path,
@@ -308,55 +337,20 @@ struct NonMDFrontmatterCLISemanticsTests {
     try expectWorkspace(workspace, matches: "batch-missing-with-create")
   }
 
-  private struct CLIResult {
-    let status: Int32
-    let standardError: String
-  }
-
-  private func runCLI(_ arguments: [String], standardInput: String = "") throws -> CLIResult {
-    let process = Process()
-    process.executableURL = try mdUtilsExecutableURL()
-    process.arguments = arguments
-
-    var environment = ProcessInfo.processInfo.environment
-    environment["NO_COLOR"] = "1"
-    environment["TERM"] = "dumb"
-    process.environment = environment
-
-    let input = Pipe()
-    let error = Pipe()
-    process.standardInput = input
-    process.standardOutput = FileHandle.nullDevice
-    process.standardError = error
-
-    try process.run()
-    if let data = standardInput.data(using: .utf8) {
-      input.fileHandleForWriting.write(data)
-    }
-    try input.fileHandleForWriting.close()
-    process.waitUntilExit()
-
-    let errorData = error.fileHandleForReading.readDataToEndOfFile()
-    return CLIResult(
-      status: process.terminationStatus,
-      standardError: String(decoding: errorData, as: UTF8.self)
-    )
-  }
-
-  private func mdUtilsExecutableURL() throws -> URL {
-    let candidate = Bundle.module.bundleURL
-      .deletingLastPathComponent()
-      .appending(path: "md-utils")
-    guard FileManager.default.isExecutableFile(atPath: candidate.path) else {
-      throw CocoaError(.fileNoSuchFile)
-    }
-    return candidate
-  }
-
   private func makeWorkspace(from fixture: String) throws -> URL {
     let input = try fixtureDirectory(fixture).appending(path: "input/", directoryHint: .isDirectory)
-    let workspace = FileManager.default.temporaryDirectory
-      .appending(path: "md-utils-non-md-frontmatter-\(UUID().uuidString)/", directoryHint: .isDirectory)
+    let temporaryRoot = URL(
+      filePath: FileManager.default.currentDirectoryPath,
+      directoryHint: .isDirectory
+    ).appending(path: "tmp/", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: temporaryRoot,
+      withIntermediateDirectories: true
+    )
+    let workspace = temporaryRoot.appending(
+      path: "md-utils-non-md-frontmatter-\(UUID().uuidString)/",
+      directoryHint: .isDirectory
+    )
     try FileManager.default.copyItem(at: input, to: workspace)
     return workspace
   }

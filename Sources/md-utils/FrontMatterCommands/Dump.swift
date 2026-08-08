@@ -19,7 +19,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "dump",
       abstract: "Dump entire frontmatter in specified format",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Outputs the complete frontmatter from files in various formats: JSON, YAML, raw, or plist.
 
         Supports multiple files and directory processing with recursive mode.
@@ -72,7 +72,7 @@ extension CLIEntry.FrontMatterCommands {
 
           # Count entries
           md-utils fm dump posts/ -r | jq 'length'
-        """,
+        """),
       aliases: ["d"]
     )
 
@@ -86,11 +86,14 @@ extension CLIEntry.FrontMatterCommands {
 
     @Flag(name: .long, help: "Use cat-style headers (==> path <==) instead of collection output for multiple files")
     var catHeaders: Bool = false
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
-      let files = try options.resolvedPaths()
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -102,8 +105,7 @@ extension CLIEntry.FrontMatterCommands {
       if !isMultipleFiles {
         let file = files[0]
         do {
-          let content: String = try file.read()
-          let doc = try MarkdownDocument(content: content)
+          let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
 
           if includeDelimiters && (format == .yaml || format == .raw) {
             Swift.print("---")
@@ -128,8 +130,7 @@ extension CLIEntry.FrontMatterCommands {
         for (index, file) in files.enumerated() {
           Swift.print("==> \(file) <==")
           do {
-            let content: String = try file.read()
-            let doc = try MarkdownDocument(content: content)
+            let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
 
             if includeDelimiters && (format == .yaml || format == .raw) {
               Swift.print("---")
@@ -156,8 +157,7 @@ extension CLIEntry.FrontMatterCommands {
 
         for file in files {
           do {
-            let content: String = try file.read()
-            let doc = try MarkdownDocument(content: content)
+            let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
             let node = Yams.Node.mapping(doc.frontMatter)
 
             guard var dict = try YAMLConversion.safeNodeToSwiftValue(node) as? [String: Any] else {

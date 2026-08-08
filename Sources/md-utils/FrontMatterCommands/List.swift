@@ -17,12 +17,12 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "list",
       abstract: "List all keys in frontmatter",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Lists all keys present in the YAML frontmatter of Markdown files.
 
         When processing multiple files, each file's keys are prefixed with the filename.
         Keys are listed one per line in alphabetical order.
-        """,
+        """),
       aliases: ["ls"]
     )
     /// Runs the command using the parsed command-line arguments.
@@ -30,8 +30,11 @@ extension CLIEntry.FrontMatterCommands {
     /// See <doc:FrontmatterCommands> for workflow details.
     @OptionGroup var options: GlobalOptions
 
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
+
     mutating func run() async throws {
-      let files = try options.resolvedPaths()
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -41,8 +44,7 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          let doc = try MarkdownDocument(content: content)
+          let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
 
           // Extract keys from frontmatter
           let keys = Array(doc.frontMatter.keys)

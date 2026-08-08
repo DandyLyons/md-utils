@@ -17,7 +17,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "get",
       abstract: "Get a frontmatter value by key",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Retrieves the value of a specified key from YAML frontmatter.
 
         If the key doesn't exist, the command exits with an error code.
@@ -39,7 +39,7 @@ extension CLIEntry.FrontMatterCommands {
         Pipe to jq for filtering:
           md-utils fm get --key title posts/ | jq 'map(select(has("value")))'
           md-utils fm get --key title posts/ | jq 'map(select(.value != null))'
-        """
+        """)
     )
 
     @OptionGroup var options: GlobalOptions
@@ -49,6 +49,9 @@ extension CLIEntry.FrontMatterCommands {
 
     @Option(name: .long, help: "Output format (json, inline, bullets, numbered-list); json is the default")
     var format: OutputFormat = .json
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
     /// Defines the `Get` command behavior.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
@@ -63,7 +66,7 @@ extension CLIEntry.FrontMatterCommands {
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
-      let files = try options.resolvedPaths()
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -76,8 +79,7 @@ extension CLIEntry.FrontMatterCommands {
         var results: [[String: Any]] = []
         for file in files {
           do {
-            let content: String = try file.read()
-            let doc = try MarkdownDocument(content: content)
+            let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
 
             if let value = doc.getValue(forKey: key) {
               // Key found — include "value" (NSNull if YAML value is null)
@@ -103,8 +105,7 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          let doc = try MarkdownDocument(content: content)
+          let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
           processedCount += 1
 
           guard let value = doc.getValue(forKey: key) else {
