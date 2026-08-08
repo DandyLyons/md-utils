@@ -16,7 +16,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "touch",
       abstract: "Add frontmatter keys without values",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Adds one or more keys to the frontmatter with null values.
 
         Keys are specified as a comma-separated list via --keys.
@@ -28,7 +28,7 @@ extension CLIEntry.FrontMatterCommands {
         Examples:
           md-utils fm touch --keys=title,author file.md
           md-utils fm touch --keys=draft,published ./posts/
-        """
+        """)
     )
 
     @OptionGroup var options: GlobalOptions
@@ -38,6 +38,12 @@ extension CLIEntry.FrontMatterCommands {
       help: "Comma-separated list of frontmatter keys to add"
     )
     var keys: String
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
+
+    @Flag(name: .long, help: "Authorize creation of wrapped frontmatter in non-Markdown files")
+    var createFrontmatter = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
@@ -52,7 +58,7 @@ extension CLIEntry.FrontMatterCommands {
         throw ValidationError("At least one key must be specified")
       }
 
-      let files = try options.resolvedPaths()
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
       }
@@ -62,18 +68,25 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          var doc = try MarkdownDocument(content: content)
+          let parsed = try FrontMatterCLIMutator.parsedFile(
+            at: file,
+            includeNonMarkdown: includeNonMD
+          )
+          var doc = parsed.document
+          let missingKeys = keyList.filter { doc.hasKey($0) == false }
+          guard missingKeys.isEmpty == false else { continue }
+          try FrontMatterCLIMutator.authorizeCreationIfNeeded(
+            for: parsed,
+            options: options,
+            createFrontmatter: createFrontmatter
+          )
 
           // Add each key if it doesn't exist
-          for key in keyList {
-            if !doc.hasKey(key) {
-              try doc.createNewKeyWithNullValue(key)
-            }
+          for key in missingKeys {
+            try doc.createNewKeyWithNullValue(key)
           }
 
-          let updated = try doc.render()
-          try file.write(updated)
+          try FrontMatterCLIMutator.write(doc, parsed: parsed, to: file)
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
           hasErrors = true

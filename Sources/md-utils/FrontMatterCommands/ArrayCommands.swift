@@ -17,7 +17,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "array",
       abstract: "Array manipulation commands for frontmatter",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Manipulate arrays in YAML frontmatter with various subcommands.
 
         SUBCOMMANDS:
@@ -49,7 +49,7 @@ extension CLIEntry.FrontMatterCommands {
 
           # Find files and update them
           md-utils fm array contains --key tags --value swift . | xargs md-utils fm set --key published --value true
-        """,
+        """),
       subcommands: [Contains.self, Append.self, Prepend.self, Remove.self]
     )
   }

@@ -21,7 +21,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     static let configuration = CommandConfiguration(
       commandName: "prepend",
       abstract: "Prepend a value to the beginning of an array in frontmatter",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Add a value to the beginning of an array in frontmatter. Useful for
         priority ordering (e.g., most important tag first). If the key doesn't
         exist, it will be created as a new array with the value. If the key exists
@@ -41,7 +41,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         CASE INSENSITIVE:
           Use --case-insensitive for case-insensitive duplicate checking:
           md-utils fm array prepend --key tags --value SWIFT --case-insensitive --skip-duplicates posts/*.md
-        """
+        """)
     )
 
     @OptionGroup var options: GlobalOptions
@@ -57,12 +57,18 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
     @Flag(name: .long, help: "Case-insensitive duplicate check")
     var caseInsensitive: Bool = false
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
+
+    @Flag(name: .long, help: "Authorize creation of wrapped frontmatter in non-Markdown files")
+    var createFrontmatter = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
-      let paths = try options.resolvedPaths()
+      let paths = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !paths.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -73,9 +79,11 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
       for path in paths {
         do {
-          // Parse file
-          let content: String = try path.read()
-          var doc = try MarkdownDocument(content: content)
+          let parsed = try FrontMatterCLIMutator.parsedFile(
+            at: path,
+            includeNonMarkdown: includeNonMD
+          )
+          var doc = parsed.document
 
           // Get array (creates empty if doesn't exist, errors if not an array)
           let sequence = try ArrayHelpers.getOrCreateArrayKey(key, in: doc, path: path)
@@ -87,13 +95,18 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
             }
           }
 
+          try FrontMatterCLIMutator.authorizeCreationIfNeeded(
+            for: parsed,
+            options: options,
+            createFrontmatter: createFrontmatter
+          )
+
           // Prepend value
           let updatedSequence = ArrayHelpers.prepend(value: value, to: sequence)
           doc.frontMatter[key] = .sequence(updatedSequence)
 
           // Write back
-          let updatedContent = try doc.render()
-          try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
+          try FrontMatterCLIMutator.write(doc, parsed: parsed, to: path)
           updatedCount += 1
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")

@@ -1,0 +1,7 @@
+/*
+---
+replacement: yes
+---
+*/
+
+struct ReplaceFixture {}

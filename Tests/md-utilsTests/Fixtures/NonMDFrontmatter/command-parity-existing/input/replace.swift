@@ -1,0 +1,7 @@
+/*
+---
+old: metadata
+---
+*/
+
+struct ReplaceFixture {}

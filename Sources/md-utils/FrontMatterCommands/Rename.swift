@@ -16,7 +16,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "rename",
       abstract: "Rename a key in frontmatter",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Renames an existing frontmatter key to a new name, preserving the value.
 
         The operation will fail if:
@@ -29,7 +29,7 @@ extension CLIEntry.FrontMatterCommands {
 
           # Rename key across all Markdown files in a directory
           md-utils fm rename --key tags --new-key categories ./docs/
-        """,
+        """),
       aliases: ["rn"]
     )
 
@@ -40,11 +40,14 @@ extension CLIEntry.FrontMatterCommands {
 
     @Option(help: "The new key name")
     var newKey: String
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
-      let files = try options.resolvedPaths()
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -54,13 +57,15 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          var doc = try MarkdownDocument(content: content)
+          let parsed = try FrontMatterCLIMutator.parsedFile(
+            at: file,
+            includeNonMarkdown: includeNonMD
+          )
+          var doc = parsed.document
 
           try doc.renameKey(from: key, to: newKey)
 
-          let updated = try doc.render()
-          try file.write(updated)
+          try FrontMatterCLIMutator.write(doc, parsed: parsed, to: file)
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
           hasErrors = true

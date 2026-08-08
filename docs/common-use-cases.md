@@ -146,6 +146,14 @@ md-utils fm set Sources/ --key status --value approved \
   --include-non-md --create-frontmatter
 ```
 
+Every `fm` leaf command supports mapped non-Markdown files. This includes
+`remove`, `rename`, `replace`, `sort-keys`, `touch`, and all `fm array`
+subcommands in addition to the read and `set` commands. Mutations that can
+create frontmatter—`set`, `replace`, `touch`, `array append`, and
+`array prepend`—accept `--create-frontmatter`. The flag does not suppress
+`fm replace`'s separate destructive-replacement confirmation; use `--yes` for
+that confirmation when appropriate.
+
 New wrappers are inserted at line 1 followed by one blank line. Multiple complete
 blocks are diagnosed, and mutation refuses to change the file. Per-line comment
 formats, custom delimiters, and project-defined syntax mappings are not supported.

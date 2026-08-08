@@ -21,7 +21,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     static let configuration = CommandConfiguration(
       commandName: "contains",
       abstract: "Find files where an array contains a specific value",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Search for files whose frontmatter contains an array with a specific value.
 
         This command performs case-sensitive string comparison only.
@@ -54,7 +54,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         INVERT RESULTS:
           Use --invert to find files that DON'T contain the value:
           md-utils fm array contains --key tags --value deprecated --invert posts/
-        """
+        """)
     )
 
     @OptionGroup var options: GlobalOptions
@@ -70,6 +70,9 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
     @Flag(name: .long, help: "Case-insensitive comparison")
     var caseInsensitive: Bool = false
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
@@ -78,7 +81,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       var matchingFiles: [String] = []
       var hasErrors = false
       var searchedCount = 0
-      let paths = try options.resolvedPaths()
+      let paths = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !paths.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -89,11 +92,12 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
       for path in paths {
         // 1. Parse file
-        let content: String
         let doc: MarkdownDocument
         do {
-          content = try path.read()
-          doc = try MarkdownDocument(content: content)
+          doc = try FrontMatterCLIReader.document(
+            at: path,
+            includeNonMarkdown: includeNonMD
+          )
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hasErrors = true

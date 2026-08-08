@@ -1,0 +1,8 @@
+/*
+---
+tags:
+- first
+---
+*/
+
+struct PrependCreation {}

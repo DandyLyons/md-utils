@@ -1,0 +1,7 @@
+/*
+---
+created: true
+---
+*/
+
+struct ReplaceCreation {}

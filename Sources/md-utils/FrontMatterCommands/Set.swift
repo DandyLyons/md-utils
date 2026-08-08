@@ -5,7 +5,6 @@
 
 import ArgumentParser
 import Foundation
-import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 /// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
@@ -56,46 +55,21 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          guard let syntax = FrontMatterFileSyntax.resolve(
-            for: file,
+          let parsed = try FrontMatterCLIMutator.parsedFile(
+            at: file,
             includeNonMarkdown: includeNonMD
-          ) else {
-            throw ValidationError("No frontmatter syntax mapping for extension \"\(file.extension ?? "")\"")
-          }
-          let parsed = try ParsedFrontMatterFile.parse(source: content, syntax: syntax)
-
-          if let secondLine = parsed.additionalOpeningLines.first {
-            throw FrontMatterCommandError(
-              message: "multiple frontmatter blocks; additional block opens at line \(secondLine)"
-            )
-          }
-
-          if case .wrapped(let wrapper) = syntax, parsed.wrappedBlock == nil,
-            createFrontmatter == false
-          {
-            let isSingleExplicitFile = options.paths.count == 1 && options.paths[0].isFile
-            if isSingleExplicitFile {
-              CLIStyle.writeStderr(
-                "Create wrapped frontmatter using \(wrapper.name) (\(wrapper.openingWrapper) … \(wrapper.closingWrapper))? [y/N]"
-              )
-              let response = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-              guard response == "y" || response == "yes" else {
-                throw FrontMatterCommandError(message: "frontmatter creation declined")
-              }
-            } else {
-              throw FrontMatterCommandError(
-                message: "missing non-Markdown frontmatter requires --create-frontmatter"
-              )
-            }
-          }
+          )
+          try FrontMatterCLIMutator.authorizeCreationIfNeeded(
+            for: parsed,
+            options: options,
+            createFrontmatter: createFrontmatter
+          )
 
           var doc = parsed.document
 
           doc.setValue(value, forKey: key)
 
-          let updated = try parsed.rendering(doc)
-          try FrontMatterFileWriter.write(updated, to: file, expectedSource: content)
+          try FrontMatterCLIMutator.write(doc, parsed: parsed, to: file)
           updatedCount += 1
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")

@@ -21,7 +21,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     static let configuration = CommandConfiguration(
       commandName: "remove",
       abstract: "Remove first occurrence of a value from an array in frontmatter",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Remove the first occurrence of a value from an array. If the value appears
         multiple times, only the first occurrence is removed.
 
@@ -37,7 +37,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         CASE SENSITIVITY:
           Use --case-insensitive for case-insensitive matching:
           md-utils fm array remove --key tags --value SWIFT --case-insensitive posts/*.md
-        """
+        """)
     )
 
     @OptionGroup var options: GlobalOptions
@@ -50,6 +50,9 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
     @Flag(name: .long, help: "Case-insensitive comparison")
     var caseInsensitive: Bool = false
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
@@ -58,7 +61,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       var processedCount = 0
       var skippedCount = 0
       var hasErrors = false
-      let paths = try options.resolvedPaths()
+      let paths = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !paths.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -66,9 +69,11 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
       for path in paths {
         do {
-          // Parse file
-          let content: String = try path.read()
-          var doc = try MarkdownDocument(content: content)
+          let parsed = try FrontMatterCLIMutator.parsedFile(
+            at: path,
+            includeNonMarkdown: includeNonMD
+          )
+          var doc = parsed.document
 
           // Validate array exists
           let sequence = try ArrayHelpers.validateArrayKey(key, in: doc, path: path)
@@ -86,8 +91,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           doc.frontMatter[key] = .sequence(updatedSequence)
 
           // Write back
-          let updatedContent = try doc.render()
-          try updatedContent.write(toFile: path.string, atomically: true, encoding: .utf8)
+          try FrontMatterCLIMutator.write(doc, parsed: parsed, to: path)
           processedCount += 1
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")

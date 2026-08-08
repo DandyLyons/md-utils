@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 
@@ -162,6 +163,20 @@ enum FrontMatterCLIReader {
   /// - Returns: The first frontmatter block in the existing document representation.
   /// - Throws: A filesystem, syntax-mapping, multiplicity, or YAML conversion error.
   static func document(at path: Path, includeNonMarkdown: Bool) throws -> MarkdownDocument {
+    try FrontMatterCLIMutator.parsedFile(
+      at: path,
+      includeNonMarkdown: includeNonMarkdown
+    ).document
+  }
+}
+
+/// Shared snapshot-safe loading, creation authorization, and writing for CLI mutations.
+enum FrontMatterCLIMutator {
+  /// Loads one file from a single source snapshot and rejects repeated wrapped blocks.
+  static func parsedFile(
+    at path: Path,
+    includeNonMarkdown: Bool
+  ) throws -> ParsedFrontMatterFile {
     let source: String = try path.read()
     guard let syntax = FrontMatterFileSyntax.resolve(
       for: path,
@@ -177,7 +192,49 @@ enum FrontMatterCLIReader {
         message: "multiple frontmatter blocks; additional block opens at line \(secondLine)"
       )
     }
-    return parsed.document
+    return parsed
+  }
+
+  /// Requires explicit authorization before a mutation creates a wrapped block.
+  ///
+  /// Markdown creation remains silent. A sole explicit mapped file may prompt;
+  /// batch operations require `--create-frontmatter` and never prompt.
+  static func authorizeCreationIfNeeded(
+    for parsed: ParsedFrontMatterFile,
+    options: GlobalOptions,
+    createFrontmatter: Bool
+  ) throws {
+    guard case .wrapped(let wrapper) = parsed.syntax,
+      parsed.wrappedBlock == nil,
+      createFrontmatter == false
+    else {
+      return
+    }
+
+    let isSingleExplicitFile = options.paths.count == 1 && options.paths[0].isFile
+    guard isSingleExplicitFile else {
+      throw FrontMatterCommandError(
+        message: "missing non-Markdown frontmatter requires --create-frontmatter"
+      )
+    }
+
+    CLIStyle.writeStderr(
+      "Create wrapped frontmatter using \(wrapper.name) (\(wrapper.openingWrapper) … \(wrapper.closingWrapper))? [y/N]"
+    )
+    let response = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    guard response == "y" || response == "yes" else {
+      throw FrontMatterCommandError(message: "frontmatter creation declined")
+    }
+  }
+
+  /// Renders against the parsed snapshot and atomically writes after a revision check.
+  static func write(
+    _ document: MarkdownDocument,
+    parsed: ParsedFrontMatterFile,
+    to path: Path
+  ) throws {
+    let updated = try parsed.rendering(document)
+    try FrontMatterFileWriter.write(updated, to: path, expectedSource: parsed.source)
   }
 }
 

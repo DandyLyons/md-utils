@@ -1,0 +1,7 @@
+/*
+---
+current: retained
+---
+*/
+
+struct RenameFixture {}
