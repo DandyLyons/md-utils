@@ -15,7 +15,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "unique",
       abstract: "Check that a frontmatter value is unique across files",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Evaluates one JMESPath expression against each file's YAML frontmatter and
         checks that the selected scalar value is unique.
 
@@ -58,7 +58,7 @@ extension CLIEntry.FrontMatterCommands {
         EXIT STATUS:
           Exits successfully only when the requested uniqueness invariant holds,
           required values are present, and every file was evaluated successfully.
-        """
+        """)
     )
 
     @Argument(help: "JMESPath expression selecting one scalar frontmatter value")
@@ -77,6 +77,9 @@ extension CLIEntry.FrontMatterCommands {
     @Flag(name: .long, help: "Fail when any checked note has a missing or null result")
     var requireValue = false
 
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
+
     @Option(name: .long, help: "Output format: text, json, or yaml")
     var format: UniqueOutputFormat = .text
 
@@ -93,7 +96,7 @@ extension CLIEntry.FrontMatterCommands {
           """)
       }
 
-      let resolved = try options.resolvedPaths()
+      let resolved = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
       guard resolved.isEmpty == false else {
         throw ValidationError("No Markdown files found to process")
       }
@@ -111,7 +114,8 @@ extension CLIEntry.FrontMatterCommands {
         expression: expression,
         compiledExpression: compiledExpression,
         files: comparisonFiles,
-        reference: referencePath
+        reference: referencePath,
+        includeNonMarkdown: includeNonMD
       )
       print(try UniqueRenderer.render(report, format: format, requireValue: requireValue))
 
@@ -309,9 +313,12 @@ enum UniqueAnalyzer {
     expression: String,
     compiledExpression: JMESExpression,
     files: [Path],
-    reference: Path?
+    reference: Path?,
+    includeNonMarkdown: Bool = false
   ) -> UniqueReport {
-    let evaluations = files.map { evaluate($0, using: compiledExpression) }
+    let evaluations = files.map {
+      evaluate($0, using: compiledExpression, includeNonMarkdown: includeNonMarkdown)
+    }
     let missingPaths = evaluations.compactMap { evaluation in
       evaluation.isMissing ? evaluation.path : nil
     }
@@ -320,7 +327,11 @@ enum UniqueAnalyzer {
 
     let collisions: [UniqueCollision]
     if let reference {
-      let referenceEvaluation = evaluate(reference, using: compiledExpression)
+      let referenceEvaluation = evaluate(
+        reference,
+        using: compiledExpression,
+        includeNonMarkdown: includeNonMarkdown
+      )
       var combinedMissing = missingPaths
       var combinedDiagnostics = diagnostics
       if referenceEvaluation.isMissing {
@@ -384,9 +395,16 @@ enum UniqueAnalyzer {
     )
   }
 
-  private static func evaluate(_ path: Path, using expression: JMESExpression) -> UniqueFileEvaluation {
+  private static func evaluate(
+    _ path: Path,
+    using expression: JMESExpression,
+    includeNonMarkdown: Bool
+  ) -> UniqueFileEvaluation {
     do {
-      let document = try MarkdownDocument(content: path.read(.utf8))
+      let document = try FrontMatterCLIReader.document(
+        at: path,
+        includeNonMarkdown: includeNonMarkdown
+      )
       let object = try FrontMatterJMESPath.object(from: document)
       let result = try expression.search(object: object)
       let scalar = try UniqueScalar.scalar(from: result)

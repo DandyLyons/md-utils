@@ -16,7 +16,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "sort-keys",
       abstract: "Sort keys in frontmatter",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Sorts the frontmatter keys alphabetically or by key length.
 
         The sorting can be reversed using the --reverse flag.
@@ -30,7 +30,7 @@ extension CLIEntry.FrontMatterCommands {
 
           # Sort keys by length across all Markdown files in a directory
           md-utils fm sort-keys --method length ./docs/
-        """,
+        """),
       aliases: ["sk"]
     )
 
@@ -41,11 +41,14 @@ extension CLIEntry.FrontMatterCommands {
 
     @Flag(name: .long, help: "Reverse the sorting order")
     var reverse: Bool = false
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
-      let files = try options.resolvedPaths()
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -55,13 +58,18 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          var doc = try MarkdownDocument(content: content)
+          let parsed = try FrontMatterCLIMutator.parsedFile(
+            at: file,
+            includeNonMarkdown: includeNonMD
+          )
+          if case .wrapped = parsed.syntax, parsed.wrappedBlock == nil {
+            continue
+          }
+          var doc = parsed.document
 
           doc.sortKeys(by: method, reverse: reverse)
 
-          let updated = try doc.render()
-          try file.write(updated)
+          try FrontMatterCLIMutator.write(doc, parsed: parsed, to: file)
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
           hasErrors = true

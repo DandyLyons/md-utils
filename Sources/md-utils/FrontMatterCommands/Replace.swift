@@ -19,7 +19,7 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "replace",
       abstract: "Replace entire frontmatter with new data",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Replace the complete frontmatter in files with new structured data.
 
         This is a DESTRUCTIVE operation - the entire frontmatter will be replaced.
@@ -61,7 +61,7 @@ extension CLIEntry.FrontMatterCommands {
 
           # Process multiple files (prompted once per file)
           md-utils fm replace post1.md post2.md --data '{"status": "published"}' --format json
-        """,
+        """),
       aliases: ["r"]
     )
 
@@ -78,6 +78,12 @@ extension CLIEntry.FrontMatterCommands {
 
     @Flag(name: [.customShort("y"), .long], help: "Skip confirmation prompt")
     var yes: Bool = false
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
+
+    @Flag(name: .long, help: "Authorize creation of wrapped frontmatter in non-Markdown files")
+    var createFrontmatter = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
@@ -117,7 +123,7 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       // Process each file
-      let files = try options.resolvedPaths()
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -141,6 +147,16 @@ extension CLIEntry.FrontMatterCommands {
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     private func replaceInFile(path: Path, newFrontMatter: Yams.Node.Mapping) throws {
+      let parsed = try FrontMatterCLIMutator.parsedFile(
+        at: path,
+        includeNonMarkdown: includeNonMD
+      )
+      try FrontMatterCLIMutator.authorizeCreationIfNeeded(
+        for: parsed,
+        options: options,
+        createFrontmatter: createFrontmatter
+      )
+
       // Prompt for confirmation (unless --yes flag is used)
       if !yes {
         print(
@@ -160,16 +176,13 @@ extension CLIEntry.FrontMatterCommands {
         }
       }
 
-      // Read and parse document
-      let content: String = try path.read()
-      var doc = try MarkdownDocument(content: content)
+      var doc = parsed.document
 
       // Replace frontmatter (direct assignment)
       doc.frontMatter = newFrontMatter
 
       // Render and write back
-      let updatedContent = try doc.render()
-      try path.write(updatedContent)
+      try FrontMatterCLIMutator.write(doc, parsed: parsed, to: path)
 
       print("\(CLIStyle.success("✓")) Replaced frontmatter in '\(CLIStyle.path(path.string))'")
     }

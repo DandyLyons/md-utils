@@ -1,0 +1,7 @@
+/*
+---
+legacy: retained
+---
+*/
+
+struct RenameFixture {}

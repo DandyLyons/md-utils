@@ -1,0 +1,7 @@
+/*
+---
+title: Remove
+---
+*/
+
+struct RemoveFixture {}

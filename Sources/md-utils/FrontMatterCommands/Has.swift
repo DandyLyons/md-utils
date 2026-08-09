@@ -16,25 +16,28 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "has",
       abstract: "Check if a frontmatter key exists",
-      discussion: """
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Checks whether a specified key exists in the frontmatter.
 
         Prints 'true' if the key exists, 'false' otherwise.
         Always exits with success code (0), even when the key doesn't exist.
         When processing multiple files, the filename is included in the output.
-        """
+        """)
     )
 
     @OptionGroup var options: GlobalOptions
 
     @Option(name: .long, help: "The frontmatter key to check")
     var key: String
+
+    @Flag(name: .long, help: "Process mapped non-Markdown files")
+    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
-      let files = try options.resolvedPaths()
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -45,8 +48,7 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
-          let doc = try MarkdownDocument(content: content)
+          let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
           let exists = doc.hasKey(key)
 
           if files.count > 1 {

@@ -112,6 +112,54 @@ md-utils fm get --key tags --format numbered-list document.md
 md-utils fm set --key author --value "Jane Doe" document.md
 ```
 
+### Frontmatter in Non-Markdown Text Files
+
+One explicitly named supported file infers its shipped wrapper mapping. Wrapped
+frontmatter can occur anywhere in the file, though placing it near the beginning
+is recommended for discoverability and faster scanning.
+
+```bash
+# Swift and JSONC use a /* … */ envelope.
+md-utils fm get Example.swift --key title
+md-utils fm set settings.jsonc --key reviewed --value approved
+
+# Include mapped files in multi-file or directory operations.
+md-utils fm set Sources/ --key reviewed --value approved --include-non-md
+```
+
+The shipped mappings are:
+
+- `c-block` (`/*` / `*/`): C-family languages, Swift, Java/Kotlin, JavaScript/TypeScript, Go, Rust, Dart, PHP, CSS-family files, SQL, and JSONC
+- `html-comment` (`<!--` / `-->`): HTML, XML, SVG, Vue, and Svelte
+- `python-docstring` (`"""` / `"""`): Python and Python interface files
+- `powershell-block` (`<#` / `#>`): PowerShell files
+- `lua-block` (`--[[` / `]]`): Lua files
+- `markdown-text`: `.txt`, only with `--include-non-md`
+
+Mapped non-Markdown files without an existing block require confirmation when
+they are the sole explicit input. Use `--create-frontmatter` to authorize
+creation noninteractively. Batch operations never prompt and require the flag:
+
+```bash
+md-utils fm set Example.swift --key status --value approved --create-frontmatter
+md-utils fm set Sources/ --key status --value approved \
+  --include-non-md --create-frontmatter
+```
+
+Every `fm` leaf command supports mapped non-Markdown files. This includes
+`remove`, `rename`, `replace`, `sort-keys`, `touch`, and all `fm array`
+subcommands in addition to the read and `set` commands. Mutations that can
+create frontmatter—`set`, `replace`, `touch`, `array append`, and
+`array prepend`—accept `--create-frontmatter`. The flag does not suppress
+`fm replace`'s separate destructive-replacement confirmation; use `--yes` for
+that confirmation when appropriate.
+
+New wrappers are inserted at line 1 followed by one blank line. Multiple complete
+blocks are diagnosed, and mutation refuses to change the file. Per-line comment
+formats, custom delimiters, and project-defined syntax mappings are not supported.
+There is a residual race with uncoordinated external writers between the final
+revision check and the atomic replacement.
+
 #### Check if frontmatter key exists
 ```bash
 md-utils fm has --key published document.md

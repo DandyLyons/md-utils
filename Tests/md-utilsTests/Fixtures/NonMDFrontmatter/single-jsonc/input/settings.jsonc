@@ -1,0 +1,10 @@
+/*
+---
+title: JSONC Configuration
+---
+*/
+
+{
+  // JSONC permits comments.
+  "enabled": true
+}

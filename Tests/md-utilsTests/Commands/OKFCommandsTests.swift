@@ -406,8 +406,15 @@ struct OKFCommandsTests {
 
   @Test
   func `bundled okf concept schema requires type`() throws {
-    let url = try #require(Bundle.module.url(forResource: "OKF-concept.schema", withExtension: "json"))
-    let data = try Data(contentsOf: url)
+    let project = try createTempProject()
+    defer { try? project.delete() }
+    let bundle = project + "knowledge"
+    _ = try OKFInitializer.initialize(
+      options: OKFInitOptions(bundlePath: bundle, withLog: false)
+    )
+
+    let schemaPath = bundle + ".md-utils/schemas/OKF-concept.schema.json"
+    let data = try Data(contentsOf: URL(fileURLWithPath: schemaPath.string))
     let schema = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
 
     let valid = try JSONSchema.validate(["type": "Book"], schema: schema)

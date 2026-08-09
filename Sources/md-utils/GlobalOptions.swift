@@ -162,7 +162,7 @@ struct GlobalOptions: ParsableArguments {
   /// Non-glob patterns use prefix matching, so a directory path excludes all its contents.
   /// Glob patterns support `*` (within a path component), `**` (across path components),
   /// `?` (single character), and `[...]` character classes.
-  private func isExcluded(_ path: Path, excludePatterns: [String]) -> Bool {
+  func isExcluded(_ path: Path, excludePatterns: [String]) -> Bool {
     guard !excludePatterns.isEmpty else { return false }
     let absolutePathString = path.absolute().string
 

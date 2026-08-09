@@ -1,0 +1,7 @@
+/*
+---
+reviewed: approved
+---
+*/
+
+struct NeedsMetadata {}

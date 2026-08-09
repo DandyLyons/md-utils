@@ -12,12 +12,14 @@ extension CLIEntry {
   struct FrontMatterCommands: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "frontmatter",
-      abstract: "Manipulate YAML frontmatter in Markdown files",
-      discussion: """
-        Provides CRUD operations for YAML frontmatter in Markdown files.
+      abstract: "Manipulate YAML frontmatter in Markdown and mapped text files",
+      discussion: NonMarkdownFrontMatterHelp.appending(to: """
+        Provides CRUD operations for YAML frontmatter in Markdown files and in
+        non-Markdown text files with shipped syntax mappings.
 
-        By default, processes directories recursively.
-        """,
+        By default, directory and multi-file operations remain Markdown-only.
+        Use --include-non-md on supported commands to include mapped files.
+        """),
       subcommands: [
         ArrayCommands.self,
         Dump.self,
