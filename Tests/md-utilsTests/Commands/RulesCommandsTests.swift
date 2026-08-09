@@ -78,6 +78,26 @@ struct RulesCommandsTests {
   }
 
   @Test
+  func `rules commands parse include non md flag`() throws {
+    let validate = try #require(
+      CLIEntry.parseAsRoot(["rules", "validate", "--include-non-md"])
+        as? CLIEntry.RulesCommands.Validate
+    )
+    let filesMatching = try #require(
+      CLIEntry.parseAsRoot(["rules", "files-matching", "books", "--include-non-md"])
+        as? CLIEntry.RulesCommands.FilesMatching
+    )
+    let matching = try #require(
+      CLIEntry.parseAsRoot(["rules", "matching", "Book.swift", "--include-non-md"])
+        as? CLIEntry.RulesCommands.Matching
+    )
+
+    #expect(validate.includeNonMD)
+    #expect(filesMatching.includeNonMD)
+    #expect(matching.includeNonMD)
+  }
+
+  @Test
   func `rules list parses verbose flag`() throws {
     let parsed = try CLIEntry.parseAsRoot(["rules", "list", "--verbose"])
     let command = try #require(parsed as? CLIEntry.RulesCommands.List)
@@ -164,7 +184,7 @@ struct RulesCommandsTests {
           errors: []
         ),
       ],
-      totalMarkdownFiles: 2
+      totalFiles: 2
     )
 
     let output = RuleValidationSummaryFormatter.render(summary)
@@ -387,7 +407,7 @@ struct RulesCommandsTests {
     #expect(output.contains("Rule Name:"))
     #expect(output.contains("people-in-the-bible"))
     #expect(output.contains("Rule"))
-    #expect(output.contains("Applies to Markdown files matching People/**/*.md."))
+    #expect(output.contains("Applies to files matching People/**/*.md."))
     #expect(output.contains("Excludes People/Drafts/**/*.md."))
     #expect(output.contains("Runs only when tags includes \"Person\"."))
     #expect(output.contains("Schema Definition"))
@@ -442,7 +462,7 @@ struct RulesCommandsTests {
 
     #expect(output.contains("# Rule Name: people-in-the-bible"))
     #expect(output.contains("## Rule"))
-    #expect(output.contains("- Applies to Markdown files matching People/**/*.md."))
+    #expect(output.contains("- Applies to files matching People/**/*.md."))
     #expect(output.contains("## Schema Definition"))
     #expect(output.contains("### name-meaning"))
     #expect(output.contains("- Type: String, REQUIRED, minLength 1"))
@@ -1432,7 +1452,7 @@ struct RulesCommandsTests {
           errors: [RuleValidationErrorDetail(path: "/title", message: "is required")]
         ),
       ],
-      totalMarkdownFiles: 3
+      totalFiles: 3
     )
   }
 

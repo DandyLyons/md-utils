@@ -239,7 +239,7 @@ The package also bundles `OKF-concept.schema.json` for OKF v0.1 draft concept fr
 
 ## Project Configuration
 
-Project-level md-utils settings live in `.md-utils/md-utils.json`. The rules command group creates and uses this folder to validate Markdown files. JSON Schema validation is one supported rule check, alongside document checks such as required headings and body length limits.
+Project-level md-utils settings live in `.md-utils/md-utils.json`. The rules command group creates and uses this folder to validate files. JSON Schema validation is one supported rule check, alongside document checks such as required headings and body length limits.
 
 The md-utils CLI version and md-utils config schema version are independent. `md-utils --version` reports the installed CLI version. The `configVersion` field in `.md-utils/md-utils.json` selects the config schema version used for parsing, validation, and behavior. Existing unversioned configs are treated as legacy config schema `0.1.0`.
 
@@ -334,9 +334,9 @@ Config fields:
 - `$schema`: Optional editor hint for autocomplete, validation, and IDE IntelliSense. Runtime behavior is not driven by this URL.
 - `configVersion`: md-utils config schema version. This is independent from the md-utils CLI version.
 - `schemaDirectory`: Directory for JSON Schema files. Defaults to `.md-utils/schemas/`.
-- `rules`: Rules that map Markdown files to one or more checks.
+- `rules`: Rules that map files to one or more checks.
 - `rules[].name`: Unique rule name for `md-utils rules validate <rule-name>`.
-- `rules[].match.paths`: Glob patterns matched against project-relative Markdown paths.
+- `rules[].match.paths`: Glob patterns matched against project-relative file paths.
 - `rules[].match.excludePaths`: Glob patterns excluded after paths match.
 - `rules[].match.file`: File metadata predicates. Supported operators are `pathRegex`, `filenameEquals`, `extensionIn`, `modifiedAfter`, and `modifiedBefore`.
 - `rules[].match.frontmatter`: Frontmatter field predicates. Supported operators are `equals`, `doesntEqual`, `includes`, `notIncludes`, `hasKey`, `doesntHaveKey`, `regex`, `startsWith`, `endsWith`, `contains`, `empty`, `emptyString`, `emptyArray`, `emptyObject`, `notEmpty`, `in`, `notIn`, numeric comparisons, date/time comparisons, inclusive `between`, and `typeIs`.
@@ -367,11 +367,25 @@ md-utils rules describe books --format markdown
 md-utils rules describe books --format json
 md-utils rules validate
 md-utils rules validate books
+md-utils rules validate --include-non-md
+md-utils rules files-matching swift-components --include-non-md
+md-utils rules matching Sources/APIClient.swift
 md-utils rules remove books
 md-utils rules remove books --delete-schema
 ```
 
 `config init` bootstraps `.md-utils/`, including empty `.md-utils/schemas/` and `.md-utils/types/` directories, without adding a rule or type. `rules add` adds a frontmatter schema rule to existing config. `rules describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema when the rule has one; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `rules remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
+
+Rules project scans remain Markdown-only by default. Use `--include-non-md` with
+`rules validate` or `rules files-matching` to include other files selected by
+configured paths. An explicit non-Markdown file passed to `rules matching` is
+selected automatically, except `.txt`, which requires `--include-non-md`.
+Mapped extensions use the same `c-block`, `html-comment`, `python-docstring`,
+`powershell-block`, and `lua-block` wrappers documented in
+[Frontmatter in Non-Markdown Text Files](docs/common-use-cases.md#frontmatter-in-non-markdown-text-files).
+Wrapped YAML supports frontmatter predicates, JMESPath, type hints, and JSON
+Schema checks. Raw body predicates operate on wrapper-excluded host text, while
+Markdown headings, sections, and wikilinks are explicitly unsupported.
 
 If a file matches multiple rules, all matching checks apply. Files matching no rules are ignored. Invalid YAML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed.
 

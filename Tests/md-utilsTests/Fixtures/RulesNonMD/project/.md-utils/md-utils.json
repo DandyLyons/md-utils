@@ -1,0 +1,67 @@
+{
+  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json",
+  "configVersion": "0.2.0",
+  "schemaDirectory": ".md-utils/schemas/",
+  "rules": [
+    {
+      "name": "swift-components",
+      "match": {
+        "paths": ["Sources/APIClient.swift"],
+        "frontmatter": { "component": { "equals": "networking" } },
+        "frontmatterQuery": { "jmespath": "owner == 'platform'" },
+        "document": {
+          "bodyContains": "@MainActor",
+          "bodyRegex": "struct\\s+APIClient",
+          "lineCount": { "max": 20 },
+          "wordCount": { "max": 30 }
+        }
+      },
+      "checks": [
+        { "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true },
+        { "type": "maxBodyLines", "max": 20 },
+        { "type": "maxBodyWords", "max": 30 }
+      ]
+    },
+    {
+      "name": "text-frontmatter",
+      "match": {
+        "paths": ["Notes/notes.txt"],
+        "frontmatter": { "kind": { "equals": "notes" } }
+      },
+      "checks": [{ "type": "maxBodyLines", "max": 100 }]
+    },
+    {
+      "name": "wrapper-is-not-body",
+      "match": {
+        "paths": ["Sources/APIClient.swift"],
+        "document": { "bodyContains": "wrapperOnly" }
+      },
+      "checks": [{ "type": "maxBodyLines", "max": 100 }]
+    },
+    {
+      "name": "toml-file",
+      "match": {
+        "paths": ["Config/settings.toml"],
+        "file": { "extensionIn": ["toml"] },
+        "document": { "bodyContains": "enabled = true" }
+      },
+      "checks": [{ "type": "maxBodyLines", "max": 100 }]
+    },
+    {
+      "name": "toml-frontmatter",
+      "match": {
+        "paths": ["Config/settings.toml"],
+        "frontmatter": { "status": { "hasKey": true } }
+      },
+      "checks": [{ "type": "maxBodyLines", "max": 100 }]
+    },
+    { "name": "missing-frontmatter", "match": { "paths": ["Cases/Missing.swift"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
+    { "name": "incomplete-frontmatter", "match": { "paths": ["Cases/Incomplete.swift"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
+    { "name": "malformed-frontmatter", "match": { "paths": ["Cases/Malformed.swift"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
+    { "name": "multiple-frontmatter", "match": { "paths": ["Cases/Multiple.swift"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
+    { "name": "source-heading", "match": { "paths": ["Sources/Structural.swift"], "document": { "hasHeading": "Fake" } }, "checks": [{ "type": "maxBodyLines", "max": 100 }] },
+    { "name": "source-section", "match": { "paths": ["Sources/Structural.swift"], "document": { "hasSection": "Fake" } }, "checks": [{ "type": "maxBodyLines", "max": 100 }] },
+    { "name": "source-wikilink", "match": { "paths": ["Sources/Structural.swift"], "document": { "hasWikilink": "Target" } }, "checks": [{ "type": "maxBodyLines", "max": 100 }] },
+    { "name": "source-required-heading", "match": { "paths": ["Sources/Structural.swift"] }, "checks": [{ "type": "requiredHeading", "heading": "Fake" }] }
+  ]
+}

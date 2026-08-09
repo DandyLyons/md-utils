@@ -16,7 +16,10 @@ extension CLIEntry.RulesCommands {
   struct FilesMatching: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "files-matching",
-      abstract: "List Markdown files matching a configured rule"
+      abstract: "List files matching a configured rule",
+      discussion: RulesNonMarkdownHelp.appending(
+        to: "Project scans remain Markdown-only unless non-Markdown files are explicitly included."
+      )
     )
 
     @Argument(help: "Rule name to match files against")
@@ -25,11 +28,17 @@ extension CLIEntry.RulesCommands {
     @Flag(name: .long, help: "Print absolute paths instead of project-relative paths")
     var absolute = false
 
+    @Flag(name: .long, help: "Include non-Markdown files selected by the configured rule")
+    var includeNonMD = false
+
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      let files = try await RulesValidatorRunner.filesMatching(ruleName: ruleName)
+      let files = try await RulesValidatorRunner.filesMatching(
+        ruleName: ruleName,
+        includeNonMarkdown: includeNonMD
+      )
       print(RulesFilesMatchingFormatter.render(files, ruleName: ruleName, absolute: absolute))
     }
   }

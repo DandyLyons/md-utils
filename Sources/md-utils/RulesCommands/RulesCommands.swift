@@ -8,11 +8,11 @@ import ArgumentParser
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
 extension CLIEntry {
-  /// Project-level Markdown rules commands.
+  /// Project-level file rules commands.
   struct RulesCommands: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "rules",
-      abstract: "Validate Markdown files with configured rules",
+      abstract: "Validate files with configured rules",
       subcommands: [
         Add.self,
         Remove.self,

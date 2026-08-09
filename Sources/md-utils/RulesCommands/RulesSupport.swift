@@ -1201,14 +1201,35 @@ enum SchemaDocumentLoader {
     return schema
   }
 }
-/// Finds Markdown files that can participate in rules validation.
+
+/// Shared generated-help content for rules commands that can opt into host files.
+enum RulesNonMarkdownHelp {
+  static func appending(to discussion: String) -> String {
+    discussion + "\n\n" + section
+  }
+
+  private static let section = """
+    NON-MARKDOWN FILES
+      Rules scan only .md and .markdown files by default. Use --include-non-md
+      to include other files selected by configured rule paths. An explicit file
+      passed to rules matching is selected automatically, except .txt, which
+      requires --include-non-md.
+
+      Mapped extensions use shipped wrapped-frontmatter syntax. Plain .txt uses
+      ordinary leading --- frontmatter. Unmapped files support file and raw-text
+      predicates, but frontmatter evaluation reports that no syntax mapping exists.
+      Markdown headings, sections, and wikilinks are unsupported in non-Markdown
+      files.
+    """
+}
+/// Finds files that can participate in rules validation.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
 enum RuleFileScanner {
-  /// Finds Markdown files below the project root for rules validation.
+  /// Finds eligible files below the project root for rules validation.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  static func markdownFiles(root: Path = .current) throws -> [Path] {
+  static func files(root: Path = .current, includeNonMarkdown: Bool = false) throws -> [Path] {
     let manager = FileManager.default
     let rootURL = URL(fileURLWithPath: root.absolute().string)
     guard let enumerator = manager.enumerator(
@@ -1223,14 +1244,16 @@ enum RuleFileScanner {
     for case let url as URL in enumerator {
       let path = Path(url.path)
       guard !path.isDirectory else { continue }
-      guard let ext = path.extension?.lowercased(), ["md", "markdown"].contains(ext) else { continue }
+      if includeNonMarkdown == false {
+        guard let ext = path.extension?.lowercased(), ["md", "markdown"].contains(ext) else { continue }
+      }
       files.append(path)
     }
     files.sort { $0.string < $1.string }
     return files
   }
 }
-/// Describes one JSON Schema validation issue for a Markdown file.
+/// Describes one validation issue for a file.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
 struct RuleValidationErrorDetail: Sendable {
@@ -1296,20 +1319,21 @@ private func boundedConcurrentMap<Input: Sendable, Output: Sendable>(
     return completed.sorted { $0.0 < $1.0 }.map(\.1)
   }
 }
-/// Records whether one configured rule matches a specific Markdown file.
+/// Records whether one configured rule matches a specific file.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
 struct RuleMatchEvaluation {
   var rule: Rule
   var matched: Bool
   var reasons: [String]
+  var diagnostics: [String] = []
 }
 /// Aggregates rule validation results for command output and exit status.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
 struct RuleValidationSummary {
   var results: [RuleValidationResult]
-  var totalMarkdownFiles: Int
+  var totalFiles: Int
 
   var errors: Int {
     results.reduce(0) { count, result in
@@ -1342,6 +1366,7 @@ enum RulesValidatorRunner {
   /// See <doc:RulesValidationCommands> for workflow details.
   static func validate(
     ruleName: String? = nil,
+    includeNonMarkdown: Bool = false,
     root: Path = .current,
     configPath: Path = RulesPaths.configFile
   ) async throws -> RuleValidationSummary {
@@ -1362,7 +1387,7 @@ enum RulesValidatorRunner {
       guard let compiled = registry.rule(named: rule.name) else { return nil }
       return (rule, compiled)
     }
-    let files = try RuleFileScanner.markdownFiles(root: root)
+    let files = try RuleFileScanner.files(root: root, includeNonMarkdown: includeNonMarkdown)
     let rootString = root.absolute().normalize().string
     let schemaPaths = Dictionary(uniqueKeysWithValues: rules.map { rule in
       (
@@ -1399,7 +1424,8 @@ enum RulesValidatorRunner {
       let record = try MarkdownRecordFileAdapter.read(file, projectRoot: projectRoot)
       let analyzed = await MarkdownRecordAnalyzer.analyze(
         record,
-        requirements: job.analysisRequirements
+        requirements: job.analysisRequirements,
+        contentKind: recordContentKind(for: file)
       )
       var results: [RuleValidationResult] = []
       for compiled in job.rules {
@@ -1435,12 +1461,13 @@ enum RulesValidatorRunner {
     }
     return RuleValidationSummary(
       results: groupedResults.flatMap { $0 },
-      totalMarkdownFiles: files.count
+      totalFiles: files.count
     )
   }
 
   static func filesMatching(
     ruleName: String,
+    includeNonMarkdown: Bool = false,
     root: Path = .current,
     configPath: Path = RulesPaths.configFile
   ) async throws -> [Path] {
@@ -1452,7 +1479,7 @@ enum RulesValidatorRunner {
     let registry = try config.compiledRuleRegistry(root: root)
     guard let compiled = registry.rule(named: ruleName) else { return [] }
     let checker = MarkdownRuleChecker(registry: registry)
-    let files = try RuleFileScanner.markdownFiles(root: root)
+    let files = try RuleFileScanner.files(root: root, includeNonMarkdown: includeNonMarkdown)
     let rootString = root.absolute().normalize().string
     let candidates = try files.compactMap { file -> String? in
       let logicalPath = try MarkdownRecordPath(relativePath(from: root, to: file))
@@ -1463,9 +1490,13 @@ enum RulesValidatorRunner {
       let record = try MarkdownRecordFileAdapter.read(file, projectRoot: Path(rootString))
       let analyzed = await MarkdownRecordAnalyzer.analyze(
         record,
-        requirements: checker.analysisRequirements(for: compiled)
+        requirements: checker.analysisRequirements(for: compiled),
+        contentKind: recordContentKind(for: file)
       )
       let assessment = try checker.assess(analyzed, against: compiled)
+      if let diagnostic = assessment.applicabilityDiagnostics.first {
+        throw ValidationError(diagnostic.message)
+      }
       return assessment.status != .notApplicable ? fileString : nil
     }
     return matches.compactMap { path in
@@ -1475,13 +1506,18 @@ enum RulesValidatorRunner {
 
   static func rulesMatching(
     fileName: String,
+    includeNonMarkdown: Bool = false,
     root: Path = .current,
     configPath: Path = RulesPaths.configFile
   ) async throws -> [RuleMatchEvaluation] {
     let config = try MdUtilsConfig.load(from: configPath)
     let file = Path(fileName)
     guard file.exists else {
-      throw ValidationError("Markdown file not found: \(fileName)")
+      throw ValidationError("File not found: \(fileName)")
+    }
+    let fileExtension = file.extension?.lowercased() ?? ""
+    if fileExtension == "txt" && includeNonMarkdown == false {
+      throw ValidationError("Plain .txt files require --include-non-md.")
     }
 
     let registry = try config.compiledRuleRegistry(root: root)
@@ -1495,20 +1531,27 @@ enum RulesValidatorRunner {
     }
     let analyzed = await MarkdownRecordAnalyzer.analyze(
       record,
-      requirements: analysisRequirements
+      requirements: analysisRequirements,
+      contentKind: recordContentKind(for: file)
     )
     return try config.schemaRules.map { rule in
       guard let compiled = registry.rule(named: rule.name) else {
         return RuleMatchEvaluation(rule: rule, matched: false, reasons: ["compiled rule is unavailable"])
       }
       let assessment = try checker.assess(analyzed, against: compiled)
+      let pathCandidate = checker.isPathCandidate(record.context.path, for: compiled)
       return RuleMatchEvaluation(
         rule: rule,
         matched: assessment.status != .notApplicable && assessment.applicabilityDiagnostics.isEmpty,
         reasons: assessment.evidence.map(\.message)
-          + assessment.applicabilityDiagnostics.map(\.message)
+          + assessment.applicabilityDiagnostics.map(\.message),
+        diagnostics: pathCandidate ? assessment.applicabilityDiagnostics.map(\.message) : []
       )
     }
+  }
+
+  private static func recordContentKind(for file: Path) -> MarkdownRecordContentKind {
+    MarkdownRecordContentKind.rulesKind(forExtension: file.extension ?? "")
   }
 
 }

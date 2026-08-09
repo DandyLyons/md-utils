@@ -109,6 +109,17 @@ public struct MarkdownTypeChecker: Sendable {
     _ record: AnalyzedMarkdownRecord,
     definition: MarkdownTypeDefinition
   ) -> [MarkdownDiagnostic] {
+    if let fileExtension = record.unavailableFrontmatterExtension,
+      definition.frontmatter.effectivePresence == .required || definition.frontmatter.schemas.isEmpty == false
+    {
+      return [MarkdownDiagnostic(
+        code: "record.frontmatter.syntax-unavailable",
+        severity: .error,
+        domain: .frontmatter,
+        location: "frontmatter",
+        message: "no frontmatter syntax mapping for extension \"\(fileExtension)\""
+      )]
+    }
     guard record.parseDiagnostics.contains(where: { $0.domain == .frontmatter }) == false else {
       return []
     }
@@ -201,6 +212,16 @@ public struct MarkdownTypeChecker: Sendable {
     domain: MarkdownDiagnosticDomain,
     record: AnalyzedMarkdownRecord
   ) -> MarkdownDiagnostic? {
+    if constraint.predicate.requiresMarkdownStructure && record.supportsMarkdownStructure == false {
+      return MarkdownDiagnostic(
+        code: "record.markdown-structure.unsupported",
+        severity: severity,
+        domain: domain,
+        constraintID: constraint.id,
+        location: "body.structure",
+        message: "Markdown structural predicates are unsupported for non-Markdown files"
+      )
+    }
     switch constraint.predicate {
     case .heading(let predicate):
       guard record.headings.contains(where: { matches($0, predicate) }) == false else { return nil }
@@ -398,6 +419,17 @@ public struct MarkdownTypeChecker: Sendable {
     guard pointer.isEmpty == false, pointer != "/" else { return "frontmatter" }
     let trimmed = pointer.hasPrefix("/") ? String(pointer.dropFirst()) : pointer
     return "frontmatter." + trimmed.replacingOccurrences(of: "/", with: ".")
+  }
+}
+
+private extension MarkdownPredicate {
+  var requiresMarkdownStructure: Bool {
+    switch self {
+    case .heading, .headingRelationship, .section:
+      return true
+    case .path, .maxBodyLines, .maxBodyWords:
+      return false
+    }
   }
 }
 

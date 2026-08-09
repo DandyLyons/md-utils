@@ -1,0 +1,4 @@
+---
+kind: notes
+---
+# This is text, not Markdown structure

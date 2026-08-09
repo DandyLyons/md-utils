@@ -126,6 +126,7 @@ let package = Package(
       ],
       resources: [
         .copy("Fixtures/NonMDFrontmatter"),
+        .copy("Fixtures/RulesNonMD"),
       ]
     ),
   ]

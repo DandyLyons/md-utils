@@ -38,6 +38,29 @@ package struct MarkdownRecordAnalysisRequirements: OptionSet, Sendable {
   }
 }
 
+/// Describes how one rules-runtime record exposes frontmatter and body content.
+package enum MarkdownRecordContentKind: Sendable {
+  /// Ordinary Markdown with leading `---` frontmatter and Markdown structure.
+  case markdown
+  /// Non-Markdown text using ordinary leading `---` frontmatter.
+  case plainText
+  /// Non-Markdown host source using a shipped wrapped-frontmatter syntax.
+  case wrapped(FrontMatterSyntax)
+  /// Non-Markdown host source without a shipped frontmatter mapping.
+  case unmapped(fileExtension: String)
+
+  /// Resolves rules-runtime behavior from a filename extension.
+  package static func rulesKind(forExtension fileExtension: String) -> Self {
+    let normalized = fileExtension.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+    if normalized == "md" || normalized == "markdown" { return .markdown }
+    if normalized == "txt" { return .plainText }
+    if let syntax = FrontMatterSyntax.shippedSyntax(forExtension: normalized) {
+      return .wrapped(syntax)
+    }
+    return .unmapped(fileExtension: normalized)
+  }
+}
+
 /// Parsed record state shared by rule, type, identity, and server assessment.
 ///
 /// Package visibility keeps parser implementation details out of the public API while
@@ -50,6 +73,8 @@ package struct AnalyzedMarkdownRecord: Sendable {
   package var systemTypeHints: [MarkdownTypeHint]
   package var headings: [AnalyzedMarkdownHeading]
   package var parseDiagnostics: [MarkdownDiagnostic]
+  package var supportsMarkdownStructure: Bool
+  package var unavailableFrontmatterExtension: String?
 
   package var allTypeHints: [MarkdownTypeHint] {
     var result: [MarkdownTypeHint] = []
@@ -75,33 +100,74 @@ package enum MarkdownRecordAnalyzer {
   /// Separates frontmatter, parses safe YAML, and derives requested document state.
   package static func analyze(
     _ record: MarkdownRecord,
-    requirements: MarkdownRecordAnalysisRequirements = .all
+    requirements: MarkdownRecordAnalysisRequirements = .all,
+    contentKind: MarkdownRecordContentKind = .markdown
   ) async -> AnalyzedMarkdownRecord {
-    let parser = FrontMatterParser()
-    var input = Substring(record.content)
-    let parts: (rawFrontMatter: String, body: String)
-    do {
-      parts = try parser.parse(&input)
-    } catch {
+    let parts: RecordParts
+    switch contentKind {
+    case .markdown, .plainText:
+      let parser = FrontMatterParser()
+      var input = Substring(record.content)
+      do {
+        let parsed = try parser.parse(&input)
+        parts = RecordParts(
+          rawFrontmatter: parsed.rawFrontMatter,
+          body: parsed.body,
+          hasFrontmatter: containsFrontmatterBlock(record.content),
+          diagnostics: []
+        )
+      } catch {
+        let supportsMarkdownStructure = contentKind.supportsMarkdownStructure
+        return AnalyzedMarkdownRecord(
+          record: record,
+          body: record.content,
+          hasFrontmatter: containsFrontmatterBlock(record.content),
+          userFrontmatter: nil,
+          systemTypeHints: [],
+          headings: supportsMarkdownStructure
+            ? await analyzeHeadings(in: record.content, when: requirements)
+            : [],
+          parseDiagnostics: [parseDiagnostic(error.localizedDescription)],
+          supportsMarkdownStructure: supportsMarkdownStructure,
+          unavailableFrontmatterExtension: nil
+        )
+      }
+    case .wrapped(let syntax):
+      let scan = WrappedFrontMatterParser(syntax: syntax).parse(record.content)
+      var body = record.content
+      if let block = scan.firstBlock {
+        body.removeSubrange(block.range)
+      }
+      let diagnostics = scan.additionalOpeningLines.first.map { line in
+        [multipleBlocksDiagnostic(line: line)]
+      } ?? []
+      parts = RecordParts(
+        rawFrontmatter: scan.firstBlock?.rawYAML ?? "",
+        body: body,
+        hasFrontmatter: scan.firstBlock != nil,
+        diagnostics: diagnostics
+      )
+    case .unmapped(let fileExtension):
       return AnalyzedMarkdownRecord(
         record: record,
         body: record.content,
-        hasFrontmatter: containsFrontmatterBlock(record.content),
+        hasFrontmatter: false,
         userFrontmatter: nil,
         systemTypeHints: [],
-        headings: await analyzeHeadings(in: record.content, when: requirements),
-        parseDiagnostics: [parseDiagnostic(error.localizedDescription)]
+        headings: [],
+        parseDiagnostics: [],
+        supportsMarkdownStructure: false,
+        unavailableFrontmatterExtension: fileExtension
       )
     }
 
-    let hasPhysicalFrontmatter = containsFrontmatterBlock(record.content)
     var userFrontmatter: [String: JSONValue]?
     var hints: [MarkdownTypeHint] = []
-    var diagnostics: [MarkdownDiagnostic] = []
+    var diagnostics = parts.diagnostics
 
-    if hasPhysicalFrontmatter {
+    if parts.hasFrontmatter {
       do {
-        let mapping = try YAMLConversion.parse(parts.rawFrontMatter)
+        let mapping = try YAMLConversion.parse(parts.rawFrontmatter)
         let dynamicValue = try YAMLConversion.safeNodeToSwiftValue(.mapping(mapping))
         guard case .object(var object) = try JSONValue(any: dynamicValue) else {
           throw YAMLConversionError.notAMapping
@@ -120,12 +186,23 @@ package enum MarkdownRecordAnalyzer {
     return AnalyzedMarkdownRecord(
       record: record,
       body: parts.body,
-      hasFrontmatter: hasPhysicalFrontmatter,
+      hasFrontmatter: parts.hasFrontmatter,
       userFrontmatter: userFrontmatter,
       systemTypeHints: hints,
-      headings: await analyzeHeadings(in: parts.body, when: requirements),
-      parseDiagnostics: diagnostics
+      headings: contentKind.supportsMarkdownStructure
+        ? await analyzeHeadings(in: parts.body, when: requirements)
+        : [],
+      parseDiagnostics: diagnostics,
+      supportsMarkdownStructure: contentKind.supportsMarkdownStructure,
+      unavailableFrontmatterExtension: nil
     )
+  }
+
+  private struct RecordParts {
+    var rawFrontmatter: String
+    var body: String
+    var hasFrontmatter: Bool
+    var diagnostics: [MarkdownDiagnostic]
   }
 
   private static func analyzeHeadings(
@@ -224,6 +301,16 @@ package enum MarkdownRecordAnalyzer {
     )
   }
 
+  private static func multipleBlocksDiagnostic(line: Int) -> MarkdownDiagnostic {
+    MarkdownDiagnostic(
+      code: "record.frontmatter.multiple-blocks",
+      severity: .error,
+      domain: .frontmatter,
+      location: "frontmatter",
+      message: "multiple frontmatter blocks; additional block opens at line \(line)"
+    )
+  }
+
   private static func hintDiagnostic(_ message: String) -> MarkdownDiagnostic {
     MarkdownDiagnostic(
       code: "type.hint.malformed",
@@ -232,5 +319,12 @@ package enum MarkdownRecordAnalyzer {
       location: "$md-utils.typeHints",
       message: message
     )
+  }
+}
+
+private extension MarkdownRecordContentKind {
+  var supportsMarkdownStructure: Bool {
+    if case .markdown = self { return true }
+    return false
   }
 }
