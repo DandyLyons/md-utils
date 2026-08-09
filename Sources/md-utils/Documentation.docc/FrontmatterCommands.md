@@ -50,3 +50,9 @@ literals from shell command substitution.
 ## Output Semantics
 
 Commands that report values preserve the distinction between a missing key and a key whose YAML value is null. Machine-readable formats should be preferred when that distinction matters.
+
+`fm dump` is read-only and automatically selects Markdown, plain-text, and
+mapped non-Markdown files. A sole explicit file outputs its mapping directly.
+Directory and explicit file-list invocations output an object whose
+`frontMatter`, `noFrontMatter`, and `emptyFrontMatter` members distinguish
+nonempty mappings, absent blocks, and complete blocks with empty mappings.

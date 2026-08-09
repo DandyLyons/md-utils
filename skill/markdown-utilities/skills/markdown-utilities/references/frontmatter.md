@@ -70,20 +70,27 @@ md-utils fm dump post.md
 # YAML format
 md-utils fm dump post.md --format yaml
 
-# Multiple files: outputs JSON array with "$path" key injected
+# Multiple files: categorizes populated, absent, and empty frontmatter
 md-utils fm dump posts/ --format json
 
 # Pipe to jq
-md-utils fm dump posts/ | jq '.[].title'
+md-utils fm dump posts/ | jq '.frontMatter[].title'
 
 # Pipe to yq
-md-utils fm dump posts/ --format yaml | yq '.[].title'
+md-utils fm dump posts/ --format yaml | yq '.frontMatter[].title'
 
 # Cat-style headers (legacy)
 md-utils fm dump posts/ --cat-headers
 ```
 
 **Formats:** `json` (default), `yaml`, `raw`, `plist`
+
+`fm dump` automatically processes Markdown, `.txt`, and mapped non-Markdown
+files; it does not accept `--include-non-md`. Multi-file output is an object:
+
+- `frontMatter` contains nonempty mappings with a `$path` key.
+- `noFrontMatter` contains paths with no complete frontmatter block.
+- `emptyFrontMatter` contains paths whose complete block has an empty mapping.
 
 ## Search with JMESPath
 
@@ -158,10 +165,10 @@ md-utils fm array contains --key tags --value swift posts/ \
   | xargs -I {} sh -c 'md-utils fm array contains --key tags --value tutorial {} && echo {}'
 
 # List all unique authors across a directory
-md-utils fm dump posts/ | jq -r '.[].author' | sort -u
+md-utils fm dump posts/ | jq -r '.frontMatter[].author' | sort -u
 
 # Count published posts
-md-utils fm dump posts/ | jq '[.[] | select(.status == "published")] | length'
+md-utils fm dump posts/ | jq '[.frontMatter[] | select(.status == "published")] | length'
 
 # Find files missing a required key
 find posts/ -name "*.md" | xargs -I {} sh -c 'md-utils fm has --key author {} || echo {}'

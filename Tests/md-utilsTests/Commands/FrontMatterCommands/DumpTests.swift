@@ -60,7 +60,7 @@ struct DumpTests {
     ])
     var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Dump)
 
-    // Should succeed — outputs JSON array with $path
+    // Should succeed — outputs a categorized JSON object.
     try await command.run()
   }
 
@@ -278,6 +278,106 @@ struct DumpTests {
     try await command.run()
   }
 
+  @Test
+  func `collection categorizes Markdown text and mapped files without opt-in`() throws {
+    let tempDir = try createProjectTempDirectory(prefix: "md-utils-dump-categories")
+    defer { try? tempDir.delete() }
+
+    try (tempDir + "filled.md").write("""
+    ---
+    title: Markdown
+    ---
+    Body
+    """)
+    try (tempDir + "empty.md").write("""
+    ---
+    ---
+    Body
+    """)
+    try (tempDir + "missing.md").write("# No frontmatter\n")
+    try (tempDir + "Source.swift").write("""
+    /*
+    ---
+    title: Swift
+    ---
+    */
+    import Foundation
+    """)
+    try (tempDir + "Empty.swift").write("""
+    /*
+    ---
+    {}
+    ---
+    */
+    """)
+    try (tempDir + "notes.txt").write("""
+    ---
+    title: Text
+    ---
+    Notes
+    """)
+    try (tempDir + "plain.txt").write("Plain text without frontmatter\n")
+
+    let result = try CLIProcessTestHelper.run(["fm", "dump", tempDir.string])
+
+    #expect(result.status == 0, "Command failed: \(result.standardError)")
+    let data = try #require(result.standardOutput.data(using: .utf8))
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let frontMatter = try #require(object["frontMatter"] as? [[String: Any]])
+    let noFrontMatter = try #require(object["noFrontMatter"] as? [String])
+    let emptyFrontMatter = try #require(object["emptyFrontMatter"] as? [String])
+
+    #expect(Set(frontMatter.compactMap { $0["title"] as? String }) == ["Markdown", "Swift", "Text"])
+    #expect(Set(noFrontMatter.map { Path($0).lastComponent }) == ["missing.md", "plain.txt"])
+    #expect(Set(emptyFrontMatter.map { Path($0).lastComponent }) == ["empty.md", "Empty.swift"])
+  }
+
+  @Test
+  func `single text file dumps frontmatter without opt-in`() throws {
+    let tempDir = try createProjectTempDirectory(prefix: "md-utils-dump-text")
+    defer { try? tempDir.delete() }
+    let file = tempDir + "notes.txt"
+    try file.write("""
+    ---
+    title: Plain Text
+    ---
+    Notes
+    """)
+
+    let result = try CLIProcessTestHelper.run(["fm", "dump", file.string])
+
+    #expect(result.status == 0, "Command failed: \(result.standardError)")
+    let data = try #require(result.standardOutput.data(using: .utf8))
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(object["title"] as? String == "Plain Text")
+  }
+
+  @Test
+  func `directory with one file still uses collection envelope`() throws {
+    let tempDir = try createProjectTempDirectory(prefix: "md-utils-dump-single-directory")
+    defer { try? tempDir.delete() }
+    let file = tempDir + "missing.md"
+    try file.write("# No frontmatter\n")
+
+    let result = try CLIProcessTestHelper.run(["fm", "dump", tempDir.string])
+
+    #expect(result.status == 0, "Command failed: \(result.standardError)")
+    let data = try #require(result.standardOutput.data(using: .utf8))
+    let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect((object["frontMatter"] as? [[String: Any]])?.isEmpty == true)
+    #expect((object["emptyFrontMatter"] as? [String])?.isEmpty == true)
+    let noFrontMatter = try #require(object["noFrontMatter"] as? [String])
+    #expect(noFrontMatter == [file.string])
+  }
+
+  @Test
+  func `include-non-md is not accepted by dump`() throws {
+    let result = try CLIProcessTestHelper.run(["fm", "dump", "--help"])
+
+    #expect(result.status == 0)
+    #expect(result.standardOutput.contains("--include-non-md") == false)
+  }
+
   // MARK: - Test Helpers
 
   private func createTempFile(content: String, name: String) throws -> Path {
@@ -285,5 +385,13 @@ struct DumpTests {
     let tempFile = tempDir + "md-utils-test-\(UUID().uuidString)-\(name)"
     try tempFile.write(content)
     return tempFile
+  }
+
+  private func createProjectTempDirectory(prefix: String) throws -> Path {
+    let tempRoot = Path(FileManager.default.currentDirectoryPath) + "tmp/"
+    try tempRoot.mkpath()
+    let directory = tempRoot + "\(prefix)-\(UUID().uuidString)/"
+    try directory.mkpath()
+    return directory
   }
 }

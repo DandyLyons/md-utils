@@ -61,16 +61,16 @@ md-utils headings promote --index 3 document.md --in-place
 
 ```bash
 # Get all titles across a directory
-md-utils fm dump posts/ | jq -r '.[].title'
+md-utils fm dump posts/ | jq -r '.frontMatter[].title'
 
 # Dump all frontmatter as YAML
 md-utils fm dump posts/ --format yaml
 
 # Count published posts
-md-utils fm dump posts/ | jq '[.[] | select(.status == "published")] | length'
+md-utils fm dump posts/ | jq '[.frontMatter[] | select(.status == "published")] | length'
 
 # Get unique authors
-md-utils fm dump posts/ | jq -r '.[].author' | sort -u
+md-utils fm dump posts/ | jq -r '.frontMatter[].author' | sort -u
 
 # Extract specific lines with line numbers
 md-utils lines document.md -s 1 -e 50 --numbered

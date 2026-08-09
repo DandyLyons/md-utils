@@ -14,8 +14,16 @@ enum NonMarkdownFrontMatterHelp {
     discussion + "\n\n" + section
   }
 
-  /// The exact syntax and selection contract shown on relevant help pages.
-  private static let section = """
+  /// Appends the wrapped-frontmatter contract used by `fm dump`.
+  ///
+  /// Dump is read-only, so it discovers every shipped syntax without requiring
+  /// the opt-in used by batch mutation commands.
+  static func appendingForDump(to discussion: String) -> String {
+    discussion + "\n\n" + dumpSection
+  }
+
+  /// The syntax contract shared by frontmatter command help pages.
+  private static let syntaxContract = """
     FRONTMATTER ON NON-MD FILES
       A supported non-Markdown file uses the wrapper mapped from its extension.
       A complete wrapped frontmatter block must contain, on separate complete LF
@@ -30,11 +38,25 @@ enum NonMarkdownFrontMatterHelp {
 
       The block may occur anywhere, though placement near the beginning is
       recommended. Incomplete blocks are treated as absent; multiple complete
-      blocks are invalid. Plain .txt uses ordinary Markdown-style frontmatter and
-      only participates with --include-non-md.
+      blocks are invalid. Plain .txt uses ordinary Markdown-style frontmatter.
+    """
+
+  /// The exact opt-in selection contract shown on relevant help pages.
+  private static let section = syntaxContract + """
+
+
+      Plain .txt only participates with --include-non-md.
 
       A sole explicit mapped file is selected automatically. Multi-file and
       directory operations require --include-non-md for mapped files.
+    """
+
+  /// The exact syntax and automatic-selection contract shown by `fm dump`.
+  private static let dumpSection = syntaxContract + """
+
+
+      Dump automatically selects Markdown, plain-text, and mapped non-Markdown
+      files in explicit file lists and directory operations.
     """
 }
 
