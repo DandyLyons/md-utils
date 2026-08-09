@@ -62,6 +62,14 @@ public struct MarkdownRuleChecker: Sendable {
     for check in rule.definition.checks {
       switch check.predicate {
       case .frontmatterSchema(_, let presence):
+        if let fileExtension = record.unavailableFrontmatterExtension {
+          diagnostics.append(frontmatterSyntaxUnavailableDiagnostic(
+            fileExtension: fileExtension,
+            constraintID: check.id,
+            severity: check.severity
+          ))
+          continue
+        }
         guard record.hasFrontmatter else {
           if presence == .optional {
             skippedChecks += 1
@@ -339,6 +347,9 @@ public struct MarkdownRuleChecker: Sendable {
       unavailableMessage = nil
       detail = matched ? "modification date is before \(operand.rawValue)" : "modification date is not before \(operand.rawValue)"
     case .frontmatterField(let key, let operation):
+      if let fileExtension = record.unavailableFrontmatterExtension {
+        return unavailableFrontmatter(requirement.id, fileExtension: fileExtension)
+      }
       guard record.hasFrontmatter else {
         matched = false
         unavailableMessage = nil
@@ -360,6 +371,9 @@ public struct MarkdownRuleChecker: Sendable {
       unavailableMessage = nil
       detail = matched ? "frontmatter \"\(key)\" matched" : "frontmatter \"\(key)\" did not match"
     case .frontmatterJMESPath(let expression):
+      if let fileExtension = record.unavailableFrontmatterExtension {
+        return unavailableFrontmatter(requirement.id, fileExtension: fileExtension)
+      }
       guard record.hasFrontmatter else {
         matched = false
         unavailableMessage = nil
@@ -377,16 +391,25 @@ public struct MarkdownRuleChecker: Sendable {
       unavailableMessage = nil
       detail = matched ? "frontmatterQuery matched" : "frontmatterQuery did not match"
     case .heading(let predicate):
+      guard record.supportsMarkdownStructure else {
+        return unsupportedMarkdownStructure(requirement.id)
+      }
       matched = record.headings.contains { heading in
         heading.text == predicate.text && (predicate.level == nil || predicate.level == heading.level)
       }
       unavailableMessage = nil
       detail = matched ? "document heading matched" : "document heading did not match"
     case .headingRegularExpression(let pattern):
+      guard record.supportsMarkdownStructure else {
+        return unsupportedMarkdownStructure(requirement.id)
+      }
       matched = record.headings.contains { regularExpression(pattern, matches: $0.text) }
       unavailableMessage = nil
       detail = matched ? "document heading matched regular expression" : "document heading did not match regular expression"
     case .section(let heading):
+      guard record.supportsMarkdownStructure else {
+        return unsupportedMarkdownStructure(requirement.id)
+      }
       matched = record.headings.contains { $0.text == heading && $0.directContentIsEmpty == false }
       unavailableMessage = nil
       detail = matched ? "document section matched" : "document section did not match"
@@ -399,6 +422,9 @@ public struct MarkdownRuleChecker: Sendable {
       unavailableMessage = nil
       detail = matched ? "document body matched regular expression" : "document body did not match regular expression"
     case .wikilink(let target):
+      guard record.supportsMarkdownStructure else {
+        return unsupportedMarkdownStructure(requirement.id)
+      }
       let links = WikilinkScanner.scan(record.body)
       matched = target.map { expected in links.contains { $0.target == expected } }
         ?? (links.isEmpty == false)
@@ -436,6 +462,12 @@ public struct MarkdownRuleChecker: Sendable {
     record: AnalyzedMarkdownRecord,
     ruleName: String
   ) throws -> [MarkdownDiagnostic] {
+    if predicate.requiresMarkdownStructure && record.supportsMarkdownStructure == false {
+      return [markdownStructureUnsupportedDiagnostic(
+        constraintID: id,
+        severity: severity
+      )]
+    }
     switch predicate {
     case .heading(let heading):
       guard record.headings.contains(where: {
@@ -514,6 +546,63 @@ public struct MarkdownRuleChecker: Sendable {
     _ message: String
   ) -> (evidence: MarkdownRulePredicateEvidence, diagnostic: MarkdownDiagnostic?) {
     (MarkdownRulePredicateEvidence(id: id, status: .unavailable, message: message), nil)
+  }
+
+  private func unavailableFrontmatter(
+    _ id: String,
+    fileExtension: String
+  ) -> (evidence: MarkdownRulePredicateEvidence, diagnostic: MarkdownDiagnostic?) {
+    let diagnostic = frontmatterSyntaxUnavailableDiagnostic(
+      fileExtension: fileExtension,
+      constraintID: id,
+      severity: .error
+    )
+    return (
+      MarkdownRulePredicateEvidence(id: id, status: .unavailable, message: diagnostic.message),
+      diagnostic
+    )
+  }
+
+  private func unsupportedMarkdownStructure(
+    _ id: String
+  ) -> (evidence: MarkdownRulePredicateEvidence, diagnostic: MarkdownDiagnostic?) {
+    let diagnostic = markdownStructureUnsupportedDiagnostic(
+      constraintID: id,
+      severity: .error
+    )
+    return (
+      MarkdownRulePredicateEvidence(id: id, status: .unavailable, message: diagnostic.message),
+      diagnostic
+    )
+  }
+
+  private func frontmatterSyntaxUnavailableDiagnostic(
+    fileExtension: String,
+    constraintID: String,
+    severity: MarkdownDiagnosticSeverity
+  ) -> MarkdownDiagnostic {
+    MarkdownDiagnostic(
+      code: "record.frontmatter.syntax-unavailable",
+      severity: severity,
+      domain: .frontmatter,
+      constraintID: constraintID,
+      location: "frontmatter",
+      message: "no frontmatter syntax mapping for extension \"\(fileExtension)\""
+    )
+  }
+
+  private func markdownStructureUnsupportedDiagnostic(
+    constraintID: String,
+    severity: MarkdownDiagnosticSeverity
+  ) -> MarkdownDiagnostic {
+    MarkdownDiagnostic(
+      code: "record.markdown-structure.unsupported",
+      severity: severity,
+      domain: .body,
+      constraintID: constraintID,
+      location: "body.structure",
+      message: "Markdown structural predicates are unsupported for non-Markdown files"
+    )
   }
 
   private func regularExpression(_ pattern: String, matches value: String) -> Bool {
@@ -620,6 +709,17 @@ public struct MarkdownRuleChecker: Sendable {
     if pointer.isEmpty || pointer == "/" { return "frontmatter" }
     let trimmed = pointer.hasPrefix("/") ? String(pointer.dropFirst()) : pointer
     return trimmed.replacingOccurrences(of: "/", with: ".")
+  }
+}
+
+private extension MarkdownPredicate {
+  var requiresMarkdownStructure: Bool {
+    switch self {
+    case .heading, .headingRelationship, .section:
+      return true
+    case .path, .maxBodyLines, .maxBodyWords:
+      return false
+    }
   }
 }
 

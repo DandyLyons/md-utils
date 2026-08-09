@@ -14,7 +14,10 @@ extension CLIEntry.RulesCommands {
   struct Validate: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "validate",
-      abstract: "Validate Markdown files against configured rules"
+      abstract: "Validate files against configured rules",
+      discussion: RulesNonMarkdownHelp.appending(
+        to: "Project scans remain Markdown-only unless non-Markdown files are explicitly included."
+      )
     )
 
     @Argument(help: "Optional rule name to validate")
@@ -22,12 +25,18 @@ extension CLIEntry.RulesCommands {
 
     @Flag(name: .long, help: "Include successful validation results in output")
     var includeOk: Bool = false
+
+    @Flag(name: .long, help: "Include non-Markdown files selected by configured rule paths")
+    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
-      let summary = try await RulesValidatorRunner.validate(ruleName: ruleName)
+      let summary = try await RulesValidatorRunner.validate(
+        ruleName: ruleName,
+        includeNonMarkdown: includeNonMD
+      )
       print(RuleValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk))
       timer.writeStatus("Validated \(summary.matchedFiles) file(s)")
       if summary.hasFailures {

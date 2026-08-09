@@ -162,9 +162,9 @@ enum RuleDescriptionSummarizer {
     var lines: [String] = []
 
     if rule.match.paths.isEmpty {
-      lines.append("Applies to Markdown files matched by rule conditions.")
+      lines.append("Applies to files matched by rule conditions.")
     } else {
-      lines.append("Applies to Markdown files matching \(rule.match.paths.joined(separator: ", ")).")
+      lines.append("Applies to files matching \(rule.match.paths.joined(separator: ", ")).")
     }
     if !rule.match.excludePaths.isEmpty {
       lines.append("Excludes \(rule.match.excludePaths.joined(separator: ", ")).")

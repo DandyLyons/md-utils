@@ -1,0 +1,4 @@
+/*
+---
+component: incomplete
+struct Incomplete {}

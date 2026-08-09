@@ -42,7 +42,8 @@ enum CLIProcessTestHelper {
   static func run(
     _ arguments: [String],
     standardInput: String = "",
-    environment: [String: String] = [:]
+    environment: [String: String] = [:],
+    workingDirectory: URL? = nil
   ) throws -> CLIProcessResult {
     let captureDirectoryURL = URL(
       filePath: FileManager.default.currentDirectoryPath,
@@ -76,6 +77,7 @@ enum CLIProcessTestHelper {
     let process = Process()
     process.executableURL = try executableURL()
     process.arguments = arguments
+    process.currentDirectoryURL = workingDirectory
 
     var processEnvironment = ProcessInfo.processInfo.environment
     processEnvironment["NO_COLOR"] = "1"

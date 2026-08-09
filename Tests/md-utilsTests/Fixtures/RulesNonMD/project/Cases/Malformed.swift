@@ -1,0 +1,6 @@
+/*
+---
+component: [
+---
+*/
+struct Malformed {}

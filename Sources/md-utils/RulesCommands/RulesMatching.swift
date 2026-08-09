@@ -16,11 +16,17 @@ extension CLIEntry.RulesCommands {
   struct Matching: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "matching",
-      abstract: "List configured rules matching a Markdown file"
+      abstract: "List configured rules matching a file",
+      discussion: RulesNonMarkdownHelp.appending(
+        to: "An explicit mapped non-Markdown file is selected automatically."
+      )
     )
 
-    @Argument(help: "Markdown file path to match rules against")
+    @Argument(help: "File path to match rules against")
     var fileName: String
+
+    @Flag(name: .long, help: "Include a plain .txt or other non-Markdown file")
+    var includeNonMD = false
 
     @Flag(name: .long, help: "Explain why each configured rule matched or did not match")
     var explain = false
@@ -35,13 +41,19 @@ extension CLIEntry.RulesCommands {
       if explain && explainNoSkips {
         throw ValidationError("Use either --explain or --explain-no-skips, not both.")
       }
-      let evaluations = try await RulesValidatorRunner.rulesMatching(fileName: fileName)
+      let evaluations = try await RulesValidatorRunner.rulesMatching(
+        fileName: fileName,
+        includeNonMarkdown: includeNonMD
+      )
       print(RulesMatchingFormatter.render(
         evaluations,
         fileName: fileName,
         explain: explain || explainNoSkips,
         includeSkips: !explainNoSkips
       ))
+      if evaluations.contains(where: { $0.diagnostics.isEmpty == false }) {
+        throw ExitCode.failure
+      }
     }
   }
 }
@@ -58,10 +70,11 @@ enum RulesMatchingFormatter {
     }
 
     let names = evaluations.filter(\.matched).map(\.rule.name)
-    guard !names.isEmpty else {
+    let diagnostics = evaluations.flatMap(\.diagnostics)
+    guard !names.isEmpty || !diagnostics.isEmpty else {
       return CLIStyle.muted("No rules matched file \"\(fileName)\".")
     }
-    return names.joined(separator: "\n")
+    return (names + diagnostics.map { "ERROR: \($0)" }).joined(separator: "\n")
   }
 
   private static func renderExplanation(
@@ -84,6 +97,9 @@ enum RulesMatchingFormatter {
       lines.append("  \(status) \(CLIStyle.heading(evaluation.rule.name))")
       for reason in evaluation.reasons {
         lines.append("    - \(reason)")
+      }
+      for diagnostic in evaluation.diagnostics where evaluation.reasons.contains(diagnostic) == false {
+        lines.append("    - \(diagnostic)")
       }
     }
     return lines.joined(separator: "\n")
