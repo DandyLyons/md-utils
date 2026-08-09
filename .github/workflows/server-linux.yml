@@ -1,0 +1,48 @@
+name: Native Server Linux
+
+on:
+  pull_request:
+    paths:
+      - Package.swift
+      - Package.resolved
+      - Sources/MarkdownUtilitiesCore/**
+      - Sources/MarkdownUtilities/**
+      - Sources/MarkdownUtilitiesServer/**
+      - Sources/md-utils-server/**
+      - Tests/MarkdownUtilitiesServerTests/**
+      - Dockerfile.server-linux
+      - .github/workflows/server-linux.yml
+  push:
+    branches:
+      - main
+    paths:
+      - Package.swift
+      - Package.resolved
+      - Sources/MarkdownUtilitiesCore/**
+      - Sources/MarkdownUtilities/**
+      - Sources/MarkdownUtilitiesServer/**
+      - Sources/md-utils-server/**
+      - Tests/MarkdownUtilitiesServerTests/**
+      - Dockerfile.server-linux
+      - .github/workflows/server-linux.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-server:
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build native server
+        run: swift build --product md-utils-server
+
+      - name: Test native server
+        run: >-
+          swift test
+          --filter MarkdownServerHTTPAdapterTests
+          --filter MarkdownServerProjectLoaderTests
