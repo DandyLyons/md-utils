@@ -112,6 +112,16 @@ let package = Package(
         .product(name: "PathKit", package: "PathKit"),
       ]
     ),
+    .executableTarget(
+      name: "MarkdownUtilitiesServerLinuxSmoke",
+      dependencies: [
+        "MarkdownUtilitiesCore",
+        "MarkdownUtilitiesServer",
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "HummingbirdTesting", package: "hummingbird"),
+      ],
+      path: "IntegrationTests/LinuxServerSmoke/"
+    ),
 
     // MARK: md-utils-server (native HTTP server)
     .executableTarget(

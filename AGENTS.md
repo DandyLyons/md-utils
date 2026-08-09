@@ -18,7 +18,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 - **Library Targets**: `MarkdownUtilitiesCore`, `MarkdownUtilities`
 - **Test Framework**: Swift Testing, not XCTest
 - **Build Command**: `swift build`
-- **Test Command**: `swift test`; focused server verification with `swift test --filter MarkdownUtilitiesServerTests`
+- **Test Command**: `swift test`; native Linux server route smoke test with `swift run MarkdownUtilitiesServerLinuxSmoke`
 - **Formatter/Linter**: No dedicated formatter or linter is configured in-package
 - **Documentation**: README.md, AGENTS.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
 - **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/JSON parsing failures as user-visible errors

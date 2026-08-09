@@ -8,6 +8,4 @@ RUN swift package resolve
 COPY . .
 
 RUN swift build --product md-utils-server
-RUN swift test \
-  --filter MarkdownServerHTTPAdapterTests \
-  --filter MarkdownServerProjectLoaderTests
+RUN swift run MarkdownUtilitiesServerLinuxSmoke
