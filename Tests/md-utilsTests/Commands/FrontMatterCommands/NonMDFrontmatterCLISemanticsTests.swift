@@ -9,7 +9,7 @@ struct NonMDFrontmatterCLISemanticsTests {
   @Test(arguments: [
     nil,
     "dump", "get", "has", "list", "remove", "rename", "replace", "search", "set",
-    "sort-keys", "touch", "unique", "array", "array append", "array contains",
+    "remove-frontmatter", "sort-keys", "touch", "unique", "array", "array append", "array contains",
     "array prepend", "array remove",
   ] as [String?])
   func `relevant help pages explain valid wrapped frontmatter`(_ commandPath: String?) throws {

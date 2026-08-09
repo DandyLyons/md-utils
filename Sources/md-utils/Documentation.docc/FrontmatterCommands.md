@@ -6,7 +6,22 @@ Read, search, and mutate YAML frontmatter from the `frontmatter` command group.
 
 The `frontmatter` command group, also available as `fm`, provides CRUD operations for Markdown YAML frontmatter. Commands can operate on one file, several files, or directories resolved through the shared global path options.
 
-Common operations include reading values, setting values, checking for keys, removing or renaming keys, replacing an entire frontmatter block, dumping frontmatter in multiple formats, searching with JMESPath, checking uniqueness, sorting keys, touching empty keys, and mutating array values.
+Common operations include reading values, setting values, checking for keys, removing or renaming keys, replacing or completely removing an entire frontmatter block, dumping frontmatter in multiple formats, searching with JMESPath, checking uniqueness, sorting keys, touching empty keys, and mutating array values.
+
+## Removing Complete Frontmatter
+
+Use `fm remove-frontmatter`, or its `rmfm` alias, to delete the complete
+frontmatter block while preserving the document body:
+
+```bash
+md-utils fm remove-frontmatter post.md
+md-utils fm rmfm notes/ --include-non-md
+md-utils fm rmfm post.md --yes
+```
+
+The command asks for `y` confirmation once per file that contains frontmatter.
+Pass `-y` or `--yes` to skip the confirmation. Mapped non-Markdown files are
+included in batch operations only when `--include-non-md` is supplied.
 
 ## Uniqueness Checks
 

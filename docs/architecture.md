@@ -99,6 +99,7 @@ if let heading = ast.children.first as? Heading {
   - `fm set` - Set/update frontmatter value by key
   - `fm has` - Check if frontmatter key exists
   - `fm remove` - Delete frontmatter key
+  - `fm remove-frontmatter` / `fm rmfm` - Delete the complete frontmatter block
   - `fm rename` - Rename frontmatter key
   - `fm replace` / `fm r` - Replace entire frontmatter with new data
   - `fm list` - List all frontmatter keys

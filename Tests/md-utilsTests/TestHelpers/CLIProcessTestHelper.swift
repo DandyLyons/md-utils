@@ -32,6 +32,13 @@ struct CLIProcessResult: Sendable {
 /// execution tests. Use this helper when a test must observe process exit status,
 /// stdin interaction, or the executable's stdout/stderr routing.
 enum CLIProcessTestHelper {
+  /// Stable package root derived from this source file rather than mutable process state.
+  private static let packageRootURL = URL(filePath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+
   /// Runs the built `md-utils` executable with controlled input and environment.
   ///
   /// - Parameters:
@@ -45,10 +52,7 @@ enum CLIProcessTestHelper {
     environment: [String: String] = [:],
     workingDirectory: URL? = nil
   ) throws -> CLIProcessResult {
-    let captureDirectoryURL = URL(
-      filePath: FileManager.default.currentDirectoryPath,
-      directoryHint: .isDirectory
-    ).appending(
+    let captureDirectoryURL = packageRootURL.appending(
       path: "tmp/cli-process-\(UUID().uuidString)/",
       directoryHint: .isDirectory
     )

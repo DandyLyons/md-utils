@@ -12,7 +12,7 @@ The `md-utils` CLI provides structured operations on Markdown files. Add `--help
 
 | Command | Purpose |
 |---------|---------|
-| `md-utils fm` | YAML frontmatter: get, set, search, uniqueness checks, array ops, dump |
+| `md-utils fm` | YAML frontmatter: get, set, search, remove blocks, uniqueness checks, array ops, dump |
 | `md-utils explore` | Progressively inspect large Markdown files by tree, heading, and line |
 | `md-utils toc` | Generate table of contents |
 | `md-utils headings` | Promote or demote heading levels |
@@ -77,6 +77,6 @@ Use the `--tree` output to identify headings, source line numbers, frontmatter, 
 
 Load these when you need detailed command options:
 
-- **[Frontmatter operations](references/frontmatter.md)** — get, set, has, list, remove, rename, replace, sort-keys, touch, dump, search, array ops
+- **[Frontmatter operations](references/frontmatter.md)** — get, set, has, list, remove keys or complete blocks, rename, replace, sort-keys, touch, dump, search, array ops
 - **[Headings & sections](references/headings-sections.md)** — explore, promote/demote, section get/set/move, extract, TOC, lines, body, convert, links
 - **[Common use cases](references/common-use-cases.md)** — practical recipes and pipelines

@@ -122,7 +122,6 @@ deterministic terminal environment and captures both output streams.
 - Give every test its own files or directory. Never reuse mutable fixture inputs directly.
 - Copy fixture `input/` contents into an isolated workspace and compare the result against `expected/` byte-for-byte when preservation is part of the contract.
 - Store test-created temporary data under the project-level `tmp/` directory and remove it with `defer`.
-- Add `.serialized` only when tests truly share process-global or external state. Independent temporary workspaces should remain parallelizable.
 - Set environment-dependent behavior explicitly. CLI process tests default to `NO_COLOR=1` and `TERM=dumb`.
 
 ## Regression Tests

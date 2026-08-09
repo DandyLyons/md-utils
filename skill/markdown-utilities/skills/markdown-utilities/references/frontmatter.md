@@ -30,6 +30,15 @@ md-utils fm list document.md
 md-utils fm remove --key draft document.md
 ```
 
+### Remove the complete frontmatter block
+```bash
+# Prompts for exactly y before removing each frontmatter block
+md-utils fm remove-frontmatter document.md
+
+# Short alias, noninteractive confirmation, and mapped non-Markdown files
+md-utils fm rmfm posts/ --yes --include-non-md
+```
+
 ### Rename a key
 ```bash
 md-utils fm rename --old-key pubDate --new-key date document.md

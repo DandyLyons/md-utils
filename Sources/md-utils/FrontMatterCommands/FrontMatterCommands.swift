@@ -27,6 +27,7 @@ extension CLIEntry {
         Has.self,
         List.self,
         Remove.self,
+        RemoveFrontmatter.self,
         Rename.self,
         Replace.self,
         Search.self,

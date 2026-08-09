@@ -96,6 +96,16 @@ struct ParsedFrontMatterFile {
   /// The 1-based opening lines of complete wrapped blocks after the first.
   let additionalOpeningLines: [Int]
 
+  /// Whether the source contains a complete frontmatter block.
+  var hasFrontMatterBlock: Bool {
+    switch syntax {
+    case .markdown:
+      return document.body != source
+    case .wrapped:
+      return wrappedBlock != nil
+    }
+  }
+
   /// Parses frontmatter from a source snapshot using its selected representation.
   ///
   /// Later wrapped blocks are located but their YAML is never converted or merged.
@@ -148,6 +158,27 @@ struct ParsedFrontMatterFile {
       }
       var result = source
       result.replaceSubrange(wrappedBlock.range, with: renderedBlock)
+      return result
+    }
+  }
+
+  /// Removes the complete frontmatter envelope from the original source snapshot.
+  ///
+  /// Markdown parsing already preserves the exact body after consuming the closing
+  /// delimiter and its optional newline. Wrapped blocks consume that same single
+  /// trailing newline here so both representations have matching removal semantics.
+  func renderingWithoutFrontMatter() -> String {
+    switch syntax {
+    case .markdown:
+      return document.body
+    case .wrapped:
+      guard let wrappedBlock else { return source }
+      var removalEnd = wrappedBlock.range.upperBound
+      if removalEnd < source.endIndex && source[removalEnd] == "\n" {
+        removalEnd = source.index(after: removalEnd)
+      }
+      var result = source
+      result.removeSubrange(wrappedBlock.range.lowerBound..<removalEnd)
       return result
     }
   }
@@ -235,6 +266,15 @@ enum FrontMatterCLIMutator {
   ) throws {
     let updated = try parsed.rendering(document)
     try FrontMatterFileWriter.write(updated, to: path, expectedSource: parsed.source)
+  }
+
+  /// Removes a complete frontmatter block using the parsed source snapshot.
+  static func removeFrontMatter(parsed: ParsedFrontMatterFile, from path: Path) throws {
+    try FrontMatterFileWriter.write(
+      parsed.renderingWithoutFrontMatter(),
+      to: path,
+      expectedSource: parsed.source
+    )
   }
 }
 
