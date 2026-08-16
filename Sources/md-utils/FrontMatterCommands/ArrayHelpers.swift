@@ -8,7 +8,6 @@
 import Foundation
 import MarkdownUtilitiesCore
 import PathKit
-import Yams
 
 /// Shared utilities for array manipulation commands
 enum ArrayHelpers {
@@ -24,7 +23,7 @@ enum ArrayHelpers {
     _ key: String,
     in doc: MarkdownDocument,
     path: Path
-  ) throws -> Yams.Node.Sequence {
+  ) throws -> [FrontMatterValue] {
     guard doc.hasKey(key) else {
       throw ArrayError.keyNotFound(key: key, path: path.string)
     }
@@ -33,7 +32,7 @@ enum ArrayHelpers {
       throw ArrayError.cannotRetrieveValue(key: key, path: path.string)
     }
 
-    guard case .sequence(let sequence) = node else {
+    guard case .array(let sequence) = node else {
       throw ArrayError.notAnArray(key: key, path: path.string)
     }
 
@@ -51,10 +50,10 @@ enum ArrayHelpers {
     _ key: String,
     in doc: MarkdownDocument,
     path: Path
-  ) throws -> Yams.Node.Sequence {
+  ) throws -> [FrontMatterValue] {
     // If key doesn't exist, return empty sequence
     guard doc.hasKey(key) else {
-      return Yams.Node.Sequence()
+      return []
     }
 
     guard let node = doc.getValue(forKey: key) else {
@@ -62,7 +61,7 @@ enum ArrayHelpers {
     }
 
     // If key exists but is not an array, throw error
-    guard case .sequence(let sequence) = node else {
+    guard case .array(let sequence) = node else {
       throw ArrayError.notAnArray(key: key, path: path.string)
     }
 
@@ -77,7 +76,7 @@ enum ArrayHelpers {
   /// - Returns: True if the value is found, false otherwise
   static func containsValue(
     _ searchValue: String,
-    in sequence: Yams.Node.Sequence,
+    in sequence: [FrontMatterValue],
     caseInsensitive: Bool
   ) -> Bool {
     let compareValue = caseInsensitive ? searchValue.lowercased() : searchValue
@@ -86,11 +85,9 @@ enum ArrayHelpers {
       let element = sequence[i]
 
       // Only compare scalar (string) values
-      guard case .scalar(let scalar) = element else {
+      guard case .string(let elementString) = element else {
         continue
       }
-
-      let elementString = scalar.string
       let compareElement = caseInsensitive ? elementString.lowercased() : elementString
 
       if compareElement == compareValue {
@@ -108,10 +105,10 @@ enum ArrayHelpers {
   /// - Returns: A new sequence with the value appended
   static func append(
     value: String,
-    to sequence: Yams.Node.Sequence
-  ) -> Yams.Node.Sequence {
+    to sequence: [FrontMatterValue]
+  ) -> [FrontMatterValue] {
     var newSequence = sequence
-    newSequence.append(.scalar(.init(value)))
+    newSequence.append(.string(value))
     return newSequence
   }
 
@@ -122,10 +119,10 @@ enum ArrayHelpers {
   /// - Returns: A new sequence with the value prepended
   static func prepend(
     value: String,
-    to sequence: Yams.Node.Sequence
-  ) -> Yams.Node.Sequence {
+    to sequence: [FrontMatterValue]
+  ) -> [FrontMatterValue] {
     var newSequence = sequence
-    newSequence.insert(.scalar(.init(value)), at: 0)
+    newSequence.insert(.string(value), at: 0)
     return newSequence
   }
 
@@ -137,9 +134,9 @@ enum ArrayHelpers {
   /// - Returns: A new sequence with the first occurrence removed, or nil if value not found
   static func removeFirst(
     value: String,
-    from sequence: Yams.Node.Sequence,
+    from sequence: [FrontMatterValue],
     caseInsensitive: Bool
-  ) -> Yams.Node.Sequence? {
+  ) -> [FrontMatterValue]? {
     let compareValue = caseInsensitive ? value.lowercased() : value
     var newSequence = sequence
 
@@ -147,11 +144,9 @@ enum ArrayHelpers {
       let element = newSequence[i]
 
       // Only compare scalar (string) values
-      guard case .scalar(let scalar) = element else {
+      guard case .string(let elementString) = element else {
         continue
       }
-
-      let elementString = scalar.string
       let compareElement = caseInsensitive ? elementString.lowercased() : elementString
 
       if compareElement == compareValue {

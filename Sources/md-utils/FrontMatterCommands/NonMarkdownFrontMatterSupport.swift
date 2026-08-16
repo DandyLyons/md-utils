@@ -14,13 +14,21 @@ enum NonMarkdownFrontMatterHelp {
     discussion + "\n\n" + section
   }
 
-  /// The exact syntax and selection contract shown on relevant help pages.
-  private static let section = """
+  /// Appends the wrapped-frontmatter contract used by `fm dump`.
+  ///
+  /// Dump is read-only, so it discovers every shipped syntax without requiring
+  /// the opt-in used by batch mutation commands.
+  static func appendingForDump(to discussion: String) -> String {
+    discussion + "\n\n" + dumpSection
+  }
+
+  /// The syntax contract shared by frontmatter command help pages.
+  private static let syntaxContract = """
     FRONTMATTER ON NON-MD FILES
       A supported non-Markdown file uses the wrapper mapped from its extension.
       A complete wrapped frontmatter block must contain, on separate complete LF
-      lines: the mapped opening wrapper, an opening ---, a YAML mapping, a closing
-      ---, and the matching mapped closing wrapper. For example:
+      lines: the mapped opening wrapper, matching YAML --- or TOML +++ delimiter
+      lines, a mapping, and the matching mapped closing wrapper. For example:
 
         /*
         ---
@@ -28,25 +36,45 @@ enum NonMarkdownFrontMatterHelp {
         ---
         */
 
+        /*
+        +++
+        title = "Example"
+        +++
+        */
+
       The block may occur anywhere, though placement near the beginning is
       recommended. Incomplete blocks are treated as absent; multiple complete
-      blocks are invalid. Plain .txt uses ordinary Markdown-style frontmatter and
-      only participates with --include-non-md.
+      blocks are invalid. Plain .txt uses ordinary Markdown-style frontmatter.
+    """
+
+  /// The exact opt-in selection contract shown on relevant help pages.
+  private static let section = syntaxContract + """
+
+
+      Plain .txt only participates with --include-non-md.
 
       A sole explicit mapped file is selected automatically. Multi-file and
       directory operations require --include-non-md for mapped files.
+    """
+
+  /// The exact syntax and automatic-selection contract shown by `fm dump`.
+  private static let dumpSection = syntaxContract + """
+
+
+      Dump automatically selects Markdown, plain-text, and mapped non-Markdown
+      files in explicit file lists and directory operations.
     """
 }
 
 /// Describes how a selected file represents frontmatter.
 ///
-/// Markdown and opted-in plain-text files use ordinary leading `---` markers.
+/// Markdown and opted-in plain-text files use ordinary leading format markers.
 /// Other supported text files use the shipped wrapper mapped from their extension.
 enum FrontMatterFileSyntax: Equatable {
   /// Ordinary Markdown-style frontmatter.
   case markdown
 
-  /// YAML frontmatter enclosed by a host-language wrapper.
+  /// YAML or TOML frontmatter enclosed by a host-language wrapper.
   case wrapped(FrontMatterSyntax)
 
   /// Resolves the frontmatter representation for a selected file.
@@ -100,7 +128,7 @@ struct ParsedFrontMatterFile {
   var hasFrontMatterBlock: Bool {
     switch syntax {
     case .markdown:
-      return document.body != source
+      return document.frontMatterFormat != nil
     case .wrapped:
       return wrappedBlock != nil
     }
@@ -108,13 +136,13 @@ struct ParsedFrontMatterFile {
 
   /// Parses frontmatter from a source snapshot using its selected representation.
   ///
-  /// Later wrapped blocks are located but their YAML is never converted or merged.
+  /// Later wrapped blocks are located but their frontmatter is never converted or merged.
   ///
   /// - Parameters:
   ///   - source: The complete LF text snapshot.
   ///   - syntax: The representation selected for the file.
   /// - Returns: Parsed frontmatter tied to `source`.
-  /// - Throws: A YAML conversion error when the first complete block is invalid.
+  /// - Throws: A conversion error when the first complete block is invalid.
   static func parse(source: String, syntax: FrontMatterFileSyntax) throws -> ParsedFrontMatterFile {
     switch syntax {
     case .markdown:
@@ -127,11 +155,18 @@ struct ParsedFrontMatterFile {
       )
     case .wrapped(let wrapper):
       let scan = WrappedFrontMatterParser(syntax: wrapper).parse(source)
-      let mapping = try YAMLConversion.parse(scan.firstBlock?.rawYAML ?? "")
+      let format = scan.firstBlock?.format
+      let frontMatter = try format.map {
+        try FrontMatterConversion.parse(scan.firstBlock?.rawFrontMatter ?? "", format: $0)
+      } ?? FrontMatter()
       return ParsedFrontMatterFile(
         source: source,
         syntax: syntax,
-        document: MarkdownDocument(frontMatter: mapping, body: source),
+        document: MarkdownDocument(
+          frontMatter: frontMatter,
+          body: source,
+          frontMatterFormat: format
+        ),
         wrappedBlock: scan.firstBlock,
         additionalOpeningLines: scan.additionalOpeningLines
       )
@@ -145,14 +180,15 @@ struct ParsedFrontMatterFile {
   ///
   /// - Parameter updatedDocument: The document containing the updated mapping.
   /// - Returns: Complete updated file text.
-  /// - Throws: A YAML serialization error.
+  /// - Throws: A frontmatter serialization error.
   func rendering(_ updatedDocument: MarkdownDocument) throws -> String {
     switch syntax {
     case .markdown:
       return try updatedDocument.render()
     case .wrapped(let wrapper):
-      let yaml = try YAMLConversion.serialize(updatedDocument.frontMatter)
-      let renderedBlock = "\(wrapper.openingWrapper)\n---\n\(yaml)---\n\(wrapper.closingWrapper)"
+      let format = updatedDocument.frontMatterFormat ?? .yaml
+      let serialized = try FrontMatterConversion.serialize(updatedDocument.frontMatter, format: format)
+      let renderedBlock = "\(wrapper.openingWrapper)\n\(format.delimiter)\n\(serialized)\(format.delimiter)\n\(wrapper.closingWrapper)"
       guard let wrappedBlock else {
         return "\(renderedBlock)\n\n\(source)"
       }

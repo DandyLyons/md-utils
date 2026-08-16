@@ -9,7 +9,6 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilitiesCore
 import PathKit
-import Yams
 /// Adds Markdown document behavior to ``CLIEntry.FrontMatterCommands``.
 ///
 /// See <doc:FrontmatterCommands> for workflow details.
@@ -106,7 +105,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         searchedCount += 1
 
         // 2. Check if key exists and is an array (skip if not)
-        let sequence: Yams.Node.Sequence
+        let sequence: [FrontMatterValue]
         do {
           sequence = try ArrayHelpers.validateArrayKey(key, in: doc, path: path)
         } catch {

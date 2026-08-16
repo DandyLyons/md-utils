@@ -279,8 +279,8 @@ struct MarkdownASTIntegrationTests {
 
     // Verify frontmatter parsed correctly
     #expect(!doc.frontMatter.isEmpty)
-    let title = try #require(doc.frontMatter["title"]?.string)
-    let author = try #require(doc.frontMatter["author"]?.string)
+    let title = try #require(doc.frontMatter["title"]?.stringValue)
+    let author = try #require(doc.frontMatter["author"]?.stringValue)
     #expect(title == "My Document")
     #expect(author == "Test User")
 

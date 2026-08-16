@@ -35,7 +35,7 @@ struct GlobalOptions: ParsableArguments {
   /// File extensions to process (comma-separated).
   @Option(
     name: .long,
-    help: "File extensions to process (comma-separated, default: md,markdown)"
+    help: "File extensions to process (comma-separated; default: md,markdown, while fm dump scans all supported extensions)"
   )
   var extensions: String = "md,markdown"
 

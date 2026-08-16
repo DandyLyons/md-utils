@@ -21,7 +21,8 @@ extension CLIEntry.FrontMatterCommands {
       discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Search for files whose frontmatter matches a JMESPath expression.
 
-        The query is evaluated against each file's YAML frontmatter.
+        The query is evaluated against each file's YAML frontmatter. TOML
+        frontmatter is intentionally outside the scope of this command.
         Files where the expression evaluates to true (or truthy) are included.
 
         Directories are searched recursively.
@@ -106,6 +107,10 @@ extension CLIEntry.FrontMatterCommands {
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
+      guard format != .toml else {
+        throw ValidationError("TOML output is not supported by fm search")
+      }
+
       // Convert path strings to Path objects
       let paths = pathStrings.isEmpty ? [Path.current] : pathStrings.map { Path($0) }
       // Compile the JMESPath expression once
@@ -147,6 +152,8 @@ extension CLIEntry.FrontMatterCommands {
         case .plist:
           // For search results (file paths), use plist format
           try printAny(matchingFiles, format: .plist)
+        case .toml:
+          break
         }
       }
 

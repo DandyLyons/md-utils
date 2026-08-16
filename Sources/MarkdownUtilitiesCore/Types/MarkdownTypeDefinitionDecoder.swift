@@ -5,6 +5,7 @@ import Yams
 public enum MarkdownTypeDefinitionFormat: String, Codable, Equatable, Sendable {
   case yaml
   case json
+  case toml
 }
 
 /// Decodes YAML and JSON type definitions into the same portable model.
@@ -70,6 +71,14 @@ public enum MarkdownTypeDefinitionDecoder {
         return object
       } catch let error as MarkdownTypeDefinitionError {
         throw error
+      } catch {
+        throw MarkdownTypeDefinitionError.invalidSerialization(error.localizedDescription)
+      }
+    case .toml:
+      do {
+        return FrontMatterConversion.foundationValue(
+          try FrontMatterConversion.parse(content, format: .toml)
+        )
       } catch {
         throw MarkdownTypeDefinitionError.invalidSerialization(error.localizedDescription)
       }

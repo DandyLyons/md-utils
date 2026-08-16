@@ -10,6 +10,7 @@ public enum MarkdownTypeFileRegistryLoader {
     ".mdtype.yaml",
     ".mdtype.yml",
     ".mdtype.json",
+    ".mdtype.toml",
   ]
 
   public static func load(projectRoot: Path) throws -> MarkdownTypeRegistry {
@@ -61,6 +62,8 @@ public enum MarkdownTypeFileRegistryLoader {
       return .yaml
     case "json":
       return .json
+    case "toml":
+      return .toml
     default:
       throw MarkdownTypeFileLoaderError.unsupportedDefinitionFormat(path.string)
     }

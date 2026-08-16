@@ -127,9 +127,7 @@ extension CLIEntry {
         }
         /// Reconstructs formatted Markdown output from parsed document parts.
         private func reconstructOutput(_ doc: MarkdownDocument) throws -> String {
-            guard !doc.frontMatter.isEmpty else { return doc.body }
-            let yaml = try YAMLConversion.serialize(doc.frontMatter)
-            return "---\n\(yaml)---\n\(doc.body)"
+            try doc.render()
         }
     }
 }

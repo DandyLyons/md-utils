@@ -4,6 +4,7 @@ enum WasmCoreSmokeError: Error {
   case frontmatterNotParsed
   case emptyAST
   case renderMismatch
+  case tomlMismatch
   case typeAssessmentFailed
 }
 
@@ -37,6 +38,22 @@ struct WasmCoreSmoke {
     let rendered = try document.render()
     guard rendered.contains("ratio: 1.25"), rendered.contains("# Portable Core") else {
       throw WasmCoreSmokeError.renderMismatch
+    }
+
+    let tomlDocument = try MarkdownDocument(content: """
+      +++
+      title = "WebAssembly TOML"
+      tags = ["swift", "wasm"]
+      +++
+      # TOML
+      """)
+    let tomlRendered = try tomlDocument.render()
+    guard tomlDocument.frontMatterFormat == .toml,
+      tomlDocument.frontMatter["tags"]?.sequence?.count == 2,
+      tomlRendered.hasPrefix("+++\n"),
+      tomlRendered.contains("title = \"WebAssembly TOML\"")
+    else {
+      throw WasmCoreSmokeError.tomlMismatch
     }
 
     let definition = MarkdownTypeDefinition(

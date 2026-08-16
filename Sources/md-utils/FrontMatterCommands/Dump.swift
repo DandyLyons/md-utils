@@ -19,8 +19,8 @@ extension CLIEntry.FrontMatterCommands {
     static let configuration = CommandConfiguration(
       commandName: "dump",
       abstract: "Dump entire frontmatter in specified format",
-      discussion: NonMarkdownFrontMatterHelp.appending(to: """
-        Outputs the complete frontmatter from files in various formats: JSON, YAML, raw, or plist.
+      discussion: NonMarkdownFrontMatterHelp.appendingForDump(to: """
+        Outputs complete frontmatter as JSON, YAML, TOML, raw source, or plist.
 
         Supports multiple files and directory processing with recursive mode.
 
@@ -28,12 +28,14 @@ extension CLIEntry.FrontMatterCommands {
           Single-file dumps output the frontmatter directly with no wrapper.
           The --format flag controls the output format.
 
-        MULTIPLE FILES:
-          By default, multiple files output a single parseable collection (JSON array,
-          YAML sequence, or plist array) with a "$path" key injected into each entry.
+        COLLECTION MODE:
+          Directories and explicit file lists output a parseable object with three keys:
+          "frontMatter" contains nonempty mappings with a "$path" key, "noFrontMatter"
+          contains paths with no complete block, and "emptyFrontMatter" contains paths
+          whose complete block has an empty mapping.
           The --include-delimiters flag is ignored in collection mode.
 
-          Use --cat-headers for the legacy cat-style header format (==> path <==).
+          Use --cat-headers for the legacy cat-style format (==> path <==).
 
         Examples:
           # Dump single file as JSON (default)
@@ -45,7 +47,7 @@ extension CLIEntry.FrontMatterCommands {
           # Dump with delimiters
           md-utils fm dump post.md --format yaml --include-delimiters
 
-          # Dump multiple files as JSON array with $path
+          # Dump multiple files as a categorized JSON object
           md-utils fm dump posts/ -r --format json
 
           # Dump multiple files with cat-style headers
@@ -59,62 +61,61 @@ extension CLIEntry.FrontMatterCommands {
           into jq or yq for further filtering and transformation.
 
           # List all titles
-          md-utils fm dump posts/ -r | jq '.[].title'
+          md-utils fm dump posts/ -r | jq '.frontMatter[].title'
 
           # Find drafts
-          md-utils fm dump posts/ -r | jq '[.[] | select(.status == "draft")]'
+          md-utils fm dump posts/ -r | jq '[.frontMatter[] | select(.status == "draft")]'
 
           # Get paths of posts tagged "swift"
-          md-utils fm dump posts/ -r | jq '[.[] | select(.tags | index("swift")) | ."$path"]'
+          md-utils fm dump posts/ -r | jq '[.frontMatter[] | select(.tags | index("swift")) | ."$path"]'
 
           # Same with yq (YAML output)
-          md-utils fm dump posts/ -r --format yaml | yq '.[].title'
+          md-utils fm dump posts/ -r --format yaml | yq '.frontMatter[].title'
 
           # Count entries
-          md-utils fm dump posts/ -r | jq 'length'
+          md-utils fm dump posts/ -r | jq '.frontMatter | length'
         """),
       aliases: ["d"]
     )
 
     @OptionGroup var options: GlobalOptions
 
-    @Option(name: .shortAndLong, help: "Output format (json, yaml, raw, plist)")
+    @Option(name: .shortAndLong, help: "Output format (json, yaml, toml, raw, plist)")
     var format: OutputFormat = .json
 
-    @Flag(name: .long, help: "Include --- delimiters in YAML/raw output")
+    @Flag(name: .long, help: "Include format-appropriate delimiters in YAML/TOML/raw output")
     var includeDelimiters: Bool = false
 
     @Flag(name: .long, help: "Use cat-style headers (==> path <==) instead of collection output for multiple files")
     var catHeaders: Bool = false
 
-    @Flag(name: .long, help: "Process mapped non-Markdown files")
-    var includeNonMD = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
-      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: true)
 
       guard !files.isEmpty else {
-        throw ValidationError("No Markdown files found to process")
+        throw ValidationError("No supported files found to process")
       }
 
-      let isMultipleFiles = files.count > 1
+      let isSingleExplicitFile = options.paths.count == 1 && options.paths[0].isFile
 
-      // Single file: output directly
-      if !isMultipleFiles {
+      // A sole explicit file outputs directly. Directory scans and explicit file
+      // lists keep the collection envelope even when only one file is selected.
+      if isSingleExplicitFile {
         let file = files[0]
         do {
-          let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
+          let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: true)
 
-          if includeDelimiters && (format == .yaml || format == .raw) {
-            Swift.print("---")
+          if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
+            Swift.print(delimiter)
           }
 
-          try print(node: .mapping(doc.frontMatter), format: format)
+          try print(frontMatter: doc.frontMatter, format: format, sourceFormat: doc.frontMatterFormat)
 
-          if includeDelimiters && (format == .yaml || format == .raw) {
-            Swift.print("---")
+          if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
+            Swift.print(delimiter)
           }
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
@@ -123,23 +124,23 @@ extension CLIEntry.FrontMatterCommands {
         return
       }
 
-      // Multiple files
+      // Collection-oriented invocation
       var hasErrors = false
       if catHeaders {
         // Cat-style output with headers
         for (index, file) in files.enumerated() {
           Swift.print("==> \(file) <==")
           do {
-            let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
+            let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: true)
 
-            if includeDelimiters && (format == .yaml || format == .raw) {
-              Swift.print("---")
+            if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
+              Swift.print(delimiter)
             }
 
-            try print(node: .mapping(doc.frontMatter), format: format)
+            try print(frontMatter: doc.frontMatter, format: format, sourceFormat: doc.frontMatterFormat)
 
-            if includeDelimiters && (format == .yaml || format == .raw) {
-              Swift.print("---")
+            if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
+              Swift.print(delimiter)
             }
           } catch {
             CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
@@ -152,29 +153,55 @@ extension CLIEntry.FrontMatterCommands {
           }
         }
       } else {
-        // Collection mode: single parseable document with $path metadata
-        var collection: [[String: Any]] = []
+        // Collection mode: categorize files by frontmatter state.
+        var frontMatter: [[String: Any]] = []
+        var noFrontMatter: [String] = []
+        var emptyFrontMatter: [String] = []
 
         for file in files {
           do {
-            let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
-            let node = Yams.Node.mapping(doc.frontMatter)
+            let parsed = try FrontMatterCLIMutator.parsedFile(
+              at: file,
+              includeNonMarkdown: true
+            )
 
-            guard var dict = try YAMLConversion.safeNodeToSwiftValue(node) as? [String: Any] else {
+            guard parsed.hasFrontMatterBlock else {
+              noFrontMatter.append(file.string)
               continue
             }
 
+            guard parsed.document.frontMatter.isEmpty == false else {
+              emptyFrontMatter.append(file.string)
+              continue
+            }
+
+            var dict = FrontMatterConversion.foundationValue(parsed.document.frontMatter)
+
             dict["$path"] = file.string
-            collection.append(dict)
+            frontMatter.append(dict)
           } catch {
             CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
             hasErrors = true
           }
         }
 
+        let collection: [String: Any] = [
+          "frontMatter": frontMatter,
+          "noFrontMatter": noFrontMatter,
+          "emptyFrontMatter": emptyFrontMatter,
+        ]
         try printAny(collection, format: format)
       }
       if hasErrors { throw ExitCode.failure }
+    }
+
+    private func outputDelimiter(for document: MarkdownDocument) -> String? {
+      switch format {
+      case .yaml: FrontMatterFormat.yaml.delimiter
+      case .toml: FrontMatterFormat.toml.delimiter
+      case .raw: (document.frontMatterFormat ?? .yaml).delimiter
+      case .json, .plist: nil
+      }
     }
   }
 }

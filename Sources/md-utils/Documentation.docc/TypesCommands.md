@@ -4,14 +4,15 @@ Create, inspect, assess, identify, verify, and repair typed Markdown records.
 
 ## Definitions
 
-Project definitions are YAML or JSON files under `.md-utils/types/`. Definition filenames must end in `.mdtype.yaml`, `.mdtype.yml`, or `.mdtype.json`. Other YAML and JSON files in the directory are ignored. Add a definition scaffold with:
+Project definitions are YAML, JSON, or TOML files under `.md-utils/types/`. Definition filenames must end in `.mdtype.yaml`, `.mdtype.yml`, `.mdtype.json`, or `.mdtype.toml`. Other structured-data files in the directory are ignored. Add a definition scaffold with:
 
 ```bash
 md-utils types add Book --version 1.0.0
 md-utils types add Publishable --version draft-3 --format json
+md-utils types add Article --version 1.0.0 --format toml
 ```
 
-These commands create `.md-utils/types/` when needed, then add `.md-utils/types/book.mdtype.yaml` and `.md-utils/types/publishable.mdtype.json`. The declared `name` inside each definition remains the stable type identity; the filename only identifies the file as a Markdown type definition.
+These commands create `.md-utils/types/` when needed and use the compound extension matching the selected format. The declared `name` inside each definition remains the stable type identity; the filename only identifies the file as a Markdown type definition.
 
 Use `types list`, `types describe Book`, and `types doctor` to inspect compiled definitions. `types schema` prints the JSON Schema for definition format version `1`.
 

@@ -18,7 +18,7 @@ struct FrontMatterEdgeCasesTests {
     """
     let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     #expect(doc.body == "")
     #expect(doc.hasFrontMatter == true)
   }
@@ -33,7 +33,7 @@ struct FrontMatterEdgeCasesTests {
     """
     let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     // Body should include the whitespace
     #expect(doc.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
   }
@@ -50,7 +50,7 @@ struct FrontMatterEdgeCasesTests {
     """
     let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     #expect(doc.body == "---\n---\nContent")
   }
 
@@ -81,7 +81,7 @@ struct FrontMatterEdgeCasesTests {
 
     // Parser accepts mixed line endings in frontmatter content
     // YAML parser should handle \r characters
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     #expect(doc.body == "Body")
   }
 
@@ -90,7 +90,7 @@ struct FrontMatterEdgeCasesTests {
     let content = "---\ntitle: Test\n---Body"
     let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     #expect(doc.body == "Body")
   }
 
@@ -164,8 +164,8 @@ struct FrontMatterEdgeCasesTests {
     let content = "---\n\(largeFM)---\nBody"
     let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
-    #expect(doc.frontMatter["key0"]?.string == "value0")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
+    #expect(doc.frontMatter["key0"]?.stringValue == "value0")
     #expect(doc.body == "Body")
     #expect(doc.hasFrontMatter == true)
   }
@@ -183,8 +183,8 @@ struct FrontMatterEdgeCasesTests {
     let doc = try MarkdownDocument(content: content)
 
     #expect(doc.hasFrontMatter == true)
-    #expect(doc.frontMatter["title"]?.string == "Test with quotes")
-    #expect(doc.frontMatter["emoji"]?.string == "🚀")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test with quotes")
+    #expect(doc.frontMatter["emoji"]?.stringValue == "🚀")
     #expect(doc.body == "Body")
   }
 
@@ -200,8 +200,8 @@ struct FrontMatterEdgeCasesTests {
     let doc = try MarkdownDocument(content: content)
 
     #expect(doc.hasFrontMatter == true)
-    #expect(doc.frontMatter["title"]?.string == "日本語")
-    #expect(doc.frontMatter["chinese"]?.string == "中文")
+    #expect(doc.frontMatter["title"]?.stringValue == "日本語")
+    #expect(doc.frontMatter["chinese"]?.stringValue == "中文")
   }
 
   @Test
@@ -211,7 +211,7 @@ struct FrontMatterEdgeCasesTests {
 
     // PrefixUpTo("---") matches the first 3 hyphens of "----"
     // This is reasonable behavior - treats first 3 hyphens as closing delimiter
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     #expect(doc.body == "-\nBody")
   }
 }

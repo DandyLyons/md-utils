@@ -12,10 +12,14 @@ extension CLIEntry {
   struct FrontMatterCommands: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "frontmatter",
-      abstract: "Manipulate YAML frontmatter in Markdown and mapped text files",
+      abstract: "Manipulate YAML or TOML frontmatter in Markdown and mapped text files",
       discussion: NonMarkdownFrontMatterHelp.appending(to: """
-        Provides CRUD operations for YAML frontmatter in Markdown files and in
+        Provides CRUD operations for YAML or TOML frontmatter in Markdown files and in
         non-Markdown text files with shipped syntax mappings.
+
+        Existing blocks preserve their format. Creation-capable commands accept
+        --frontmatter-format yaml|toml and default to YAML. Comments in either
+        format are not guaranteed to survive mutation.
 
         By default, directory and multi-file operations remain Markdown-only.
         Use --include-non-md on supported commands to include mapped files.

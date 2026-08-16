@@ -6,7 +6,6 @@
 import Foundation
 import MarkdownSyntax
 import Parsing
-import Yams
 
 /// A parsed representation of Markdown content.
 ///
@@ -14,12 +13,15 @@ import Yams
 /// frontmatter, body text, and a derived Markdown AST. It has no persistent
 /// identity, logical path, revision, or storage context. Use ``MarkdownRecord``
 /// for canonical, addressable content that must remain representable even when
-/// its YAML is invalid.
+/// its frontmatter is invalid.
 public struct MarkdownDocument: @unchecked Sendable {
-  /// The YAML frontmatter as a parsed mapping.
+  /// The YAML or TOML frontmatter as a format-neutral parsed mapping.
   ///
   /// This is an empty mapping if the document has no frontmatter.
-  public var frontMatter: Yams.Node.Mapping
+  public var frontMatter: FrontMatter
+
+  /// The serialization format of the physical frontmatter block, or `nil` when absent.
+  public var frontMatterFormat: FrontMatterFormat?
 
   /// The body content of the document (everything after frontmatter, or entire document if no frontmatter).
   ///
@@ -29,18 +31,19 @@ public struct MarkdownDocument: @unchecked Sendable {
 
   /// Initialize a markdown document by parsing the content to separate frontmatter from body.
   ///
-  /// This initializer uses `FrontMatterParser` to detect and separate YAML frontmatter
-  /// delimited by `---` markers. The frontmatter is immediately parsed into a `Yams.Node.Mapping`,
-  /// and the body contains everything after the closing delimiter.
+  /// This initializer detects YAML (`---`) or TOML (`+++`) frontmatter, parses it
+  /// into ``FrontMatter``, and retains the source format for rendering.
   ///
   /// - Parameter content: The markdown content to parse
-  /// - Throws: `YAMLConversionError` if the frontmatter exists but is invalid YAML or not a mapping
+  /// - Throws: If frontmatter is invalid or its root is not a mapping
   public init(content: String) throws {
     let parser = FrontMatterParser()
     var input = Substring(content)
-    let (rawFrontMatter, body) = try parser.parse(&input)
+    let (rawFrontMatter, body, format) = try parser.parse(&input)
 
-    self.frontMatter = try YAMLConversion.parse(rawFrontMatter)
+    self.frontMatter = try format.map { try FrontMatterConversion.parse(rawFrontMatter, format: $0) }
+      ?? FrontMatter()
+    self.frontMatterFormat = format
     self.body = body
   }
 
@@ -50,10 +53,15 @@ public struct MarkdownDocument: @unchecked Sendable {
   /// avoiding the YAML serialize/parse round-trip that `init(content:)` performs.
   ///
   /// - Parameters:
-  ///   - frontMatter: The parsed YAML frontmatter mapping (empty mapping if none)
+  ///   - frontMatter: The parsed format-neutral frontmatter mapping (empty if none)
   ///   - body: The markdown body text
-  public init(frontMatter: Yams.Node.Mapping, body: String) {
+  public init(
+    frontMatter: FrontMatter,
+    body: String,
+    frontMatterFormat: FrontMatterFormat? = nil
+  ) {
     self.frontMatter = frontMatter
+    self.frontMatterFormat = frontMatterFormat ?? (frontMatter.isEmpty ? nil : .yaml)
     self.body = body
   }
 

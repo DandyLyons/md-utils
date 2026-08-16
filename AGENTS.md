@@ -12,7 +12,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 ## Project Brief
 
 - **Language**: Swift 6.2+
-- **Frameworks/Libraries**: Foundation, MarkdownSyntax, swift-parsing, PathKit, Yams, JMESPath, JSONSchema.swift, swift-argument-parser, Rainbow
+- **Frameworks/Libraries**: Foundation, MarkdownSyntax, swift-parsing, PathKit, Yams, swift-toml, JMESPath, JSONSchema.swift, swift-argument-parser, Rainbow
 - **Package Manager / Build Tool**: Swift Package Manager
 - **CLI Target**: `md-utils`
 - **Library Targets**: `MarkdownUtilitiesCore`, `MarkdownUtilities`
@@ -21,7 +21,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 - **Test Command**: `swift test`
 - **Formatter/Linter**: No dedicated formatter or linter is configured in-package
 - **Documentation**: README.md, AGENTS.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
-- **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/JSON parsing failures as user-visible errors
+- **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/TOML/JSON parsing failures as user-visible errors
 - **CI/Coverage**: No project-specific CI or coverage command is documented in this repo
 
 ## Requirements

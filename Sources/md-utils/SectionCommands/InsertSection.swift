@@ -185,16 +185,7 @@ extension CLIEntry {
     }
 
     private func reconstructDocument(_ doc: MarkdownDocument) throws -> String {
-      guard !doc.frontMatter.isEmpty else {
-        return doc.body
-      }
-
-      let yamlContent = try YAMLConversion.serialize(doc.frontMatter)
-      return """
-        ---
-        \(yamlContent)---
-        \(doc.body)
-        """
+      try doc.render()
     }
   }
 }

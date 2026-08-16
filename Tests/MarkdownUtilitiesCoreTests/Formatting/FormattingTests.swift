@@ -437,8 +437,7 @@ struct MarkdownDocumentFormattingTests {
         let result = try await doc.format(options: options)
         #expect(!result.frontMatter.isEmpty)
         // Frontmatter title preserved
-        let titleKey = Yams.Node(stringLiteral: "title")
-        #expect(result.frontMatter[titleKey] != nil)
+        #expect(result.frontMatter["title"] != nil)
         #expect(result.body.contains("- item one"))
     }
 
@@ -459,7 +458,7 @@ struct MarkdownDocumentFormattingTests {
         let options = FormattingOptions(normalizeTables: true)
         let result = try await doc.format(options: options)
 
-        let serialized = try YAMLConversion.serialize(result.frontMatter)
+        let serialized = try FrontMatterConversion.serialize(result.frontMatter, format: .yaml)
         // Block-style: tags should be a block sequence, not flow style [swift, yaml]
         #expect(serialized.contains("- swift"))
         #expect(!serialized.contains("[swift"))

@@ -1,5 +1,11 @@
 # Frontmatter Operations Reference
 
+YAML blocks use `---` delimiters and TOML blocks use `+++`. Mutations preserve
+the existing format. Creation-capable commands accept `--frontmatter-format
+yaml|toml` and default to YAML. Do not rely on YAML or TOML comments surviving a
+mutation: both formats are parsed into structured values and serialized again.
+TOML cannot represent null, so `fm touch` is unavailable for TOML blocks.
+
 ## Basic CRUD
 
 ### Get a value
@@ -12,6 +18,8 @@ md-utils fm get --key title document.md
 md-utils fm set --key author --value "Jane Doe" document.md
 # Batch: applies to all .md files in the directory
 md-utils fm set --key status --value published posts/
+# Create TOML frontmatter
+md-utils fm set --key status --value published --frontmatter-format toml document.md
 ```
 
 ### Check if key exists
@@ -70,24 +78,39 @@ md-utils fm dump post.md
 # YAML format
 md-utils fm dump post.md --format yaml
 
-# Multiple files: outputs JSON array with "$path" key injected
+# TOML format
+md-utils fm dump post.md --format toml
+
+# Multiple files: categorizes populated, absent, and empty frontmatter
 md-utils fm dump posts/ --format json
 
 # Pipe to jq
-md-utils fm dump posts/ | jq '.[].title'
+md-utils fm dump posts/ | jq '.frontMatter[].title'
 
 # Pipe to yq
-md-utils fm dump posts/ --format yaml | yq '.[].title'
+md-utils fm dump posts/ --format yaml | yq '.frontMatter[].title'
 
 # Cat-style headers (legacy)
 md-utils fm dump posts/ --cat-headers
 ```
 
-**Formats:** `json` (default), `yaml`, `raw`, `plist`
+**Formats:** `json` (default), `yaml`, `toml`, `raw`, `plist`
+
+TOML requires a table at the document root, so scalar and array output uses a
+stable `value` envelope. Raw dumps retain the source format and delimiter style.
+
+`fm dump` automatically processes Markdown, `.txt`, and mapped non-Markdown
+files; it does not accept `--include-non-md`. Multi-file output is an object:
+
+- `frontMatter` contains nonempty mappings with a `$path` key.
+- `noFrontMatter` contains paths with no complete frontmatter block.
+- `emptyFrontMatter` contains paths whose complete block has an empty mapping.
 
 ## Search with JMESPath
 
 `fm search` filters files using a JMESPath expression evaluated against each file's frontmatter. Outputs matching file paths.
+
+`fm search` supports YAML frontmatter only. TOML search is intentionally out of scope.
 
 ```bash
 # Find files where status is "published"
@@ -158,10 +181,10 @@ md-utils fm array contains --key tags --value swift posts/ \
   | xargs -I {} sh -c 'md-utils fm array contains --key tags --value tutorial {} && echo {}'
 
 # List all unique authors across a directory
-md-utils fm dump posts/ | jq -r '.[].author' | sort -u
+md-utils fm dump posts/ | jq -r '.frontMatter[].author' | sort -u
 
 # Count published posts
-md-utils fm dump posts/ | jq '[.[] | select(.status == "published")] | length'
+md-utils fm dump posts/ | jq '[.frontMatter[] | select(.status == "published")] | length'
 
 # Find files missing a required key
 find posts/ -name "*.md" | xargs -I {} sh -c 'md-utils fm has --key author {} || echo {}'

@@ -16,7 +16,7 @@ extension CLIEntry.FrontMatterCommands {
       commandName: "unique",
       abstract: "Check that a frontmatter value is unique across files",
       discussion: NonMarkdownFrontMatterHelp.appending(to: """
-        Evaluates one JMESPath expression against each file's YAML frontmatter and
+        Evaluates one JMESPath expression against each file's YAML or TOML frontmatter and
         checks that the selected scalar value is unique.
 
         COLLECTION MODE:
@@ -80,7 +80,7 @@ extension CLIEntry.FrontMatterCommands {
     @Flag(name: .long, help: "Process mapped non-Markdown files")
     var includeNonMD = false
 
-    @Option(name: .long, help: "Output format: text, json, or yaml")
+    @Option(name: .long, help: "Output format: text, json, yaml, or toml")
     var format: UniqueOutputFormat = .text
 
     mutating func run() async throws {
@@ -130,6 +130,7 @@ enum UniqueOutputFormat: String, ExpressibleByArgument {
   case text
   case json
   case yaml
+  case toml
 }
 
 enum UniqueMode: String {
@@ -440,6 +441,8 @@ enum UniqueRenderer {
       return try YAMLConversion.anyToJSON(report.foundationObject, options: [.prettyPrinted, .sortedKeys])
     case .yaml:
       return try YAMLConversion.anyToYAML(report.foundationObject)
+    case .toml:
+      return try FrontMatterConversion.serializeTOMLValue(report.foundationObject)
     }
   }
 

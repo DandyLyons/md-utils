@@ -36,7 +36,7 @@ Slug validation is selected explicitly:
 - `unicode` accepts lowercase Unicode letters and digits separated by non-adjacent hyphens or underscores; and
 - `preserve` accepts ASCII letters and digits separated by single hyphens while preserving authored case.
 
-Missing and null values are reported as missing identities. Malformed YAML, invalid formats, arrays, objects, booleans, non-integral numbers, and lossy conversions produce structured invalid-identity diagnostics. Identity status is independent from Markdown type conformance.
+Missing and null values are reported as missing identities. Malformed YAML or TOML, invalid formats, arrays, objects, booleans, non-integral numbers, and lossy conversions produce structured invalid-identity diagnostics. Identity status is independent from Markdown type conformance.
 
 ## Stability and Collisions
 

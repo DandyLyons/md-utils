@@ -39,15 +39,15 @@ struct SortKeysTests {
     let doc = try MarkdownDocument(content: updatedContent)
 
     // Get keys in the order they appear
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
 
     #expect(keys == ["author", "date", "title", "zebra"])
 
     // Verify values are preserved
-    #expect(doc.getValue(forKey: "title")?.string == "Test Document")
-    #expect(doc.getValue(forKey: "author")?.string == "Jane Doe")
-    #expect(doc.getValue(forKey: "date")?.string == "2024-01-15")
-    #expect(doc.getValue(forKey: "zebra")?.string == "last")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "Test Document")
+    #expect(doc.getValue(forKey: "author")?.stringValue == "Jane Doe")
+    #expect(doc.getValue(forKey: "date")?.stringValue == "2024-01-15")
+    #expect(doc.getValue(forKey: "zebra")?.stringValue == "last")
   }
 
   @Test
@@ -76,7 +76,7 @@ struct SortKeysTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
 
     #expect(keys == ["zebra", "title", "author"])
   }
@@ -106,7 +106,7 @@ struct SortKeysTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["a", "ab", "abc"])
   }
 
@@ -137,15 +137,15 @@ struct SortKeysTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
 
     #expect(keys == ["a", "short", "mid_length", "very_long_key_name"])
 
     // Verify values are preserved
-    #expect(doc.getValue(forKey: "very_long_key_name")?.string == "value1")
-    #expect(doc.getValue(forKey: "short")?.string == "value2")
-    #expect(doc.getValue(forKey: "mid_length")?.string == "value3")
-    #expect(doc.getValue(forKey: "a")?.string == "value4")
+    #expect(doc.getValue(forKey: "very_long_key_name")?.stringValue == "value1")
+    #expect(doc.getValue(forKey: "short")?.stringValue == "value2")
+    #expect(doc.getValue(forKey: "mid_length")?.stringValue == "value3")
+    #expect(doc.getValue(forKey: "a")?.stringValue == "value4")
   }
 
   @Test
@@ -174,7 +174,7 @@ struct SortKeysTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["abc", "ab", "a"])
   }
 
@@ -237,7 +237,7 @@ struct SortKeysTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["author", "metadata", "zebra"])
 
     // Verify array was preserved
@@ -290,8 +290,8 @@ struct SortKeysTests {
     let doc1 = try MarkdownDocument(content: try file1.read())
     let doc2 = try MarkdownDocument(content: try file2.read())
 
-    let keys1 = Array(doc1.frontMatter.keys).compactMap { $0.string }
-    let keys2 = Array(doc2.frontMatter.keys).compactMap { $0.string }
+    let keys1 = doc1.frontMatter.keys
+    let keys2 = doc2.frontMatter.keys
 
     #expect(keys1 == ["a", "m", "z"])
     #expect(keys2 == ["author", "date", "title"])
@@ -330,8 +330,8 @@ struct SortKeysTests {
     let doc1 = try MarkdownDocument(content: try file1.read())
     let doc2 = try MarkdownDocument(content: try file2.read())
 
-    let keys1 = Array(doc1.frontMatter.keys).compactMap { $0.string }
-    let keys2 = Array(doc2.frontMatter.keys).compactMap { $0.string }
+    let keys1 = doc1.frontMatter.keys
+    let keys2 = doc2.frontMatter.keys
 
     #expect(keys1 == ["a", "m", "z"])
     #expect(keys2 == ["a", "m", "z"])
@@ -363,7 +363,7 @@ struct SortKeysTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["active", "count", "disabled", "price"])
 
     #expect(doc.getValue(forKey: "count")?.int == 42)
@@ -397,7 +397,7 @@ struct SortKeysTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["a", "z"])
   }
 

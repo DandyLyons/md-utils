@@ -3,10 +3,9 @@
 //  MarkdownUtilities
 //
 
-import Yams
 /// Adds wikilink behavior to ``MarkdownDocument``.
 extension MarkdownDocument {
-  /// Scans both the YAML frontmatter and the document body for wikilinks.
+  /// Scans both YAML or TOML frontmatter and the document body for wikilinks.
   ///
   /// Frontmatter wikilinks appear first (in the order they are encountered
   /// while walking the YAML tree), followed by body wikilinks in document order.
@@ -29,33 +28,32 @@ extension MarkdownDocument {
     WikilinkScanner.scan(body)
   }
 
-  /// Scans only the YAML frontmatter for wikilinks.
+  /// Scans only the YAML or TOML frontmatter for wikilinks.
   ///
   /// Recursively walks all scalar values in the frontmatter mapping and scans
   /// each string for wikilinks.
   public func frontMatterWikilinks() -> [Wikilink] {
     var results: [Wikilink] = []
-    collectWikilinks(from: .mapping(frontMatter), into: &results)
+    for (_, value) in frontMatter {
+      collectWikilinks(from: value, into: &results)
+    }
     return results
   }
 
   /// Recursively walks a YAML node tree, scanning all scalar string values for wikilinks.
-  private func collectWikilinks(from node: Yams.Node, into results: inout [Wikilink]) {
-    switch node {
-    case .scalar(let scalar):
-      results.append(contentsOf: WikilinkScanner.scan(scalar.string))
-
-    case .mapping(let mapping):
+  private func collectWikilinks(from value: FrontMatterValue, into results: inout [Wikilink]) {
+    switch value {
+    case .string(let string):
+      results.append(contentsOf: WikilinkScanner.scan(string))
+    case .object(let mapping):
       for (_, value) in mapping {
         collectWikilinks(from: value, into: &results)
       }
-
-    case .sequence(let sequence):
+    case .array(let sequence):
       for item in sequence {
         collectWikilinks(from: item, into: &results)
       }
-
-    case .alias:
+    default:
       break
     }
   }

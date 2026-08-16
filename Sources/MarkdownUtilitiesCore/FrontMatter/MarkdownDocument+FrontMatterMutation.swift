@@ -1,5 +1,4 @@
 import Foundation
-import Yams
 /// Adds frontmatter behavior to ``MarkdownDocument``.
 ///
 /// See <doc:FrontmatterWorkflows> for workflow details.
@@ -7,21 +6,20 @@ extension MarkdownDocument {
   /// Get value for key from frontmatter
   ///
   /// - Parameter key: The frontmatter key to retrieve
-  /// - Returns: The Yams.Node value if the key exists, nil otherwise
-  public func getValue(forKey key: String) -> Yams.Node? {
+  /// - Returns: The format-neutral value if the key exists, nil otherwise
+  public func getValue(forKey key: String) -> FrontMatterValue? {
     return frontMatter[key]
   }
 
   /// Set string value for key in frontmatter
   ///
-  /// This method converts the provided string value to a YAML scalar node
-  /// and assigns it to the specified key in the frontmatter mapping.
+  /// This method stores the provided value as a string in the frontmatter mapping.
   ///
   /// - Parameters:
   ///   - value: The string value to set
   ///   - key: The frontmatter key
   public mutating func setValue(_ value: String, forKey key: String) {
-    frontMatter[key] = Yams.Node.scalar(.init(value))
+    frontMatter[key] = .string(value)
   }
   /// Groups CreateKeyError cases and related behavior.
   ///
@@ -45,7 +43,7 @@ extension MarkdownDocument {
     guard !hasKey(key) else {
       throw CreateKeyError.keyAlreadyExists
     }
-    frontMatter[key] = Yams.Node("", Tag(.null))
+    frontMatter[key] = .null
   }
 
   /// Check if key exists in frontmatter
@@ -113,26 +111,16 @@ extension MarkdownDocument {
   ///   - method: The sorting method to use (alphabetical or by length)
   ///   - reverse: Whether to reverse the sorting order (default: false)
   public mutating func sortKeys(by method: SortMethod = .alphabetical, reverse: Bool = false) {
-    let sorted: [(Yams.Node, Yams.Node)]
-
     switch method {
     case .alphabetical:
-      sorted = frontMatter.sorted { lhs, rhs in
-        guard let lhsKey = lhs.key.string, let rhsKey = rhs.key.string else {
-          return false
-        }
-        return reverse ? lhsKey > rhsKey : lhsKey < rhsKey
+      frontMatter.sort { lhs, rhs in
+        reverse ? lhs.key > rhs.key : lhs.key < rhs.key
       }
     case .length:
-      sorted = frontMatter.sorted { lhs, rhs in
-        guard let lhsKey = lhs.key.string, let rhsKey = rhs.key.string else {
-          return false
-        }
-        return reverse ? lhsKey.count > rhsKey.count : lhsKey.count < rhsKey.count
+      frontMatter.sort { lhs, rhs in
+        reverse ? lhs.key.count > rhs.key.count : lhs.key.count < rhs.key.count
       }
     }
-
-    frontMatter = Yams.Node.Mapping(sorted)
   }
 
   /// Sorting method for frontmatter keys

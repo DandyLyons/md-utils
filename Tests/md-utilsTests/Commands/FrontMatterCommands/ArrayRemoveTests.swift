@@ -200,12 +200,9 @@ struct ArrayRemoveTests {
 
   private func extractArrayValues(from doc: MarkdownDocument, key: String) throws -> [String] {
     guard let node = doc.getValue(forKey: key),
-          case .sequence(let sequence) = node else {
+          case .array(let sequence) = node else {
       return []
     }
-    return sequence.compactMap { node in
-      guard case .scalar(let scalar) = node else { return nil }
-      return scalar.string
-    }
+    return sequence.compactMap(\.stringValue)
   }
 }

@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Yams
 /// Adds frontmatter behavior to ``MarkdownDocument``.
 ///
 /// See <doc:FrontmatterWorkflows> for workflow details.
@@ -25,20 +24,16 @@ extension MarkdownDocument {
   /// it returns just the body.
   ///
   /// - Returns: The reconstructed markdown document
-  /// - Throws: If YAML serialization fails
+  /// - Throws: If serialization in the selected frontmatter format fails
   public func render() throws -> String {
-    // Only add delimiters if there's actual frontmatter content
-    if frontMatter.isEmpty {
-      return body
-    }
+    guard !frontMatter.isEmpty else { return body }
+    let format = frontMatterFormat ?? .yaml
 
-    // Serialize frontmatter back to YAML
-    let yamlString = try YAMLConversion.serialize(frontMatter)
+    let serialized = try FrontMatterConversion.serialize(frontMatter, format: format)
 
-    // Add delimiters around frontmatter
     return """
-    ---
-    \(yamlString)---
+    \(format.delimiter)
+    \(serialized)\(format.delimiter)
     \(body)
     """
   }
