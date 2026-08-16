@@ -17,7 +17,7 @@ import MarkdownUtilitiesCore
 public struct CSVOptions: ConversionOptions, Sendable {
     // MARK: - ConversionOptions Conformance
 
-    /// Whether to include YAML frontmatter in the CSV output
+    /// Whether to include YAML or TOML frontmatter in the CSV output
     ///
     /// This is always `true` for CSV conversion since the entire purpose
     /// is to export frontmatter as columns.

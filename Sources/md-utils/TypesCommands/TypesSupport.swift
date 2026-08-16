@@ -10,11 +10,13 @@ enum TypesOutputFormat: String, ExpressibleByArgument {
   case markdown
   case json
   case yaml
+  case toml
 }
 
 enum TypesDefinitionFormat: String, ExpressibleByArgument {
   case yaml
   case json
+  case toml
 }
 
 enum TypesProject {
@@ -58,6 +60,8 @@ enum TypesProject {
       [".mdtype.yaml", ".mdtype.yml"]
     case .json:
       [".mdtype.json"]
+    case .toml:
+      [".mdtype.toml"]
     }
     guard allowedSuffixes.contains(where: destinationName.hasSuffix) else {
       let expectedSuffixes = allowedSuffixes.joined(separator: " or ")
@@ -121,6 +125,16 @@ enum TypesProject {
         throw ValidationError("Failed to encode type definition")
       }
       return string + "\n"
+    case .toml:
+      let object: [String: Any] = [
+        "md-utils-type-schema": "1",
+        "name": name,
+        "version": version,
+        "frontmatter": ["schemas": []],
+        "body": ["requirements": [], "recommendations": []],
+        "context": ["requirements": [], "recommendations": []],
+      ]
+      return try FrontMatterConversion.serializeTOMLValue(object)
     }
   }
 
@@ -210,7 +224,7 @@ enum TypesRenderer {
     case .markdown:
       guard definitions.isEmpty == false else { return "No Markdown types found." }
       return definitions.map { "- `\($0.name.rawValue)` \($0.version)" }.joined(separator: "\n")
-    case .json, .yaml:
+    case .json, .yaml, .toml:
       return try serialize(definitions.map(definitionObject), format: format)
     }
   }
@@ -252,7 +266,7 @@ enum TypesRenderer {
       - Context requirements: \(definition.context.requirements.count)
       - Context recommendations: \(definition.context.recommendations.count)
       """
-    case .json, .yaml:
+    case .json, .yaml, .toml:
       return try serialize(definitionObject(definition), format: format)
     }
   }
@@ -264,7 +278,7 @@ enum TypesRenderer {
     includeOK: Bool,
     includeAdvisories: Bool = true
   ) throws -> String {
-    if format == .json || format == .yaml {
+    if format == .json || format == .yaml || format == .toml {
       let objects = results.map { result in
         assessmentObject(result.assessment, path: relativePath(from: root, to: result.file))
       }
@@ -292,7 +306,7 @@ enum TypesRenderer {
     root: Path,
     includeAll: Bool
   ) throws -> String {
-    if format == .json || format == .yaml {
+    if format == .json || format == .yaml || format == .toml {
       let objects: [[String: Any]] = results.map { file, assessments in
         [
           "path": relativePath(from: root, to: file),
@@ -322,7 +336,7 @@ enum TypesRenderer {
         "hints": hints.filter { includeConfirmed || $0.status != .confirmed }.map(hintObject),
       ]
     }
-    if format == .json || format == .yaml {
+    if format == .json || format == .yaml || format == .toml {
       return try serialize(objects, format: format)
     }
     return results.map { file, hints in
@@ -476,8 +490,10 @@ enum TypesRenderer {
       return string
     case .yaml:
       return try Yams.dump(object: object, sortKeys: true)
+    case .toml:
+      return try FrontMatterConversion.serializeTOMLValue(object)
     case .text, .markdown:
-      throw ValidationError("Structured serialization requires json or yaml output")
+      throw ValidationError("Structured serialization requires json, yaml, or toml output")
     }
   }
 }

@@ -7,11 +7,34 @@ import ArgumentParser
 import Foundation
 import PathKit
 import Testing
+import MarkdownUtilitiesCore
 
 @testable import md_utils
 
 @Suite("fm search command")
 struct SearchTests {
+
+  @Test
+  func `search explicitly rejects TOML frontmatter`() throws {
+    let document = try MarkdownDocument(content: "+++\ntitle = \"Example\"\n+++\nBody")
+
+    #expect(throws: Error.self) {
+      try FrontMatterJMESPath.object(from: document)
+    }
+  }
+
+  @Test
+  func `search explicitly rejects TOML output`() async throws {
+    let command_ = try CLIEntry.FrontMatterCommands.Search.parseAsRoot([
+      "title",
+      "--format", "toml",
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Search)
+
+    await #expect(throws: Error.self) {
+      try await command.run()
+    }
+  }
 
   // MARK: - Basic Equality Tests
 

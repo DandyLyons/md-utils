@@ -113,7 +113,8 @@ package enum MarkdownRecordAnalyzer {
         parts = RecordParts(
           rawFrontmatter: parsed.rawFrontMatter,
           body: parsed.body,
-          hasFrontmatter: containsFrontmatterBlock(record.content),
+          hasFrontmatter: parsed.format != nil,
+          format: parsed.format,
           diagnostics: []
         )
       } catch {
@@ -127,7 +128,7 @@ package enum MarkdownRecordAnalyzer {
           headings: supportsMarkdownStructure
             ? await analyzeHeadings(in: record.content, when: requirements)
             : [],
-          parseDiagnostics: [parseDiagnostic(error.localizedDescription)],
+          parseDiagnostics: [parseDiagnostic(error.localizedDescription, format: nil)],
           supportsMarkdownStructure: supportsMarkdownStructure,
           unavailableFrontmatterExtension: nil
         )
@@ -142,9 +143,10 @@ package enum MarkdownRecordAnalyzer {
         [multipleBlocksDiagnostic(line: line)]
       } ?? []
       parts = RecordParts(
-        rawFrontmatter: scan.firstBlock?.rawYAML ?? "",
+        rawFrontmatter: scan.firstBlock?.rawFrontMatter ?? "",
         body: body,
         hasFrontmatter: scan.firstBlock != nil,
+        format: scan.firstBlock?.format,
         diagnostics: diagnostics
       )
     case .unmapped(let fileExtension):
@@ -167,8 +169,11 @@ package enum MarkdownRecordAnalyzer {
 
     if parts.hasFrontmatter {
       do {
-        let mapping = try YAMLConversion.parse(parts.rawFrontmatter)
-        let dynamicValue = try YAMLConversion.safeNodeToSwiftValue(.mapping(mapping))
+        let frontMatter = try FrontMatterConversion.parse(
+          parts.rawFrontmatter,
+          format: parts.format ?? .yaml
+        )
+        let dynamicValue = FrontMatterConversion.foundationValue(frontMatter)
         guard case .object(var object) = try JSONValue(any: dynamicValue) else {
           throw YAMLConversionError.notAMapping
         }
@@ -179,7 +184,7 @@ package enum MarkdownRecordAnalyzer {
         }
         userFrontmatter = object.isEmpty ? nil : object
       } catch {
-        diagnostics.append(parseDiagnostic(error.localizedDescription))
+        diagnostics.append(parseDiagnostic(error.localizedDescription, format: parts.format))
       }
     }
 
@@ -202,6 +207,7 @@ package enum MarkdownRecordAnalyzer {
     var rawFrontmatter: String
     var body: String
     var hasFrontmatter: Bool
+    var format: FrontMatterFormat?
     var diagnostics: [MarkdownDiagnostic]
   }
 
@@ -255,10 +261,9 @@ package enum MarkdownRecordAnalyzer {
   }
 
   private static func containsFrontmatterBlock(_ content: String) -> Bool {
-    guard content.starts(with: "---\n") else { return false }
-    let remaining = content.dropFirst(4)
-    return remaining == "---" || remaining.hasPrefix("---\n") || remaining.contains("\n---\n")
-      || remaining.hasSuffix("\n---")
+    let parser = FrontMatterParser()
+    var input = Substring(content)
+    return (try? parser.parse(&input).format) != nil
   }
 
   private static func parseTypeHints(
@@ -291,13 +296,17 @@ package enum MarkdownRecordAnalyzer {
     return (hints, diagnostics)
   }
 
-  private static func parseDiagnostic(_ message: String) -> MarkdownDiagnostic {
-    MarkdownDiagnostic(
-      code: "record.frontmatter.invalid-yaml",
+  private static func parseDiagnostic(
+    _ message: String,
+    format: FrontMatterFormat?
+  ) -> MarkdownDiagnostic {
+    let formatName = format?.rawValue.uppercased() ?? "frontmatter"
+    return MarkdownDiagnostic(
+      code: format == .toml ? "record.frontmatter.invalid-toml" : "record.frontmatter.invalid-yaml",
       severity: .error,
       domain: .frontmatter,
       location: "frontmatter",
-      message: "Invalid YAML: \(message)"
+      message: "Invalid \(formatName): \(message)"
     )
   }
 

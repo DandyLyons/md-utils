@@ -18,7 +18,7 @@ extension CLIEntry.FrontMatterCommands {
       commandName: "array",
       abstract: "Array manipulation commands for frontmatter",
       discussion: NonMarkdownFrontMatterHelp.appending(to: """
-        Manipulate arrays in YAML frontmatter with various subcommands.
+        Manipulate arrays in YAML or TOML frontmatter with various subcommands.
 
         SUBCOMMANDS:
           contains   Check if arrays contain specific values

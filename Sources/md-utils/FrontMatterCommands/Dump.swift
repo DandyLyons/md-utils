@@ -20,7 +20,7 @@ extension CLIEntry.FrontMatterCommands {
       commandName: "dump",
       abstract: "Dump entire frontmatter in specified format",
       discussion: NonMarkdownFrontMatterHelp.appendingForDump(to: """
-        Outputs the complete frontmatter from files in various formats: JSON, YAML, raw, or plist.
+        Outputs complete frontmatter as JSON, YAML, TOML, raw source, or plist.
 
         Supports multiple files and directory processing with recursive mode.
 
@@ -80,10 +80,10 @@ extension CLIEntry.FrontMatterCommands {
 
     @OptionGroup var options: GlobalOptions
 
-    @Option(name: .shortAndLong, help: "Output format (json, yaml, raw, plist)")
+    @Option(name: .shortAndLong, help: "Output format (json, yaml, toml, raw, plist)")
     var format: OutputFormat = .json
 
-    @Flag(name: .long, help: "Include --- delimiters in YAML/raw output")
+    @Flag(name: .long, help: "Include format-appropriate delimiters in YAML/TOML/raw output")
     var includeDelimiters: Bool = false
 
     @Flag(name: .long, help: "Use cat-style headers (==> path <==) instead of collection output for multiple files")
@@ -108,14 +108,14 @@ extension CLIEntry.FrontMatterCommands {
         do {
           let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: true)
 
-          if includeDelimiters && (format == .yaml || format == .raw) {
-            Swift.print("---")
+          if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
+            Swift.print(delimiter)
           }
 
-          try print(node: .mapping(doc.frontMatter), format: format)
+          try print(frontMatter: doc.frontMatter, format: format, sourceFormat: doc.frontMatterFormat)
 
-          if includeDelimiters && (format == .yaml || format == .raw) {
-            Swift.print("---")
+          if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
+            Swift.print(delimiter)
           }
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
@@ -133,14 +133,14 @@ extension CLIEntry.FrontMatterCommands {
           do {
             let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: true)
 
-            if includeDelimiters && (format == .yaml || format == .raw) {
-              Swift.print("---")
+            if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
+              Swift.print(delimiter)
             }
 
-            try print(node: .mapping(doc.frontMatter), format: format)
+            try print(frontMatter: doc.frontMatter, format: format, sourceFormat: doc.frontMatterFormat)
 
-            if includeDelimiters && (format == .yaml || format == .raw) {
-              Swift.print("---")
+            if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
+              Swift.print(delimiter)
             }
           } catch {
             CLIStyle.writeError("\(CLIStyle.path(file.string)): \(error.localizedDescription)")
@@ -175,11 +175,7 @@ extension CLIEntry.FrontMatterCommands {
               continue
             }
 
-            let node = Yams.Node.mapping(parsed.document.frontMatter)
-
-            guard var dict = try YAMLConversion.safeNodeToSwiftValue(node) as? [String: Any] else {
-              continue
-            }
+            var dict = FrontMatterConversion.foundationValue(parsed.document.frontMatter)
 
             dict["$path"] = file.string
             frontMatter.append(dict)
@@ -197,6 +193,15 @@ extension CLIEntry.FrontMatterCommands {
         try printAny(collection, format: format)
       }
       if hasErrors { throw ExitCode.failure }
+    }
+
+    private func outputDelimiter(for document: MarkdownDocument) -> String? {
+      switch format {
+      case .yaml: FrontMatterFormat.yaml.delimiter
+      case .toml: FrontMatterFormat.toml.delimiter
+      case .raw: (document.frontMatterFormat ?? .yaml).delimiter
+      case .json, .plist: nil
+      }
     }
   }
 }

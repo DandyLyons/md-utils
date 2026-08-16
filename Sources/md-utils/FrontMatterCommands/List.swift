@@ -18,7 +18,7 @@ extension CLIEntry.FrontMatterCommands {
       commandName: "list",
       abstract: "List all keys in frontmatter",
       discussion: NonMarkdownFrontMatterHelp.appending(to: """
-        Lists all keys present in the YAML frontmatter of Markdown files.
+        Lists all keys present in the YAML or TOML frontmatter of Markdown files.
 
         When processing multiple files, each file's keys are prefixed with the filename.
         Keys are listed one per line in alphabetical order.
@@ -47,9 +47,7 @@ extension CLIEntry.FrontMatterCommands {
           let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
 
           // Extract keys from frontmatter
-          let keys = Array(doc.frontMatter.keys)
-            .compactMap { $0.string }
-            .sorted()
+          let keys = doc.frontMatter.keys.sorted()
 
           // Print keys
           if keys.isEmpty {

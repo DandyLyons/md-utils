@@ -117,18 +117,10 @@ extension MarkdownDocument {
 
   /// Rebuilds the document with a new body, preserving frontmatter.
   private func rebuildDocument(withBody newBody: String) throws -> MarkdownDocument {
-    guard !frontMatter.isEmpty else {
-      return try MarkdownDocument(content: newBody)
-    }
-
-    let yamlContent = try YAMLConversion.serialize(frontMatter)
-
-    let fullContent = """
-      ---
-      \(yamlContent)---
-      \(newBody)
-      """
-
-    return try MarkdownDocument(content: fullContent)
+    MarkdownDocument(
+      frontMatter: frontMatter,
+      body: newBody,
+      frontMatterFormat: frontMatterFormat
+    )
   }
 }

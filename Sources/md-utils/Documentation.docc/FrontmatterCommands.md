@@ -1,12 +1,14 @@
 # Frontmatter Commands
 
-Read, search, and mutate YAML frontmatter from the `frontmatter` command group.
+Read and mutate YAML or TOML frontmatter from the `frontmatter` command group.
 
 ## Overview
 
-The `frontmatter` command group, also available as `fm`, provides CRUD operations for Markdown YAML frontmatter. Commands can operate on one file, several files, or directories resolved through the shared global path options.
+The `frontmatter` command group, also available as `fm`, provides CRUD operations for Markdown frontmatter. YAML uses `---` delimiter lines and TOML uses `+++`. Existing blocks retain their format; creation-capable commands accept `--frontmatter-format yaml|toml`, with YAML as the default. Commands can operate on one file, several files, or directories resolved through the shared global path options.
 
-Common operations include reading values, setting values, checking for keys, removing or renaming keys, replacing or completely removing an entire frontmatter block, dumping frontmatter in multiple formats, searching with JMESPath, checking uniqueness, sorting keys, touching empty keys, and mutating array values.
+Common operations include reading values, setting values, checking for keys, removing or renaming keys, replacing or completely removing an entire frontmatter block, dumping frontmatter in multiple formats, checking uniqueness, sorting keys, and mutating array values. `fm search` is intentionally YAML-only. TOML has no null value, so `fm touch` cannot add an empty TOML key and reports an error instead.
+
+Do not put comments in frontmatter that will be mutated by `md-utils`. YAML and TOML are parsed into a format-neutral value model and serialized again, so comments are not guaranteed to survive.
 
 ## Removing Complete Frontmatter
 
@@ -49,7 +51,9 @@ literals from shell command substitution.
 
 ## Output Semantics
 
-Commands that report values preserve the distinction between a missing key and a key whose YAML value is null. Machine-readable formats should be preferred when that distinction matters.
+Commands that report values preserve the distinction between a missing key and a YAML null value. TOML cannot represent null. Machine-readable formats should be preferred when that distinction matters.
+
+`--format toml` is available anywhere the shared structured-output format is supported. Because TOML requires a document root to be a table, scalar and array roots are emitted under a stable `value` key. `fm dump --format raw` emits the source format, and `--include-delimiters` uses the matching `---` or `+++` lines.
 
 `fm dump` is read-only and automatically selects Markdown, plain-text, and
 mapped non-Markdown files. A sole explicit file outputs its mapping directly.

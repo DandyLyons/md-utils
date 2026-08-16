@@ -13,6 +13,28 @@ import MarkdownUtilitiesCore
 struct ReplaceTests {
 
   @Test
+  func `fm replace accepts TOML and can convert the physical format`() async throws {
+    let tempFile = try createTempFile(content: "---\nold: value\n---\nBody", name: "toml.md")
+    defer { try? tempFile.delete() }
+
+    let command_ = try CLIEntry.FrontMatterCommands.Replace.parseAsRoot([
+      "--data", "title = \"TOML Title\"\ncount = 2",
+      "--format", "toml",
+      "--frontmatter-format", "toml",
+      "--yes",
+      tempFile.string,
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Replace)
+    try await command.run()
+
+    let content: String = try tempFile.read()
+    let document = try MarkdownDocument(content: content)
+    #expect(content.hasPrefix("+++\n"))
+    #expect(document.frontMatter["title"]?.stringValue == "TOML Title")
+    #expect(document.frontMatter["count"]?.int == 2)
+  }
+
+  @Test
   func `fm replace with inline JSON data`() async throws {
     let testContent = """
     ---
@@ -46,8 +68,8 @@ struct ReplaceTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    #expect(doc.getValue(forKey: "title")?.string == "New Title")
-    #expect(doc.getValue(forKey: "status")?.string == "published")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "New Title")
+    #expect(doc.getValue(forKey: "status")?.stringValue == "published")
     // Old keys should be gone
     #expect(doc.getValue(forKey: "author") == nil)
     #expect(doc.getValue(forKey: "draft") == nil)
@@ -87,8 +109,8 @@ struct ReplaceTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    #expect(doc.getValue(forKey: "title")?.string == "YAML Title")
-    #expect(doc.getValue(forKey: "category")?.string == "tutorial")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "YAML Title")
+    #expect(doc.getValue(forKey: "category")?.stringValue == "tutorial")
     #expect(doc.getValue(forKey: "old_key") == nil)
   }
 
@@ -129,9 +151,9 @@ struct ReplaceTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    #expect(doc.getValue(forKey: "title")?.string == "From File")
-    #expect(doc.getValue(forKey: "author")?.string == "Test Author")
-    #expect(doc.getValue(forKey: "version")?.string == "2")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "From File")
+    #expect(doc.getValue(forKey: "author")?.stringValue == "Test Author")
+    #expect(doc.getValue(forKey: "version")?.int == 2)
   }
 
   @Test
@@ -221,13 +243,13 @@ struct ReplaceTests {
     let doc1 = try MarkdownDocument(content: try file1.read())
     let doc2 = try MarkdownDocument(content: try file2.read())
 
-    #expect(doc1.getValue(forKey: "category")?.string == "tutorial")
-    #expect(doc1.getValue(forKey: "status")?.string == "published")
+    #expect(doc1.getValue(forKey: "category")?.stringValue == "tutorial")
+    #expect(doc1.getValue(forKey: "status")?.stringValue == "published")
     #expect(doc1.getValue(forKey: "title") == nil)
     #expect(doc1.getValue(forKey: "type") == nil)
 
-    #expect(doc2.getValue(forKey: "category")?.string == "tutorial")
-    #expect(doc2.getValue(forKey: "status")?.string == "published")
+    #expect(doc2.getValue(forKey: "category")?.stringValue == "tutorial")
+    #expect(doc2.getValue(forKey: "status")?.stringValue == "published")
     #expect(doc2.getValue(forKey: "title") == nil)
     #expect(doc2.getValue(forKey: "type") == nil)
   }
@@ -271,8 +293,8 @@ struct ReplaceTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    #expect(doc.getValue(forKey: "title")?.string == "Plist Title")
-    #expect(doc.getValue(forKey: "version")?.string == "3")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "Plist Title")
+    #expect(doc.getValue(forKey: "version")?.int == 3)
   }
 
   @Test
@@ -407,8 +429,8 @@ struct ReplaceTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    #expect(doc.getValue(forKey: "title")?.string == "Added Title")
-    #expect(doc.getValue(forKey: "draft")?.string == "false")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "Added Title")
+    #expect(doc.getValue(forKey: "draft")?.bool == false)
   }
 
   // MARK: - Test Helpers

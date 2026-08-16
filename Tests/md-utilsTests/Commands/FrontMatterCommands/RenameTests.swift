@@ -41,10 +41,10 @@ struct RenameTests {
 
     #expect(doc.hasKey("date") == false)
     #expect(doc.hasKey("created") == true)
-    #expect(doc.getValue(forKey: "created")?.string == "2024-01-15")
+    #expect(doc.getValue(forKey: "created")?.stringValue == "2024-01-15")
     // Other keys should remain unchanged
-    #expect(doc.getValue(forKey: "title")?.string == "Test Document")
-    #expect(doc.getValue(forKey: "author")?.string == "Jane Doe")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "Test Document")
+    #expect(doc.getValue(forKey: "author")?.stringValue == "Jane Doe")
   }
 
   @Test
@@ -75,7 +75,7 @@ struct RenameTests {
 
     #expect(doc.hasKey("status") == false)
     #expect(doc.hasKey("publish_status") == true)
-    #expect(doc.getValue(forKey: "publish_status")?.string == "draft")
+    #expect(doc.getValue(forKey: "publish_status")?.stringValue == "draft")
   }
 
   @Test
@@ -137,8 +137,8 @@ struct RenameTests {
     // Verify file was not modified
     let content: String = try tempFile.read()
     let doc = try MarkdownDocument(content: content)
-    #expect(doc.getValue(forKey: "title")?.string == "Test")
-    #expect(doc.getValue(forKey: "author")?.string == "Jane")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "Test")
+    #expect(doc.getValue(forKey: "author")?.stringValue == "Jane")
   }
 
   @Test
@@ -253,11 +253,11 @@ struct RenameTests {
 
     #expect(doc1.hasKey("old_key") == false)
     #expect(doc1.hasKey("new_key") == true)
-    #expect(doc1.getValue(forKey: "new_key")?.string == "Value 1")
+    #expect(doc1.getValue(forKey: "new_key")?.stringValue == "Value 1")
 
     #expect(doc2.hasKey("old_key") == false)
     #expect(doc2.hasKey("new_key") == true)
-    #expect(doc2.getValue(forKey: "new_key")?.string == "Value 2")
+    #expect(doc2.getValue(forKey: "new_key")?.stringValue == "Value 2")
   }
 
   @Test
@@ -296,13 +296,13 @@ struct RenameTests {
 
     #expect(doc1.hasKey("old_name") == false)
     #expect(doc1.hasKey("new_name") == true)
-    #expect(doc1.getValue(forKey: "new_name")?.string == "Test Value")
-    #expect(doc1.getValue(forKey: "other")?.string == "Keep This")
+    #expect(doc1.getValue(forKey: "new_name")?.stringValue == "Test Value")
+    #expect(doc1.getValue(forKey: "other")?.stringValue == "Keep This")
 
     #expect(doc2.hasKey("old_name") == false)
     #expect(doc2.hasKey("new_name") == true)
-    #expect(doc2.getValue(forKey: "new_name")?.string == "Test Value")
-    #expect(doc2.getValue(forKey: "other")?.string == "Keep This")
+    #expect(doc2.getValue(forKey: "new_name")?.stringValue == "Test Value")
+    #expect(doc2.getValue(forKey: "other")?.stringValue == "Keep This")
   }
 
   @Test
@@ -365,7 +365,7 @@ struct RenameTests {
 
     #expect(doc.hasKey("before") == false)
     #expect(doc.hasKey("after") == true)
-    #expect(doc.getValue(forKey: "after")?.string == "value")
+    #expect(doc.getValue(forKey: "after")?.stringValue == "value")
   }
 
   // MARK: - Test Helpers

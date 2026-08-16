@@ -11,6 +11,7 @@ readonly SWIFT_WASM_SDK="${SWIFT_WASM_SDK:-swift-6.3.1-RELEASE_wasm}"
 # A package update must be evaluated before these guards are changed.
 readonly YAMS_REVISION="51b5127c7fb6ffac106ad6d199aaa33c5024895f"
 readonly JSONSCHEMA_REVISION="d14de4b2d9205068c9db89c00d097ca43c897000"
+readonly SWIFT_TOML_REVISION="827506c90475e82d5a7f191f950fb3025cbdc0d6"
 
 # CI uses the default SDK store, while local verification can point Swift at an
 # isolated SDK installation through SWIFT_WASM_SDKS_PATH.
@@ -44,14 +45,14 @@ apply_dependency_patch() {
 
   # A successful reverse check means this exact patch is already present. This
   # keeps repeated and incremental WASM builds idempotent.
-  if git -C "${checkout_directory}" apply --reverse --check "${patch_file}" 2>/dev/null; then
+  if git -C "${checkout_directory}" apply --unidiff-zero --reverse --check "${patch_file}" 2>/dev/null; then
     return 0
   fi
 
   # Validate the entire diff before modifying the checkout. Context drift or a
   # partial prior edit fails here rather than leaving a half-applied patch.
-  git -C "${checkout_directory}" apply --check "${patch_file}"
-  git -C "${checkout_directory}" apply "${patch_file}"
+  git -C "${checkout_directory}" apply --unidiff-zero --check "${patch_file}"
+  git -C "${checkout_directory}" apply --unidiff-zero "${patch_file}"
 }
 
 cd "${REPOSITORY_ROOT}"
@@ -77,6 +78,13 @@ apply_dependency_patch \
   "${JSONSCHEMA_REVISION}" \
   "${SCRIPT_DIRECTORY}wasm-patches/jsonschema-0.6.0-wasi.patch" \
   "Sources/Validators.swift"
+# The WASI SDK's C++ runtime has exceptions disabled. toml++ supports an
+# exception-free parser result, so the C bridge uses that path on WASI.
+apply_dependency_patch \
+  ".build/checkouts/swift-toml/" \
+  "${SWIFT_TOML_REVISION}" \
+  "${SCRIPT_DIRECTORY}wasm-patches/swift-toml-2.0.0-wasi.patch" \
+  "Sources/CTomlPlusPlus/ctoml.cpp"
 
 # swift-cmark's C sources require wasi-libc's signal and memory-mapping
 # compatibility shims. Package.swift links the matching emulation libraries.
@@ -84,7 +92,8 @@ swift build \
   "${swift_sdk_arguments[@]}" \
   --target MarkdownUtilitiesCore \
   -Xcc -D_WASI_EMULATED_SIGNAL \
-  -Xcc -D_WASI_EMULATED_MMAN
+  -Xcc -D_WASI_EMULATED_MMAN \
+  -Xcxx -fno-exceptions
 
 # Running the product through `swift run` executes it with the SDK's configured
 # WASM runtime and verifies real parsing behavior, not compilation alone.
@@ -92,4 +101,5 @@ swift run \
   "${swift_sdk_arguments[@]}" \
   -Xcc -D_WASI_EMULATED_SIGNAL \
   -Xcc -D_WASI_EMULATED_MMAN \
+  -Xcxx -fno-exceptions \
   MarkdownUtilitiesCoreWasmSmoke

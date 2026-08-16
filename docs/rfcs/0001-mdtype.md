@@ -85,7 +85,7 @@ A **document** is a successfully parsed content view derived from a record. It h
 
 ### Type definition
 
-A **type definition** is a named, versioned structural contract serialized as YAML or JSON.
+A **type definition** is a named, versioned structural contract serialized as YAML, JSON, or TOML.
 
 ### Requirement
 
@@ -130,10 +130,11 @@ A definition filename MUST end with one of these compound extensions:
 - `.mdtype.yaml`
 - `.mdtype.yml`
 - `.mdtype.json`
+- `.mdtype.toml`
 
 Suffix matching is case-insensitive. Other files under `.md-utils/types/` are ignored. The declared `name`, not the filename, is the type's identity.
 
-The portable Core decoder does not perform discovery and can decode explicitly supplied YAML or JSON from any host.
+The portable Core decoder does not perform discovery and can decode explicitly supplied YAML, JSON, or TOML from any host.
 
 ### Definition envelope
 

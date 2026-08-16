@@ -33,6 +33,7 @@ let package = Package(
     .package(url: "https://github.com/kylef/PathKit", from: "1.0.1"),
     .package(url: "https://github.com/kylef/JSONSchema.swift", from: "0.6.0"),
     .package(url: "https://github.com/jpsim/Yams.git", from: "6.1.0"),
+    .package(url: "https://github.com/mattt/swift-toml.git", from: "2.0.0"),
     .package(url: "https://github.com/adam-fowler/jmespath.swift.git", from: "1.0.3"),
     .package(url: "https://github.com/onevcat/Rainbow", from: "4.2.1"),
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
@@ -46,6 +47,7 @@ let package = Package(
         .product(name: "Parsing", package: "swift-parsing"),
         .product(name: "JSONSchema", package: "JSONSchema.swift"),
         "Yams",
+        .product(name: "TOML", package: "swift-toml"),
       ]
     ),
     .testTarget(

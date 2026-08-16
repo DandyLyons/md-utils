@@ -6,7 +6,6 @@
 import Foundation
 import JMESPath
 import MarkdownUtilitiesCore
-import Yams
 
 /// Shared JMESPath support for frontmatter commands.
 enum FrontMatterJMESPath {
@@ -17,7 +16,10 @@ enum FrontMatterJMESPath {
 
   /// Converts parsed frontmatter into the Foundation representation expected by JMESPath.
   static func object(from document: MarkdownDocument) throws -> Any {
-    try YAMLConversion.safeNodeToSwiftValue(.mapping(document.frontMatter))
+    guard document.frontMatterFormat != .toml else {
+      throw FrontMatterCommandError(message: "TOML frontmatter is not supported by fm search")
+    }
+    return FrontMatterConversion.foundationValue(document.frontMatter)
   }
 
   /// Extracts the useful description from the JMESPath package's wrapped errors.

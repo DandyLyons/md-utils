@@ -110,7 +110,16 @@ md-utils fm get --key tags --format numbered-list document.md
 #### Set frontmatter value
 ```bash
 md-utils fm set --key author --value "Jane Doe" document.md
+
+# Create a TOML block when the document has no frontmatter
+md-utils fm set --key author --value "Jane Doe" --frontmatter-format toml document.md
 ```
+
+YAML frontmatter is delimited by `---`; TOML frontmatter is delimited by `+++`.
+Mutations preserve the existing format. Creation-capable commands default to
+YAML unless `--frontmatter-format toml` is supplied. Avoid comments inside either
+format: parsing and reserialization do not guarantee that comments are preserved.
+TOML cannot represent null, so `fm touch` is unavailable for TOML blocks.
 
 ### Frontmatter in Non-Markdown Text Files
 
@@ -174,8 +183,10 @@ md-utils fm list document.md
 
 #### Search files by frontmatter value
 ```bash
-md-utils fm search --key status --value published posts/
+md-utils fm search 'status == `"published"`' posts/
 ```
+
+`fm search` is YAML-only; TOML support is intentionally out of scope for that command.
 
 ### Frontmatter Array Operations
 
@@ -201,9 +212,10 @@ md-utils fm array remove --key tags --value draft posts/*.md
 md-utils fm sort-keys document.md
 ```
 
-#### Dump all frontmatter as YAML
+#### Dump all frontmatter as YAML or TOML
 ```bash
-md-utils fm dump document.md
+md-utils fm dump document.md --format yaml
+md-utils fm dump document.md --format toml
 ```
 
 ## Conversion Operations
@@ -221,7 +233,7 @@ md-utils convert to-text document.md
 md-utils types add Book --version 1.0.0
 ```
 
-Type definitions are stored under `.md-utils/types/` and use the compound extensions `.mdtype.yaml`, `.mdtype.yml`, or `.mdtype.json`.
+Type definitions are stored under `.md-utils/types/` and use the compound extensions `.mdtype.yaml`, `.mdtype.yml`, `.mdtype.json`, or `.mdtype.toml`.
 
 ### Check and find conforming records
 

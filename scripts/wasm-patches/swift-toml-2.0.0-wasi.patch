@@ -1,0 +1,46 @@
+diff --git a/Sources/CTomlPlusPlus/ctoml.cpp b/Sources/CTomlPlusPlus/ctoml.cpp
+index e2158b7..8bb64be 100644
+--- a/Sources/CTomlPlusPlus/ctoml.cpp
++++ b/Sources/CTomlPlusPlus/ctoml.cpp
+@@ -3,0 +4,3 @@
++#if defined(__wasi__)
++#define TOML_EXCEPTIONS 0
++#endif
+@@ -43,0 +47,3 @@ struct CTomlTable
++		#if defined(__wasi__)
++			std::abort();
++		#else
+@@ -44,0 +51 @@ struct CTomlTable
++		#endif
+@@ -57,0 +65,3 @@ struct CTomlTable
++		#if defined(__wasi__)
++			std::abort();
++		#else
+@@ -58,0 +69 @@ struct CTomlTable
++		#endif
+@@ -200,0 +212,23 @@ extern "C"
++	#if defined(__wasi__)
++		CTomlTable* storage = new (std::nothrow) CTomlTable();
++		if (!storage)
++		{
++			result.error_message = "Out of memory";
++			return result;
++		}
++		result.handle = storage;
++
++		std::string_view sv(input, length);
++		auto parsed = toml::parse(sv);
++		if (!parsed)
++		{
++			const auto& err = parsed.error();
++			storage->error_message = std::string(err.description());
++			result.error_message = storage->error_message.c_str();
++			result.error_line = err.source().begin.line;
++			result.error_column = err.source().begin.column;
++			return result;
++		}
++		result.root = convert_table(parsed.table(), storage);
++		result.success = true;
++	#else
+@@ -259,0 +294 @@ extern "C"
++	#endif

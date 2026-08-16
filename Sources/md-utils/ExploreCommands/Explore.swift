@@ -91,7 +91,7 @@ extension CLIEntry {
 
     @Flag(
       name: [.customShort("F"), .customLong("expand-frontmatter")],
-      help: "Expand YAML frontmatter when present"
+      help: "Expand YAML or TOML frontmatter when present"
     )
     var expandFrontmatter: Bool = false
 

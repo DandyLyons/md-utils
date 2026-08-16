@@ -22,8 +22,8 @@ struct FrontMatterSeparationTests {
     """
     let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
-    #expect(doc.frontMatter["author"]?.string == "Jane")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
+    #expect(doc.frontMatter["author"]?.stringValue == "Jane")
     #expect(doc.body == "Body content here")
   }
 
@@ -61,7 +61,7 @@ struct FrontMatterSeparationTests {
     """
     let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     #expect(doc.body == "Some text\n---\nMore text")
   }
 
@@ -111,8 +111,8 @@ struct FrontMatterSeparationTests {
     """
     let doc = try MarkdownDocument(content: content)
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
-    #expect(doc.frontMatter["author"]?.string == "John")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
+    #expect(doc.frontMatter["author"]?.stringValue == "John")
     #expect(doc.body == "")
   }
 

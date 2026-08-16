@@ -18,7 +18,7 @@ extension CLIEntry.FrontMatterCommands {
       commandName: "get",
       abstract: "Get a frontmatter value by key",
       discussion: NonMarkdownFrontMatterHelp.appending(to: """
-        Retrieves the value of a specified key from YAML frontmatter.
+        Retrieves the value of a specified key from YAML or TOML frontmatter.
 
         If the key doesn't exist, the command exits with an error code.
         When processing multiple files, the filename is included in the output.
@@ -83,7 +83,7 @@ extension CLIEntry.FrontMatterCommands {
 
             if let value = doc.getValue(forKey: key) {
               // Key found — include "value" (NSNull if YAML value is null)
-              let jsonValue = try YAMLConversion.safeNodeToSwiftValue(value)
+              let jsonValue = FrontMatterConversion.foundationValue(value)
               results.append(["path": file.string, "value": jsonValue])
             } else {
               // Key missing — omit "value" key; absence is the signal
@@ -137,29 +137,22 @@ extension CLIEntry.FrontMatterCommands {
       }
     }
 
-    /// Format a Yams.Node value for display
-    private func formatNodeValue(_ node: Yams.Node, format: OutputFormat) -> String {
-      // Handle scalar values
-      if let string = node.string {
-        return string
-      }
-
-      // Handle numbers
-      if let int = node.int {
-        return String(int)
-      }
-
-      if let float = node.float {
-        return String(float)
-      }
-
-      // Handle booleans
-      if let bool = node.bool {
-        return String(bool)
-      }
-
-      // Handle arrays
-      if let sequence = node.sequence {
+    /// Formats a frontmatter value for display.
+    private func formatNodeValue(_ node: FrontMatterValue, format: OutputFormat) -> String {
+      switch node {
+      case .null:
+        return "null"
+      case .string(let value):
+        return value
+      case .integer(let value):
+        return String(value)
+      case .number(let value):
+        return String(value)
+      case .boolean(let value):
+        return String(value)
+      case .offsetDateTime, .localDateTime, .localDate, .localTime:
+        return String(describing: FrontMatterConversion.foundationValue(node))
+      case .array(let sequence):
         let items = sequence.map { formatNodeValue($0, format: .inline) }
 
         switch format {
@@ -172,18 +165,12 @@ extension CLIEntry.FrontMatterCommands {
             "\(index + 1). \(item)"
           }.joined(separator: "\n")
         }
-      }
-
-      // Handle mappings/objects
-      if let mapping = node.mapping {
+      case .object(let mapping):
         let pairs = mapping.map { key, value in
-          "\(formatNodeValue(key, format: .inline)): \(formatNodeValue(value, format: .inline))"
+          "\(key): \(formatNodeValue(value, format: .inline))"
         }
         return "{\(pairs.joined(separator: ", "))}"
       }
-
-      // Fallback
-      return String(describing: node)
     }
   }
 }

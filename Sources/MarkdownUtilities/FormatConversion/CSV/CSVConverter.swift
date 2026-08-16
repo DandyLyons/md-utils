@@ -3,7 +3,7 @@ import MarkdownUtilitiesCore
 import PathKit
 import Yams
 
-/// Converts Markdown documents with YAML frontmatter to CSV format.
+/// Converts Markdown documents with YAML or TOML frontmatter to CSV format.
 ///
 /// This converter takes a collection of Markdown documents and their file paths,
 /// extracts their frontmatter keys, and generates a CSV with one row per document.
@@ -83,9 +83,7 @@ public struct CSVConverter {
 
         for (_, document) in documents {
             for (key, _) in document.frontMatter {
-                if case .scalar(let scalar) = key {
-                    keySet.insert(scalar.string)
-                }
+                keySet.insert(key)
             }
         }
 
@@ -194,34 +192,38 @@ public struct CSVConverter {
     /// Get a frontmatter value for a specific key
     func getFrontmatterValue(document: MarkdownDocument, key: String) throws -> String {
         // Look up the key in frontmatter
-        let keyNode = Yams.Node.scalar(.init(key))
-
-        guard let valueNode = document.frontMatter[keyNode] else {
+        guard let value = document.frontMatter[key] else {
             // Key not present in this document
             return ""
         }
 
         // Convert the value to a string
-        return try frontmatterValueToString(valueNode)
+        return try frontmatterValueToString(value)
     }
 
     /// Convert a Yams.Node to a string representation
     ///
     /// - Scalars: Return as-is
     /// - Complex types (arrays, objects): Serialize to JSON
-    func frontmatterValueToString(_ node: Yams.Node) throws -> String {
-        switch node {
-        case .scalar(let scalar):
-            return scalar.string
-
-        case .sequence, .mapping:
-            // Serialize complex types as JSON (compact, no pretty printing)
-            return try YAMLConversion.nodeToJSON(node, options: [])
-
-        case .alias:
-            // YAML aliases should be resolved by the parser, but if we encounter one,
-            // serialize it as JSON for safety
-            return try YAMLConversion.nodeToJSON(node, options: [])
+    func frontmatterValueToString(_ value: FrontMatterValue) throws -> String {
+        switch value {
+        case .null:
+            return ""
+        case .string(let value):
+            return value
+        case .boolean(let value):
+            return String(value)
+        case .integer(let value):
+            return String(value)
+        case .number(let value):
+            return String(value)
+        case .offsetDateTime, .localDateTime, .localDate, .localTime:
+            return String(describing: FrontMatterConversion.foundationValue(value))
+        case .array, .object:
+            return try YAMLConversion.anyToJSON(
+                FrontMatterConversion.foundationValue(value),
+                options: []
+            )
         }
     }
     // MARK: - CSV Escaping

@@ -105,20 +105,7 @@ extension CLIEntry {
 
     /// Reconstructs the full document including frontmatter if present.
     private func reconstructDocument(_ doc: MarkdownDocument) throws -> String {
-      // If frontmatter is empty, return just the body
-      guard !doc.frontMatter.isEmpty else {
-        return doc.body
-      }
-
-      // Serialize frontmatter
-      let yamlContent = try YAMLConversion.serialize(doc.frontMatter)
-
-      // Reconstruct with frontmatter delimiters
-      return """
-        ---
-        \(yamlContent)---
-        \(doc.body)
-        """
+      try doc.render()
     }
   }
 }

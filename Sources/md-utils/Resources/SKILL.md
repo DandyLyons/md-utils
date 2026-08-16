@@ -1,7 +1,7 @@
 ---
 name: markdown-utilities
 description: >-
-  Parse, manipulate, and analyze Markdown files using the `md-utils` CLI. Supports YAML frontmatter CRUD (get/set/search/array ops), structured document exploration, heading manipulation, section extraction and reordering, table of contents generation, wikilink analysis, line extraction, and format conversion. Handles batch operations across files and directories. Use when working with Markdown files to: read or write frontmatter, inspect lengthy document structure, restructure documents, search files by metadata using JMESPath, generate a TOC, extract sections or line ranges, check wikilinks, or convert to plain text or CSV. More reliable than grep/regex for structured Markdown operations.
+  Parse, manipulate, and analyze Markdown files using the `md-utils` CLI. Supports YAML and TOML frontmatter CRUD and array operations, YAML-only JMESPath search, structured document exploration, heading manipulation, section extraction and reordering, table of contents generation, wikilink analysis, line extraction, and format conversion. Handles batch operations across files and directories. Use when working with Markdown files to: read or write frontmatter, inspect lengthy document structure, restructure documents, search YAML files by metadata using JMESPath, generate a TOC, extract sections or line ranges, check wikilinks, or convert to plain text or CSV. More reliable than grep/regex for structured Markdown operations.
 ---
 
 # Markdown Utilities
@@ -12,7 +12,7 @@ The `md-utils` CLI provides structured operations on Markdown files. Add `--help
 
 | Command | Purpose |
 |---------|---------|
-| `md-utils fm` | YAML frontmatter: get, set, search, remove blocks, uniqueness checks, array ops, dump |
+| `md-utils fm` | YAML/TOML frontmatter: get, set, remove blocks, uniqueness checks, array ops, dump; YAML-only search |
 | `md-utils explore` | Progressively inspect large Markdown files by tree, heading, and line |
 | `md-utils toc` | Generate table of contents |
 | `md-utils headings` | Promote or demote heading levels |
@@ -39,6 +39,9 @@ md-utils toc docs/*.md
 ```bash
 # Get a frontmatter value
 md-utils fm get --key title post.md
+
+# Create TOML frontmatter in a document that has none
+md-utils fm set --key title --value "TOML Note" --frontmatter-format toml post.md
 
 # Find files with a specific tag
 md-utils fm array contains --key tags --value swift posts/

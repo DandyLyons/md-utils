@@ -34,6 +34,9 @@ extension CLIEntry.FrontMatterCommands {
     @Option(name: .long, help: "The value to set")
     var value: String
 
+    @Option(name: .long, help: "Frontmatter format to create or convert to (yaml, toml)")
+    var frontmatterFormat: FrontMatterFormat?
+
     @Flag(name: .long, help: "Process mapped non-Markdown files")
     var includeNonMD = false
 
@@ -66,6 +69,7 @@ extension CLIEntry.FrontMatterCommands {
           )
 
           var doc = parsed.document
+          if let frontmatterFormat { doc.frontMatterFormat = frontmatterFormat }
 
           doc.setValue(value, forKey: key)
 

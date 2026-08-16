@@ -1432,12 +1432,19 @@ enum RulesValidatorRunner {
         let assessment = try checker.assess(analyzed, against: compiled)
         guard assessment.status != .notApplicable else { continue }
         let ruleName = compiled.definition.name
-        let errors = (assessment.applicabilityDiagnostics + assessment.diagnostics).map {
+        let errors = (assessment.applicabilityDiagnostics + assessment.diagnostics).map { diagnostic in
           RuleValidationErrorDetail(
-            path: $0.location,
-            message: $0.code == "record.frontmatter.invalid-yaml"
-              ? $0.message.replacingOccurrences(of: "Invalid YAML:", with: "invalid YAML:")
-              : $0.message
+            path: diagnostic.location,
+            message: {
+              switch diagnostic.code {
+              case "record.frontmatter.invalid-yaml":
+                return diagnostic.message.replacingOccurrences(of: "Invalid YAML:", with: "invalid YAML:")
+              case "record.frontmatter.invalid-toml":
+                return diagnostic.message.replacingOccurrences(of: "Invalid TOML:", with: "invalid TOML:")
+              default:
+                return diagnostic.message
+              }
+            }()
           )
         }
         let status: RuleValidationResult.Status

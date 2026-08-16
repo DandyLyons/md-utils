@@ -1,7 +1,7 @@
 import Foundation
 import Parsing
 
-/// A host-language envelope used to contain YAML frontmatter in a text file.
+/// A host-language envelope used to contain YAML or TOML frontmatter in a text file.
 public struct FrontMatterSyntax: Equatable, Sendable {
   /// The stable name used in diagnostics and prompts.
   public let name: String
@@ -101,8 +101,14 @@ public struct FrontMatterSyntax: Equatable, Sendable {
 
 /// A complete wrapped frontmatter block located in one exact source snapshot.
 public struct WrappedFrontMatterBlock: Equatable, Sendable {
-  /// The raw YAML between the two `---` marker lines.
-  public let rawYAML: String
+  /// The raw metadata between the format marker lines.
+  public let rawFrontMatter: String
+
+  /// The serialization format used by the wrapped block.
+  public let format: FrontMatterFormat
+
+  /// Compatibility spelling for YAML-only callers.
+  public var rawYAML: String { rawFrontMatter }
 
   /// The source range spanning both host wrapper lines.
   public let range: Range<String.Index>
@@ -120,7 +126,7 @@ public struct WrappedFrontMatterScan: Equatable, Sendable {
   public let additionalOpeningLines: [Int]
 }
 
-/// Finds complete delimiter-wrapped YAML frontmatter blocks in LF text.
+/// Finds complete delimiter-wrapped YAML or TOML frontmatter blocks in LF text.
 public struct WrappedFrontMatterParser: Sendable {
   /// The host syntax recognized by this parser.
   public let syntax: FrontMatterSyntax
@@ -132,7 +138,7 @@ public struct WrappedFrontMatterParser: Sendable {
 
   /// Scans the whole snapshot, returning the first block and later opening lines.
   ///
-  /// The parser recognizes LF input and requires wrapper delimiters and both YAML
+  /// The parser recognizes LF input and requires wrapper and frontmatter
   /// markers to occupy complete physical lines. Incomplete candidates are treated
   /// as absent. Returned ranges are valid only for the supplied snapshot.
   ///
@@ -146,7 +152,9 @@ public struct WrappedFrontMatterParser: Sendable {
     while openingIndex < lines.count {
       guard lines[openingIndex].text == syntax.openingWrapper,
         openingIndex + 1 < lines.count,
-        lines[openingIndex + 1].text == "---"
+        let format = FrontMatterFormat.allCases.first(where: {
+          $0.delimiter == lines[openingIndex + 1].text
+        })
       else {
         openingIndex += 1
         continue
@@ -155,14 +163,15 @@ public struct WrappedFrontMatterParser: Sendable {
       var yamlClosingIndex = openingIndex + 2
       var matchedBlock: WrappedFrontMatterBlock?
       while yamlClosingIndex + 1 < lines.count {
-        if lines[yamlClosingIndex].text == "---",
+        if lines[yamlClosingIndex].text == format.delimiter,
           lines[yamlClosingIndex + 1].text == syntax.closingWrapper
         {
           let range = lines[openingIndex].start..<lines[yamlClosingIndex + 1].contentEnd
           let candidate = String(source[range])
-          if let rawYAML = parseCompleteEnvelope(candidate) {
+          if let rawFrontMatter = parseCompleteEnvelope(candidate, format: format) {
             matchedBlock = WrappedFrontMatterBlock(
-              rawYAML: rawYAML,
+              rawFrontMatter: rawFrontMatter,
+              format: format,
               range: range,
               openingLine: openingIndex + 1
             )
@@ -186,13 +195,16 @@ public struct WrappedFrontMatterParser: Sendable {
     )
   }
 
-  private func parseCompleteEnvelope(_ candidate: String) -> String? {
+  private func parseCompleteEnvelope(
+    _ candidate: String,
+    format: FrontMatterFormat
+  ) -> String? {
     var input = Substring(candidate)
     let parser = Parse {
       syntax.openingWrapper
-      "\n---\n"
-      PrefixUpTo("---\n\(syntax.closingWrapper)").map(String.init)
-      "---\n"
+      "\n\(format.delimiter)\n"
+      PrefixUpTo("\(format.delimiter)\n\(syntax.closingWrapper)").map(String.init)
+      "\(format.delimiter)\n"
       syntax.closingWrapper
       End()
     }

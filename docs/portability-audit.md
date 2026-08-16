@@ -12,7 +12,7 @@
 
 | Classification | Source files | Reason |
 |---|---|---|
-| Portable Core | `MarkdownDocument.swift`; every Swift file under `Explore/`, `Formatting/`, `FrontMatter/`, `HeadingAdjustment/`, `Helpers/`, `SectionExtraction/`, `SectionReordering/`, and `TOC/` | Operates on strings, YAML nodes, or Markdown AST models without discovering host state. |
+| Portable Core | `MarkdownDocument.swift`; every Swift file under `Explore/`, `Formatting/`, `FrontMatter/`, `HeadingAdjustment/`, `Helpers/`, `SectionExtraction/`, `SectionReordering/`, and `TOC/` | Operates on strings, format-neutral frontmatter values, or Markdown AST models without discovering host state. |
 | Portable Core | `FormatConversion/Protocols/`; `FormatConversion/Shared/`; `FormatConversion/PlainText/`; `FormatConversion/MarkdownDocument+FormatConversion.swift` | Pure conversion contracts and Markdown-to-text transformations. |
 | Portable Core | `Wikilink/Wikilink.swift`, `WikilinkAnchor.swift`, `WikilinkParser.swift`, `WikilinkScanner.swift`, and `MarkdownDocument+Wikilink.swift` | Parses supplied content without resolving against a filesystem. |
 | Portable Core | Every Swift file under `Types/` and `Rules/` | Operates on canonical record strings, explicit logical context, supplied definitions, and host-provided schema resources. It does not discover or mutate host state. |
@@ -32,6 +32,7 @@ Directory paths in the table are relative to `Sources/MarkdownUtilitiesCore/`, `
 | MarkdownSyntax and swift-cmark | Core | Verified by the Linux container build and Core tests. | MarkdownSyntax 1.3.0 and swift-cmark 0.7.1 compile and run under WASI, including GFM task lists and tables. |
 | swift-parsing | Core | Verified by the Linux container build and parser tests. | Verified while building and running the Core WASI smoke target. |
 | Yams and libYAML | Core | Verified by the Linux container build and frontmatter tests. | libYAML and Yams compile and run under WASI. Yams 6.2.0 requires the version-checked `DBL_DECIMAL_DIG` compatibility patch described in [WebAssembly Support](webassembly.md). |
+| swift-toml and toml++ | Core | TOML parsing and serialization are covered by Core tests. | Built as part of the Core WASI workflow. The version-checked compatibility patch selects toml++'s exception-free parser because the WASI C++ runtime has exceptions disabled. |
 | JSONSchema | Core | Draft 2020-12 validation, external graph compilation, and the Linux Core build are verified. | Draft 2020-12 assessment runs under WASI. JSONSchema.swift 0.6.0 requires the version-checked WASI `NSNumber` compatibility patch described in [WebAssembly Support](webassembly.md). |
 | PathKit | Native only | Supported by the native package; excluded from Core. | Out of scope because it is not a Core dependency. |
 | ArgumentParser, JMESPath, Rainbow | CLI only | Outside the Core boundary. JMESPath is exposed to Core only through a serialized runtime capability provider; result truthiness remains a Core semantic. | Out of scope because the CLI is not a WebAssembly target. |

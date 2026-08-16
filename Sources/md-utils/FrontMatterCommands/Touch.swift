@@ -39,6 +39,9 @@ extension CLIEntry.FrontMatterCommands {
     )
     var keys: String
 
+    @Option(name: .long, help: "Frontmatter format to create or convert to (yaml, toml)")
+    var frontmatterFormat: FrontMatterFormat?
+
     @Flag(name: .long, help: "Process mapped non-Markdown files")
     var includeNonMD = false
 
@@ -73,6 +76,7 @@ extension CLIEntry.FrontMatterCommands {
             includeNonMarkdown: includeNonMD
           )
           var doc = parsed.document
+          if let frontmatterFormat { doc.frontMatterFormat = frontmatterFormat }
           let missingKeys = keyList.filter { doc.hasKey($0) == false }
           guard missingKeys.isEmpty == false else { continue }
           try FrontMatterCLIMutator.authorizeCreationIfNeeded(
