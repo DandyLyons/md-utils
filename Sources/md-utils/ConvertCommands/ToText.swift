@@ -82,7 +82,7 @@ extension CLIEntry.ConvertCommands {
 
     @Flag(
       name: .long,
-      help: "Include YAML frontmatter in the plain text output"
+      help: "Include YAML or TOML frontmatter in the plain text output"
     )
     var includeFrontmatter: Bool = false
 

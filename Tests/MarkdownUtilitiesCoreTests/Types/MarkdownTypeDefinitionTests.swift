@@ -47,6 +47,33 @@ struct MarkdownTypeDefinitionTests {
   }
 
   @Test
+  func `Decode an equivalent TOML definition`() throws {
+    let toml = """
+    "md-utils-type-schema" = "1"
+    name = "Book"
+    version = "draft-3"
+
+    [frontmatter]
+    schemas = []
+
+    [body]
+    requirements = []
+    recommendations = []
+
+    [context]
+    requirements = []
+    recommendations = []
+    """
+
+    let definition = try MarkdownTypeDefinitionDecoder.decode(toml, format: .toml)
+
+    #expect(definition.name.rawValue == "Book")
+    #expect(definition.version == "draft-3")
+    #expect(definition.frontmatter.schemas.isEmpty)
+    #expect(definition.body.requirements.isEmpty)
+  }
+
+  @Test
   func `Infer required frontmatter when schemas are present`() async throws {
     let definition = MarkdownFrontmatterDefinition(schemas: [
       .inline(.object(["type": .string("object")]))

@@ -50,7 +50,11 @@ public enum MarkdownTypeFixer {
     } else if canAppendWithoutReformatting(frontmatterEdits, original: original) {
       prefix = try appending(frontmatterEdits, to: original.prefix)
     } else {
-      prefix = try renderFrontmatter(frontmatter, preserveEmpty: ensureFrontmatter)
+      prefix = try renderFrontmatter(
+        frontmatter,
+        preserveEmpty: ensureFrontmatter,
+        format: original.format ?? .yaml
+      )
     }
 
     var updated = record
@@ -62,12 +66,21 @@ public enum MarkdownTypeFixer {
     let parser = FrontMatterParser()
     var input = Substring(content)
     let parts = try parser.parse(&input)
-    let hasFrontmatter = content.starts(with: "---\n")
+    let hasFrontmatter = parts.format != nil
     guard hasFrontmatter else {
-      return ParsedRecordContent(frontmatter: [:], prefix: "", body: parts.body, hasFrontmatter: false)
+      return ParsedRecordContent(
+        frontmatter: [:],
+        prefix: "",
+        body: parts.body,
+        hasFrontmatter: false,
+        format: nil
+      )
     }
-    let mapping = try YAMLConversion.parse(parts.rawFrontMatter)
-    let value = try JSONValue(any: YAMLConversion.safeNodeToSwiftValue(.mapping(mapping)))
+    let frontMatter = try FrontMatterConversion.parse(
+      parts.rawFrontMatter,
+      format: parts.format ?? .yaml
+    )
+    let value = try JSONValue(any: FrontMatterConversion.foundationValue(frontMatter))
     let prefix = parts.body.isEmpty
       ? content
       : String(content.dropLast(parts.body.count))
@@ -75,7 +88,8 @@ public enum MarkdownTypeFixer {
       frontmatter: value.objectValue ?? [:],
       prefix: prefix,
       body: parts.body,
-      hasFrontmatter: true
+      hasFrontmatter: true,
+      format: parts.format
     )
   }
 
@@ -83,7 +97,7 @@ public enum MarkdownTypeFixer {
     _ edits: [(path: [String], value: JSONValue)],
     original: ParsedRecordContent
   ) -> Bool {
-    guard original.hasFrontmatter else { return false }
+    guard original.hasFrontmatter, original.format == .yaml else { return false }
     var seen = Set(original.frontmatter.keys)
     for edit in edits {
       guard edit.path.count == 1, let key = edit.path.first, seen.insert(key).inserted else {
@@ -151,19 +165,20 @@ public enum MarkdownTypeFixer {
 
   private static func renderFrontmatter(
     _ frontmatter: [String: JSONValue],
-    preserveEmpty: Bool
+    preserveEmpty: Bool,
+    format: FrontMatterFormat
   ) throws -> String {
     guard frontmatter.isEmpty == false else {
-      return preserveEmpty ? "---\n---\n" : ""
+      return preserveEmpty ? "\(format.delimiter)\n\(format.delimiter)\n" : ""
     }
-    let yaml = try Yams.dump(
-      object: JSONValue.object(frontmatter).foundationValue,
-      sortKeys: false,
-      sequenceStyle: .block,
-      mappingStyle: .block,
-      newLineScalarStyle: .plain
-    ).trimmingCharacters(in: .newlines)
-    return "---\n\(yaml)\n---\n"
+    let converted = try FrontMatterConversion.fromFoundationValue(
+      JSONValue.object(frontmatter).foundationValue
+    )
+    guard case .object(let object) = converted else {
+      throw MarkdownTypeFixerError.invalidFrontmatterBoundary
+    }
+    let serialized = try FrontMatterConversion.serialize(object, format: format)
+    return "\(format.delimiter)\n\(serialized)\(format.delimiter)\n"
   }
 
   private struct ParsedRecordContent {
@@ -171,6 +186,7 @@ public enum MarkdownTypeFixer {
     var prefix: String
     var body: String
     var hasFrontmatter: Bool
+    var format: FrontMatterFormat?
   }
 }
 

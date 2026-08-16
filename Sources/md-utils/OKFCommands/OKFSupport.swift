@@ -126,10 +126,10 @@ enum OKFValidator {
         return [issueError(relativePath, path: "frontmatter", message: "invalid YAML: \(error.localizedDescription)")]
       }
 
-      guard let typeNode = document.frontMatter[Yams.Node("type")] else {
+      guard let typeNode = document.frontMatter["type"] else {
         return [issueError(relativePath, path: "frontmatter.type", message: "missing required field \"type\"")]
       }
-      guard let typeValue = typeNode.string else {
+      guard let typeValue = typeNode.stringValue else {
         return [issueError(relativePath, path: "frontmatter.type", message: "must be a string")]
       }
       guard !typeValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -201,11 +201,11 @@ enum OKFAnalyzer {
       guard frontmatterPresence(in: content).hasFrontmatter else { continue }
       guard let document = try? MarkdownDocument(content: content) else { continue }
 
-      if let type = document.frontMatter[Yams.Node("type")]?.string?.trimmingCharacters(in: .whitespacesAndNewlines), !type.isEmpty {
+      if let type = document.frontMatter["type"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !type.isEmpty {
         typeCounts[type, default: 0] += 1
       }
 
-      let missing = recommendedFields.filter { document.frontMatter[Yams.Node($0)] == nil }
+      let missing = recommendedFields.filter { document.frontMatter[$0] == nil }
       if !missing.isEmpty {
         missingRecommendedFields[relative] = missing
         advisoryIssues.append(OKFValidationIssue(
@@ -216,7 +216,7 @@ enum OKFAnalyzer {
         ))
       }
 
-      if let timestamp = document.frontMatter[Yams.Node("timestamp")]?.string,
+      if let timestamp = document.frontMatter["timestamp"]?.stringValue,
          !isISO8601Timestamp(timestamp) {
         advisoryIssues.append(OKFValidationIssue(
           severity: .warning,
@@ -639,9 +639,9 @@ enum OKFTypeSetter {
 
   private static func matchesFilter(document: MarkdownDocument, key: String?, contains value: String?) -> Bool {
     guard let key, let value else { return true }
-    guard let node = document.frontMatter[Yams.Node(key)] else { return false }
-    guard case .sequence(let sequence) = node else { return false }
-    return sequence.contains { $0.string == value }
+    guard let node = document.frontMatter[key] else { return false }
+    guard case .array(let sequence) = node else { return false }
+    return sequence.contains { $0.stringValue == value }
   }
 }
 

@@ -18,7 +18,7 @@ extension CLIEntry.ConvertCommands {
             commandName: "to-csv",
             abstract: "Convert Markdown files with frontmatter to CSV format",
             discussion: """
-                Converts a directory of Markdown files with YAML frontmatter into a single CSV file.
+                Converts a directory of Markdown files with YAML or TOML frontmatter into a single CSV file.
                 Each YAML key becomes a column, and each file becomes a row.
 
                 EXAMPLES:

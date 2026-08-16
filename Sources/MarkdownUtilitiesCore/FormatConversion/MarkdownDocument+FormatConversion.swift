@@ -42,21 +42,13 @@ extension MarkdownDocument {
 
         // Optionally prepend frontmatter
         if options.includeFrontmatter && !frontMatter.isEmpty {
-            let frontmatterYAML = try serializeFrontmatter()
+            let format = frontMatterFormat ?? .yaml
+            let serializedFrontmatter = try FrontMatterConversion.serialize(frontMatter, format: format)
             let separator = String(repeating: "\n", count: max(1, options.blockSeparator))
-            return "---\n\(frontmatterYAML)---\(separator)\(bodyText)"
+            return "\(format.delimiter)\n\(serializedFrontmatter)\(format.delimiter)\(separator)\(bodyText)"
         }
 
         return bodyText
-    }
-    // MARK: - Private Helpers
-
-    /// Serializes the frontmatter mapping back to YAML format.
-    ///
-    /// - Returns: The YAML representation of the frontmatter
-    /// - Throws: Serialization errors if the frontmatter cannot be converted to YAML
-    private func serializeFrontmatter() throws -> String {
-        try YAMLConversion.serialize(frontMatter)
     }
     // MARK: - Future Format Conversions (Placeholders)
 

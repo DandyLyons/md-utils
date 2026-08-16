@@ -59,11 +59,16 @@ The patches live in `scripts/wasm-patches/`. The build script verifies the exact
 
 CoreFoundation also requires the WASI signal and memory-mapping emulation definitions while compiling. The smoke target links the corresponding `wasi-emulated-signal` and `wasi-emulated-mman` libraries only on WASI.
 
+swift-toml's toml++ parser is a C++ target, while the WASI SDK's C++ runtime has
+exceptions disabled. The version-checked compatibility patch selects toml++'s
+exception-free parse-result path and the build passes `-fno-exceptions` for WASI
+C++ sources. Native behavior is unchanged.
+
 ## Smoke Coverage
 
 `IntegrationTests/WasmCoreSmoke/` verifies representative behavior across the dependency boundary:
 
-- YAML frontmatter parsing and floating-point serialization through Yams and libYAML;
+- YAML frontmatter through Yams/libYAML and TOML frontmatter through swift-toml;
 - Markdown AST parsing of headings, task lists, and tables through MarkdownSyntax and swift-cmark;
 - Markdown rendering; and
 - draft 2020-12 JSON Schema and Markdown type assessment.

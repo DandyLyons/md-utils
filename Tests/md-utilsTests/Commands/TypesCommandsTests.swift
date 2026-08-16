@@ -98,6 +98,24 @@ struct TypesCommandsTests {
   }
 
   @Test
+  func `types project scaffolds and loads a TOML definition`() throws {
+    let project = Path(NSTemporaryDirectory()) + "types-command-toml-\(UUID().uuidString)"
+    defer { try? project.delete() }
+
+    let destination = try TypesProject.addDefinition(
+      name: "Article",
+      version: "1.0.0",
+      format: .toml,
+      root: project,
+      output: nil
+    )
+    let registry = try TypesProject.load(root: project)
+
+    #expect(destination.string.hasSuffix(".md-utils/types/article.mdtype.toml"))
+    #expect(try #require(registry.definition(named: "Article")).version == "1.0.0")
+  }
+
+  @Test
   func `types project rejects an output filename without the mdtype suffix`() throws {
     let project = Path(NSTemporaryDirectory()) + "types-command-output-\(UUID().uuidString)"
     defer { try? project.delete() }

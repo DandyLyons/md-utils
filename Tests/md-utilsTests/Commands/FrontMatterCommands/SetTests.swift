@@ -14,6 +14,27 @@ import ArgumentParser
 struct SetTests {
 
   @Test
+  func `fm set can create TOML frontmatter`() async throws {
+    let tempFile = try createTempFile(content: "Body", name: "toml.md")
+    defer { try? tempFile.delete() }
+
+    let command_ = try CLIEntry.FrontMatterCommands.Set.parseAsRoot([
+      "--key", "title",
+      "--value", "TOML Title",
+      "--frontmatter-format", "toml",
+      tempFile.string,
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.Set)
+    try await command.run()
+
+    let content: String = try tempFile.read()
+    let document = try MarkdownDocument(content: content)
+    #expect(content.hasPrefix("+++\n"))
+    #expect(document.frontMatterFormat == .toml)
+    #expect(document.frontMatter["title"]?.stringValue == "TOML Title")
+  }
+
+  @Test
   func `fm set creates new frontmatter key`() async throws {
     let testContent = "Just body"
 
@@ -33,7 +54,7 @@ struct SetTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    #expect(doc.getValue(forKey: "title")?.string == "Test Title")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "Test Title")
   }
 
   @Test
@@ -62,8 +83,8 @@ struct SetTests {
     let updatedContent: String = try tempFile.read()
     let doc = try MarkdownDocument(content: updatedContent)
 
-    #expect(doc.getValue(forKey: "title")?.string == "Updated Title")
-    #expect(doc.getValue(forKey: "author")?.string == "Jane")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "Updated Title")
+    #expect(doc.getValue(forKey: "author")?.stringValue == "Jane")
   }
 
   @Test
@@ -132,8 +153,8 @@ struct SetTests {
     let doc1 = try MarkdownDocument(content: try file1.read())
     let doc2 = try MarkdownDocument(content: try file2.read())
 
-    #expect(doc1.getValue(forKey: "category")?.string == "Tutorial")
-    #expect(doc2.getValue(forKey: "category")?.string == "Tutorial")
+    #expect(doc1.getValue(forKey: "category")?.stringValue == "Tutorial")
+    #expect(doc2.getValue(forKey: "category")?.stringValue == "Tutorial")
   }
 
   // MARK: - Invalid YAML Error Handling Tests
@@ -180,7 +201,7 @@ struct SetTests {
 
     // Valid file should have been processed despite the error on the invalid file
     let updatedDoc = try MarkdownDocument(content: try validFile.read())
-    #expect(updatedDoc.getValue(forKey: "status")?.string == "processed")
+    #expect(updatedDoc.getValue(forKey: "status")?.stringValue == "processed")
 
     // Invalid file should be unchanged (parse failed before write)
     let invalidFileContent: String = try invalidFile.read()

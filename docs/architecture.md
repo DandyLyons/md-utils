@@ -21,8 +21,8 @@ The full source and dependency classification is recorded in the [portability au
 **Location**: `Sources/MarkdownUtilitiesCore/MarkdownDocument.swift`
 
 Central data structure representing a Markdown document:
-- Separates YAML frontmatter from body content
-- Frontmatter parsed into `Yams.Node.Mapping` for structured access
+- Separates YAML (`---`) or TOML (`+++`) frontmatter from body content
+- Frontmatter parsed into the ordered, format-neutral `FrontMatter` model
 - Body available as `String` for text processing
 - Supports parsing body into Markdown AST via `parseAST()` method
 - AST parsing uses MarkdownSyntax library returning `Root` structure
@@ -56,8 +56,8 @@ Server resources are explicit and opt-in. Configuration supports rule selection,
 The read snapshot scans canonical storage in bounded pages, applies path narrowing before parsing, reuses one record analysis across rule, type, and identity assessment, and publishes immutable generic envelopes with collision-safe primary-ID and logical-path lookup. The standalone server work in issue #77 will load its own configuration outside `.md-utils.json`, add Hummingbird 2, and register adapters from the plan and snapshot. The OpenAPI generator in issue #84 consumes the same accepted plan.
 
 **Frontmatter Handling:**
-- Uses `FrontMatterParser` to separate `---` delimited YAML frontmatter
-- Frontmatter parsed into `Yams.Node.Mapping` during initialization
+- Uses `FrontMatterParser` to detect YAML and TOML delimiter blocks
+- Frontmatter parsed into `FrontMatter` during initialization while retaining its source format
 - Gracefully handles documents with no frontmatter (empty mapping)
 
 **Markdown AST Parsing:**
@@ -94,7 +94,7 @@ if let heading = ast.children.first as? Heading {
   - `convert to-text` - Convert Markdown to plain text
   - `convert to-csv` - Convert Markdown to CSV
 - `extract` (ExtractSection) - Extract a section from Markdown files by name or index
-- `frontmatter` / `fm` (FrontMatterCommands) - Manipulate YAML frontmatter
+- `frontmatter` / `fm` (FrontMatterCommands) - Manipulate YAML or TOML frontmatter
   - `fm get` - Retrieve frontmatter value by key
   - `fm set` - Set/update frontmatter value by key
   - `fm has` - Check if frontmatter key exists
@@ -103,8 +103,8 @@ if let heading = ast.children.first as? Heading {
   - `fm rename` - Rename frontmatter key
   - `fm replace` / `fm r` - Replace entire frontmatter with new data
   - `fm list` - List all frontmatter keys
-  - `fm dump` - Dump entire frontmatter in specified format (JSON, YAML, raw, plist)
-  - `fm search` - Search for files matching a JMESPath query
+  - `fm dump` - Dump entire frontmatter in specified format (JSON, YAML, TOML, raw, plist)
+  - `fm search` - Search YAML frontmatter with a JMESPath query (TOML is out of scope)
   - `fm sort-keys` / `fm sk` - Sort frontmatter keys
   - `fm touch` - Add frontmatter keys without values
   - `fm array` - Array manipulation commands:
@@ -152,7 +152,7 @@ By default, CLI commands performed on a directory:
 
 ### 1. Front Matter Parsing ✅
 
-YAML frontmatter separated and parsed into structured data.
+YAML and TOML frontmatter are separated and parsed into structured data.
 
 ### 2. Markdown AST Parsing ✅
 
@@ -171,16 +171,16 @@ Body text parsed into Abstract Syntax Tree for programmatic manipulation.
 Full CRUD operations plus advanced features:
 
 - **Library**: `MarkdownDocument+FrontMatterMutation` extension with `getValue`, `setValue`, `hasKey`, `removeValue`
-- **Format conversion**: `YAMLConversion` utilities for JSON, YAML, and PropertyList output
+- **Format conversion**: `FrontMatterConversion` for YAML/TOML and shared JSON, YAML, TOML, and PropertyList output
 - **CLI**: `md-utils frontmatter` (alias `fm`) with subcommands:
   - Basic CRUD: `get`, `set`, `has`, `remove`, `rename`, `list`, `dump`
   - Advanced: `replace`, `search` (JMESPath queries), `sort-keys`, `touch`
   - Array operations: `array append`, `array contains`, `array prepend`, `array remove`
 - **Dump Feature**: Output entire frontmatter in multiple formats
-  - Formats: JSON (default), YAML, raw, PropertyList (XML)
+  - Formats: JSON (default), YAML, TOML, raw, PropertyList (XML)
   - Single file: direct output without wrapper
   - Multiple files: cat-style headers (==> path <==) with separation
-  - Optional YAML delimiters (---) via `--include-delimiters`
+  - Optional format-appropriate delimiters via `--include-delimiters`
   - Alias: `fm d` for quick access
 - Works on single files or batch operations across directories
 - Preserves body content and existing frontmatter structure
@@ -288,6 +288,7 @@ The following features are **NOT YET IMPLEMENTED**:
 - **swift-argument-parser** (1.6.1+) - CLI argument parsing
 - **PathKit** (1.0.1+) - File path handling
 - **Yams** (6.1.0+) - YAML parsing and serialization
+- **swift-toml** (2.0.0+) - TOML parsing and serialization
 - **jmespath.swift** (1.0.3+) - JMESPath query language for JSON (used by `fm search`)
 - **Rainbow** (4.2.1+) - ANSI styling for human-facing CLI output
 

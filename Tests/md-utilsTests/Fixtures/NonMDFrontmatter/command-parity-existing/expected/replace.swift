@@ -1,6 +1,6 @@
 /*
 ---
-replacement: yes
+replacement: true
 ---
 */
 

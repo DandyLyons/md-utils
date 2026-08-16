@@ -1,5 +1,5 @@
 {
-  "originHash" : "e56fd98950b05bf9e566493b53b092470707bdff7060affbbc1bda563d6fe9de",
+  "originHash" : "b062f903fa31180e051fa77f7046b54f4cdc0e72cc442dee56a0d1a2062c4cfa",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -330,8 +330,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system",
       "state" : {
-        "revision" : "704705c5c51156ede21172a38654d522ce487074",
-        "version" : "1.8.0"
+        "revision" : "869129b7bf4ecc57b97d0193ad29690ca2134750",
+        "version" : "1.8.1"
+      }
+    },
+    {
+      "identity" : "swift-toml",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattt/swift-toml.git",
+      "state" : {
+        "revision" : "827506c90475e82d5a7f191f950fb3025cbdc0d6",
+        "version" : "2.0.0"
       }
     },
     {

@@ -4,13 +4,13 @@ Assess complete Markdown records against reusable structural contracts.
 
 ## Records and Conformance
 
-A `MarkdownRecord` contains canonical Markdown text and optional identity, revision, and external context. A `MarkdownDocument` is the parsed content view produced from valid text. Type assessment accepts the record so invalid YAML can be returned as a structured diagnostic instead of preventing the resource from being represented.
+A `MarkdownRecord` contains canonical Markdown text and optional identity, revision, and external context. A `MarkdownDocument` is the parsed content view produced from valid text. Type assessment accepts the record so invalid YAML or TOML can be returned as a structured diagnostic instead of preventing the resource from being represented.
 
 Conformance is structural and non-exclusive. One record can conform to `Book`, `Document`, and `Publishable` at the same time. Requirements produce errors and affect conformance. Recommendations produce advisories without making the record fail.
 
 Types have three domains:
 
-- `frontmatter` validates schema-visible YAML values against every listed JSON Schema;
+- `frontmatter` validates schema-visible YAML or TOML values against every listed JSON Schema;
 - `body` evaluates Markdown AST predicates such as headings, hierarchy, and sections; and
 - `context` evaluates external facts such as a normalized logical path.
 
@@ -18,7 +18,7 @@ Types have three domains:
 
 ## Define and Assess a Type
 
-Type definitions use the same model whether decoded from YAML or JSON. Filesystem-backed definitions use the compound extensions `.mdtype.yaml`, `.mdtype.yml`, or `.mdtype.json`. A type contract version is an opaque nonempty string; Semantic Versioning is recommended but not enforced.
+Type definitions use the same model whether decoded from YAML, JSON, or TOML. Filesystem-backed definitions use the compound extensions `.mdtype.yaml`, `.mdtype.yml`, `.mdtype.json`, or `.mdtype.toml`. A type contract version is an opaque nonempty string; Semantic Versioning is recommended but not enforced.
 
 ```swift
 let definition = MarkdownTypeDefinition(

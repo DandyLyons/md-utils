@@ -51,6 +51,9 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     @Option(name: .shortAndLong, help: "The value to append to the array")
     var value: String
 
+    @Option(name: .long, help: "Frontmatter format to create or convert to (yaml, toml)")
+    var frontmatterFormat: FrontMatterFormat?
+
     @Flag(name: .long, help: "Skip if value already exists in array")
     var skipDuplicates: Bool = false
 
@@ -83,6 +86,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
             includeNonMarkdown: includeNonMD
           )
           var doc = parsed.document
+          if let frontmatterFormat { doc.frontMatterFormat = frontmatterFormat }
 
           // Get array (creates empty if doesn't exist, errors if not an array)
           let sequence = try ArrayHelpers.getOrCreateArrayKey(key, in: doc, path: path)
@@ -102,7 +106,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
 
           // Append value
           let updatedSequence = ArrayHelpers.append(value: value, to: sequence)
-          doc.frontMatter[key] = .sequence(updatedSequence)
+          doc.frontMatter[key] = .array(updatedSequence)
 
           // Write back
           try FrontMatterCLIMutator.write(doc, parsed: parsed, to: path)

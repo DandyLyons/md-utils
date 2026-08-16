@@ -170,22 +170,13 @@ extension MarkdownDocument {
   ///   - body: The body content
   /// - Returns: Complete markdown content with frontmatter (if non-empty) and body
   private func reconstructFullDocument(
-    frontMatter: Yams.Node.Mapping,
+    frontMatter: FrontMatter,
     body: String
   ) throws -> String {
-    // If frontmatter is empty, return just the body
-    guard !frontMatter.isEmpty else {
-      return body
-    }
-
-    // Serialize frontmatter to YAML
-    let yamlContent = try YAMLConversion.serialize(frontMatter)
-
-    // Reconstruct with frontmatter delimiters
-    return """
-      ---
-      \(yamlContent)---
-      \(body)
-      """
+    try MarkdownDocument(
+      frontMatter: frontMatter,
+      body: body,
+      frontMatterFormat: frontMatterFormat
+    ).render()
   }
 }

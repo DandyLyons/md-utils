@@ -11,6 +11,7 @@ The executable target wraps the `MarkdownUtilities` library in a Swift Argument 
 ### Frontmatter
 
 - <doc:FrontmatterCommands>
+- <doc:YAMLVsTOML>
 
 ### Project Rules
 

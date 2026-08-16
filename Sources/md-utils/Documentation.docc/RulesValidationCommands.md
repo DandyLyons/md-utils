@@ -38,7 +38,7 @@ Mapped extensions reuse the shipped wrapped-frontmatter syntaxes:
 - `lua-block`: Lua files
 - `markdown-text`: `.txt`, only with `--include-non-md`
 
-Wrapped YAML supports frontmatter field predicates, JMESPath, `$md-utils` type
+Wrapped YAML or TOML supports frontmatter field predicates, JMESPath, `$md-utils` type
 hints, and JSON Schema validation. Raw body predicates and counts operate on the
 host source after the wrapper is removed; they can therefore match comments or
 string literals. Markdown headings, sections, heading relationships, required
@@ -49,7 +49,7 @@ requires frontmatter for one of those files reports that no syntax mapping exist
 
 ## Supported Checks
 
-- `frontmatterSchema`: validates parsed YAML frontmatter against a JSON Schema file.
+- `frontmatterSchema`: validates parsed YAML or TOML frontmatter against a JSON Schema file.
 - `requiredHeading`: requires an exact Markdown heading text in a Markdown body.
 - `maxBodyLines`: limits Markdown body line count.
 - `maxBodyWords`: limits Markdown body word count.
@@ -84,4 +84,4 @@ Supported file metadata matcher operators are `pathRegex`, `filenameEquals`, `ex
 
 ## Failure Behavior
 
-Invalid YAML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed. Files without required frontmatter fail when the matched `frontmatterSchema` check requires frontmatter, and are skipped for optional frontmatter schema checks.
+Invalid YAML or TOML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed. Files without required frontmatter fail when the matched `frontmatterSchema` check requires frontmatter, and are skipped for optional frontmatter schema checks.

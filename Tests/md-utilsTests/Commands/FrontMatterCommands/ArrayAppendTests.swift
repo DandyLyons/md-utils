@@ -14,6 +14,30 @@ import Yams
 struct ArrayAppendTests {
 
   @Test
+  func `fm array append preserves TOML frontmatter`() async throws {
+    let tempFile = try createTempFile(content: """
+      +++
+      tags = ["swift"]
+      +++
+      Body
+      """, name: "toml.md")
+    defer { try? tempFile.delete() }
+
+    let command_ = try CLIEntry.FrontMatterCommands.ArrayCommands.Append.parseAsRoot([
+      "--key", "tags",
+      "--value", "cli",
+      tempFile.string,
+    ])
+    var command = try #require(command_ as? CLIEntry.FrontMatterCommands.ArrayCommands.Append)
+    try await command.run()
+
+    let content: String = try tempFile.read()
+    let document = try MarkdownDocument(content: content)
+    #expect(content.hasPrefix("+++\n"))
+    #expect(try extractArrayValues(from: document, key: "tags") == ["swift", "cli"])
+  }
+
+  @Test
   func `fm array append adds value to end of array`() async throws {
     let testContent = """
     ---
@@ -202,12 +226,9 @@ struct ArrayAppendTests {
 
   private func extractArrayValues(from doc: MarkdownDocument, key: String) throws -> [String] {
     guard let node = doc.getValue(forKey: key),
-          case .sequence(let sequence) = node else {
+          case .array(let sequence) = node else {
       return []
     }
-    return sequence.compactMap { node in
-      guard case .scalar(let scalar) = node else { return nil }
-      return scalar.string
-    }
+    return sequence.compactMap(\.stringValue)
   }
 }

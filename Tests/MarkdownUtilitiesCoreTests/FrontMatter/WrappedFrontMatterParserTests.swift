@@ -50,6 +50,15 @@ struct WrappedFrontMatterParserTests {
   }
 
   @Test
+  func `discovers wrapped TOML frontmatter`() throws {
+    let source = "/*\n+++\ntitle = \"Example\"\n+++\n*/\nstruct Example {}\n"
+    let block = try #require(WrappedFrontMatterParser(syntax: .cBlock).parse(source).firstBlock)
+
+    #expect(block.format == .toml)
+    #expect(block.rawFrontMatter == "title = \"Example\"\n")
+  }
+
+  @Test
   func `treats incomplete candidates as absent`() {
     let missingYAMLCloser = "/*\n---\ntitle: Example\n*/\n"
     let missingWrapperCloser = "/*\n---\ntitle: Example\n---\n"

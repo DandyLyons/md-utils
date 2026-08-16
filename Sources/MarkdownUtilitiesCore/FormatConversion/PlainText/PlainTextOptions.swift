@@ -17,7 +17,7 @@ import Foundation
 public struct PlainTextOptions: ConversionOptions, Sendable {
     // MARK: - ConversionOptions Conformance
 
-    /// Whether to include YAML frontmatter in the plain text output
+    /// Whether to include YAML or TOML frontmatter in the plain text output
     ///
     /// When `true`, frontmatter is preserved as a YAML block at the beginning.
     /// When `false`, frontmatter is excluded from the output.
@@ -67,7 +67,7 @@ public struct PlainTextOptions: ConversionOptions, Sendable {
     /// Creates plain text conversion options with specified settings.
     ///
     /// - Parameters:
-    ///   - includeFrontmatter: Include YAML frontmatter (default: false)
+    ///   - includeFrontmatter: Include YAML or TOML frontmatter (default: false)
     ///   - blockSeparator: Newlines between blocks (default: 2)
     ///   - preserveLineBreaks: Preserve line breaks as newlines (default: true)
     ///   - extractImageAltText: Extract image alt text (default: true)

@@ -41,6 +41,7 @@ extension CLIEntry.FrontMatterCommands {
         SUPPORTED FORMATS:
           - json: JavaScript Object Notation
           - yaml: YAML Ain't Markup Language
+          - toml: Tom's Obvious, Minimal Language
           - plist: Apple PropertyList XML
 
         VALIDATION:
@@ -73,8 +74,11 @@ extension CLIEntry.FrontMatterCommands {
     @Option(name: .long, help: "Path to file containing new frontmatter")
     var fromFile: String?
 
-    @Option(name: [.short, .long], help: "Data format (json, yaml, plist)")
+    @Option(name: [.short, .long], help: "Data format (json, yaml, toml, plist)")
     var format: OutputFormat = .json
+
+    @Option(name: .long, help: "Frontmatter format to create or convert to (yaml, toml)")
+    var frontmatterFormat: FrontMatterFormat?
 
     @Flag(name: [.customShort("y"), .long], help: "Skip confirmation prompt")
     var yes: Bool = false
@@ -108,17 +112,23 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       // Parse to mapping based on format
-      let newFrontMatter: Yams.Node.Mapping
+      let newFrontMatter: FrontMatter
       do {
         switch format {
           case .json:
-            newFrontMatter = try YAMLConversion.parseJSON(dataString)
+            newFrontMatter = try FrontMatterConversion.fromYAMLMapping(
+              YAMLConversion.parseJSON(dataString)
+            )
           case .yaml, .raw:
-            newFrontMatter = try YAMLConversion.parse(dataString)
+            newFrontMatter = try FrontMatterConversion.parse(dataString, format: .yaml)
+          case .toml:
+            newFrontMatter = try FrontMatterConversion.parse(dataString, format: .toml)
           case .plist:
-            newFrontMatter = try YAMLConversion.parsePlist(dataString)
+            newFrontMatter = try FrontMatterConversion.fromYAMLMapping(
+              YAMLConversion.parsePlist(dataString)
+            )
         }
-      } catch let error as YAMLConversionError {
+      } catch {
         throw ValidationError(error.localizedDescription)
       }
 
@@ -146,7 +156,7 @@ extension CLIEntry.FrontMatterCommands {
     /// Replaces frontmatter in one Markdown file.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
-    private func replaceInFile(path: Path, newFrontMatter: Yams.Node.Mapping) throws {
+    private func replaceInFile(path: Path, newFrontMatter: FrontMatter) throws {
       let parsed = try FrontMatterCLIMutator.parsedFile(
         at: path,
         includeNonMarkdown: includeNonMD
@@ -177,6 +187,7 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       var doc = parsed.document
+      if let frontmatterFormat { doc.frontMatterFormat = frontmatterFormat }
 
       // Replace frontmatter (direct assignment)
       doc.frontMatter = newFrontMatter

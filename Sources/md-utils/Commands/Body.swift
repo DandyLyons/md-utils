@@ -13,7 +13,7 @@ import PathKit
 ///
 /// See <doc:ContentSelectionCommands> for workflow details.
 extension CLIEntry {
-  /// Extracts Markdown body content after removing YAML frontmatter.
+  /// Extracts Markdown body content after removing YAML or TOML frontmatter.
   ///
   /// See <doc:ContentSelectionCommands> for workflow details.
   struct Body: AsyncParsableCommand {
@@ -21,7 +21,7 @@ extension CLIEntry {
       commandName: "body",
       abstract: "Extract the body content without frontmatter",
       discussion: """
-        Extract the body content from Markdown files, excluding YAML frontmatter.
+        Extract the body content from Markdown files, excluding YAML or TOML frontmatter.
 
         Output can be in Markdown format (preserves formatting) or plain text
         (strips all Markdown formatting).

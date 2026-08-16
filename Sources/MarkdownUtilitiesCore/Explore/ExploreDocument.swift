@@ -11,7 +11,7 @@ public struct ExploreDocument: Sendable {
   /// Original Markdown source lines split on newline boundaries.
   public let sourceLines: [String]
 
-  /// Optional YAML frontmatter block from the original source.
+  /// Optional YAML or TOML frontmatter block from the original source.
   public let frontmatter: ExploreFrontmatter?
 
   /// Optional document preamble before the first heading.
@@ -82,13 +82,15 @@ public struct ExploreDocument: Sendable {
   }
 
   private static func detectFrontmatter(in sourceLines: [String]) throws -> ExploreFrontmatter? {
-    guard sourceLines.first == "---" else {
+    guard let opening = sourceLines.first,
+      let format = FrontMatterFormat.allCases.first(where: { $0.delimiter == opening })
+    else {
       return nil
     }
 
-    for index in 1..<sourceLines.count where sourceLines[index] == "---" {
-      let rawYAML = sourceLines[1..<index].joined(separator: "\n")
-      let mapping = try YAMLConversion.parse(rawYAML)
+    for index in 1..<sourceLines.count where sourceLines[index] == format.delimiter {
+      let rawFrontMatter = sourceLines[1..<index].joined(separator: "\n")
+      let mapping = try FrontMatterConversion.parse(rawFrontMatter, format: format)
       return ExploreFrontmatter(
         lineRange: 1...(index + 1),
         fieldCount: mapping.count

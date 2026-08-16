@@ -21,7 +21,7 @@ struct FrontMatterMutationTests {
     let doc = try MarkdownDocument(content: content)
     let value = doc.getValue(forKey: "title")
 
-    let stringValue = try #require(value?.string)
+    let stringValue = try #require(value?.stringValue)
     #expect(stringValue == "Test Document")
   }
 
@@ -70,7 +70,7 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: "Just body")
     doc.setValue("Test", forKey: "title")
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
   }
 
   @Test
@@ -84,8 +84,8 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.setValue("New Value", forKey: "author")
 
-    #expect(doc.frontMatter["author"]?.string == "New Value")
-    #expect(doc.frontMatter["title"]?.string == "Original")
+    #expect(doc.frontMatter["author"]?.stringValue == "New Value")
+    #expect(doc.frontMatter["title"]?.stringValue == "Original")
   }
 
   @Test
@@ -100,8 +100,8 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.setValue("Updated", forKey: "title")
 
-    #expect(doc.frontMatter["title"]?.string == "Updated")
-    #expect(doc.frontMatter["author"]?.string == "Jane")
+    #expect(doc.frontMatter["title"]?.stringValue == "Updated")
+    #expect(doc.frontMatter["author"]?.stringValue == "Jane")
   }
 
   @Test
@@ -129,7 +129,7 @@ struct FrontMatterMutationTests {
     try doc.createNewKeyWithNullValue("title")
 
     #expect(doc.hasKey("title") == true)
-    #expect(doc.frontMatter["title"] == Yams.Node("", Tag(.null)))
+    #expect(doc.frontMatter["title"] == .null)
   }
 
   @Test
@@ -145,7 +145,7 @@ struct FrontMatterMutationTests {
 
     #expect(doc.hasKey("newkey") == true)
     #expect(doc.hasKey("existing") == true)
-    #expect(doc.frontMatter["existing"]?.string == "value")
+    #expect(doc.frontMatter["existing"]?.stringValue == "value")
   }
 
   @Test
@@ -188,9 +188,9 @@ struct FrontMatterMutationTests {
     let reparsed = try MarkdownDocument(content: rendered)
 
     #expect(reparsed.hasKey("title") == true)
-    #expect(reparsed.frontMatter["title"] == Yams.Node("", Tag(.null)))
+    #expect(reparsed.frontMatter["title"] == .null)
     #expect(reparsed.hasKey("author") == true)
-    #expect(reparsed.frontMatter["author"] == Yams.Node("", Tag(.null)))
+    #expect(reparsed.frontMatter["author"] == .null)
     #expect(reparsed.body == "Original body")
     let rerendered = try reparsed.render()
     #expect(rerendered == rendered)
@@ -249,7 +249,7 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.removeValue(forKey: "author")
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     #expect(doc.frontMatter["author"] == nil)
     #expect(doc.frontMatter["count"]?.int == 42)
   }
@@ -265,7 +265,7 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.removeValue(forKey: "nonexistent")
 
-    #expect(doc.frontMatter["title"]?.string == "Test")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test")
     #expect(doc.frontMatter.count == 1)
   }
 
@@ -326,7 +326,7 @@ struct FrontMatterMutationTests {
 
     // Update one
     doc.setValue("published", forKey: "status")
-    #expect(doc.getValue(forKey: "status")?.string == "published")
+    #expect(doc.getValue(forKey: "status")?.stringValue == "published")
 
     // Remove one
     doc.removeValue(forKey: "author")
@@ -344,8 +344,8 @@ struct FrontMatterMutationTests {
     let rendered = try doc.render()
     let reparsed = try MarkdownDocument(content: rendered)
 
-    #expect(reparsed.getValue(forKey: "title")?.string == "Test")
-    #expect(reparsed.getValue(forKey: "author")?.string == "Jane")
+    #expect(reparsed.getValue(forKey: "title")?.stringValue == "Test")
+    #expect(reparsed.getValue(forKey: "author")?.stringValue == "Jane")
     #expect(reparsed.body == "Original body")
   }
 
@@ -366,9 +366,9 @@ struct FrontMatterMutationTests {
 
     #expect(doc.hasKey("author") == false)
     #expect(doc.hasKey("creator") == true)
-    #expect(doc.getValue(forKey: "creator")?.string == "Jane Doe")
+    #expect(doc.getValue(forKey: "creator")?.stringValue == "Jane Doe")
     // Other keys should remain unchanged
-    #expect(doc.getValue(forKey: "title")?.string == "Test Document")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "Test Document")
     #expect(doc.getValue(forKey: "count")?.int == 42)
   }
 
@@ -463,8 +463,8 @@ struct FrontMatterMutationTests {
 
     #expect(reparsed.hasKey("old_key") == false)
     #expect(reparsed.hasKey("new_key") == true)
-    #expect(reparsed.getValue(forKey: "new_key")?.string == "Some Value")
-    #expect(reparsed.getValue(forKey: "other")?.string == "Another Value")
+    #expect(reparsed.getValue(forKey: "new_key")?.stringValue == "Some Value")
+    #expect(reparsed.getValue(forKey: "other")?.stringValue == "Another Value")
     #expect(reparsed.body == "Body content")
   }
 
@@ -483,13 +483,13 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.sortKeys()
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["author", "title", "zebra"])
 
     // Verify values are preserved
-    #expect(doc.getValue(forKey: "zebra")?.string == "last")
-    #expect(doc.getValue(forKey: "title")?.string == "middle")
-    #expect(doc.getValue(forKey: "author")?.string == "first")
+    #expect(doc.getValue(forKey: "zebra")?.stringValue == "last")
+    #expect(doc.getValue(forKey: "title")?.stringValue == "middle")
+    #expect(doc.getValue(forKey: "author")?.stringValue == "first")
   }
 
   @Test
@@ -505,7 +505,7 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.sortKeys(by: .alphabetical, reverse: true)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["zebra", "title", "author"])
   }
 
@@ -523,14 +523,14 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.sortKeys(by: .length)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["a", "mid", "short", "very_long_key_name"])
 
     // Verify values are preserved
-    #expect(doc.getValue(forKey: "very_long_key_name")?.string == "value1")
-    #expect(doc.getValue(forKey: "short")?.string == "value2")
-    #expect(doc.getValue(forKey: "mid")?.string == "value3")
-    #expect(doc.getValue(forKey: "a")?.string == "value4")
+    #expect(doc.getValue(forKey: "very_long_key_name")?.stringValue == "value1")
+    #expect(doc.getValue(forKey: "short")?.stringValue == "value2")
+    #expect(doc.getValue(forKey: "mid")?.stringValue == "value3")
+    #expect(doc.getValue(forKey: "a")?.stringValue == "value4")
   }
 
   @Test
@@ -546,7 +546,7 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.sortKeys(by: .length, reverse: true)
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["abc", "ab", "a"])
   }
 
@@ -567,7 +567,7 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.sortKeys()
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["author", "metadata", "zebra"])
 
     // Verify array was preserved
@@ -625,7 +625,7 @@ struct FrontMatterMutationTests {
     var doc = try MarkdownDocument(content: content)
     doc.sortKeys()
 
-    let keys = Array(doc.frontMatter.keys).compactMap { $0.string }
+    let keys = doc.frontMatter.keys
     #expect(keys == ["active", "count", "disabled", "price"])
 
     #expect(doc.getValue(forKey: "count")?.int == 42)
@@ -650,11 +650,11 @@ struct FrontMatterMutationTests {
     let rendered = try doc.render()
     let reparsed = try MarkdownDocument(content: rendered)
 
-    let keys = Array(reparsed.frontMatter.keys).compactMap { $0.string }
+    let keys = reparsed.frontMatter.keys
     #expect(keys == ["a", "m", "z"])
-    #expect(reparsed.getValue(forKey: "a")?.string == "first")
-    #expect(reparsed.getValue(forKey: "m")?.string == "middle")
-    #expect(reparsed.getValue(forKey: "z")?.string == "last")
+    #expect(reparsed.getValue(forKey: "a")?.stringValue == "first")
+    #expect(reparsed.getValue(forKey: "m")?.stringValue == "middle")
+    #expect(reparsed.getValue(forKey: "z")?.stringValue == "last")
     #expect(reparsed.body == "Body content")
   }
 }

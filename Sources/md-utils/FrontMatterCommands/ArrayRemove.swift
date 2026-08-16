@@ -88,7 +88,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
             continue
           }
 
-          doc.frontMatter[key] = .sequence(updatedSequence)
+          doc.frontMatter[key] = .array(updatedSequence)
 
           // Write back
           try FrontMatterCLIMutator.write(doc, parsed: parsed, to: path)

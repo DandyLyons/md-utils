@@ -27,7 +27,7 @@ struct FrontMatterParsingTests {
     let doc = try MarkdownDocument(content: content)
 
     // Verify parsed values
-    #expect(doc.frontMatter["title"]?.string == "Test Document")
+    #expect(doc.frontMatter["title"]?.stringValue == "Test Document")
     #expect(doc.frontMatter["count"]?.int == 42)
     #expect(doc.frontMatter["tags"]?.sequence?.count == 2)
   }
@@ -145,7 +145,7 @@ struct FrontMatterParsingTests {
 
     #expect(doc.frontMatter["nested"] != nil)
     #expect(doc.frontMatter["list"]?.sequence?.count == 3)
-    #expect(doc.frontMatter["metadata"]?.mapping?["author"]?.string == "Jane")
+    #expect(doc.frontMatter["metadata"]?.mapping?["author"]?.stringValue == "Jane")
   }
 
   @Test

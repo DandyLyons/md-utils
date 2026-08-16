@@ -14,6 +14,41 @@ import ArgumentParser
 struct DumpTests {
 
   @Test
+  func `single TOML file supports raw and TOML output with delimiters`() throws {
+    let tempFile = try createTempFile(content: "+++\ntitle = \"Example\"\n+++\nBody", name: "toml.md")
+    defer { try? tempFile.delete() }
+
+    let raw = try CLIProcessTestHelper.run([
+      "fm", "dump", tempFile.string, "--format", "raw", "--include-delimiters",
+    ])
+    #expect(raw.status == 0, "Command failed: \(raw.standardError)")
+    #expect(raw.standardOutput.hasPrefix("+++\n"))
+    #expect(raw.standardOutput.contains("title = \"Example\""))
+
+    let toml = try CLIProcessTestHelper.run([
+      "fm", "dump", tempFile.string, "--format", "toml",
+    ])
+    #expect(toml.status == 0, "Command failed: \(toml.standardError)")
+    #expect(toml.standardOutput.contains("title = \"Example\""))
+  }
+
+  @Test
+  func `TOML collection output remains a parseable document`() throws {
+    let tempDir = try createProjectTempDirectory(prefix: "md-utils-toml-dump")
+    defer { try? tempDir.delete() }
+    try (tempDir + "one.md").write("+++\ntitle = \"One\"\n+++\nBody")
+    try (tempDir + "two.md").write("+++\ntitle = \"Two\"\n+++\nBody")
+
+    let result = try CLIProcessTestHelper.run([
+      "fm", "dump", tempDir.string, "--format", "toml",
+    ])
+    #expect(result.status == 0, "Command failed: \(result.standardError)")
+    let output = try FrontMatterConversion.parse(result.standardOutput, format: .toml)
+    #expect(output["frontMatter"]?.sequence?.count == 2)
+    #expect(output["noFrontMatter"]?.sequence?.isEmpty == true)
+  }
+
+  @Test
   func `single file outputs directly without array or path`() async throws {
     let tempFile = try createTempFile(content: """
     ---

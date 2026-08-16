@@ -8,7 +8,7 @@ import Foundation
 /// Conforming types should provide configuration options specific to their
 /// target format while maintaining the base requirement for frontmatter handling.
 public protocol ConversionOptions: Sendable {
-    /// Whether to include YAML frontmatter in the converted output
+    /// Whether to include YAML or TOML frontmatter in the converted output
     ///
     /// When `true`, frontmatter will be preserved in the output.
     /// When `false`, frontmatter will be excluded from the conversion.

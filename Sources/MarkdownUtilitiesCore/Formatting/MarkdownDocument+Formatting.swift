@@ -64,6 +64,10 @@ extension MarkdownDocument {
             result = TableNormalizer.normalize(result, maxWidth: options.tableMaxWidth)
         }
 
-        return MarkdownDocument(frontMatter: frontMatter, body: result)
+        return MarkdownDocument(
+            frontMatter: frontMatter,
+            body: result,
+            frontMatterFormat: frontMatterFormat
+        )
     }
 }

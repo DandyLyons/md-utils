@@ -527,7 +527,10 @@ public struct MarkdownRuleChecker: Sendable {
     )
     let typeRegistry = try MarkdownTypeRegistry(definitions: [definition])
     return try MarkdownTypeChecker(registry: typeRegistry).assess(record, as: definition.name).diagnostics
-      .filter { $0.code != "record.frontmatter.invalid-yaml" }
+      .filter {
+        $0.code != "record.frontmatter.invalid-yaml"
+          && $0.code != "record.frontmatter.invalid-toml"
+      }
   }
 
   private func isPathCandidate(

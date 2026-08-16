@@ -18,7 +18,7 @@ extension CLIEntry.TypesCommands {
     @Option(name: .long, help: "Type contract version; Semantic Versioning is recommended")
     var version = "0.1.0"
 
-    @Option(name: .long, help: "Definition format: yaml or json")
+    @Option(name: .long, help: "Definition format: yaml, json, or toml")
     var format: TypesDefinitionFormat = .yaml
 
     @Option(name: .long, help: "Override the generated definition file", completion: .file(), transform: { Path($0) })
@@ -46,7 +46,7 @@ extension CLIEntry.TypesCommands {
       abstract: "List project Markdown type definitions"
     )
 
-    @Option(name: .long, help: "Output format: text, markdown, json, or yaml")
+    @Option(name: .long, help: "Output format: text, markdown, json, yaml, or toml")
     var format: TypesOutputFormat = .text
 
     @Option(name: .long, help: "Project root directory", completion: .directory, transform: { Path($0) })
@@ -72,7 +72,7 @@ extension CLIEntry.TypesCommands {
     @Argument(help: "Type name to describe")
     var name: String
 
-    @Option(name: .long, help: "Output format: text, markdown, json, or yaml")
+    @Option(name: .long, help: "Output format: text, markdown, json, yaml, or toml")
     var format: TypesOutputFormat = .text
 
     @Option(name: .long, help: "Project root directory", completion: .directory, transform: { Path($0) })
@@ -371,7 +371,7 @@ extension CLIEntry.TypesCommands {
       abstract: "Print the md-utils Markdown type-definition JSON Schema"
     )
 
-    @Option(name: .long, help: "Output format: json or yaml")
+    @Option(name: .long, help: "Output format: json, yaml, or toml")
     var format: TypesDefinitionFormat = .json
 
     mutating func run() async throws {
@@ -382,7 +382,15 @@ extension CLIEntry.TypesCommands {
         guard let data = content.data(using: .utf8) else {
           throw ValidationError("Bundled type schema is not UTF-8")
         }
-        print(try Yams.dump(object: JSONSerialization.jsonObject(with: data), sortKeys: true))
+        let object = try JSONSerialization.jsonObject(with: data)
+        switch format {
+        case .yaml:
+          print(try Yams.dump(object: object, sortKeys: true))
+        case .toml:
+          print(try FrontMatterConversion.serializeTOMLValue(object), terminator: "")
+        case .json:
+          break
+        }
       }
     }
   }

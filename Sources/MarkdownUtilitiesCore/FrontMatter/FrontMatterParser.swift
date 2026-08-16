@@ -8,49 +8,48 @@ import Parsing
 
 /// Parser for separating frontmatter from markdown body content.
 ///
-/// This parser detects YAML frontmatter delimited by `---` markers and separates
-/// it from the body content without parsing the YAML itself.
+/// This parser detects YAML (`---`) or TOML (`+++`) frontmatter and separates it
+/// from the body content without parsing the structured data itself.
 struct FrontMatterParser: Parsing.Parser {
   typealias Input = Substring
-  typealias Output = (rawFrontMatter: String, body: String)
+  typealias Output = (rawFrontMatter: String, body: String, format: FrontMatterFormat?)
   /// Parses input into structured Markdown data.
   ///
   /// See <doc:FrontmatterWorkflows> for workflow details.
   func parse(_ input: inout Substring) throws -> Output {
-    // Check if input starts with frontmatter delimiter (Unix line endings only)
-    if input.starts(with: "---\n") {
-      var workingInput = input
-      do {
-        // Try to extract just the frontmatter (up to and including closing delimiter)
-        let rawFrontMatter = try frontMatterOnlyParser.parse(&workingInput)
-        // Whatever remains in workingInput is the body
-        let body = String(workingInput)
-        input = ""
-        return (rawFrontMatter, body)
-      } catch {
-        // No closing delimiter found - treat entire content as body with empty frontmatter
-        let body = String(input)
-        input = ""
-        return ("", body)
-      }
-    } else {
-      // No opening delimiter - empty frontmatter, entire content is body
-      let body = String(input)
+    let originalSource = String(input)
+    guard let format = FrontMatterFormat.allCases.first(where: {
+      originalSource.hasPrefix("\($0.delimiter)\n")
+    }) else {
       input = ""
-      return ("", body)
+      return ("", originalSource, nil)
     }
-  }
+    let bytes = Array(originalSource.utf8)
+    let delimiter = Array(format.delimiter.utf8)
+    let contentStart = delimiter.count + 1
+    let closingStart = stride(from: contentStart, to: bytes.count, by: 1).first { index in
+      let startsLine = index == contentStart || bytes[index - 1] == 0x0A
+      return startsLine
+        && index + delimiter.count <= bytes.count
+        && bytes[index..<(index + delimiter.count)].elementsEqual(delimiter)
+    }
+    guard let closingStart else {
+      input = ""
+      return ("", originalSource, nil)
+    }
 
-  /// Parser that extracts only the frontmatter content (between delimiters)
-  private var frontMatterOnlyParser: some Parsing.Parser<Substring, String> {
-    Parse {
-      "---\n"                              // Opening delimiter with newline
-      PrefixUpTo("---").map { String($0) } // Content until closing delimiter
-      "---"                                // Closing delimiter
-      Optionally { "\n" }                  // Optional newline after closing
+    let rawEnd = closingStart > contentStart && bytes[closingStart - 1] == 0x0A
+      ? closingStart - 1
+      : closingStart
+    let rawFrontMatter = String(decoding: bytes[contentStart..<rawEnd], as: UTF8.self)
+    var bodyStart = closingStart + delimiter.count
+    if bodyStart + 1 < bytes.count, bytes[bodyStart] == 0x0D, bytes[bodyStart + 1] == 0x0A {
+      bodyStart += 2
+    } else if bodyStart < bytes.count, bytes[bodyStart] == 0x0A {
+      bodyStart += 1
     }
-    .map { (frontMatter, _) in
-      frontMatter
-    }
+    let body = String(decoding: bytes[bodyStart...], as: UTF8.self)
+    input = ""
+    return (rawFrontMatter, body, format)
   }
 }

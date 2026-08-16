@@ -114,7 +114,7 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 - **Heading Manipulation** — Promote/demote headings while maintaining nested structure
 - **Section Operations** — Extract sections by name or index; reorder sections (move up/down/to position)
 - **Content Selection** — Extract body without frontmatter, select by line range, extract by section
-- **YAML Front Matter** — Full CRUD operations with 12+ subcommands including get, set, remove, rename, search (JMESPath), sort keys, array manipulation, and multi-format dump (JSON, YAML, raw, PropertyList)
+- **YAML and TOML Front Matter** — Format-preserving CRUD, array manipulation, and multi-format output. JMESPath `fm search` remains YAML-only.
 - **Format Conversion** — Convert Markdown to plain text or CSV
 - **File Metadata** — Read file metadata including standard and extended attributes (xattr)
 - **Wikilink Parsing & Resolution** — Parse Obsidian-flavored wikilinks, resolve against a vault directory, detect broken/ambiguous links, find backlinks
@@ -150,6 +150,9 @@ swift run md-utils fm get --key title posts/ | jq '.[] | select(has("value")) | 
 
 # Set a frontmatter value
 swift run md-utils fm set --key tags --value "[swift, cli]" document.md
+
+# Create TOML frontmatter in a document that has none
+swift run md-utils fm set --key title --value "TOML Note" --frontmatter-format toml document.md
 
 # Dump frontmatter as JSON
 swift run md-utils fm dump document.md
@@ -383,11 +386,11 @@ selected automatically, except `.txt`, which requires `--include-non-md`.
 Mapped extensions use the same `c-block`, `html-comment`, `python-docstring`,
 `powershell-block`, and `lua-block` wrappers documented in
 [Frontmatter in Non-Markdown Text Files](docs/common-use-cases.md#frontmatter-in-non-markdown-text-files).
-Wrapped YAML supports frontmatter predicates, JMESPath, type hints, and JSON
+Wrapped YAML or TOML supports frontmatter predicates, JMESPath, type hints, and JSON
 Schema checks. Raw body predicates operate on wrapper-excluded host text, while
 Markdown headings, sections, and wikilinks are explicitly unsupported.
 
-If a file matches multiple rules, all matching checks apply. Files matching no rules are ignored. Invalid YAML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed.
+If a file matches multiple rules, all matching checks apply. Files matching no rules are ignored. Invalid YAML or TOML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed.
 
 ## GitHub Pages
 
@@ -500,6 +503,7 @@ docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 - [PathKit](https://github.com/kylef/PathKit) — File path handling
 - [JSONSchema.swift](https://github.com/kylef/JSONSchema.swift) — JSON Schema validation
 - [Yams](https://github.com/jpsim/Yams) — YAML parsing and serialization
+- [swift-toml](https://github.com/mattt/swift-toml) — TOML parsing and serialization
 - [jmespath.swift](https://github.com/nicktmro/jmespath.swift) — JMESPath query language for JSON
 - [Hummingbird 2](https://github.com/hummingbird-project/hummingbird) — Native HTTP routing and lifecycle
 
