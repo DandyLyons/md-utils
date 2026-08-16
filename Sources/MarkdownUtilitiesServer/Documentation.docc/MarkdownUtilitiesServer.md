@@ -1,12 +1,14 @@
 # ``MarkdownUtilitiesServer``
 
-Persist canonical Markdown records and compile explicit resources into one deterministic endpoint plan.
+Persist canonical Markdown records, compile explicit resources, and serve immutable native reads.
 
 ## Overview
 
 `MarkdownUtilitiesServer` defines the transport-neutral contract shared by runtime
-route registration and OpenAPI generation. It does not load configuration files,
-start an HTTP application, or depend on Hummingbird.
+route registration and OpenAPI generation. It also provides native project loading
+and the generic Hummingbird 2 adapter. The `md-utils-server` executable remains the
+thin owner of command-line options, logging, application construction, and process
+lifecycle.
 
 The module also defines the storage-neutral ``RecordStore`` contract. Stores persist
 canonical `MarkdownRecord` values without treating filesystem paths, SQL, parsed
@@ -109,8 +111,8 @@ cannot use the `/_md-utils` namespace.
 
 ``EndpointRouteDescription`` values contain only an HTTP method, canonical path
 template, semantic route kind, optional resource name, and stable operation ID.
-Issue #77 adapts these descriptions to Hummingbird 2. Issue #84 generates OpenAPI
-3.1 from the same ``EndpointPlan``.
+``MarkdownServerHTTPAdapter`` installs these routes in Hummingbird 2. Issue #84
+generates OpenAPI 3.1 from the same ``EndpointPlan``.
 
 ## Startup validation
 
@@ -127,12 +129,15 @@ projection policies without mutating the plan.
 ## Configuration boundary
 
 ``MarkdownServerConfiguration`` is a versioned `Codable` model, currently version
-`1`. The `md-utils-server` executable introduced by issue #77 will own JSON or YAML
-file discovery and decoding. Server configuration is separate from the md-utils CLI
-configuration and does not extend `.md-utils.json`.
+`1`. ``MarkdownServerProjectLoader`` decodes the human-authored YAML at
+`.md-utils/server.yaml`, loads rules and mdtypes, recursively imports Markdown, and
+builds the immutable plan and snapshot before route registration. Server
+configuration is separate from the md-utils CLI configuration and does not extend
+`.md-utils/md-utils.json`.
 
 ## Topics
 
 ### Read-side composition
 
 - <doc:ReadSnapshots>
+- <doc:NativeReadOnlyServer>

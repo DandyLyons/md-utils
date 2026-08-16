@@ -25,6 +25,10 @@ let package = Package(
       name: "md-utils",
       targets: ["md-utils"]
     ),
+    .executable(
+      name: "md-utils-server",
+      targets: ["md-utils-server"]
+    ),
   ],
   dependencies: [
     .package(url: "https://github.com/hebertialmeida/MarkdownSyntax", from: "1.3.0"),
@@ -36,6 +40,8 @@ let package = Package(
     .package(url: "https://github.com/mattt/swift-toml.git", from: "2.0.0"),
     .package(url: "https://github.com/adam-fowler/jmespath.swift.git", from: "1.0.3"),
     .package(url: "https://github.com/onevcat/Rainbow", from: "4.2.1"),
+    .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.26.0"),
+    .package(url: "https://github.com/apple/swift-log.git", from: "1.15.0"),
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
@@ -89,13 +95,45 @@ let package = Package(
     // MARK: MarkdownUtilitiesServer
     .target(
       name: "MarkdownUtilitiesServer",
-      dependencies: ["MarkdownUtilitiesCore"]
+      dependencies: [
+        "MarkdownUtilitiesCore",
+        "MarkdownUtilities",
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "JMESPath", package: "jmespath.swift"),
+        .product(name: "PathKit", package: "PathKit"),
+        "Yams",
+      ]
     ),
     .testTarget(
       name: "MarkdownUtilitiesServerTests",
       dependencies: [
         "MarkdownUtilitiesCore",
         "MarkdownUtilitiesServer",
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "HummingbirdTesting", package: "hummingbird"),
+        .product(name: "PathKit", package: "PathKit"),
+      ]
+    ),
+    .executableTarget(
+      name: "MarkdownUtilitiesServerLinuxSmoke",
+      dependencies: [
+        "MarkdownUtilitiesCore",
+        "MarkdownUtilitiesServer",
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "HummingbirdTesting", package: "hummingbird"),
+      ],
+      path: "IntegrationTests/LinuxServerSmoke/"
+    ),
+
+    // MARK: md-utils-server (native HTTP server)
+    .executableTarget(
+      name: "md-utils-server",
+      dependencies: [
+        "MarkdownUtilitiesServer",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "PathKit", package: "PathKit"),
       ]
     ),
 

@@ -12,17 +12,17 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 ## Project Brief
 
 - **Language**: Swift 6.2+
-- **Frameworks/Libraries**: Foundation, MarkdownSyntax, swift-parsing, PathKit, Yams, swift-toml, JMESPath, JSONSchema.swift, swift-argument-parser, Rainbow
+- **Frameworks/Libraries**: Foundation, MarkdownSyntax, swift-parsing, PathKit, Yams, swift-toml, JMESPath, JSONSchema.swift, swift-argument-parser, Rainbow, Hummingbird 2, Swift Logging
 - **Package Manager / Build Tool**: Swift Package Manager
-- **CLI Target**: `md-utils`
+- **Executable Targets**: `md-utils`, `md-utils-server`
 - **Library Targets**: `MarkdownUtilitiesCore`, `MarkdownUtilities`
 - **Test Framework**: Swift Testing, not XCTest
 - **Build Command**: `swift build`
-- **Test Command**: `swift test`
+- **Test Command**: `swift test`; native Linux server route smoke test with `swift run MarkdownUtilitiesServerLinuxSmoke`
 - **Formatter/Linter**: No dedicated formatter or linter is configured in-package
 - **Documentation**: README.md, AGENTS.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
 - **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/TOML/JSON parsing failures as user-visible errors
-- **CI/Coverage**: No project-specific CI or coverage command is documented in this repo
+- **CI/Coverage**: Schema publication, Pages, WebAssembly, and native Linux server workflows are configured; local Linux server verification uses `Dockerfile.server-linux`; no coverage command is documented
 
 ## Requirements
 
@@ -41,6 +41,9 @@ swift test
 
 # Build and test Core on Linux
 docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
+
+# Build and test the native server on Linux
+docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 
 # Run CLI
 swift run md-utils <command>

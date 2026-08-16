@@ -1,7 +1,7 @@
 # MarkdownUtilities Server Architecture
 
-- Status: mdtype and portable rules prerequisites implemented; server design can proceed
-- Last updated: 2026-08-02
+- Status: native read-only Hummingbird 2 vertical slice implemented
+- Last updated: 2026-08-09
 
 This document records the architectural direction for exposing Markdown-backed data through conventional HTTP APIs. It distinguishes implemented foundations, decisions already made, the next recommended milestone, and questions that still require explicit design.
 
@@ -31,6 +31,8 @@ The original type-system prerequisite has been met. The project now has enough p
 - native adapters can read filesystem records, construct logical paths, resolve project-confined schema resources, and write records atomically.
 - `MarkdownUtilitiesServer` defines the asynchronous, storage-neutral `RecordStore` contract and actor-backed `InMemoryRecordStore` reference implementation.
 - `MarkdownServerReadSnapshotBuilder` performs one bounded scan, reuses one analysis per candidate, and builds immutable generic record, membership, validity, identity, and lookup indexes.
+- `MarkdownServerHTTPAdapter` registers generic Hummingbird 2 collection, item, and reserved logical-path handlers directly from the immutable plan.
+- `md-utils-server` loads `.md-utils/server.yaml`, imports project Markdown recursively, builds one immutable snapshot, logs startup state, and runs with signal-aware lifecycle handling.
 
 The normative type design is documented in [RFC 0001: mdtype](rfcs/0001-mdtype.md). The portable dependency and runtime status is documented in [WebAssembly Support](webassembly.md).
 
@@ -41,11 +43,11 @@ The following pieces do not yet exist:
 - a domain-resource projection and encoding contract;
 - a public schema-introspection API suitable for generators outside `MarkdownUtilitiesCore`;
 - OpenAPI generation from exposed resources;
-- server request semantics, HTTP error mapping, resource pagination, and query behavior;
-- native HTTP or Cloudflare Workers distributions; and
+- resource pagination, filtering, and query behavior;
+- the Cloudflare Workers distribution; and
 - persistent type indexes or a production storage backend.
 
-The next blocker is native HTTP adaptation of the accepted generic read representation.
+The native read-only adapter is complete. The next contract milestone is OpenAPI 3.1 generation from the same accepted endpoint plan.
 
 ## Decisions
 
@@ -108,24 +110,32 @@ MarkdownUtilities
 
 MarkdownUtilitiesServer
 ├── MarkdownUtilitiesCore
+├── MarkdownUtilities native loaders
 ├── Storage-neutral RecordStore and InMemoryRecordStore
 ├── Explicit versioned resource configuration
 ├── Deterministic EndpointPlan compilation
 ├── Transport-neutral route descriptions
-└── Structured startup diagnostics
+├── Native project composition and structured startup diagnostics
+└── Generic Hummingbird 2 route adapter
 
 md-utils
 ├── MarkdownUtilities
 ├── ArgumentParser commands
 ├── CLI presentation and prompts
 └── Process exit behavior
+
+md-utils-server
+├── MarkdownUtilitiesServer
+├── ArgumentParser startup options
+├── Hummingbird application and logging composition
+└── Signal-aware process lifecycle
 ```
 
 `MarkdownUtilitiesCore` runs on Linux and compiles to WebAssembly. It avoids direct filesystem access, process execution, CLI dependencies, and platform-specific APIs. Linux support is verified with `Dockerfile.core-linux`; WASI compilation and representative runtime behavior are verified with `scripts/build-wasm.sh`.
 
 `MarkdownUtilities` contains functionality appropriate for native platforms but unavailable or unsuitable in WebAssembly. The `md-utils` executable is not a server runtime and must not be spawned by server code.
 
-The standalone `md-utils-server` executable will own configuration-file loading and Hummingbird 2 application composition. Its server configuration remains separate from the md-utils CLI configuration and `.md-utils.json`.
+The standalone `md-utils-server` executable selects startup paths and owns Hummingbird 2 application composition. The server library performs configuration-file loading so it remains directly testable. Server configuration remains separate from the md-utils CLI configuration and `.md-utils/md-utils.json`.
 
 ### Treat Types and Rules as Distinct Server Inputs
 
@@ -327,25 +337,25 @@ The implemented `RecordStore` is asynchronous, `Sendable`, and storage-neutral. 
 
 Logical paths narrow enumeration but are not universal storage keys. The collection root retains pathless records. Cancellation is checked before work, during enumeration, and immediately before commits, and is propagated without wrapping. Paging is deterministic while store contents remain unchanged; immutable cross-mutation snapshots belong to the read-snapshot layer.
 
-`InMemoryRecordStore` is the first implementation because it enables portable repository and contract tests without deciding the production database. A `FileRecordStore` should follow to validate ordinary folder-backed operation. SQLite should be evaluated after repository semantics are stable.
+`InMemoryRecordStore` is the first implementation because it enables portable repository and contract tests without deciding the production database. The native executable recursively imports `.md` and `.markdown` files into this store once at startup; it does not claim persistent filesystem-store semantics. A `FileRecordStore` should follow if live folder-backed persistence is required. SQLite should be evaluated after repository semantics are stable.
 
 The initial repository may enumerate candidates and assess types on demand. Persistent type indexes are an optimization and must never become the source of truth.
 
-## Recommended First Vertical Slice
+## Implemented Native Read-Only Vertical Slice
 
-The next implementation milestone should prove endpoint derivation with the smallest useful read path:
+The first vertical slice proves endpoint derivation with the smallest useful read path:
 
 1. Define one explicit exposed resource backed by a `Book` mdtype.
 2. Define a minimal response projection for that resource.
-3. Implement `InMemoryRecordStore` and the read-only portion of `TypedMarkdownRepository`.
+3. Import recursively discovered Markdown into `InMemoryRecordStore` and build the generic immutable read snapshot.
 4. Compile the resource into an immutable `EndpointPlan` containing `GET /books` and `GET /books/{id}`.
 5. Register generic Hummingbird 2 handlers from that plan.
 6. For type selection, return records that conform to `Book`; separately test rule selection with an expected type, where invalid candidates remain visible with `valid: false` and diagnostics.
 7. Add in-process HTTP tests for success, not found, nonconforming stored data, overlapping type membership, route collisions, and revision exposure.
 
-This slice intentionally excludes OpenAPI generation, create, update, delete, authentication, SQLite, persistent indexes, and Workers deployment. Its purpose is to validate the resource model, endpoint-planning boundary, and typed read repository before expensive infrastructure choices are made. OpenAPI 3.1 generation follows as a separate milestone using the accepted plan.
+This slice intentionally excludes OpenAPI generation, create, update, delete, authentication, SQLite, persistent indexes, and Workers deployment. It validates the resource model, endpoint-planning boundary, collision-safe generic reads, and native transport before expensive infrastructure choices are made. OpenAPI 3.1 generation follows as a separate milestone using the accepted plan.
 
-Success means the same repository fixture produces the same resource responses through direct library calls and Hummingbird without exposing Markdown storage details.
+The same snapshot fixtures produce the same resource responses through direct library calls and in-process Hummingbird tests without exposing Markdown storage details.
 
 ## Native Server Architecture
 
@@ -367,7 +377,13 @@ rules + mdtype definitions + resource configuration
                          FileRecordStore or SQLiteRecordStore
 ```
 
-`MarkdownUtilitiesServer` owns plan construction and generic handlers. The `md-utils-server` executable performs startup composition and serves the registered plan through Hummingbird 2. No resource-specific Swift source is generated.
+`MarkdownUtilitiesServer` owns plan construction and generic handlers. The `md-utils-server` executable performs startup composition and serves the registered plan through Hummingbird 2. No resource-specific Swift source is generated. The process accepts `--project-root`, `--config`, `--hostname`, and `--port`; it defaults to `.md-utils/server.yaml` and `127.0.0.1:8080`.
+
+At startup, the executable loads rule and mdtype definitions, recursively imports project Markdown while excluding `.md-utils/`, compiles the plan, and publishes one immutable snapshot. A filesystem change becomes visible only after restart. `runService()` handles `SIGINT` and `SIGTERM` through graceful lifecycle shutdown.
+
+Collection handlers return the complete selected resource. Item and logical-path handlers switch exhaustively over record, not-found, and conflict lookup results. All HTTP failures use a stable JSON error envelope; `409 Conflict` includes every candidate and never selects one arbitrarily. Invalid rule-selected candidates remain normal `200` representations with `valid: false` and diagnostics. Missing primary identities remain visible in collections but have no item lookup key.
+
+The startup scan and parsing cost is paid once. Concurrent handlers only read immutable arrays and indexes. The initial server deliberately has no response pagination or production persistence, so operators should treat it as a bounded-project distribution and restart it after content changes.
 
 Storage must remain replaceable so a maintainer can use an ordinary folder hierarchy, SQLite, or a future adapter appropriate to the deployment.
 

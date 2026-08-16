@@ -415,11 +415,84 @@ The bundled CLI schema in `Sources/md-utils/Resources/0.2.0_md-utils.schema.json
 
 When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json` to both `md-utils.schema.json` at the site root and `schemas/latest/md-utils.schema.json`. Versioned schema URLs are immutable after release. For future schema releases, add a new versioned folder under `site/schemas/`, update `CURRENT_MD_UTILS_JSONSCHEMA_VERSION` in `.github/workflows/pages.yml`, and keep the canonical bundled schema synchronized with the new published copy. Do not edit already-published versioned schema files; publish a new version instead.
 
+## Native Read-Only Server
+
+`md-utils-server` uses Hummingbird 2 to expose explicitly configured resources. It
+loads `.md-utils/server.yaml`, rules from `.md-utils/md-utils.json`, mdtypes from
+`.md-utils/types/`, and `.md` or `.markdown` records recursively beneath the project
+root. Files inside `.md-utils/` are never imported as records.
+
+```yaml
+serverConfigVersion: "1"
+resources:
+  - name: books
+    route: /books
+    operations: [list, get]
+    selection:
+      mode: type
+      type: Book
+      searchRoot: books/
+    identityPolicy:
+      source: frontmatter
+      path: [slug]
+      format: string
+      logicalPathFallbackEnabled: true
+```
+
+Identity `source` supports `existingIdentity`, `logicalPath`, and `frontmatter`.
+Frontmatter identities require a nonempty `path` and a `format` of `string`,
+`integer`, `uuid`, or `slug`; slug identities also require `slugPolicy` set to
+`strictASCII`, `unicode`, or `preserve`. Projection defaults to `genericRecord`,
+operation-ID overrides default to an empty list, and logical-path fallback defaults
+to enabled.
+
+Start the server from the directory containing `.md-utils/`:
+
+```bash
+swift run md-utils-server
+swift run md-utils-server \
+  --project-root ./example/ \
+  --config .md-utils/server.yaml \
+  --hostname 0.0.0.0 \
+  --port 8080
+```
+
+The default bind address is `127.0.0.1:8080`. `LOG_LEVEL` controls Swift Logging.
+Hummingbird handles `SIGINT` and `SIGTERM` through graceful service shutdown.
+
+- `GET /books` returns the complete configured resource as a JSON array.
+- `GET /books/{id}` returns one unambiguous primary-ID record.
+- `GET /_md-utils/path/**` returns an exact nested logical path when at least one
+  `get` resource enables fallback.
+- Missing records return `404`; invalid lookup paths return `400`; identity or path
+  collisions return `409` with every candidate in
+  `{"error":{"code","message","candidates"}}`.
+
+Rule-selected records remain present when checks or an expected mdtype fail; their
+generic envelopes report `valid: false` and structured diagnostics. Missing primary
+IDs remain visible in collections but cannot be fetched by item ID. A canonical
+record may appear through several resources with the same canonical identity and
+revision.
+
+Startup performs one deterministic recursive import into `InMemoryRecordStore`,
+then builds one immutable snapshot. Requests do not rescan files or reparse Markdown.
+Filesystem changes require a process restart, and collection responses are currently
+unpaginated, so this initial distribution is intended for bounded project trees. It
+does not provide hot reload, writes, authentication, or a persistent production
+store.
+
+Verify the native server on Linux with:
+
+```bash
+docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
+```
+
 ## Architecture
 
 - **Swift 6.2** or later
 - **MarkdownUtilitiesCore** for portable content operations on Apple platforms, Linux, and WebAssembly
 - **MarkdownUtilities** for native filesystem and metadata integrations
+- **MarkdownUtilitiesServer** for immutable server planning, snapshots, and Hummingbird 2 routes
 - All testing uses the native Swift Testing framework
 
 ### Dependencies
@@ -432,11 +505,12 @@ When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_
 - [Yams](https://github.com/jpsim/Yams) — YAML parsing and serialization
 - [swift-toml](https://github.com/mattt/swift-toml) — TOML parsing and serialization
 - [jmespath.swift](https://github.com/nicktmro/jmespath.swift) — JMESPath query language for JSON
+- [Hummingbird 2](https://github.com/hummingbird-project/hummingbird) — Native HTTP routing and lifecycle
 
 ## Platform Compatibility
 **macOS** is the primary development and testing platform. Core, native integrations, and the CLI are covered by the full Swift test suite.
 
-**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.2 using `Dockerfile.core-linux`. The container builds Core and runs an isolated parsing, AST, frontmatter, and rendering smoke executable. The complete native `MarkdownUtilities` and `md-utils` CLI layers are not covered by this Core guarantee.
+**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.2 using `Dockerfile.core-linux`. The native read-only server is separately built and tested with `Dockerfile.server-linux`. The complete `MarkdownUtilities` and `md-utils` CLI layers are not covered by the Core guarantee.
 
 **WebAssembly**: `MarkdownUtilitiesCore` is supported with the official Swift 6.3.1 WASI SDK. Run `scripts/build-wasm.sh` to compile Core and execute the root-package smoke target under WasmKit. See [WebAssembly Support](docs/webassembly.md) for SDK installation, dependency compatibility patches, artifact location, and current scope.
 

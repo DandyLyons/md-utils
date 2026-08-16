@@ -40,7 +40,7 @@ JSON is a useful common denominator, but it is not identical to either format. I
 
 YAML and TOML both allow comments. JSON does not, and neither does the `md-utils fm` data model.
 
-Once an `fm` command mutates frontmatter, however, `md-utils` parses and serializes the complete block. Comments—and syntax choices such as quoting or inline layout—are not guaranteed to survive. Avoid comments in frontmatter that will be managed with `md-utils fm`. Note: Read-only operations do not rewrite a file, and `fm dump --format raw` can return the original frontmatter text. 
+Once an `fm` command mutates frontmatter, however, `md-utils` parses and serializes the complete block. Comments—and syntax choices such as quoting or inline layout—are not guaranteed to survive. Avoid comments in frontmatter that will be managed with `md-utils fm`. Note: Read-only operations do not rewrite a file, and `fm dump --format raw` can return the original frontmatter text.
 
 ## CLI-specific differences
 

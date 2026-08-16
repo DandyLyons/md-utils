@@ -1,0 +1,11 @@
+FROM swift:6.2-noble
+
+WORKDIR /workspace/
+
+COPY Package.swift Package.resolved ./
+RUN swift package resolve
+
+COPY . .
+
+RUN swift build --product md-utils-server
+RUN swift run MarkdownUtilitiesServerLinuxSmoke
