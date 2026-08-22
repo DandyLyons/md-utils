@@ -53,3 +53,12 @@ Most frontmatter CRUD, array, batch, rules, schema, and Markdown type workflows 
 Use `fm dump --format raw` when the source representation matters. Use `--format json`, `--format yaml`, or `--format toml` when downstream tools need a particular serialization, and use `--frontmatter-format yaml|toml` only when creating or explicitly converting a stored frontmatter block.
 
 See <doc:FrontmatterCommands> for command details.
+
+## Codable Markdown documents
+
+`MarkdownUtilitiesCore` provides separate codec pairs rather than hiding these data-model differences behind one format switch:
+
+- `YAMLMarkdownEncoder` and `YAMLMarkdownDecoder` support YAML frontmatter, including explicit null values.
+- `TOMLMarkdownEncoder` and `TOMLMarkdownDecoder` preserve TOML's native temporal values. Synthesized keyed `nil` optionals are omitted, while explicit nulls and nil collection elements are rejected as lossy.
+
+Both pairs map one caller-selected `String` property to the Markdown body and require an explicit encoded coding path. Callers must choose the format-specific pair; there is no automatic decoder or format-neutral `MarkdownEncoder`.
