@@ -42,6 +42,11 @@ let package = Package(
     .package(url: "https://github.com/onevcat/Rainbow", from: "4.2.1"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.26.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.15.0"),
+    .package(
+      url: "https://github.com/mattpolzin/OpenAPIKit.git",
+      from: "6.0.0",
+      traits: []
+    ),
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
@@ -100,6 +105,7 @@ let package = Package(
         "MarkdownUtilities",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "JMESPath", package: "jmespath.swift"),
+        .product(name: "OpenAPIKit", package: "OpenAPIKit"),
         .product(name: "PathKit", package: "PathKit"),
         "Yams",
       ],
@@ -114,7 +120,9 @@ let package = Package(
         "MarkdownUtilitiesServer",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
+        .product(name: "OpenAPIKit", package: "OpenAPIKit"),
         .product(name: "PathKit", package: "PathKit"),
+        "Yams",
       ]
     ),
     .executableTarget(
@@ -143,7 +151,9 @@ let package = Package(
       name: "md-utils-serverTests",
       dependencies: [
         "md-utils-server",
+        "MarkdownUtilitiesCore",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        "Yams",
       ]
     ),
 

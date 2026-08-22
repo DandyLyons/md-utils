@@ -182,6 +182,9 @@ public enum EndpointRouteKind: String, Codable, Equatable, Sendable {
 
   /// Retrieves a canonical record by its collection-relative logical path.
   case logicalPath
+
+  /// Retrieves the active OpenAPI 3.1 description generated from this plan.
+  case openAPI
 }
 
 /// A transport-neutral route installed from an endpoint plan.
@@ -235,6 +238,9 @@ public struct EndpointPlan: Codable, Equatable, Sendable {
   /// Runtime and contract routes in deterministic path, method, and operation-ID order.
   public let routes: [EndpointRouteDescription]
 
+  /// Resolved contracts for the Markdown types explicitly referenced by resources.
+  public let typeSchemas: [ResolvedMarkdownTypeFrontmatterSchema]
+
   /// Creates an immutable endpoint plan from already compiled values.
   ///
   /// Callers normally obtain a plan from ``EndpointPlanCompiler/compile(_:)``.
@@ -243,13 +249,16 @@ public struct EndpointPlan: Codable, Equatable, Sendable {
   ///   - serverConfigVersion: Validated configuration schema version.
   ///   - resources: Canonically ordered planned resources.
   ///   - routes: Canonically ordered transport-neutral routes.
+  ///   - typeSchemas: Resolved schemas referenced by planned resources.
   public init(
     serverConfigVersion: String,
     resources: [PlannedMarkdownResource],
-    routes: [EndpointRouteDescription]
+    routes: [EndpointRouteDescription],
+    typeSchemas: [ResolvedMarkdownTypeFrontmatterSchema] = []
   ) {
     self.serverConfigVersion = serverConfigVersion
     self.resources = resources
     self.routes = routes
+    self.typeSchemas = typeSchemas
   }
 }

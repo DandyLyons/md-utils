@@ -98,7 +98,7 @@ struct MarkdownServerProjectLoaderTests {
     #expect(runtime.importedRecordCount == 2)
     #expect(runtime.plan.resources.map(\.name) == ["books"])
     #expect(runtime.plan.routes.map(\.path.rawValue) == [
-      "/_md-utils/path/{path...}", "/books", "/books/{id}",
+      "/_md-utils/path/{path}", "/books", "/books/{id}", "/openapi.json",
     ])
     let books = try #require(runtime.snapshot.resource(named: "books"))
     #expect(books.records.count == 1)
@@ -119,6 +119,30 @@ struct MarkdownServerProjectLoaderTests {
     await #expect(throws: MarkdownServerProjectLoaderError.configurationNotFound(expectedPath)) {
       try await MarkdownServerProjectLoader(projectRoot: root).load()
     }
+  }
+
+  @Test
+  func `Plan-only loading does not scan Markdown records`() throws {
+    let base = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
+    let root = base + "project/"
+    defer { try? base.delete() }
+    try (root + ".md-utils/server/").mkpath()
+    try (root + ".md-utils/server/server.yaml").write(
+      """
+      serverConfigVersion: "1"
+      resources: []
+      """
+    )
+    let outside = base + "outside.md"
+    try outside.write("# Outside")
+    try FileManager.default.createSymbolicLink(
+      atPath: (root + "linked.md").string,
+      withDestinationPath: outside.string
+    )
+
+    let runtime = try MarkdownServerProjectLoader(projectRoot: root).loadPlan()
+
+    #expect(runtime.plan.routes.map(\.path.rawValue) == ["/openapi.json"])
   }
 
   @Test

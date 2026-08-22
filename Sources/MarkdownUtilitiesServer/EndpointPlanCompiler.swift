@@ -87,9 +87,13 @@ public struct EndpointPlanCompilationError: Error, Codable, Equatable, Sendable,
 /// Compiles explicit resources against reusable rules and validated Markdown types.
 public struct EndpointPlanCompiler: Sendable {
   /// Reserved catch-all route used for enabled logical-path fallback lookups.
-  public static let logicalPathRoute = "/_md-utils/path/{path...}"
+  public static let logicalPathRoute = "/_md-utils/path/{path}"
   /// Stable operation identifier associated with ``logicalPathRoute``.
   public static let logicalPathOperationID = "md-utils.path.get"
+  /// Server-owned route that publishes the active generated contract.
+  public static let openAPIRoute = "/openapi.json"
+  /// Stable operation identifier associated with ``openAPIRoute``.
+  public static let openAPIOperationID = "md-utils.openapi.get"
 
   /// Compiled rules remain private so planning exposes only explicit references.
   private let ruleRegistry: MarkdownRuleRegistry
@@ -260,6 +264,21 @@ public struct EndpointPlanCompiler: Sendable {
       ))
     }
 
+    routeCandidates.append(RouteCandidate(
+      description: EndpointRouteDescription(
+        method: .get,
+        path: EndpointRoutePath(validated: Self.openAPIRoute),
+        kind: .openAPI,
+        resourceName: nil,
+        operationID: Self.openAPIOperationID
+      ),
+      location: "routes.openAPI"
+    ))
+    operationIDCandidates.append(OperationIDCandidate(
+      id: Self.openAPIOperationID,
+      location: "routes.openAPI"
+    ))
+
     appendRouteCollisionDiagnostics(routeCandidates, to: &diagnostics)
     appendOperationIDDiagnostics(operationIDCandidates, to: &diagnostics)
 
@@ -268,10 +287,23 @@ public struct EndpointPlanCompiler: Sendable {
       throw EndpointPlanCompilationError(diagnostics: sortedDiagnostics(diagnostics))
     }
 
+    let referencedTypes = Set(plannedResources.compactMap { resource -> MarkdownTypeName? in
+      switch resource.selection {
+      case .rule:
+        return nil
+      case .type(let name, _), .ruleWithExpectedType(_, let name):
+        return name
+      }
+    })
+    let typeSchemas = referencedTypes.compactMap {
+      typeRegistry.resolvedFrontmatterSchema(for: $0)
+    }.sorted { $0.name.rawValue < $1.name.rawValue }
+
     return EndpointPlan(
       serverConfigVersion: configuration.serverConfigVersion,
       resources: plannedResources.sorted(by: resourceOrder),
-      routes: routeCandidates.map(\.description).sorted(by: routeOrder)
+      routes: routeCandidates.map(\.description).sorted(by: routeOrder),
+      typeSchemas: typeSchemas
     )
   }
 
@@ -497,14 +529,14 @@ public struct EndpointPlanCompiler: Sendable {
   private func routesOverlap(_ left: String, _ right: String) -> Bool {
     let leftComponents = left.split(separator: "/").map(String.init)
     let rightComponents = right.split(separator: "/").map(String.init)
-    if leftComponents.last == "{path...}" {
+    if leftComponents.last == "{path}" {
       let prefix = leftComponents.dropLast()
       guard rightComponents.count >= prefix.count else { return false }
       return zip(prefix, rightComponents.prefix(prefix.count)).allSatisfy {
         componentsOverlap($0.0, $0.1)
       }
     }
-    if rightComponents.last == "{path...}" {
+    if rightComponents.last == "{path}" {
       let prefix = rightComponents.dropLast()
       guard leftComponents.count >= prefix.count else { return false }
       return zip(leftComponents.prefix(prefix.count), prefix).allSatisfy {

@@ -68,12 +68,14 @@ public enum MarkdownServerHTTPAdapter {
   ///   - plan: Validated source of route truth.
   ///   - snapshot: Immutable read-side state used by every handler.
   ///   - router: Hummingbird router that receives the planned routes.
+  /// - Returns: Every route successfully installed, preserving endpoint-plan order.
   /// - Throws: ``MarkdownServerHTTPAdapterError`` when the plan and snapshot drift.
+  @discardableResult
   public static func register(
     plan: EndpointPlan,
     snapshot: MarkdownServerReadSnapshot,
     on router: Router<BasicRequestContext>
-  ) throws {
+  ) throws -> [EndpointRouteDescription] {
     let plannedNames = plan.resources.map(\.name).sorted()
     let snapshotNames = snapshot.resources.map(\.name).sorted()
     guard plannedNames == snapshotNames else {
@@ -83,7 +85,10 @@ public enum MarkdownServerHTTPAdapter {
       )
     }
 
+    let openAPIDocument = try MarkdownServerOpenAPIGenerator.generate(from: plan)
+    let openAPIJSON = try openAPIDocument.serialized(format: .json)
     let resources = Dictionary(uniqueKeysWithValues: snapshot.resources.map { ($0.name, $0) })
+    var installedRoutes: [EndpointRouteDescription] = []
     for route in plan.routes {
       guard route.method == .get else {
         throw MarkdownServerHTTPAdapterError.unsupportedMethod(
@@ -138,8 +143,19 @@ public enum MarkdownServerHTTPAdapter {
             conflictMessage: "Several records share the requested logical path"
           )
         }
+
+      case .openAPI:
+        router.get(RouterPath(route.path.rawValue)) { _, _ in
+          Response(
+            status: .ok,
+            headers: [.contentType: "application/json; charset=utf-8"],
+            body: .init(byteBuffer: ByteBuffer(bytes: openAPIJSON))
+          )
+        }
       }
+      installedRoutes.append(route)
     }
+    return installedRoutes
   }
 
   private static func routeResource(
@@ -159,7 +175,7 @@ public enum MarkdownServerHTTPAdapter {
     switch route.kind {
     case .logicalPath:
       return "/_md-utils/path/**"
-    case .collection, .item:
+    case .collection, .item, .openAPI:
       return route.path.rawValue
     }
   }

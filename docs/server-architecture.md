@@ -360,7 +360,7 @@ The first vertical slice proves endpoint derivation with the smallest useful rea
 6. For type selection, return records that conform to `Book`; separately test rule selection with an expected type, where invalid candidates remain visible with `valid: false` and diagnostics.
 7. Add in-process HTTP tests for success, not found, nonconforming stored data, overlapping type membership, route collisions, and revision exposure.
 
-This slice intentionally excludes OpenAPI generation, create, update, delete, authentication, SQLite, persistent indexes, and Workers deployment. It validates the resource model, endpoint-planning boundary, collision-safe generic reads, and native transport before expensive infrastructure choices are made. OpenAPI 3.1 generation follows as a separate milestone using the accepted plan.
+This slice intentionally excludes create, update, delete, authentication, SQLite, persistent indexes, and Workers deployment. It validates the resource model, endpoint-planning boundary, collision-safe generic reads, native transport, and deterministic OpenAPI 3.1 generation from the accepted plan before expensive infrastructure choices are made.
 
 The same snapshot fixtures produce the same resource responses through direct library calls and in-process Hummingbird tests without exposing Markdown storage details.
 

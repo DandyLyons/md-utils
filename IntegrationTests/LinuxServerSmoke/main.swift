@@ -7,6 +7,7 @@ import MarkdownUtilitiesServer
 enum LinuxServerSmokeError: Error {
   case unexpectedStatus(HTTPResponse.Status)
   case unexpectedRecord(GenericMarkdownRecord)
+  case unexpectedOpenAPIVersion(String?)
 }
 
 @main
@@ -68,6 +69,19 @@ enum LinuxServerSmoke {
               record.logicalPath?.rawValue == "books/dune.md"
         else {
           throw LinuxServerSmokeError.unexpectedRecord(record)
+        }
+      }
+      try await client.execute(uri: "/openapi.json", method: .get) { response in
+        guard response.status == .ok else {
+          throw LinuxServerSmokeError.unexpectedStatus(response.status)
+        }
+        let value = try JSONDecoder().decode(
+          JSONValue.self,
+          from: Data(response.body.readableBytesView)
+        )
+        let version = value.objectValue?["openapi"]?.stringValue
+        guard version == "3.1.1" else {
+          throw LinuxServerSmokeError.unexpectedOpenAPIVersion(version)
         }
       }
     }

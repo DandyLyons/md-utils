@@ -1,5 +1,9 @@
 import ArgumentParser
+import Foundation
+import MarkdownUtilitiesCore
+import PathKit
 import Testing
+import Yams
 @testable import md_utils_server
 
 @Suite("md-utils-server command line")
@@ -37,5 +41,36 @@ struct ServerEntryTests {
 
     let schema = try ServerEntry.parseAsRoot(["schema"])
     #expect(schema is ServerEntry.Schema)
+  }
+
+  @Test
+  func `OpenAPI command exports equivalent JSON and YAML without records`() throws {
+    let root = Path("tmp/server-openapi-command-tests/\(UUID().uuidString)/").absolute()
+    defer { try? root.delete() }
+    try (root + ".md-utils/server/").mkpath()
+    try (root + ".md-utils/server/server.yaml").write(
+      """
+      serverConfigVersion: "1"
+      resources: []
+      """
+    )
+    let jsonPath = root + "contract.json"
+    let yamlPath = root + "contract.yaml"
+
+    var jsonCommand = try #require(try ServerEntry.parseAsRoot([
+      "openapi", "--project-root", root.string, "--format", "json",
+      "--output", jsonPath.string,
+    ]) as? ServerEntry.OpenAPIExport)
+    try jsonCommand.run()
+    var yamlCommand = try #require(try ServerEntry.parseAsRoot([
+      "openapi", "--project-root", root.string, "--format", "yaml",
+      "--output", yamlPath.string,
+    ]) as? ServerEntry.OpenAPIExport)
+    try yamlCommand.run()
+
+    let json = try JSONDecoder().decode(JSONValue.self, from: jsonPath.read())
+    let yaml = try YAMLDecoder().decode(JSONValue.self, from: yamlPath.read())
+    #expect(json == yaml)
+    #expect(json.objectValue?["openapi"]?.stringValue == "3.1.1")
   }
 }

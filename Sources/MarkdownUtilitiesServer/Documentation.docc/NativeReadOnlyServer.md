@@ -39,6 +39,7 @@ resource-specific Swift code:
 - Item routes return one record by the resource's primary identity.
 - `/_md-utils/path/**` returns one record by exact nested logical path when fallback
   is enabled.
+- `/openapi.json` returns the active deterministic OpenAPI 3.1.1 document.
 
 Not-found results map to `404`. Invalid logical paths map to `400`. Identity and
 logical-path collisions map to `409` with every candidate in a stable
@@ -49,6 +50,9 @@ Rule-selected invalid candidates remain in successful collection and item respon
 with `valid: false` and diagnostics. Missing primary identities remain visible in a
 collection but cannot be addressed through the item route. Overlapping resource
 membership retains one canonical identity and revision across every representation.
+
+Use `md-utils-server openapi --format json|yaml --output <file>` to export the same
+contract without importing records or starting Hummingbird. See <doc:GeneratedOpenAPI>.
 
 ## Performance Boundary
 

@@ -53,7 +53,7 @@ The store contract fetches canonical records by stable identity, enumerates dete
 
 Server resources are explicit and opt-in. Configuration supports rule selection, type selection within a collection-relative search root, and rule selection with an expected type. Compilation resolves only referenced definitions, rejects unsafe or ambiguous routes, and derives stable operation IDs. Equivalent inputs produce identical plans regardless of authoring order.
 
-The read snapshot scans canonical storage in bounded pages, applies path narrowing before parsing, reuses one record analysis across rule, type, and identity assessment, and publishes immutable generic envelopes with collision-safe primary-ID and logical-path lookup. The standalone server work in issue #77 will load its own configuration outside `.md-utils.json`, add Hummingbird 2, and register adapters from the plan and snapshot. The OpenAPI generator in issue #84 consumes the same accepted plan.
+The read snapshot scans canonical storage in bounded pages, applies path narrowing before parsing, reuses one record analysis across rule, type, and identity assessment, and publishes immutable generic envelopes with collision-safe primary-ID and logical-path lookup. The native server loads its own configuration outside `.md-utils.json`, registers Hummingbird 2 adapters from the accepted plan and snapshot, and generates OpenAPI 3.1 from that same plan.
 
 **Frontmatter Handling:**
 - Uses `FrontMatterParser` to detect YAML and TOML delimiter blocks

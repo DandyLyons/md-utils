@@ -43,10 +43,12 @@ struct EndpointPlanCompilerTests {
 
     #expect(plan.serverConfigVersion == "1")
     #expect(plan.resources.map(\.name) == ["books", "published", "reviews"])
+    #expect(plan.typeSchemas.map(\.name.rawValue) == ["Book"])
     #expect(plan.routes.map(\.path.rawValue) == [
-      "/_md-utils/path/{path...}",
+      "/_md-utils/path/{path}",
       "/books",
       "/books/{id}",
+      "/openapi.json",
       "/published",
       "/reviews/{id}",
     ])
@@ -54,6 +56,7 @@ struct EndpointPlanCompilerTests {
       "md-utils.path.get",
       "books.list",
       "books.get",
+      "md-utils.openapi.get",
       "published.list",
       "reviews.get",
     ])
@@ -108,11 +111,11 @@ struct EndpointPlanCompilerTests {
   }
 
   @Test
-  func `Empty configuration produces an empty plan`() async throws {
+  func `Empty configuration produces only the contract route`() async throws {
     let plan = try compiler().compile(MarkdownServerConfiguration())
 
     #expect(plan.resources.isEmpty)
-    #expect(plan.routes.isEmpty)
+    #expect(plan.routes.map(\.path.rawValue) == ["/openapi.json"])
   }
 
   @Test

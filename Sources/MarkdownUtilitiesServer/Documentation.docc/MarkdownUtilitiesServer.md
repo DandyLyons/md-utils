@@ -106,13 +106,15 @@ and `GET /books/{id}` respectively. Operation identifiers default to
 override when required.
 
 When at least one configured `get` operation enables logical-path fallback, the
-plan includes one reserved `GET /_md-utils/path/{path...}` route. Resource routes
+plan includes one reserved `GET /_md-utils/path/{path}` contract route. The native
+adapter maps that semantic route to its `**` catch-all. Resource routes
 cannot use the `/_md-utils` namespace.
 
 ``EndpointRouteDescription`` values contain only an HTTP method, canonical path
 template, semantic route kind, optional resource name, and stable operation ID.
-``MarkdownServerHTTPAdapter`` installs these routes in Hummingbird 2. Issue #84
-generates OpenAPI 3.1 from the same ``EndpointPlan``.
+``MarkdownServerHTTPAdapter`` installs these routes in Hummingbird 2, including the
+plan-owned `/openapi.json` route. ``MarkdownServerOpenAPIGenerator`` derives the
+OpenAPI 3.1.1 description from the same plan. See <doc:GeneratedOpenAPI>.
 
 ## Startup validation
 
@@ -141,3 +143,4 @@ configuration is separate from the md-utils CLI configuration and does not exten
 
 - <doc:ReadSnapshots>
 - <doc:NativeReadOnlyServer>
+- <doc:GeneratedOpenAPI>

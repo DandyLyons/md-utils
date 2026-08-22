@@ -536,6 +536,17 @@ swift run md-utils-server \
   --port 8080
 ```
 
+`serve` is the default subcommand, so existing bare invocations remain valid. Export
+the same deterministic OpenAPI 3.1.1 contract without importing records or starting
+the service:
+
+```bash
+swift run md-utils-server openapi \
+  --project-root ./example/ \
+  --format json \
+  --output ./openapi.json
+```
+
 The default bind address is `127.0.0.1:8080`. `LOG_LEVEL` controls Swift Logging.
 Hummingbird handles `SIGINT` and `SIGTERM` through graceful service shutdown.
 
@@ -543,6 +554,7 @@ Hummingbird handles `SIGINT` and `SIGTERM` through graceful service shutdown.
 - `GET /books/{id}` returns one unambiguous primary-ID record.
 - `GET /_md-utils/path/**` returns an exact nested logical path when at least one
   `get` resource enables fallback.
+- `GET /openapi.json` returns the active generated OpenAPI 3.1.1 document.
 - Missing records return `404`; invalid lookup paths return `400`; identity or path
   collisions return `409` with every candidate in
   `{"error":{"code","message","candidates"}}`.
@@ -585,6 +597,7 @@ docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 - [swift-toml](https://github.com/mattt/swift-toml) — TOML parsing and serialization
 - [jmespath.swift](https://github.com/nicktmro/jmespath.swift) — JMESPath query language for JSON
 - [Hummingbird 2](https://github.com/hummingbird-project/hummingbird) — Native HTTP routing and lifecycle
+- [OpenAPIKit](https://github.com/mattpolzin/OpenAPIKit) — OpenAPI 3.1 decoding and strict contract validation
 
 ## Platform Compatibility
 **macOS** is the primary development and testing platform. Core, native integrations, and the CLI are covered by the full Swift test suite.

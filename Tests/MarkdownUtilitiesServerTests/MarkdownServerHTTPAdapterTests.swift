@@ -11,6 +11,8 @@ struct MarkdownServerHTTPAdapterTests {
   func `Planned routes preserve validity overlap paths missing IDs and collisions`() async throws {
     guard #available(macOS 14.0, *) else { return }
     let fixture = try await makeFixture()
+    let expectedOpenAPI = try MarkdownServerOpenAPIGenerator.generate(from: fixture.plan)
+      .serialized(format: .json)
     let router = Router()
     try MarkdownServerHTTPAdapter.register(
       plan: fixture.plan,
@@ -88,6 +90,12 @@ struct MarkdownServerHTTPAdapterTests {
         #expect(response.status == .notFound)
         let envelope = try decode(MarkdownServerHTTPErrorEnvelope.self, from: response.body)
         #expect(envelope.error.code == "record.not-found")
+      }
+
+      try await client.execute(uri: "/openapi.json", method: .get) { response in
+        #expect(response.status == .ok)
+        #expect(response.headers[.contentType] == "application/json; charset=utf-8")
+        #expect(Data(response.body.readableBytesView) == expectedOpenAPI)
       }
     }
   }

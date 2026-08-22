@@ -93,6 +93,38 @@ struct MarkdownTypeDefinitionTests {
   }
 
   @Test
+  func `Registry exposes immutable resolved external frontmatter schemas`() throws {
+    let name = MarkdownTypeName(rawValue: "Book")
+    let definition = MarkdownTypeDefinition(
+      name: name,
+      version: "draft-3",
+      frontmatter: MarkdownFrontmatterDefinition(
+        presence: .optional,
+        schemas: [.reference("book.schema.json"), .reference("book.schema.json")]
+      ),
+      source: "types/book.mdtype.yaml"
+    )
+    let schema = JSONValue.object([
+      "type": .string("object"),
+      "required": .array([.string("title")]),
+    ])
+    let registry = try MarkdownTypeRegistry(
+      definitions: [definition],
+      schemaProvider: FixedSchemaProvider(schema: schema)
+    )
+
+    let resolved = try #require(registry.resolvedFrontmatterSchema(for: name))
+
+    #expect(resolved.name == name)
+    #expect(resolved.version == "draft-3")
+    #expect(resolved.presence == .optional)
+    #expect(resolved.schemas.count == 1)
+    #expect(resolved.schemas.first?.objectValue?["$schema"]?.stringValue
+      == "https://json-schema.org/draft/2020-12/schema")
+    #expect(resolved.schemas.first?.objectValue?["required"] == .array([.string("title")]))
+  }
+
+  @Test
   func `Reject duplicate constraint identifiers across domains`() async throws {
     let duplicate = MarkdownConstraint(
       id: "location",
@@ -174,5 +206,13 @@ struct MarkdownTypeDefinitionTests {
     #expect(throws: MarkdownTypeDefinitionError.self) {
       try MarkdownTypeRegistry(definitions: [definition])
     }
+  }
+}
+
+private struct FixedSchemaProvider: MarkdownSchemaResourceProvider {
+  let schema: JSONValue
+
+  func resource(reference: String, relativeTo source: String?) throws -> MarkdownSchemaResource {
+    MarkdownSchemaResource(source: "schemas/\(reference)", schema: schema)
   }
 }

@@ -30,6 +30,20 @@ public struct MarkdownServerRuntime: Sendable {
   }
 }
 
+/// A plan-only native server composition suitable for contract export.
+public struct MarkdownServerPlanRuntime: Sendable {
+  /// Decoded opt-in resource configuration.
+  public let configuration: MarkdownServerConfiguration
+  /// Validated plan containing routes and referenced schema contracts.
+  public let plan: EndpointPlan
+
+  /// Creates a plan-only runtime without importing project records.
+  public init(configuration: MarkdownServerConfiguration, plan: EndpointPlan) {
+    self.configuration = configuration
+    self.plan = plan
+  }
+}
+
 /// Native startup failures produced before Hummingbird begins accepting requests.
 public enum MarkdownServerProjectLoaderError: Error, Equatable, LocalizedError, Sendable {
   /// The supplied project root does not exist.
@@ -105,6 +119,36 @@ public struct MarkdownServerProjectLoader: @unchecked Sendable {
   /// Every step completes before an immutable runtime is returned, so malformed startup
   /// inputs cannot produce a partially registered server.
   public func load() async throws -> MarkdownServerRuntime {
+    let dependencies = try loadPlanDependencies()
+    let records = try loadRecords()
+    let store = try InMemoryRecordStore(records: records)
+    let snapshot = try await MarkdownServerReadSnapshotBuilder(
+      store: store,
+      plan: dependencies.plan,
+      ruleRegistry: dependencies.ruleRegistry,
+      typeRegistry: dependencies.typeRegistry
+    ).build()
+    return MarkdownServerRuntime(
+      configuration: dependencies.configuration,
+      plan: dependencies.plan,
+      snapshot: snapshot,
+      importedRecordCount: records.count
+    )
+  }
+
+  /// Loads configuration, rules, types, and the immutable plan without scanning records.
+  ///
+  /// Use this path for offline contract generation, where importing Markdown content
+  /// would add unnecessary startup work and filesystem failure modes.
+  public func loadPlan() throws -> MarkdownServerPlanRuntime {
+    let dependencies = try loadPlanDependencies()
+    return MarkdownServerPlanRuntime(
+      configuration: dependencies.configuration,
+      plan: dependencies.plan
+    )
+  }
+
+  private func loadPlanDependencies() throws -> PlanDependencies {
     try validatePaths()
     let configuration = try loadServerConfiguration()
     let typeRegistry = try loadTypeRegistry()
@@ -113,19 +157,11 @@ public struct MarkdownServerProjectLoader: @unchecked Sendable {
       ruleRegistry: ruleRegistry,
       typeRegistry: typeRegistry
     ).compile(configuration)
-    let records = try loadRecords()
-    let store = try InMemoryRecordStore(records: records)
-    let snapshot = try await MarkdownServerReadSnapshotBuilder(
-      store: store,
+    return PlanDependencies(
+      configuration: configuration,
       plan: plan,
       ruleRegistry: ruleRegistry,
       typeRegistry: typeRegistry
-    ).build()
-    return MarkdownServerRuntime(
-      configuration: configuration,
-      plan: plan,
-      snapshot: snapshot,
-      importedRecordCount: records.count
     )
   }
 
@@ -239,6 +275,13 @@ public struct MarkdownServerProjectLoader: @unchecked Sendable {
     Path(URL(fileURLWithPath: path.absolute().string).resolvingSymlinksInPath().path)
       .normalize()
   }
+}
+
+private struct PlanDependencies {
+  let configuration: MarkdownServerConfiguration
+  let plan: EndpointPlan
+  let ruleRegistry: MarkdownRuleRegistry
+  let typeRegistry: MarkdownTypeRegistry
 }
 
 /// Human-authored YAML boundary mapped into the transport-neutral configuration model.
