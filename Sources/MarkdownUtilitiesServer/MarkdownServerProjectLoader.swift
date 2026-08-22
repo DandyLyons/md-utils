@@ -71,7 +71,7 @@ public enum MarkdownServerProjectLoaderError: Error, Equatable, LocalizedError, 
 /// filesystem watcher or a persistent store.
 public struct MarkdownServerProjectLoader: @unchecked Sendable {
   /// Default configuration location relative to a project root.
-  public static let defaultConfigurationPath = ".md-utils/server.yaml"
+  public static let defaultConfigurationPath = ".md-utils/server/server.yaml"
   /// Supported canonical Markdown filename extensions.
   public static let markdownExtensions: Set<String> = ["md", "markdown"]
 

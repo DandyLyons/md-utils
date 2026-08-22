@@ -4,9 +4,21 @@ Compose a project snapshot once and expose it through generic Hummingbird 2 rout
 
 ## Startup
 
-`md-utils-server` reads `.md-utils/server.yaml` by default. `--project-root` changes
+`md-utils-server` reads `.md-utils/server/server.yaml` by default. `--project-root` changes
 the root used for records, rules, mdtypes, and schemas; `--config` selects another
 YAML file; `--hostname` and `--port` override `127.0.0.1:8080`.
+
+Run `md-utils-server init` from a project root to create a minimal configuration and
+install `.md-utils/server/server.schema.json` for editor validation. Initialization
+preserves an existing `server.yaml`. `md-utils-server schema` prints the canonical
+bundled JSON Schema. `md-utils-server serve` starts the server explicitly;
+`md-utils-server` remains an alias for that default subcommand.
+
+The YAML requires `serverConfigVersion: "1"` and a `resources` array. Each resource
+requires a unique `name`, safe absolute `route`, at least one `list` or `get`
+operation, an explicit rule- or type-based `selection`, and an `identityPolicy`.
+The optional projection defaults to `genericRecord`, operation-ID overrides default
+to an empty array, and logical-path fallback defaults to enabled.
 
 ``MarkdownServerProjectLoader`` loads `.md-utils/md-utils.json` when present,
 recursively imports `.md` and `.markdown` files outside `.md-utils/` into

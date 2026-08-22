@@ -32,7 +32,7 @@ The original type-system prerequisite has been met. The project now has enough p
 - `MarkdownUtilitiesServer` defines the asynchronous, storage-neutral `RecordStore` contract and actor-backed `InMemoryRecordStore` reference implementation.
 - `MarkdownServerReadSnapshotBuilder` performs one bounded scan, reuses one analysis per candidate, and builds immutable generic record, membership, validity, identity, and lookup indexes.
 - `MarkdownServerHTTPAdapter` registers generic Hummingbird 2 collection, item, and reserved logical-path handlers directly from the immutable plan.
-- `md-utils-server` loads `.md-utils/server.yaml`, imports project Markdown recursively, builds one immutable snapshot, logs startup state, and runs with signal-aware lifecycle handling.
+- `md-utils-server` loads `.md-utils/server/server.yaml`, imports project Markdown recursively, builds one immutable snapshot, logs startup state, and runs with signal-aware lifecycle handling.
 
 The normative type design is documented in [RFC 0001: mdtype](rfcs/0001-mdtype.md). The portable dependency and runtime status is documented in [WebAssembly Support](webassembly.md).
 
@@ -80,7 +80,7 @@ The implemented plan contains resource names, routes, read operations, selection
 
 The OpenAPI document is inspectable, versionable output from the plan. It is not an input to Swift source generation. Resource-specific Swift code, Swift OpenAPI Generator, build plugins, and generated server protocols are explicit non-goals. Native and Workers transports use generic handlers backed by the same endpoint semantics.
 
-This decision is tracked in [issue #77](https://github.com/DandyLyons/md-utils/issues/77) and [issue #84](https://github.com/DandyLyons/md-utils/issues/84).
+The native server vertical slice implements this plan/runtime boundary. OpenAPI generation remains tracked in [issue #84](https://github.com/DandyLyons/md-utils/issues/84).
 
 ### Use Hummingbird 2 for the Native Server
 
@@ -281,17 +281,24 @@ Inferring these choices from a type name or path glob would create unstable APIs
 
 Server resources are opt-in. The versioned `MarkdownServerConfiguration` associates a stable resource name with explicit selection, route, read operations, identity, and projection behavior.
 
-The following remains illustrative file syntax; issue #77 owns file-format decoding into the implemented `Codable` model:
+The native server decodes the versioned model from `.md-utils/server/server.yaml`. The
+complete contract is documented in the README and bundled as
+`Sources/MarkdownUtilitiesServer/Resources/1_server.schema.json`:
 
 ```yaml
+serverConfigVersion: "1"
 resources:
-  books:
-    type: Book
+  - name: books
     route: /books
     operations: [list, get]
-    id: recordIdentity
-    representation: book-v1
-    rules: [published-books]
+    selection:
+      mode: type
+      type: Book
+      searchRoot: books/
+    identityPolicy:
+      source: frontmatter
+      path: [slug]
+      format: string
 ```
 
 The resource configuration should be separate from the mdtype contract. A type remains portable validation infrastructure even when no server exposes it, and the same type can support different server representations in different applications.
@@ -377,7 +384,7 @@ rules + mdtype definitions + resource configuration
                          FileRecordStore or SQLiteRecordStore
 ```
 
-`MarkdownUtilitiesServer` owns plan construction and generic handlers. The `md-utils-server` executable performs startup composition and serves the registered plan through Hummingbird 2. No resource-specific Swift source is generated. The process accepts `--project-root`, `--config`, `--hostname`, and `--port`; it defaults to `.md-utils/server.yaml` and `127.0.0.1:8080`.
+`MarkdownUtilitiesServer` owns plan construction and generic handlers. The `md-utils-server` executable performs startup composition and serves the registered plan through Hummingbird 2. No resource-specific Swift source is generated. The process accepts `--project-root`, `--config`, `--hostname`, and `--port`; it defaults to `.md-utils/server/server.yaml` and `127.0.0.1:8080`.
 
 At startup, the executable loads rule and mdtype definitions, recursively imports project Markdown while excluding `.md-utils/`, compiles the plan, and publishes one immutable snapshot. A filesystem change becomes visible only after restart. `runService()` handles `SIGINT` and `SIGTERM` through graceful lifecycle shutdown.
 
@@ -439,7 +446,6 @@ Before adopting SQLite, a prototype should test round-trip fidelity, index rebui
 
 The following questions remain intentionally unresolved:
 
-- The standalone server configuration file syntax and location; the transport-neutral model is versioned independently at version `1`.
 - Whether OpenAPI is generated as a complete document or composed with maintainer-authored operations.
 - The public resource representation and section-to-field projection model.
 - Whether the first general representation is domain-specific, generic JSON, or both.

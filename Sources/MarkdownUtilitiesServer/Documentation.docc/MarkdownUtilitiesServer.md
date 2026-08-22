@@ -130,7 +130,7 @@ projection policies without mutating the plan.
 
 ``MarkdownServerConfiguration`` is a versioned `Codable` model, currently version
 `1`. ``MarkdownServerProjectLoader`` decodes the human-authored YAML at
-`.md-utils/server.yaml`, loads rules and mdtypes, recursively imports Markdown, and
+`.md-utils/server/server.yaml`, loads rules and mdtypes, recursively imports Markdown, and
 builds the immutable plan and snapshot before route registration. Server
 configuration is separate from the md-utils CLI configuration and does not extend
 `.md-utils/md-utils.json`.

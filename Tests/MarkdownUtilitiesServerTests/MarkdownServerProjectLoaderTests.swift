@@ -6,14 +6,58 @@ import Testing
 @Suite("Native server project loading")
 struct MarkdownServerProjectLoaderTests {
   @Test
+  func `Server initialization creates valid configuration and preserves existing YAML`() async throws {
+    let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
+    defer { try? root.delete() }
+    try root.mkpath()
+
+    let first = try MarkdownServerConfigurationBootstrapper.initialize(projectRoot: root)
+
+    #expect(first.configurationCreated)
+    #expect(first.configurationFile == root + ".md-utils/server/server.yaml")
+    #expect(first.schemaFile == root + ".md-utils/server/server.schema.json")
+    #expect(first.configurationFile.exists)
+    #expect(first.schemaFile.exists)
+    #expect(
+      try first.schemaFile.read(.utf8) == MarkdownServerConfigurationSchema.content()
+    )
+
+    let runtime = try await MarkdownServerProjectLoader(projectRoot: root).load()
+    #expect(runtime.configuration.serverConfigVersion == "1")
+    #expect(runtime.configuration.resources.isEmpty)
+
+    try first.configurationFile.write(
+      """
+      serverConfigVersion: "1"
+      resources: []
+      # retained marker
+      """
+    )
+    let second = try MarkdownServerConfigurationBootstrapper.initialize(projectRoot: root)
+
+    #expect(second.configurationCreated == false)
+    #expect(try second.configurationFile.read(.utf8).contains("# retained marker"))
+  }
+
+  @Test
+  func `Bundled server schema is valid JSON`() throws {
+    let content = try MarkdownServerConfigurationSchema.content()
+    let data = try #require(content.data(using: .utf8))
+    let schema = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+    #expect(schema["$schema"] as? String == "https://json-schema.org/draft/2020-12/schema")
+    #expect(schema["title"] as? String == "md-utils server configuration")
+  }
+
+  @Test
   func `Default YAML loads rules and recursively imports Markdown once`() async throws {
     let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
     defer { try? root.delete() }
-    try (root + ".md-utils/").mkpath()
+    try (root + ".md-utils/server/").mkpath()
     try (root + "books/classics/").mkpath()
     try (root + "notes/").mkpath()
 
-    try (root + ".md-utils/server.yaml").write(
+    try (root + ".md-utils/server/server.yaml").write(
       """
       serverConfigVersion: "1"
       resources:
@@ -50,7 +94,7 @@ struct MarkdownServerProjectLoaderTests {
     let loader = MarkdownServerProjectLoader(projectRoot: root)
     let runtime = try await loader.load()
 
-    #expect(loader.configurationFile == root + ".md-utils/server.yaml")
+    #expect(loader.configurationFile == root + ".md-utils/server/server.yaml")
     #expect(runtime.importedRecordCount == 2)
     #expect(runtime.plan.resources.map(\.name) == ["books"])
     #expect(runtime.plan.routes.map(\.path.rawValue) == [
@@ -70,7 +114,7 @@ struct MarkdownServerProjectLoaderTests {
     let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
     defer { try? root.delete() }
     try root.mkpath()
-    let expectedPath = (root + ".md-utils/server.yaml").normalize().string
+    let expectedPath = (root + ".md-utils/server/server.yaml").normalize().string
 
     await #expect(throws: MarkdownServerProjectLoaderError.configurationNotFound(expectedPath)) {
       try await MarkdownServerProjectLoader(projectRoot: root).load()
@@ -82,8 +126,8 @@ struct MarkdownServerProjectLoaderTests {
     let base = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
     let root = base + "project/"
     defer { try? base.delete() }
-    try (root + ".md-utils/").mkpath()
-    try (root + ".md-utils/server.yaml").write(
+    try (root + ".md-utils/server/").mkpath()
+    try (root + ".md-utils/server/server.yaml").write(
       """
       serverConfigVersion: "1"
       resources: []

@@ -102,6 +102,9 @@ let package = Package(
         .product(name: "JMESPath", package: "jmespath.swift"),
         .product(name: "PathKit", package: "PathKit"),
         "Yams",
+      ],
+      resources: [
+        .process("Resources/1_server.schema.json"),
       ]
     ),
     .testTarget(
@@ -134,6 +137,13 @@ let package = Package(
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "Logging", package: "swift-log"),
         .product(name: "PathKit", package: "PathKit"),
+      ]
+    ),
+    .testTarget(
+      name: "md-utils-serverTests",
+      dependencies: [
+        "md-utils-server",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ]
     ),
 

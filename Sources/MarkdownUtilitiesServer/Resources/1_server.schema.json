@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dandylyons.github.io/md-utils/schemas/server/1/server.schema.json",
+  "title": "md-utils server configuration",
+  "description": "Configuration for the native read-only md-utils-server.",
+  "type": "object",
+  "required": ["serverConfigVersion", "resources"],
+  "properties": {
+    "serverConfigVersion": {
+      "const": "1",
+      "description": "Server configuration schema version. This is independent of the md-utils.json configVersion."
+    },
+    "resources": {
+      "type": "array",
+      "description": "Explicitly exposed Markdown-backed HTTP resources.",
+      "items": { "$ref": "#/$defs/resource" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "required": ["name", "route", "operations", "selection", "identityPolicy"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S(?:.*\\S)?$",
+          "description": "Stable, case-sensitive resource name."
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^/(?!_md-utils(?:/|$))(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\?#*{}:%\\s]+$",
+          "description": "Absolute literal collection route without a trailing slash. The /_md-utils namespace is reserved."
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["list", "get"] },
+          "description": "Read operations exposed for the resource."
+        },
+        "selection": {
+          "oneOf": [
+            { "$ref": "#/$defs/ruleSelection" },
+            { "$ref": "#/$defs/typeSelection" },
+            { "$ref": "#/$defs/ruleWithExpectedTypeSelection" }
+          ]
+        },
+        "identityPolicy": { "$ref": "#/$defs/identityPolicy" },
+        "projectionPolicy": {
+          "const": "genericRecord",
+          "default": "genericRecord",
+          "description": "Response representation. genericRecord is the only supported policy in version 1."
+        },
+        "operationIDOverrides": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/operationIDOverride" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ruleSelection": {
+      "type": "object",
+      "required": ["mode", "rule"],
+      "properties": {
+        "mode": { "const": "rule" },
+        "rule": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "typeSelection": {
+      "type": "object",
+      "required": ["mode", "type", "searchRoot"],
+      "properties": {
+        "mode": { "const": "type" },
+        "type": { "type": "string", "minLength": 1 },
+        "searchRoot": {
+          "type": "string",
+          "pattern": "^(?:\\.|(?!/)(?!.*(?:^|/)\\.{1,2}/)(?!.*//)[^\\\\]+/)$",
+          "description": "Collection-relative directory ending in /, or . for the project root."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ruleWithExpectedTypeSelection": {
+      "type": "object",
+      "required": ["mode", "rule", "type"],
+      "properties": {
+        "mode": { "const": "ruleWithExpectedType" },
+        "rule": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "identityPolicy": {
+      "oneOf": [
+        { "$ref": "#/$defs/intrinsicIdentityPolicy" },
+        { "$ref": "#/$defs/frontmatterIdentityPolicy" }
+      ]
+    },
+    "intrinsicIdentityPolicy": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": { "enum": ["existingIdentity", "logicalPath"] },
+        "logicalPathFallbackEnabled": { "type": "boolean", "default": true }
+      },
+      "additionalProperties": false
+    },
+    "frontmatterIdentityPolicy": {
+      "oneOf": [
+        { "$ref": "#/$defs/nonSlugFrontmatterIdentityPolicy" },
+        { "$ref": "#/$defs/slugFrontmatterIdentityPolicy" }
+      ]
+    },
+    "nonSlugFrontmatterIdentityPolicy": {
+      "type": "object",
+      "required": ["source", "path", "format"],
+      "properties": {
+        "source": { "const": "frontmatter" },
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "format": { "enum": ["string", "integer", "uuid"] },
+        "logicalPathFallbackEnabled": { "type": "boolean", "default": true }
+      },
+      "additionalProperties": false
+    },
+    "slugFrontmatterIdentityPolicy": {
+      "type": "object",
+      "required": ["source", "path", "format", "slugPolicy"],
+      "properties": {
+        "source": { "const": "frontmatter" },
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "format": { "const": "slug" },
+        "slugPolicy": { "enum": ["strictASCII", "unicode", "preserve"] },
+        "logicalPathFallbackEnabled": { "type": "boolean", "default": true }
+      },
+      "additionalProperties": false
+    },
+    "operationIDOverride": {
+      "type": "object",
+      "required": ["operation", "operationID"],
+      "properties": {
+        "operation": { "enum": ["list", "get"] },
+        "operationID": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

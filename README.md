@@ -418,11 +418,96 @@ When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_
 ## Native Read-Only Server
 
 `md-utils-server` uses Hummingbird 2 to expose explicitly configured resources. It
-loads `.md-utils/server.yaml`, rules from `.md-utils/md-utils.json`, mdtypes from
+loads `.md-utils/server/server.yaml`, rules from `.md-utils/md-utils.json`, mdtypes from
 `.md-utils/types/`, and `.md` or `.markdown` records recursively beneath the project
 root. Files inside `.md-utils/` are never imported as records.
 
+Initialize a project from its root before starting the server:
+
+```bash
+swift run md-utils-server init
+```
+
+This creates a minimal `.md-utils/server/server.yaml` and installs
+`.md-utils/server/server.schema.json` for editor validation and completion. Existing
+`server.yaml` content is preserved, while the local schema copy is refreshed. The
+generated empty `resources` array is valid and starts a server with no resource
+routes; add at least one resource to expose Markdown.
+
+Print the same canonical JSON Schema without initializing a project with:
+
+```bash
+swift run md-utils-server schema
+```
+
+The bundled schema source is
+[`Sources/MarkdownUtilitiesServer/Resources/1_server.schema.json`](Sources/MarkdownUtilitiesServer/Resources/1_server.schema.json).
+
+### `server.yaml` schema
+
+The top-level `serverConfigVersion` is required and must be `"1"`. It is versioned
+independently from `.md-utils/md-utils.json`. `resources` is a required array; every
+resource has these fields:
+
+| Field | Required | Accepted value |
+| --- | --- | --- |
+| `name` | Yes | Nonempty, case-sensitive name unique across resources |
+| `route` | Yes | Safe absolute literal route such as `/books`; trailing `/` and `/_md-utils` are forbidden |
+| `operations` | Yes | One or both unique values: `list`, `get` |
+| `selection` | Yes | One of the three selection objects described below |
+| `identityPolicy` | Yes | `existingIdentity`, `logicalPath`, or a frontmatter identity |
+| `projectionPolicy` | No | `genericRecord` (the version 1 default and only value) |
+| `operationIDOverrides` | No | Array of `{operation, operationID}` objects; defaults to `[]` |
+
+Selection modes are mutually exclusive:
+
 ```yaml
+# Records to which a rule applies
+selection:
+  mode: rule
+  rule: published-books
+
+# Records conforming to an mdtype beneath a directory, or use . for the root
+selection:
+  mode: type
+  type: Book
+  searchRoot: books/
+
+# Rule-selected records with separate mdtype validity diagnostics
+selection:
+  mode: ruleWithExpectedType
+  rule: books
+  type: Book
+```
+
+Rule names must exist in `.md-utils/md-utils.json`; type names must exist in
+`.md-utils/types/`. A `searchRoot` must be `.` or a collection-relative directory
+ending in `/`.
+
+Identity policies use one of these shapes:
+
+```yaml
+identityPolicy:
+  source: existingIdentity       # canonical record identity
+  logicalPathFallbackEnabled: true
+
+identityPolicy:
+  source: logicalPath            # project-relative Markdown path
+  logicalPathFallbackEnabled: true
+
+identityPolicy:
+  source: frontmatter
+  path: [catalog, slug]           # nonempty nested frontmatter path
+  format: slug                    # string, integer, uuid, or slug
+  slugPolicy: strictASCII         # required only for slug: strictASCII, unicode, preserve
+  logicalPathFallbackEnabled: true
+```
+
+`logicalPathFallbackEnabled` defaults to `true`. When it is enabled on a resource
+with `get`, the server also exposes its server-wide logical-path lookup route.
+
+```yaml
+# yaml-language-server: $schema=server.schema.json
 serverConfigVersion: "1"
 resources:
   - name: books
@@ -439,20 +524,14 @@ resources:
       logicalPathFallbackEnabled: true
 ```
 
-Identity `source` supports `existingIdentity`, `logicalPath`, and `frontmatter`.
-Frontmatter identities require a nonempty `path` and a `format` of `string`,
-`integer`, `uuid`, or `slug`; slug identities also require `slugPolicy` set to
-`strictASCII`, `unicode`, or `preserve`. Projection defaults to `genericRecord`,
-operation-ID overrides default to an empty list, and logical-path fallback defaults
-to enabled.
-
 Start the server from the directory containing `.md-utils/`:
 
 ```bash
 swift run md-utils-server
+swift run md-utils-server serve
 swift run md-utils-server \
   --project-root ./example/ \
-  --config .md-utils/server.yaml \
+  --config .md-utils/server/server.yaml \
   --hostname 0.0.0.0 \
   --port 8080
 ```
