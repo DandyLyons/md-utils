@@ -47,7 +47,7 @@ The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
 
 ### fm-var Foundation
 
-Core's `FMVar/` feature area defines the portable RFC 001 Rev 2 vocabulary for `<fm-var>`,
+Core's `FMVar/` feature area defines the portable [RFC 001 Rev 2](https://github.com/DandyLyons/fm-var-tag/blob/e235f05f19c0c62cf288910bf6fe9952e3b5d18c/PROPOSAL.md) vocabulary for `<fm-var>`,
 `<fm-list>`, and `<fm-format>`. It includes lossless raw attributes, exact half-open UTF-8 source
 ranges, normalized declarations, formatting provenance, statuses, stable diagnostic codes, and
 proposed child-text edits. UTF-8 offsets are zero-based; diagnostic lines and UTF-8 byte columns

@@ -12,6 +12,11 @@ resolve URI references or key paths, coerce or format values, escape cached text
 YAML frontmatter is authoritative under the v1 specification. TOML frontmatter support in other
 parts of `MarkdownUtilitiesCore` does not extend the fm-var source model.
 
+Use ``FMVarElement`` and ``FMVarRawAttribute`` for lossless scanner output. After syntax validation,
+represent normalized attributes with ``FMVarScalarDeclaration``, ``FMVarListDeclaration``, or
+``FMVarFormatDeclaration``. ``FMVarEffectiveConfiguration`` records both the flattened formatting
+values and the precedence layer that supplied each populated option.
+
 ## Source Coordinates
 
 ``FMVarSourcePosition`` records a zero-based UTF-8 byte offset together with one-based line and
@@ -22,6 +27,15 @@ line and the position after LF is column one of the next line.
 ``FMVarSourceRange`` is half-open. Its end position may equal the source snapshot's end-of-file
 offset. ``FMVarSourceMap`` translates positions in both directions and rejects coordinates outside
 the immutable source snapshot against which it was initialized.
+
+```swift
+let source = "é\r\n<fm-var key=\"title\">Old</fm-var>"
+let sourceMap = FMVarSourceMap(source: source)
+let cacheRange = try sourceMap.range(fromUTF8Offset: 24, toUTF8Offset: 27)
+
+cacheRange.start.line    // 2
+cacheRange.start.column  // 21
+```
 
 Reference edits use ``FMVarTextEdit`` to replace only an element's cache range. Native host layers
 remain responsible for checking the source revision and applying edits atomically.
