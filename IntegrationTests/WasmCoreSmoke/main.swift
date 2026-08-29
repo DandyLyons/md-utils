@@ -6,6 +6,7 @@ enum WasmCoreSmokeError: Error {
   case renderMismatch
   case tomlMismatch
   case typeAssessmentFailed
+  case fmVarModelMismatch
 }
 
 @main
@@ -86,6 +87,24 @@ struct WasmCoreSmoke {
     )
     guard assessment.conforms else {
       throw WasmCoreSmokeError.typeAssessmentFailed
+    }
+
+    let fmVarSourceMap = FMVarSourceMap(source: "é\r\n<fm-var key=\"title\">old</fm-var>")
+    let fmVarPosition = try fmVarSourceMap.position(atUTF8Offset: 24)
+    let fmVarDeclaration = FMVarScalarDeclaration(
+      key: "title",
+      type: .string,
+      locale: "en-US"
+    )
+    guard fmVarPosition.line == 2,
+      fmVarPosition.column == 21,
+      try fmVarSourceMap.utf8Offset(
+        line: fmVarPosition.line,
+        column: fmVarPosition.column
+      ) == 24,
+      fmVarDeclaration.type == .string
+    else {
+      throw WasmCoreSmokeError.fmVarModelMismatch
     }
 
     print("MarkdownUtilitiesCore WebAssembly smoke test passed")

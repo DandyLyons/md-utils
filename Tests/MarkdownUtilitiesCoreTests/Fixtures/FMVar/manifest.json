@@ -1,0 +1,62 @@
+{
+  "$schema": "schema.json",
+  "schema-version": 1,
+  "specification": {
+    "repository": "https://github.com/DandyLyons/fm-var-tag",
+    "document": "PROPOSAL.md",
+    "rfc": "RFC 001 Rev 2",
+    "revision": "e235f05f19c0c62cf288910bf6fe9952e3b5d18c",
+    "blob": "44fc7af58564eeaf94452644930c4fc01328aa7d"
+  },
+  "cases": [
+    {
+      "id": "all-v1-attributes",
+      "summary": "All three elements and every RFC 001 Rev 2 attribute",
+      "input": "cases/all-v1-attributes/input.md",
+      "expectation": "cases/all-v1-attributes/expected.json",
+      "features": ["fm-var", "fm-list", "fm-format", "attributes", "effective-format"]
+    },
+    {
+      "id": "fallback-and-stale",
+      "summary": "Fallback replaces a stale scalar cache",
+      "input": "cases/fallback-and-stale/input.md",
+      "expectation": "cases/fallback-and-stale/expected.json",
+      "features": ["fallback", "stale", "text-edit"]
+    },
+    {
+      "id": "unresolved-value",
+      "summary": "A missing value without a default retains its cache",
+      "input": "cases/unresolved-value/input.md",
+      "expectation": "cases/unresolved-value/expected.json",
+      "features": ["unresolved", "key-path", "diagnostic"]
+    },
+    {
+      "id": "denied-source",
+      "summary": "A host-denied source retains the existing cache",
+      "input": "cases/denied-source/input.md",
+      "expectation": "cases/denied-source/expected.json",
+      "features": ["denied", "source", "diagnostic"]
+    },
+    {
+      "id": "unsupported-shapes",
+      "summary": "Mapping scalars and nested list members fail atomically",
+      "input": "cases/unsupported-shapes/input.md",
+      "expectation": "cases/unsupported-shapes/expected.json",
+      "features": ["invalid", "unsupported", "value-shape", "list-shape"]
+    },
+    {
+      "id": "escaping-unicode",
+      "summary": "Unicode text survives while markup and Markdown delimiters are escaped",
+      "input": "cases/escaping-unicode/input.md",
+      "expectation": "cases/escaping-unicode/expected.json",
+      "features": ["unicode", "escaping", "text-edit"]
+    },
+    {
+      "id": "crlf-offsets",
+      "summary": "Encoded CRLF source demonstrates UTF-8 byte location semantics",
+      "input": "cases/crlf-offsets/input.json",
+      "expectation": "cases/crlf-offsets/expected.json",
+      "features": ["crlf", "utf8", "source-range"]
+    }
+  ]
+}

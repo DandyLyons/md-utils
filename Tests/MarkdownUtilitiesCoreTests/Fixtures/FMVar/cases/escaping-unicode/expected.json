@@ -1,0 +1,27 @@
+{
+  "case-id": "escaping-unicode",
+  "statuses": ["stale"],
+  "diagnostics": [
+    {
+      "code": "fm-var.cache.stale",
+      "severity": "warning",
+      "range": {
+        "start": { "utf8-offset": 20, "line": 1, "column": 21 },
+        "end": { "utf8-offset": 23, "line": 1, "column": 24 }
+      },
+      "element-ordinal": 0,
+      "element-kind": "fm-var",
+      "message": "Cached content requires text-only serialization"
+    }
+  ],
+  "edits": [
+    {
+      "range": {
+        "start": { "utf8-offset": 20, "line": 1, "column": 21 },
+        "end": { "utf8-offset": 23, "line": 1, "column": 24 }
+      },
+      "replacement": "Café &amp; &lt;b&gt; &#42;bold&#42;",
+      "element-ordinal": 0
+    }
+  ]
+}

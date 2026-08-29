@@ -1,0 +1,27 @@
+{
+  "case-id": "fallback-and-stale",
+  "statuses": ["stale", "fallback"],
+  "diagnostics": [
+    {
+      "code": "fm-var.cache.stale",
+      "severity": "warning",
+      "range": {
+        "start": { "utf8-offset": 41, "line": 1, "column": 42 },
+        "end": { "utf8-offset": 44, "line": 1, "column": 45 }
+      },
+      "element-ordinal": 0,
+      "element-kind": "fm-var",
+      "message": "Cached content differs from the fallback"
+    }
+  ],
+  "edits": [
+    {
+      "range": {
+        "start": { "utf8-offset": 41, "line": 1, "column": 42 },
+        "end": { "utf8-offset": 44, "line": 1, "column": 45 }
+      },
+      "replacement": "Fallback",
+      "element-ordinal": 0
+    }
+  ]
+}

@@ -45,6 +45,21 @@ Types are structural and non-exclusive. Rules and types remain distinct domain m
 
 The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
 
+### fm-var Foundation
+
+Core's `FMVar/` feature area defines the portable RFC 001 Rev 2 vocabulary for `<fm-var>`,
+`<fm-list>`, and `<fm-format>`. It includes lossless raw attributes, exact half-open UTF-8 source
+ranges, normalized declarations, formatting provenance, statuses, stable diagnostic codes, and
+proposed child-text edits. UTF-8 offsets are zero-based; diagnostic lines and UTF-8 byte columns
+are one-based. These types are content-only and `Codable`, `Equatable`, and `Sendable` where used
+for structured reports.
+
+Scanning, key and URI resolution, value coercion, formatting, escaping, host access policy, and
+mutation are deliberately outside this foundation. Later Core milestones will implement portable
+evaluation, while `MarkdownUtilities` and executable hosts retain filesystem, network-policy, and
+revision-checked write responsibilities. The language-neutral initial fixture corpus is pinned to
+the authoritative proposal revision and bundled with `MarkdownUtilitiesCoreTests`.
+
 ## Server Planning Library (MarkdownUtilitiesServer)
 
 `MarkdownUtilitiesServer` owns the storage-neutral `RecordStore` contract, actor-backed `InMemoryRecordStore`, versioned resource-configuration model, selection and identity policies, immutable `EndpointPlan`, generic read snapshot, transport-neutral route descriptions, and structured startup diagnostics. It has no Hummingbird or filesystem dependency.

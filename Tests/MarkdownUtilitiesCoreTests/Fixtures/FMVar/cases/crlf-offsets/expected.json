@@ -1,0 +1,15 @@
+{
+  "case-id": "crlf-offsets",
+  "statuses": ["stale"],
+  "diagnostics": [],
+  "edits": [
+    {
+      "range": {
+        "start": { "utf8-offset": 24, "line": 2, "column": 21 },
+        "end": { "utf8-offset": 27, "line": 2, "column": 24 }
+      },
+      "replacement": "new",
+      "element-ordinal": 0
+    }
+  ]
+}

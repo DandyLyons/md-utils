@@ -27,6 +27,7 @@ Use this target for content-only Markdown operations that must run on Apple plat
 
 - <doc:FrontmatterWorkflows>
 - <doc:MarkdownCodable>
+- <doc:FMVarModels>
 
 ### Sections
 

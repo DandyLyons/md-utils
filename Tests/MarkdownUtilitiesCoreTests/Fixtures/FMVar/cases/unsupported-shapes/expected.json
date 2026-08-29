@@ -1,0 +1,29 @@
+{
+  "case-id": "unsupported-shapes",
+  "statuses": ["invalid", "unsupported"],
+  "diagnostics": [
+    {
+      "code": "fm-var.value.wrong-shape",
+      "severity": "error",
+      "range": {
+        "start": { "utf8-offset": 22, "line": 1, "column": 23 },
+        "end": { "utf8-offset": 40, "line": 1, "column": 41 }
+      },
+      "element-ordinal": 0,
+      "element-kind": "fm-var",
+      "message": "A scalar reference selected a mapping"
+    },
+    {
+      "code": "fm-var.value.unsupported-item-shape",
+      "severity": "error",
+      "range": {
+        "start": { "utf8-offset": 91, "line": 2, "column": 42 },
+        "end": { "utf8-offset": 124, "line": 2, "column": 75 }
+      },
+      "element-ordinal": 1,
+      "element-kind": "fm-list",
+      "message": "A list member has an unsupported nested shape"
+    }
+  ],
+  "edits": []
+}

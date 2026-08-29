@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DandyLyons/md-utils/schemas/fm-var-conformance-1.json",
+  "title": "fm-var portable conformance fixture manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema-version", "specification", "cases"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema-version": { "const": 1 },
+    "specification": { "$ref": "#/$defs/specification" },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "specification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "document", "rfc", "revision", "blob"],
+      "properties": {
+        "repository": { "type": "string", "format": "uri" },
+        "document": { "const": "PROPOSAL.md" },
+        "rfc": { "const": "RFC 001 Rev 2" },
+        "revision": { "$ref": "#/$defs/git-object" },
+        "blob": { "$ref": "#/$defs/git-object" }
+      }
+    },
+    "git-object": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "summary", "input", "expectation", "features"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "summary": { "type": "string", "minLength": 1 },
+        "input": { "$ref": "#/$defs/relative-path" },
+        "expectation": { "$ref": "#/$defs/relative-path" },
+        "features": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "relative-path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case-id", "statuses", "diagnostics", "edits"],
+      "properties": {
+        "case-id": { "type": "string" },
+        "statuses": {
+          "type": "array",
+          "items": {
+            "enum": ["valid", "stale", "fallback", "unresolved", "invalid", "denied", "unsupported"]
+          }
+        },
+        "scalar-declarations": { "type": "array", "items": { "type": "object" } },
+        "list-declarations": { "type": "array", "items": { "type": "object" } },
+        "format-declarations": { "type": "array", "items": { "type": "object" } },
+        "effective-configurations": { "type": "array", "items": { "type": "object" } },
+        "diagnostics": { "type": "array", "items": { "type": "object" } },
+        "edits": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "case-id": "all-v1-attributes",
+  "statuses": ["valid", "valid", "valid"],
+  "scalar-declarations": [
+    {
+      "key": "published",
+      "src": "self",
+      "default": "Unknown",
+      "type": "timestamp",
+      "format": "iso",
+      "locale": "en-US"
+    }
+  ],
+  "list-declarations": [
+    {
+      "key": "items",
+      "src": "self",
+      "item-type": "string",
+      "format": "conjunction",
+      "locale": "en-US",
+      "list-style": "long"
+    }
+  ],
+  "format-declarations": [
+    {
+      "for": ["date", "datetime", "timestamp", "array"],
+      "options": {
+        "locale": "en-US",
+        "format": "conjunction",
+        "list-style": "long",
+        "calendar": "gregory",
+        "numbering-system": "latn",
+        "time-zone": "UTC",
+        "hour-cycle": "h23",
+        "hour12": false,
+        "date-style": "long",
+        "time-style": "medium",
+        "weekday": "long",
+        "era": "short",
+        "year": "numeric",
+        "month": "long",
+        "day": "2-digit",
+        "day-period": "long",
+        "hour": "2-digit",
+        "minute": "2-digit",
+        "second": "2-digit",
+        "fractional-second-digits": 3,
+        "time-zone-name": "short",
+        "format-matcher": "basic"
+      }
+    }
+  ],
+  "effective-configurations": [
+    {
+      "options": {
+        "locale": "en-US",
+        "date-style": "long",
+        "format-matcher": "basic"
+      },
+      "origins": [
+        {
+          "option": "date-style",
+          "origin": { "kind": "scoped-format", "element-ordinal": 0 }
+        },
+        {
+          "option": "format-matcher",
+          "origin": { "kind": "scoped-format", "element-ordinal": 0 }
+        },
+        {
+          "option": "locale",
+          "origin": { "kind": "element", "element-ordinal": 1 }
+        }
+      ]
+    }
+  ],
+  "diagnostics": [],
+  "edits": []
+}

@@ -1,0 +1,18 @@
+{
+  "case-id": "unresolved-value",
+  "statuses": ["unresolved"],
+  "diagnostics": [
+    {
+      "code": "fm-var.value.missing",
+      "severity": "error",
+      "range": {
+        "start": { "utf8-offset": 22, "line": 1, "column": 23 },
+        "end": { "utf8-offset": 29, "line": 1, "column": 30 }
+      },
+      "element-ordinal": 0,
+      "element-kind": "fm-var",
+      "message": "The selected value is missing and no default is present"
+    }
+  ],
+  "edits": []
+}

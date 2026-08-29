@@ -66,7 +66,11 @@ let package = Package(
       dependencies: [
         "MarkdownUtilitiesCore",
         .product(name: "MarkdownSyntax", package: "MarkdownSyntax"),
+        .product(name: "JSONSchema", package: "JSONSchema.swift"),
         "Yams",
+      ],
+      resources: [
+        .copy("Fixtures/FMVar"),
       ]
     ),
     .executableTarget(
