@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/DandyLyons/md-utils/schemas/fm-var-conformance-1.json",
+  "$id": "https://github.com/DandyLyons/md-utils/schemas/fm-var-conformance-2.json",
   "title": "fm-var portable conformance fixture manifest",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema-version", "specification", "cases"],
   "properties": {
     "$schema": { "type": "string" },
-    "schema-version": { "const": 1 },
+    "schema-version": { "const": 2 },
     "specification": { "$ref": "#/$defs/specification" },
     "cases": {
       "type": "array",
@@ -23,7 +23,7 @@
       "properties": {
         "repository": { "type": "string", "format": "uri" },
         "document": { "const": "PROPOSAL.md" },
-        "rfc": { "const": "RFC 001 Rev 2" },
+        "rfc": { "const": "RFC 001 Rev 3" },
         "revision": { "$ref": "#/$defs/git-object" },
         "blob": { "$ref": "#/$defs/git-object" }
       }
@@ -57,21 +57,77 @@
     "expectation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["case-id", "statuses", "diagnostics", "edits"],
+      "required": ["case-id", "statuses", "result-metadata", "diagnostics", "edits"],
       "properties": {
         "case-id": { "type": "string" },
-        "statuses": {
+        "statuses": { "type": "array", "items": { "$ref": "#/$defs/reference-status" } },
+        "result-metadata": {
           "type": "array",
-          "items": {
-            "enum": ["valid", "stale", "fallback", "unresolved", "invalid", "denied", "unsupported"]
-          }
+          "items": { "$ref": "#/$defs/result-metadata" }
         },
-        "scalar-declarations": { "type": "array", "items": { "type": "object" } },
-        "list-declarations": { "type": "array", "items": { "type": "object" } },
+        "scalar-declarations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scalar-declaration" }
+        },
+        "list-declarations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/list-declaration" }
+        },
         "format-declarations": { "type": "array", "items": { "type": "object" } },
         "effective-configurations": { "type": "array", "items": { "type": "object" } },
         "diagnostics": { "type": "array", "items": { "type": "object" } },
         "edits": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "reference-status": {
+      "enum": [
+        "valid", "stale", "zero-result-fallback", "unresolved-zero-result",
+        "null-result-fallback", "unresolved-null-result", "invalid-query-argument",
+        "invalid-query", "unsupported-query", "query-resource-limited", "wrong-value-shape",
+        "invalid", "denied", "unsupported"
+      ]
+    },
+    "scalar-declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query", "type"],
+      "properties": {
+        "query": { "type": "string", "minLength": 1 },
+        "src": { "type": "string" },
+        "default-zero": { "type": "string" },
+        "default-null": { "type": "string" },
+        "type": { "enum": ["string", "boolean", "integer", "number", "date", "datetime", "timestamp"] },
+        "format": { "type": "string" },
+        "locale": { "type": "string" }
+      }
+    },
+    "list-declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query", "item-type", "format", "list-style"],
+      "properties": {
+        "query": { "type": "string", "minLength": 1 },
+        "src": { "type": "string" },
+        "default-zero": { "type": "string" },
+        "default-null": { "type": "string" },
+        "item-type": { "enum": ["string", "boolean", "integer", "number", "date", "datetime", "timestamp"] },
+        "format": { "enum": ["ordered", "unordered", "conjunction", "disjunction", "unit"] },
+        "locale": { "type": "string" },
+        "list-style": { "enum": ["long", "short", "narrow"] }
+      }
+    },
+    "result-metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "query-argument-status", "query-evaluation-status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/reference-status" },
+        "query-argument-status": { "enum": ["valid", "invalid"] },
+        "query-evaluation-status": {
+          "enum": ["not-evaluated", "selected", "invalid-query", "unsupported-capability", "resource-limited"]
+        },
+        "selected-node-count": { "type": "integer", "minimum": 0 },
+        "selected-value-shape": { "enum": ["null", "scalar", "sequence", "mapping"] }
       }
     }
   }

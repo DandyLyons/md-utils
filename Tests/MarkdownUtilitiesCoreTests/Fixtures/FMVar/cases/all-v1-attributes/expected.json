@@ -1,11 +1,33 @@
 {
   "case-id": "all-v1-attributes",
   "statuses": ["valid", "valid", "valid"],
+  "result-metadata": [
+    {
+      "status": "valid",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "not-evaluated"
+    },
+    {
+      "status": "valid",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "selected",
+      "selected-node-count": 1,
+      "selected-value-shape": "scalar"
+    },
+    {
+      "status": "valid",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "selected",
+      "selected-node-count": 1,
+      "selected-value-shape": "sequence"
+    }
+  ],
   "scalar-declarations": [
     {
-      "key": "published",
+      "query": "$.published",
       "src": "self",
-      "default": "Unknown",
+      "default-zero": "Unknown",
+      "default-null": "Not published",
       "type": "timestamp",
       "format": "iso",
       "locale": "en-US"
@@ -13,8 +35,10 @@
   ],
   "list-declarations": [
     {
-      "key": "items",
+      "query": "$.items",
       "src": "self",
+      "default-zero": "No items",
+      "default-null": "Items unavailable",
       "item-type": "string",
       "format": "conjunction",
       "locale": "en-US",

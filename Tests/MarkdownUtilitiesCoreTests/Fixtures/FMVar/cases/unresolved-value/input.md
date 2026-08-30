@@ -1,1 +1,1 @@
-<fm-var key="missing">Keep me</fm-var>
+<fm-var query="$.missing">Keep me</fm-var>

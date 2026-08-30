@@ -25,9 +25,10 @@ struct FMVarFixtureContractTests {
       at: root.appending(path: "manifest.json")
     )
 
-    #expect(manifest.schemaVersion == 1)
-    #expect(manifest.specification.revision == "e235f05f19c0c62cf288910bf6fe9952e3b5d18c")
-    #expect(manifest.specification.blob == "44fc7af58564eeaf94452644930c4fc01328aa7d")
+    #expect(manifest.schemaVersion == 2)
+    #expect(manifest.specification.rfc == "RFC 001 Rev 3")
+    #expect(manifest.specification.revision == "18604853843d6edf22aba927c98697f5c956a0f3")
+    #expect(manifest.specification.blob == "c612cb01262ac527236dd6dc60b9db5fb46622f5")
     #expect(manifest.specification.document == "PROPOSAL.md")
     #expect(Set(manifest.cases.map(\.id)).count == manifest.cases.count)
 
@@ -43,7 +44,11 @@ struct FMVarFixtureContractTests {
     let root = try fixtureRoot()
     let schemaObject = try jsonObject(at: root.appending(path: "schema.json"))
     let definitions = try #require(schemaObject["$defs"] as? [String: Any])
-    let expectationSchema = try #require(definitions["expectation"] as? [String: Any])
+    let expectationSchema: [String: Any] = [
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$ref": "#/$defs/expectation",
+      "$defs": definitions,
+    ]
     let manifest = try decode(
       FMVarFixtureManifest.self,
       at: root.appending(path: "manifest.json")
@@ -58,6 +63,7 @@ struct FMVarFixtureContractTests {
       let expectation = try decode(FMVarFixtureExpectation.self, at: expectationURL)
       #expect(expectation.caseID == fixtureCase.id)
       #expect(expectation.statuses.isEmpty == false)
+      #expect(expectation.resultMetadata.map(\.status) == expectation.statuses)
 
       let source = try fixtureSource(
         at: safeFixtureURL(fixtureCase.input, beneath: root)
@@ -80,9 +86,12 @@ struct FMVarFixtureContractTests {
     )
     let features = Set(manifest.cases.flatMap(\.features))
     let expectedFeatures: Set<String> = [
-      "fm-var", "fm-list", "fm-format", "attributes", "effective-format", "fallback",
-      "stale", "unresolved", "denied", "invalid", "unsupported", "value-shape",
-      "list-shape", "unicode", "escaping", "crlf", "utf8", "text-edit", "diagnostic",
+      "fm-var", "fm-list", "fm-format", "attributes", "effective-format",
+      "default-zero", "default-null", "zero-result-fallback", "unresolved-zero-result",
+      "null-result-fallback", "unresolved-null-result", "query-argument", "invalid-query",
+      "unsupported-query", "query-resource", "nodelist", "multi-node", "scalar", "sequence",
+      "mapping", "denied", "wrong-value-shape", "list-shape", "unicode", "escaping", "crlf",
+      "utf8", "text-edit", "diagnostic",
     ]
 
     #expect(expectedFeatures.isSubset(of: features))
@@ -96,6 +105,25 @@ struct FMVarFixtureContractTests {
     #expect(formatOptions == completeOptions())
     #expect(allAttributes.scalarDeclarations.count == 1)
     #expect(allAttributes.listDeclarations.count == 1)
+    #expect(allAttributes.scalarDeclarations.first?.query == "$.published")
+    #expect(allAttributes.listDeclarations.first?.query == "$.items")
+  }
+
+  @Test
+  func `Rev 2 declaration attributes fail the Rev 3 fixture schema`() throws {
+    let root = try fixtureRoot()
+    let schemaObject = try jsonObject(at: root.appending(path: "schema.json"))
+    let definitions = try #require(schemaObject["$defs"] as? [String: Any])
+    let scalarSchema = try #require(definitions["scalar-declaration"] as? [String: Any])
+    let rev2Declaration: [String: Any] = [
+      "key": "title",
+      "default": "Untitled",
+      "type": "string",
+    ]
+
+    let validation = try JSONSchema.validate(rev2Declaration, schema: scalarSchema)
+
+    #expect(validation.valid == false)
   }
 
   private func allStatuses(
@@ -200,6 +228,7 @@ private struct FMVarFixtureManifest: Decodable {
 private struct FMVarFixtureExpectation: Decodable {
   let caseID: String
   let statuses: [FMVarReferenceStatus]
+  let resultMetadata: [FMVarReferenceResultMetadata]
   let scalarDeclarations: [FMVarScalarDeclaration]
   let listDeclarations: [FMVarListDeclaration]
   let formatDeclarations: [FMVarFormatDeclaration]
@@ -210,6 +239,7 @@ private struct FMVarFixtureExpectation: Decodable {
   private enum CodingKeys: String, CodingKey {
     case caseID = "case-id"
     case statuses
+    case resultMetadata = "result-metadata"
     case scalarDeclarations = "scalar-declarations"
     case listDeclarations = "list-declarations"
     case formatDeclarations = "format-declarations"
@@ -222,6 +252,10 @@ private struct FMVarFixtureExpectation: Decodable {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     caseID = try container.decode(String.self, forKey: .caseID)
     statuses = try container.decode([FMVarReferenceStatus].self, forKey: .statuses)
+    resultMetadata = try container.decode(
+      [FMVarReferenceResultMetadata].self,
+      forKey: .resultMetadata
+    )
     scalarDeclarations = try container.decodeIfPresent(
       [FMVarScalarDeclaration].self,
       forKey: .scalarDeclarations

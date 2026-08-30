@@ -123,7 +123,7 @@ public struct FMVarElement: Codable, Equatable, Sendable {
   }
 }
 
-/// Portable scalar interpretations supported by RFC 001 Rev 2.
+/// Portable scalar interpretations supported by RFC 001 Rev 3.
 public enum FMVarValueType: String, Codable, Equatable, Sendable, CaseIterable {
   /// Plain text with no numeric or temporal interpretation.
   case string
@@ -187,12 +187,14 @@ public enum FMVarListStyle: String, Codable, Equatable, Sendable, CaseIterable {
 
 /// Normalized declaration for one scalar `<fm-var>` reference.
 public struct FMVarScalarDeclaration: Codable, Equatable, Sendable {
-  /// Dot-and-index key path selecting the authoritative scalar.
-  public let key: String
+  /// Authored complete RFC 9535 JSONPath query selecting the authoritative scalar.
+  public let query: String
   /// Authored `src` URI reference, or `nil` for the containing document.
   public let source: String?
-  /// Literal fallback used only for a missing or null selected value.
-  public let defaultValue: String?
+  /// Literal presentation fallback used only when the query selects zero nodes.
+  public let defaultZero: String?
+  /// Literal presentation fallback used only when the first selected node is null.
+  public let defaultNull: String?
   /// Requested scalar interpretation, defaulting to ``FMVarValueType/string``.
   public let type: FMVarValueType
   /// Type-specific local format override.
@@ -202,25 +204,28 @@ public struct FMVarScalarDeclaration: Codable, Equatable, Sendable {
 
   /// Creates a normalized scalar-reference declaration.
   public init(
-    key: String,
+    query: String,
     source: String? = nil,
-    defaultValue: String? = nil,
+    defaultZero: String? = nil,
+    defaultNull: String? = nil,
     type: FMVarValueType = .string,
     format: String? = nil,
     locale: String? = nil
   ) {
-    self.key = key
+    self.query = query
     self.source = source
-    self.defaultValue = defaultValue
+    self.defaultZero = defaultZero
+    self.defaultNull = defaultNull
     self.type = type
     self.format = format
     self.locale = locale
   }
 
   private enum CodingKeys: String, CodingKey {
-    case key
+    case query
     case source = "src"
-    case defaultValue = "default"
+    case defaultZero = "default-zero"
+    case defaultNull = "default-null"
     case type
     case format
     case locale
@@ -229,10 +234,14 @@ public struct FMVarScalarDeclaration: Codable, Equatable, Sendable {
 
 /// Normalized declaration for one `<fm-list>` reference.
 public struct FMVarListDeclaration: Codable, Equatable, Sendable {
-  /// Dot-and-index key path selecting the authoritative sequence.
-  public let key: String
+  /// Authored complete RFC 9535 JSONPath query selecting the authoritative sequence.
+  public let query: String
   /// Authored `src` URI reference, or `nil` for the containing document.
   public let source: String?
+  /// Literal empty-state fallback for zero nodes or an empty selected sequence.
+  public let defaultZero: String?
+  /// Literal empty-state fallback for a null result or a sequence containing only null members.
+  public let defaultNull: String?
   /// Requested interpretation applied atomically to every sequence member.
   public let itemType: FMVarValueType
   /// Required block or inline cache representation.
@@ -244,15 +253,19 @@ public struct FMVarListDeclaration: Codable, Equatable, Sendable {
 
   /// Creates a normalized list-reference declaration.
   public init(
-    key: String,
+    query: String,
     source: String? = nil,
+    defaultZero: String? = nil,
+    defaultNull: String? = nil,
     itemType: FMVarValueType = .string,
     format: FMVarListFormat,
     locale: String? = nil,
     listStyle: FMVarListStyle = .long
   ) {
-    self.key = key
+    self.query = query
     self.source = source
+    self.defaultZero = defaultZero
+    self.defaultNull = defaultNull
     self.itemType = itemType
     self.format = format
     self.locale = locale
@@ -260,8 +273,10 @@ public struct FMVarListDeclaration: Codable, Equatable, Sendable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case key
+    case query
     case source = "src"
+    case defaultZero = "default-zero"
+    case defaultNull = "default-null"
     case itemType = "item-type"
     case format
     case locale

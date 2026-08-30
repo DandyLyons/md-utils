@@ -1,0 +1,75 @@
+{
+  "case-id": "query-outcomes",
+  "statuses": [
+    "invalid-query",
+    "unsupported-query",
+    "query-resource-limited",
+    "invalid-query-argument",
+    "invalid"
+  ],
+  "result-metadata": [
+    {
+      "status": "invalid-query",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "invalid-query"
+    },
+    {
+      "status": "unsupported-query",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "unsupported-capability"
+    },
+    {
+      "status": "query-resource-limited",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "resource-limited"
+    },
+    {
+      "status": "invalid-query-argument",
+      "query-argument-status": "invalid",
+      "query-evaluation-status": "not-evaluated"
+    },
+    {
+      "status": "invalid",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "not-evaluated"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "fm-var.query.invalid",
+      "severity": "error",
+      "element-ordinal": 0,
+      "element-kind": "fm-var",
+      "message": "The query is not valid RFC 9535 JSONPath"
+    },
+    {
+      "code": "fm-var.query.unsupported-capability",
+      "severity": "error",
+      "element-ordinal": 1,
+      "element-kind": "fm-var",
+      "message": "The query uses an unavailable extension function"
+    },
+    {
+      "code": "fm-var.query.resource-limit-exceeded",
+      "severity": "error",
+      "element-ordinal": 2,
+      "element-kind": "fm-var",
+      "message": "Query evaluation exceeded its configured work limit"
+    },
+    {
+      "code": "fm-var.query-argument.invalid",
+      "severity": "error",
+      "element-ordinal": 3,
+      "element-kind": "fm-var",
+      "message": "YAML data could not be projected to an I-JSON query argument"
+    },
+    {
+      "code": "fm-var.syntax.invalid-attribute",
+      "severity": "error",
+      "element-ordinal": 4,
+      "element-kind": "fm-var",
+      "message": "The query attribute must not be empty"
+    }
+  ],
+  "edits": []
+}

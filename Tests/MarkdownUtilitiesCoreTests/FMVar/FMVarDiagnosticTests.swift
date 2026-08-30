@@ -40,7 +40,7 @@ struct FMVarDiagnosticTests {
         message: "warning"
       ),
       FMVarDiagnostic(
-        code: .missingValue,
+        code: .unresolvedZeroResult,
         severity: .error,
         range: early,
         elementOrdinal: 0,
@@ -81,8 +81,10 @@ struct FMVarDiagnosticTests {
       .missingAttribute, .duplicateAttribute, .unknownAttribute, .invalidAttribute,
       .invalidPlacement, .missingClosingTag, .malformedTag, .unexpectedClosingTag,
       .mismatchedClosingTag, .nestedElement, .invalidContent, .invalidSourceReference,
-      .sourceAccessDenied, .unsupportedSource, .unreadableSource, .invalidKeyPath,
-      .missingValue, .wrongValueShape, .unsupportedItemShape, .coercionFailed,
+      .sourceAccessDenied, .unsupportedSource, .unreadableSource, .invalidQueryArgument,
+      .invalidQuery, .unsupportedQueryCapability, .queryResourceLimitExceeded,
+      .unresolvedZeroResult, .unresolvedNullResult, .wrongNodelistCardinality,
+      .wrongValueShape, .unsupportedItemShape, .coercionFailed,
       .invalidFormat, .incompatibleFormat, .missingLocale, .formattingFailed,
       .unsupportedCharacter, .staleCache,
     ]

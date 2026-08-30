@@ -1063,11 +1063,12 @@ private struct FMVarLexicalTagParser: Parsing.Parser {
 private enum FMVarDeclarationBuilder {
   /// Attribute names accepted by `<fm-var>`.
   private static let variableAttributes: Set<String> = [
-    "key", "src", "default", "type", "format", "locale",
+    "query", "src", "default-zero", "default-null", "type", "format", "locale",
   ]
   /// Attribute names accepted by `<fm-list>`.
   private static let listAttributes: Set<String> = [
-    "key", "src", "item-type", "format", "locale", "list-style",
+    "query", "src", "default-zero", "default-null", "item-type", "format", "locale",
+    "list-style",
   ]
   /// Attribute names accepted by `<fm-format>`.
   private static let formatAttributes: Set<String> = [
@@ -1152,8 +1153,8 @@ private enum FMVarDeclarationBuilder {
 
     switch element.kind {
     case .variable:
-      guard let key = required(
-        "key",
+      guard let query = required(
+        "query",
         values: values,
         element: element,
         openingTagRange: openingTagRange,
@@ -1166,23 +1167,24 @@ private enum FMVarDeclarationBuilder {
         element: element,
         diagnostics: &diagnostics
       )
-      if key.isEmpty {
-        diagnostics.append(invalidValue("key", element: element))
+      if query.isEmpty {
+        diagnostics.append(invalidValue("query", element: element))
         invalid = true
       }
       guard invalid == false, let type else { return (nil, diagnostics) }
       return (.scalar(FMVarScalarDeclaration(
-        key: key,
+        query: query,
         source: values["src"],
-        defaultValue: values["default"],
+        defaultZero: values["default-zero"],
+        defaultNull: values["default-null"],
         type: type,
         format: values["format"],
         locale: values["locale"]
       )), diagnostics)
 
     case .list:
-      guard let key = required(
-        "key",
+      guard let query = required(
+        "query",
         values: values,
         element: element,
         openingTagRange: openingTagRange,
@@ -1215,16 +1217,18 @@ private enum FMVarDeclarationBuilder {
         element: element,
         diagnostics: &diagnostics
       )
-      if key.isEmpty {
-        diagnostics.append(invalidValue("key", element: element))
+      if query.isEmpty {
+        diagnostics.append(invalidValue("query", element: element))
         invalid = true
       }
       guard invalid == false, let itemType, let format, let style else {
         return (nil, diagnostics)
       }
       return (.list(FMVarListDeclaration(
-        key: key,
+        query: query,
         source: values["src"],
+        defaultZero: values["default-zero"],
+        defaultNull: values["default-null"],
         itemType: itemType,
         format: format,
         locale: values["locale"],

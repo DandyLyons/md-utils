@@ -1,34 +1,48 @@
 {
   "$schema": "schema.json",
-  "schema-version": 1,
+  "schema-version": 2,
   "specification": {
     "repository": "https://github.com/DandyLyons/fm-var-tag",
     "document": "PROPOSAL.md",
-    "rfc": "RFC 001 Rev 2",
-    "revision": "e235f05f19c0c62cf288910bf6fe9952e3b5d18c",
-    "blob": "44fc7af58564eeaf94452644930c4fc01328aa7d"
+    "rfc": "RFC 001 Rev 3",
+    "revision": "18604853843d6edf22aba927c98697f5c956a0f3",
+    "blob": "c612cb01262ac527236dd6dc60b9db5fb46622f5"
   },
   "cases": [
     {
       "id": "all-v1-attributes",
-      "summary": "All three elements and every RFC 001 Rev 2 attribute",
+      "summary": "All three elements and every RFC 001 Rev 3 attribute",
       "input": "cases/all-v1-attributes/input.md",
       "expectation": "cases/all-v1-attributes/expected.json",
       "features": ["fm-var", "fm-list", "fm-format", "attributes", "effective-format"]
     },
     {
       "id": "fallback-and-stale",
-      "summary": "Fallback replaces a stale scalar cache",
+      "summary": "A zero-result fallback replaces a stale scalar cache",
       "input": "cases/fallback-and-stale/input.md",
       "expectation": "cases/fallback-and-stale/expected.json",
-      "features": ["fallback", "stale", "text-edit"]
+      "features": ["default-zero", "zero-result-fallback", "stale", "text-edit"]
     },
     {
       "id": "unresolved-value",
-      "summary": "A missing value without a default retains its cache",
+      "summary": "A zero-node result without default-zero retains its cache",
       "input": "cases/unresolved-value/input.md",
       "expectation": "cases/unresolved-value/expected.json",
-      "features": ["unresolved", "key-path", "diagnostic"]
+      "features": ["unresolved-zero-result", "jsonpath", "nodelist", "diagnostic"]
+    },
+    {
+      "id": "null-results",
+      "summary": "Null results distinguish default-null fallback from unresolved null",
+      "input": "cases/null-results/input.md",
+      "expectation": "cases/null-results/expected.json",
+      "features": ["default-null", "null-result-fallback", "unresolved-null-result", "null-node"]
+    },
+    {
+      "id": "query-outcomes",
+      "summary": "Query arguments, validity, capabilities, and resources remain distinct",
+      "input": "cases/query-outcomes/input.md",
+      "expectation": "cases/query-outcomes/expected.json",
+      "features": ["query-argument", "invalid-query", "unsupported-query", "query-resource", "diagnostic"]
     },
     {
       "id": "denied-source",
@@ -42,7 +56,7 @@
       "summary": "Mapping scalars and nested list members fail atomically",
       "input": "cases/unsupported-shapes/input.md",
       "expectation": "cases/unsupported-shapes/expected.json",
-      "features": ["invalid", "unsupported", "value-shape", "list-shape"]
+      "features": ["wrong-value-shape", "multi-node", "scalar", "sequence", "mapping", "list-shape"]
     },
     {
       "id": "escaping-unicode",

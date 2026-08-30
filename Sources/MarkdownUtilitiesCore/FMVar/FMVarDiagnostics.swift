@@ -6,10 +6,24 @@ public enum FMVarReferenceStatus: String, Codable, Equatable, Sendable, CaseIter
   case valid
   /// Reference resolved successfully but its cache differs from the expected presentation.
   case stale
-  /// A missing or null value used the element's literal default.
-  case fallback
-  /// A missing or null value had no default and retained its cache.
-  case unresolved
+  /// Zero selected nodes or an empty sequence used `default-zero`.
+  case zeroResultFallback = "zero-result-fallback"
+  /// Zero selected nodes or an empty sequence had no `default-zero`.
+  case unresolvedZeroResult = "unresolved-zero-result"
+  /// An applicable null result used `default-null`.
+  case nullResultFallback = "null-result-fallback"
+  /// An applicable null result had no `default-null`.
+  case unresolvedNullResult = "unresolved-null-result"
+  /// YAML projection could not construct a valid JSONPath query argument.
+  case invalidQueryArgument = "invalid-query-argument"
+  /// The authored JSONPath query was malformed or invalid.
+  case invalidQuery = "invalid-query"
+  /// The query required a valid capability that is unavailable.
+  case unsupportedQuery = "unsupported-query"
+  /// JSONPath evaluation exceeded a configured resource limit.
+  case queryResourceLimited = "query-resource-limited"
+  /// Selected nodelist cardinality or value shape did not fit the element contract.
+  case wrongValueShape = "wrong-value-shape"
   /// Element syntax, value shape, coercion, formatting, or escaping was invalid.
   case invalid
   /// Host policy denied access to an otherwise valid source reference.
@@ -76,10 +90,24 @@ public struct FMVarDiagnosticCode: RawRepresentable, Codable, Equatable, Hashabl
   public static let unsupportedSource = Self(rawValue: "fm-var.source.unsupported")
   /// An authorized source could not be read or decoded.
   public static let unreadableSource = Self(rawValue: "fm-var.source.unreadable")
-  /// A `key` value did not conform to the portable key-path grammar.
-  public static let invalidKeyPath = Self(rawValue: "fm-var.key-path.invalid")
-  /// The selected value was missing or null without an applicable default.
-  public static let missingValue = Self(rawValue: "fm-var.value.missing")
+  /// YAML data could not be projected to an I-JSON-compatible query argument.
+  public static let invalidQueryArgument = Self(rawValue: "fm-var.query-argument.invalid")
+  /// A JSONPath query was malformed or invalid under RFC 9535.
+  public static let invalidQuery = Self(rawValue: "fm-var.query.invalid")
+  /// A valid JSONPath query requires an unavailable capability.
+  public static let unsupportedQueryCapability = Self(
+    rawValue: "fm-var.query.unsupported-capability"
+  )
+  /// JSONPath evaluation exceeded a configured resource limit.
+  public static let queryResourceLimitExceeded = Self(
+    rawValue: "fm-var.query.resource-limit-exceeded"
+  )
+  /// A query selected no nodes or an empty sequence without `default-zero`.
+  public static let unresolvedZeroResult = Self(rawValue: "fm-var.value.unresolved-zero-result")
+  /// A query selected an applicable null result without `default-null`.
+  public static let unresolvedNullResult = Self(rawValue: "fm-var.value.unresolved-null-result")
+  /// A list query selected more than one node.
+  public static let wrongNodelistCardinality = Self(rawValue: "fm-var.value.wrong-cardinality")
   /// A scalar reference selected a sequence or mapping.
   public static let wrongValueShape = Self(rawValue: "fm-var.value.wrong-shape")
   /// A list contained a nested sequence or mapping member.

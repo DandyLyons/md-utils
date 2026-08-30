@@ -9,12 +9,12 @@ Scan `<fm-var>`, `<fm-list>`, and `<fm-format>` without normalizing unrelated Ma
 values in UTF-8 source order, preserves authored attributes through ``FMVarRawAttribute``, and
 provides normalized ``FMVarDeclaration`` values when attribute syntax is valid.
 
-The parser does not load `src` resources, traverse `key` paths, coerce YAML values, format values,
-or decide cache freshness. Those stages can use the lossless ranges and normalized declarations
-without reparsing or re-rendering the Markdown document.
+The parser does not load `src` resources, evaluate `query` JSONPath expressions, coerce YAML
+values, format values, or decide cache freshness. Those stages can use the lossless ranges and
+normalized declarations without reparsing or re-rendering the Markdown document.
 
 ```swift
-let source = "Before <fm-var key=\"title\">Old</fm-var> after"
+let source = "Before <fm-var query=\"$.title\">Old</fm-var> after"
 let result = try FMVarParser().parse(source)
 let element = result.elements[0]
 
@@ -54,7 +54,7 @@ value, and name/value ranges are available on ``FMVarRawAttribute``. Normalized 
 XML predefined and numeric character references without changing the raw attribute model.
 
 Every fm-var family element requires an explicit closing tag. Scalar and inline-list caches accept
-only the literal-text serialization defined by RFC 001 Rev 2. Block-list caches accept only their
+only the literal-text serialization defined by RFC 001 Rev 3. Block-list caches accept only their
 required HTML list structure, and `<fm-format>` accepts no non-whitespace children.
 
 ## Recovery and Diagnostics

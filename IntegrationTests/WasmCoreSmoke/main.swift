@@ -90,30 +90,30 @@ struct WasmCoreSmoke {
       throw WasmCoreSmokeError.typeAssessmentFailed
     }
 
-    let fmVarSourceMap = FMVarSourceMap(source: "é\r\n<fm-var key=\"title\">old</fm-var>")
-    let fmVarPosition = try fmVarSourceMap.position(atUTF8Offset: 24)
+    let fmVarSourceMap = FMVarSourceMap(source: "é\r\n<fm-var query=\"$.title\">old</fm-var>")
+    let fmVarPosition = try fmVarSourceMap.position(atUTF8Offset: 28)
     let fmVarDeclaration = FMVarScalarDeclaration(
-      key: "title",
+      query: "$.title",
       type: .string,
       locale: "en-US"
     )
     guard fmVarPosition.line == 2,
-      fmVarPosition.column == 21,
+      fmVarPosition.column == 25,
       try fmVarSourceMap.utf8Offset(
         line: fmVarPosition.line,
         column: fmVarPosition.column
-      ) == 24,
+      ) == 28,
       fmVarDeclaration.type == .string
     else {
       throw WasmCoreSmokeError.fmVarModelMismatch
     }
 
-    let fmVarSource = "é\r\n<fm-var key=\"title\">old</fm-var>"
+    let fmVarSource = "é\r\n<fm-var query=\"$.title\">old</fm-var>"
     let fmVarParseResult = try FMVarParser().parse(fmVarSource)
     guard fmVarParseResult.isValid,
       fmVarParseResult.elements.count == 1,
       try fmVarParseResult.replacingCache(ofElementOrdinal: 0, with: "new")
-        == "é\r\n<fm-var key=\"title\">new</fm-var>"
+        == "é\r\n<fm-var query=\"$.title\">new</fm-var>"
     else {
       throw WasmCoreSmokeError.fmVarParserMismatch
     }

@@ -3,31 +3,31 @@
   "cases": [
     {
       "id": "inline-contexts",
-      "source": "# <fm-var key=\"heading\">Heading</fm-var>\n\n**<fm-var key='emphasis'>Strong</fm-var>**\n\n| Value |\n| --- |\n| <fm-list key=\"table\" format=\"unit\">A, B</fm-list> |\n",
+      "source": "# <fm-var query=\"$.heading\">Heading</fm-var>\n\n**<fm-var query='$.emphasis'>Strong</fm-var>**\n\n| Value |\n| --- |\n| <fm-list query=\"$.table\" format=\"unit\">A, B</fm-list> |\n",
       "element-kinds": ["fm-var", "fm-var", "fm-list"],
       "diagnostic-codes": []
     },
     {
       "id": "unicode-crlf",
-      "source": "é\r\n<fm-var key=\"title\">Café</fm-var>\r\n",
+      "source": "é\r\n<fm-var query=\"$.title\">Café</fm-var>\r\n",
       "element-kinds": ["fm-var"],
       "diagnostic-codes": []
     },
     {
       "id": "code-and-comments",
-      "source": "`<fm-var key=\"code\">no</fm-var>`\n<!-- <fm-var key=\"comment\">no</fm-var> -->\n```\n<fm-var key=\"fence\">no</fm-var>\n```\n<fm-var key=\"yes\">yes</fm-var>\n",
+      "source": "`<fm-var query=\"$.code\">no</fm-var>`\n<!-- <fm-var query=\"$.comment\">no</fm-var> -->\n```\n<fm-var query=\"$.fence\">no</fm-var>\n```\n<fm-var query=\"$.yes\">yes</fm-var>\n",
       "element-kinds": ["fm-var"],
       "diagnostic-codes": []
     },
     {
       "id": "block-list",
-      "source": "<fm-list\n key=\"items\"\n format=\"ordered\">\n<ol>\n<li>One</li>\n</ol>\n</fm-list>\n",
+      "source": "<fm-list\n query=\"$.items\"\n format=\"ordered\">\n<ol>\n<li>One</li>\n</ol>\n</fm-list>\n",
       "element-kinds": ["fm-list"],
       "diagnostic-codes": []
     },
     {
       "id": "recover-missing-close",
-      "source": "<fm-var key=\"missing\">old\n<fm-var key=\"valid\">yes</fm-var>\n",
+      "source": "<fm-var query=\"$.missing\">old\n<fm-var query=\"$.valid\">yes</fm-var>\n",
       "element-kinds": ["fm-var", "fm-var"],
       "diagnostic-codes": [
         "fm-var.syntax.missing-closing-tag",
@@ -36,7 +36,7 @@
     },
     {
       "id": "duplicate-unknown-attributes",
-      "source": "<fm-var key=\"a\" key='b' unknown=\"c\">old</fm-var>",
+      "source": "<fm-var query=\"$.a\" query='$.b' unknown=\"c\">old</fm-var>",
       "element-kinds": ["fm-var"],
       "diagnostic-codes": [
         "fm-var.syntax.duplicate-attribute",
@@ -45,7 +45,7 @@
     },
     {
       "id": "invalid-block-placement",
-      "source": "# <fm-list key=\"items\" format=\"unordered\"><ul></ul></fm-list>\n",
+      "source": "# <fm-list query=\"$.items\" format=\"unordered\"><ul></ul></fm-list>\n",
       "element-kinds": ["fm-list"],
       "diagnostic-codes": ["fm-var.syntax.invalid-placement"]
     }

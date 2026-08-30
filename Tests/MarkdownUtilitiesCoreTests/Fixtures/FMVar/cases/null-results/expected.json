@@ -1,0 +1,43 @@
+{
+  "case-id": "null-results",
+  "statuses": ["null-result-fallback", "unresolved-null-result"],
+  "result-metadata": [
+    {
+      "status": "null-result-fallback",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "selected",
+      "selected-node-count": 1,
+      "selected-value-shape": "null"
+    },
+    {
+      "status": "unresolved-null-result",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "selected",
+      "selected-node-count": 1,
+      "selected-value-shape": "null"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "fm-var.value.unresolved-null-result",
+      "severity": "error",
+      "range": {
+        "start": { "utf8-offset": 90, "line": 2, "column": 28 },
+        "end": { "utf8-offset": 99, "line": 2, "column": 37 }
+      },
+      "element-ordinal": 1,
+      "element-kind": "fm-var",
+      "message": "The first selected node is null and no default-null is present"
+    }
+  ],
+  "edits": [
+    {
+      "range": {
+        "start": { "utf8-offset": 50, "line": 1, "column": 51 },
+        "end": { "utf8-offset": 53, "line": 1, "column": 54 }
+      },
+      "replacement": "Unknown",
+      "element-ordinal": 0
+    }
+  ]
+}

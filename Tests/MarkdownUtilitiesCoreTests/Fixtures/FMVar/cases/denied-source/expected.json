@@ -1,13 +1,20 @@
 {
   "case-id": "denied-source",
   "statuses": ["denied"],
+  "result-metadata": [
+    {
+      "status": "denied",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "not-evaluated"
+    }
+  ],
   "diagnostics": [
     {
       "code": "fm-var.source.access-denied",
       "severity": "error",
       "range": {
-        "start": { "utf8-offset": 61, "line": 1, "column": 62 },
-        "end": { "utf8-offset": 69, "line": 1, "column": 70 }
+        "start": { "utf8-offset": 65, "line": 1, "column": 66 },
+        "end": { "utf8-offset": 73, "line": 1, "column": 74 }
       },
       "element-ordinal": 0,
       "element-kind": "fm-var",

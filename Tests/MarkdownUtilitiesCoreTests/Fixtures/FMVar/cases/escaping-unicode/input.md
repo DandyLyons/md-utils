@@ -1,1 +1,1 @@
-<fm-var key="title">old</fm-var>
+<fm-var query="$.title">old</fm-var>

@@ -1,17 +1,25 @@
 {
   "case-id": "unresolved-value",
-  "statuses": ["unresolved"],
+  "statuses": ["unresolved-zero-result"],
+  "result-metadata": [
+    {
+      "status": "unresolved-zero-result",
+      "query-argument-status": "valid",
+      "query-evaluation-status": "selected",
+      "selected-node-count": 0
+    }
+  ],
   "diagnostics": [
     {
-      "code": "fm-var.value.missing",
+      "code": "fm-var.value.unresolved-zero-result",
       "severity": "error",
       "range": {
-        "start": { "utf8-offset": 22, "line": 1, "column": 23 },
-        "end": { "utf8-offset": 29, "line": 1, "column": 30 }
+        "start": { "utf8-offset": 26, "line": 1, "column": 27 },
+        "end": { "utf8-offset": 33, "line": 1, "column": 34 }
       },
       "element-ordinal": 0,
       "element-kind": "fm-var",
-      "message": "The selected value is missing and no default is present"
+      "message": "The query selected zero nodes and no default-zero is present"
     }
   ],
   "edits": []

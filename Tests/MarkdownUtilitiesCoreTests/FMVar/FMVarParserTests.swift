@@ -6,7 +6,7 @@ import Testing
 
 @Suite("fm-var lossless parser")
 struct FMVarParserTests {
-  @Test("parses every RFC 001 Rev 2 attribute from the conformance corpus")
+  @Test("parses every RFC 001 Rev 3 attribute from the conformance corpus")
   func parsesAllV1Attributes() throws {
     let root = try #require(Bundle.module.url(forResource: "FMVar", withExtension: nil))
     let inputURL = root
@@ -19,8 +19,8 @@ struct FMVarParserTests {
     #expect(result.isValid)
     #expect(result.elements.map(\.kind) == [.format, .variable, .list])
     #expect(result.elements[0].attributes.count == 23)
-    #expect(result.elements[1].attributes.count == 6)
-    #expect(result.elements[2].attributes.count == 6)
+    #expect(result.elements[1].attributes.count == 7)
+    #expect(result.elements[2].attributes.count == 8)
 
     guard case .format(let format)? = result.declaration(forElementOrdinal: 0),
       case .scalar(let scalar)? = result.declaration(forElementOrdinal: 1),
@@ -34,8 +34,14 @@ struct FMVarParserTests {
     #expect(format.options.hour12 == false)
     #expect(scalar.type == .timestamp)
     #expect(scalar.source == "self")
+    #expect(scalar.query == "$.published")
+    #expect(scalar.defaultZero == "Unknown")
+    #expect(scalar.defaultNull == "Not published")
     #expect(list.format == .conjunction)
     #expect(list.listStyle == .long)
+    #expect(list.query == "$.items")
+    #expect(list.defaultZero == "No items")
+    #expect(list.defaultNull == "Items unavailable")
   }
 
   @Test("parses conforming inline block and configuration elements losslessly")
@@ -47,13 +53,13 @@ struct FMVarParserTests {
       ---
       <fm-format locale="en-US"></fm-format>
 
-      # **<fm-var  key = 'title' locale="en-US">Café</fm-var>**
+      # **<fm-var  query = '$.title' locale="en-US">Café</fm-var>**
 
       | People |
       | --- |
-      | <fm-list key="names" format="conjunction">Alice and Bob</fm-list> |
+      | <fm-list query="$.names" format="conjunction">Alice and Bob</fm-list> |
 
-      <fm-list key="names" format="unordered">
+      <fm-list query="$.names" format="unordered">
       <ul>
       <li>Alice</li>
       <li>Bob</li>
@@ -71,20 +77,20 @@ struct FMVarParserTests {
     #expect(result.declarations.count == 4)
 
     let scalar = try #require(result.elements[safe: 1])
-    #expect(try result.text(in: scalar.range) == "<fm-var  key = 'title' locale=\"en-US\">Café</fm-var>")
-    #expect(scalar.attributes.map(\.rawText) == ["key = 'title'", "locale=\"en-US\""])
+    #expect(try result.text(in: scalar.range) == "<fm-var  query = '$.title' locale=\"en-US\">Café</fm-var>")
+    #expect(scalar.attributes.map(\.rawText) == ["query = '$.title'", "locale=\"en-US\""])
     #expect(scalar.attributes.map(\.quoteStyle) == [.single, .double])
-    #expect(scalar.attributes.map(\.value) == ["title", "en-US"])
+    #expect(scalar.attributes.map(\.value) == ["$.title", "en-US"])
   }
 
   @Test("cache replacement preserves every unrelated UTF-8 byte")
   func cacheReplacementIsSurgical() throws {
-    let source = "é\r\nBefore <fm-var key = 'title'>old</fm-var> after\r\n"
+    let source = "é\r\nBefore <fm-var query = '$.title'>old</fm-var> after\r\n"
     let result = try FMVarParser().parse(source)
     let element = try #require(result.elements.first)
     let cache = try #require(element.cacheRange)
 
-    #expect(try result.text(in: element.openingTagRange) == "<fm-var key = 'title'>")
+    #expect(try result.text(in: element.openingTagRange) == "<fm-var query = '$.title'>")
     #expect(try result.text(in: cache) == "old")
     #expect(try result.text(in: try #require(element.closingTagRange)) == "</fm-var>")
 
@@ -92,7 +98,7 @@ struct FMVarParserTests {
     let updated = try result.replacingCache(ofElementOrdinal: 0, with: replacement)
     let sourceBytes = Array(source.utf8)
     let updatedBytes = Array(updated.utf8)
-    #expect(updated == "é\r\nBefore <fm-var key = 'title'>nouveau ☕️</fm-var> after\r\n")
+    #expect(updated == "é\r\nBefore <fm-var query = '$.title'>nouveau ☕️</fm-var> after\r\n")
     #expect(updatedBytes.prefix(cache.start.utf8Offset)
       .elementsEqual(sourceBytes.prefix(cache.start.utf8Offset)))
     #expect(updatedBytes.suffix(from: cache.start.utf8Offset + replacement.utf8.count)
@@ -103,39 +109,39 @@ struct FMVarParserTests {
   func ignoresExcludedContexts() throws {
     let source = #"""
       +++
-      example = '<fm-var key="toml">ignored</fm-var>'
+      example = '<fm-var query="$.toml">ignored</fm-var>'
       +++
 
-      `<fm-var key="inline">ignored</fm-var>`
+      `<fm-var query="$.inline">ignored</fm-var>`
 
-      <!-- <fm-var key="comment">ignored</fm-var> -->
+      <!-- <fm-var query="$.comment">ignored</fm-var> -->
 
       ```html
-      <fm-list key="fence" format="ordered"><ol></ol></fm-list>
+      <fm-list query="$.fence" format="ordered"><ol></ol></fm-list>
       ```
 
-          <fm-var key="indented">ignored</fm-var>
+          <fm-var query="$.indented">ignored</fm-var>
 
-      <code><fm-var key="html-code">ignored</fm-var></code>
+      <code><fm-var query="$.html-code">ignored</fm-var></code>
 
-      \<fm-var key="escaped">ignored</fm-var>
+      \<fm-var query="$.escaped">ignored</fm-var>
 
-      <fm-var key="visible">yes</fm-var>
+      <fm-var query="$.visible">yes</fm-var>
       """#
 
     let result = try FMVarParser().parse(source)
 
     #expect(result.elements.count == 1)
-    #expect(result.elements.first?.attribute(named: "key")?.value == "visible")
+    #expect(result.elements.first?.attribute(named: "query")?.value == "$.visible")
     #expect(result.diagnostics.isEmpty)
   }
 
   @Test("recovers after malformed and missing closing tags")
   func recoversAfterMalformedInput() throws {
     let source = """
-      <fm-var key="broken
-      <fm-var key="missing">old
-      <fm-var key="valid">yes</fm-var>
+      <fm-var query="$.broken
+      <fm-var query="$.missing">old
+      <fm-var query="$.valid">yes</fm-var>
       """
     let result = try FMVarParser().parse(source)
 
@@ -154,7 +160,7 @@ struct FMVarParserTests {
   func diagnosesStructuralFailures() throws {
     let source = """
       </fm-list>
-      <fm-var key="outer"><fm-list key="inner" format="unit">x</fm-var></fm-list>
+      <fm-var query="$.outer"><fm-list query="$.inner" format="unit">x</fm-var></fm-list>
       """
     let result = try FMVarParser().parse(source)
     let codes = result.diagnostics.map(\.code)
@@ -169,19 +175,47 @@ struct FMVarParserTests {
   @Test("diagnoses attribute syntax while retaining authored attributes")
   func diagnosesAttributes() throws {
     let source = """
-      <fm-var key="one" key='two' mystery="x">old</fm-var>
-      <fm-list key=items format="bogus">old</fm-list>
+      <fm-var query="$.one" query='$.two' mystery="x">old</fm-var>
+      <fm-list query=$.items format="bogus">old</fm-list>
       <fm-format hour12="sometimes" fractional-second-digits="9"></fm-format>
       """
     let result = try FMVarParser().parse(source)
     let codes = result.diagnostics.map(\.code)
 
-    #expect(result.elements[0].attributes.map(\.name) == ["key", "key", "mystery"])
-    #expect(result.elements[1].attribute(named: "key")?.quoteStyle == .unquoted)
+    #expect(result.elements[0].attributes.map(\.name) == ["query", "query", "mystery"])
+    #expect(result.elements[1].attribute(named: "query")?.quoteStyle == .unquoted)
     #expect(codes.contains(.duplicateAttribute))
     #expect(codes.contains(.unknownAttribute))
     #expect(codes.contains(.invalidAttribute))
     #expect(result.declarations.isEmpty)
+  }
+
+  @Test("Rev 2 key and default attributes remain raw but are not normalized")
+  func rejectsDeprecatedRev2Attributes() throws {
+    let source = "<fm-var key=\"title\" default=\"Untitled\">old</fm-var>"
+    let result = try FMVarParser().parse(source)
+
+    #expect(result.elements.first?.attributes.map(\.name) == ["key", "default"])
+    #expect(result.declarations.isEmpty)
+    #expect(result.diagnostics.filter { $0.code == .unknownAttribute }.count == 2)
+    #expect(result.diagnostics.map(\.code).contains(.missingAttribute))
+  }
+
+  @Test("decodes query attribute entities while preserving raw syntax")
+  func decodesQueryAttributeEntities() throws {
+    let source = #"<fm-var query="$.books[?@.price &lt; 10]">Affordable</fm-var>"#
+    let result = try FMVarParser().parse(source)
+
+    guard case .scalar(let declaration)? = result.declaration(forElementOrdinal: 0) else {
+      Issue.record("Expected a normalized scalar declaration")
+      return
+    }
+    #expect(declaration.query == "$.books[?@.price < 10]")
+    #expect(
+      result.elements.first?.attribute(named: "query")?.value
+        == "$.books[?@.price &lt; 10]"
+    )
+    #expect(result.diagnostics.isEmpty)
   }
 
   @Test("diagnoses block-list and fm-format placement precisely")
@@ -192,7 +226,7 @@ struct FMVarParserTests {
       ---
       Ordinary content.
       <fm-format locale="en-US"></fm-format>
-      # <fm-list key="names" format="ordered"><ol><li>A</li></ol></fm-list>
+      # <fm-list query="$.names" format="ordered"><ol><li>A</li></ol></fm-list>
       """
     let result = try FMVarParser().parse(source)
     let placements = result.diagnostics.filter { $0.code == .invalidPlacement }
@@ -205,12 +239,12 @@ struct FMVarParserTests {
   @Test("validates scalar inline-list block-list and format child models")
   func diagnosesInvalidChildren() throws {
     let source = """
-      <fm-var key="title">*raw*</fm-var>
-      <fm-list key="names" format="unit">A & B</fm-list>
-      <fm-list key="names" format="ordered">
+      <fm-var query="$.title">*raw*</fm-var>
+      <fm-list query="$.names" format="unit">A & B</fm-list>
+      <fm-list query="$.names" format="ordered">
       <ul><li>A</li></ul>
       </fm-list>
-      <fm-var key="control">bad\u{0}value</fm-var>
+      <fm-var query="$.control">bad\u{0}value</fm-var>
       """
     let result = try FMVarParser().parse(source)
     let invalidContent = result.diagnostics.filter { $0.code == .invalidContent }

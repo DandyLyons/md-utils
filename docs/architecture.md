@@ -47,18 +47,20 @@ The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
 
 ### fm-var Foundation
 
-Core's `FMVar/` feature area defines the portable [RFC 001 Rev 2](https://github.com/DandyLyons/fm-var-tag/blob/e235f05f19c0c62cf288910bf6fe9952e3b5d18c/PROPOSAL.md) vocabulary for `<fm-var>`,
+Core's `FMVar/` feature area defines the portable [RFC 001 Rev 3](https://github.com/DandyLyons/fm-var-tag/blob/18604853843d6edf22aba927c98697f5c956a0f3/PROPOSAL.md) vocabulary for `<fm-var>`,
 `<fm-list>`, and `<fm-format>`. It includes lossless raw attributes, exact half-open UTF-8 source
-ranges, normalized declarations, formatting provenance, statuses, stable diagnostic codes, and
-proposed child-text edits. UTF-8 offsets are zero-based; diagnostic lines and UTF-8 byte columns
-are one-based. These types are content-only and `Codable`, `Equatable`, and `Sendable` where used
-for structured reports.
+ranges, normalized JSONPath declarations, YAML-to-I-JSON query argument and node-association
+models, ordered nodelists, formatting provenance, statuses, result metadata, stable diagnostic
+codes, and proposed child-text edits. UTF-8 offsets are zero-based; diagnostic lines and UTF-8 byte
+columns are one-based. These types are content-only and `Codable`, `Equatable`, and `Sendable`
+where used for structured reports.
 
-Scanning, key and URI resolution, value coercion, formatting, escaping, host access policy, and
-mutation are deliberately outside this foundation. Later Core milestones will implement portable
-evaluation, while `MarkdownUtilities` and executable hosts retain filesystem, network-policy, and
-revision-checked write responsibilities. The language-neutral initial fixture corpus is pinned to
-the authoritative proposal revision and bundled with `MarkdownUtilitiesCoreTests`.
+YAML projection, JSONPath evaluation, URI resolution, value coercion, formatting, escaping, host
+access policy, and mutation are deliberately outside this foundation. Later Core milestones will
+implement portable evaluation, while `MarkdownUtilities` and executable hosts retain filesystem,
+network-policy, and revision-checked write responsibilities. The language-neutral initial fixture
+corpus is pinned to the authoritative proposal revision and bundled with
+`MarkdownUtilitiesCoreTests`.
 
 ## Server Planning Library (MarkdownUtilitiesServer)
 
