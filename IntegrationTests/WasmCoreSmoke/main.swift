@@ -7,6 +7,7 @@ enum WasmCoreSmokeError: Error {
   case tomlMismatch
   case typeAssessmentFailed
   case fmVarModelMismatch
+  case fmVarParserMismatch
 }
 
 @main
@@ -105,6 +106,16 @@ struct WasmCoreSmoke {
       fmVarDeclaration.type == .string
     else {
       throw WasmCoreSmokeError.fmVarModelMismatch
+    }
+
+    let fmVarSource = "é\r\n<fm-var key=\"title\">old</fm-var>"
+    let fmVarParseResult = try FMVarParser().parse(fmVarSource)
+    guard fmVarParseResult.isValid,
+      fmVarParseResult.elements.count == 1,
+      try fmVarParseResult.replacingCache(ofElementOrdinal: 0, with: "new")
+        == "é\r\n<fm-var key=\"title\">new</fm-var>"
+    else {
+      throw WasmCoreSmokeError.fmVarParserMismatch
     }
 
     print("MarkdownUtilitiesCore WebAssembly smoke test passed")

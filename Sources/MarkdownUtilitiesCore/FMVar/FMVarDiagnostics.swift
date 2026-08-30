@@ -58,6 +58,16 @@ public struct FMVarDiagnosticCode: RawRepresentable, Codable, Equatable, Hashabl
   public static let invalidPlacement = Self(rawValue: "fm-var.syntax.invalid-placement")
   /// An element did not have the required explicit closing tag.
   public static let missingClosingTag = Self(rawValue: "fm-var.syntax.missing-closing-tag")
+  /// A candidate opening or closing tag could not be tokenized completely.
+  public static let malformedTag = Self(rawValue: "fm-var.syntax.malformed-tag")
+  /// A closing tag appeared without a compatible opening element.
+  public static let unexpectedClosingTag = Self(rawValue: "fm-var.syntax.unexpected-closing-tag")
+  /// An opening element was followed by a different custom-element closing tag.
+  public static let mismatchedClosingTag = Self(rawValue: "fm-var.syntax.mismatched-closing-tag")
+  /// One fm-var family element was nested inside another.
+  public static let nestedElement = Self(rawValue: "fm-var.syntax.nested-element")
+  /// Cached children did not satisfy the element's text-only or list content model.
+  public static let invalidContent = Self(rawValue: "fm-var.syntax.invalid-content")
   /// A `src` value was not a valid fragment-free RFC 3986 URI reference.
   public static let invalidSourceReference = Self(rawValue: "fm-var.source.invalid-reference")
   /// Host policy denied access to the resolved source.

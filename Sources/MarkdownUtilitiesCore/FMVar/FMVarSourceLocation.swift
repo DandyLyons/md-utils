@@ -23,7 +23,11 @@ public struct FMVarSourcePosition: Codable, Equatable, Sendable, Comparable {
   ///   - line: One-based line number.
   ///   - column: One-based UTF-8 byte column.
   /// - Throws: ``FMVarSourceLocationError`` when any component is outside its basic domain.
-  public init(utf8Offset: Int, line: Int, column: Int) throws {
+  public init(
+    utf8Offset: Int,
+    line: Int,
+    column: Int
+  ) throws(FMVarSourceLocationError) {
     guard utf8Offset >= 0 else { throw FMVarSourceLocationError.negativeOffset(utf8Offset) }
     guard line >= 1 else { throw FMVarSourceLocationError.invalidLine(line) }
     guard column >= 1 else { throw FMVarSourceLocationError.invalidColumn(column) }
@@ -69,7 +73,10 @@ public struct FMVarSourceRange: Codable, Equatable, Sendable, Comparable {
   /// Creates a half-open range whose start does not follow its end.
   ///
   /// - Throws: ``FMVarSourceLocationError/reversedRange(start:end:)`` when `start` follows `end`.
-  public init(start: FMVarSourcePosition, end: FMVarSourcePosition) throws {
+  public init(
+    start: FMVarSourcePosition,
+    end: FMVarSourcePosition
+  ) throws(FMVarSourceLocationError) {
     guard start.utf8Offset <= end.utf8Offset else {
       throw FMVarSourceLocationError.reversedRange(
         start: start.utf8Offset,
@@ -133,7 +140,9 @@ public struct FMVarSourceMap: Equatable, Sendable {
   /// - Returns: The offset paired with its one-based line and UTF-8 byte column.
   /// - Throws: ``FMVarSourceLocationError/offsetOutOfBounds(_:utf8Count:)`` when the offset is
   ///   outside the snapshot.
-  public func position(atUTF8Offset offset: Int) throws -> FMVarSourcePosition {
+  public func position(
+    atUTF8Offset offset: Int
+  ) throws(FMVarSourceLocationError) -> FMVarSourcePosition {
     guard offset >= 0, offset <= utf8Bytes.count else {
       throw FMVarSourceLocationError.offsetOutOfBounds(offset, utf8Count: utf8Bytes.count)
     }
@@ -164,7 +173,10 @@ public struct FMVarSourceMap: Equatable, Sendable {
   ///   - column: One-based UTF-8 byte column, including the line-ending byte position.
   /// - Returns: The corresponding zero-based UTF-8 offset.
   /// - Throws: ``FMVarSourceLocationError`` when the coordinate is outside the snapshot.
-  public func utf8Offset(line: Int, column: Int) throws -> Int {
+  public func utf8Offset(
+    line: Int,
+    column: Int
+  ) throws(FMVarSourceLocationError) -> Int {
     guard line >= 1, line <= lineStarts.count else {
       throw FMVarSourceLocationError.invalidLine(line)
     }
@@ -187,7 +199,10 @@ public struct FMVarSourceMap: Equatable, Sendable {
   /// - Returns: A range with derived line and column positions.
   /// - Throws: ``FMVarSourceLocationError`` when an offset is outside the snapshot or the range
   ///   is reversed.
-  public func range(fromUTF8Offset start: Int, toUTF8Offset end: Int) throws -> FMVarSourceRange {
+  public func range(
+    fromUTF8Offset start: Int,
+    toUTF8Offset end: Int
+  ) throws(FMVarSourceLocationError) -> FMVarSourceRange {
     try FMVarSourceRange(
       start: position(atUTF8Offset: start),
       end: position(atUTF8Offset: end)

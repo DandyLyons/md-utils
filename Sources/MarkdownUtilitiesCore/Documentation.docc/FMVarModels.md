@@ -6,8 +6,10 @@ Represent `<fm-var>`, `<fm-list>`, and `<fm-format>` source without performing h
 
 The fm-var models are the portable vocabulary for RFC 001 Rev 2. They describe lossless source
 syntax, normalized reference and formatting declarations, effective formatting provenance,
-structured diagnostics, statuses, and proposed child-text replacements. They do not scan source,
-resolve URI references or key paths, coerce or format values, escape cached text, or apply edits.
+structured diagnostics, statuses, and proposed child-text replacements. Use ``FMVarParser`` to
+scan source and <doc:ParsingFMVarElements> for its placement and recovery rules. The feature does
+not resolve URI references or key paths, coerce or format values, or escape cached text at this
+stage.
 
 YAML frontmatter is authoritative under the v1 specification. TOML frontmatter support in other
 parts of `MarkdownUtilitiesCore` does not extend the fm-var source model.
@@ -40,6 +42,9 @@ cacheRange.start.column  // 21
 Reference edits use ``FMVarTextEdit`` to replace only an element's cache range. Native host layers
 remain responsible for checking the source revision and applying edits atomically.
 
+``FMVarParseResult/replacingCache(ofElementOrdinal:with:)`` provides an in-memory cache-only
+replacement for preview and preservation checks. It never writes a file.
+
 ## Structured Results
 
 ``FMVarReferenceStatus`` distinguishes valid, stale, fallback, unresolved, invalid, denied, and
@@ -60,6 +65,9 @@ result contract. `manifest.json` records each case and pins its provenance to:
 - Document: `PROPOSAL.md`
 - Proposal commit: `e235f05f19c0c62cf288910bf6fe9952e3b5d18c`
 - Proposal blob: `44fc7af58564eeaf94452644930c4fc01328aa7d`
+
+`parser-cases.json` adds language-neutral syntax, placement, exclusion-context, recovery, Unicode,
+and CRLF cases for ``FMVarParser``.
 
 The initial corpus is maintained in `md-utils` because the specification repository has no
 conformance directory yet. Accepted portable cases may later be copied upstream. A downstream

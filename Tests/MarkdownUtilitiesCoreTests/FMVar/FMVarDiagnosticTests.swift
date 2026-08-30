@@ -79,11 +79,12 @@ struct FMVarDiagnosticTests {
   private func diagnosticCodes() -> [FMVarDiagnosticCode] {
     [
       .missingAttribute, .duplicateAttribute, .unknownAttribute, .invalidAttribute,
-      .invalidPlacement, .missingClosingTag, .invalidSourceReference, .sourceAccessDenied,
-      .unsupportedSource, .unreadableSource, .invalidKeyPath, .missingValue,
-      .wrongValueShape, .unsupportedItemShape, .coercionFailed, .invalidFormat,
-      .incompatibleFormat, .missingLocale, .formattingFailed, .unsupportedCharacter,
-      .staleCache,
+      .invalidPlacement, .missingClosingTag, .malformedTag, .unexpectedClosingTag,
+      .mismatchedClosingTag, .nestedElement, .invalidContent, .invalidSourceReference,
+      .sourceAccessDenied, .unsupportedSource, .unreadableSource, .invalidKeyPath,
+      .missingValue, .wrongValueShape, .unsupportedItemShape, .coercionFailed,
+      .invalidFormat, .incompatibleFormat, .missingLocale, .formattingFailed,
+      .unsupportedCharacter, .staleCache,
     ]
   }
 
