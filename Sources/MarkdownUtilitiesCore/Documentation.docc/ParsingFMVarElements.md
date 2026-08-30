@@ -31,8 +31,9 @@ Scalar `<fm-var>` elements and inline `<fm-list>` formats (`conjunction`, `disju
 may appear in ordinary inline Markdown, including headings, emphasis, and table cells.
 
 Ordered and unordered `<fm-list>` elements are block content. Their opening and closing custom tags
-must each stand on their own line. Their cache must contain one matching explicit HTML `<ol>` or
-`<ul>` whose children are escaped `<li>` text values.
+must each stand on their own line. A successful cache contains one matching explicit HTML `<ol>`
+or `<ul>` whose children are escaped `<li>` text values. When `default-zero` or `default-null` is
+declared, the cache may instead contain escaped literal fallback text without list wrappers.
 
 `<fm-format>` is configuration rather than rendered content. Each declaration must be top-level,
 appear after YAML frontmatter and before ordinary document content, and use an explicit closing
@@ -51,11 +52,14 @@ The parser does not recognize tag-like source in these literal contexts:
 
 Attributes remain in authored order. Their raw spelling, whitespace around `=`, quote style, raw
 value, and name/value ranges are available on ``FMVarRawAttribute``. Normalized declarations decode
-XML predefined and numeric character references without changing the raw attribute model.
+XML predefined and numeric character references exactly once without changing the raw attribute
+model or asking the parser to validate the resulting JSONPath query.
 
 Every fm-var family element requires an explicit closing tag. Scalar and inline-list caches accept
-only the literal-text serialization defined by RFC 001 Rev 3. Block-list caches accept only their
-required HTML list structure, and `<fm-format>` accepts no non-whitespace children.
+only the literal-text serialization defined by RFC 001 Rev 3. Block-list caches accept either their
+required HTML list structure or, when a fallback attribute is declared, the same escaped literal
+text serialization without `<ol>`, `<ul>`, or `<li>` wrappers. Arbitrary child markup remains
+invalid, and `<fm-format>` accepts no non-whitespace children.
 
 ## Recovery and Diagnostics
 

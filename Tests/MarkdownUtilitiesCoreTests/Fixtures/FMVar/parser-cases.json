@@ -1,5 +1,5 @@
 {
-  "schema-version": 1,
+  "schema-version": 2,
   "cases": [
     {
       "id": "inline-contexts",
@@ -23,7 +23,46 @@
       "id": "block-list",
       "source": "<fm-list\n query=\"$.items\"\n format=\"ordered\">\n<ol>\n<li>One</li>\n</ol>\n</fm-list>\n",
       "element-kinds": ["fm-list"],
-      "diagnostic-codes": []
+      "diagnostic-codes": [],
+      "normalized-queries": ["$.items"],
+      "raw-query-values": ["$.items"],
+      "cache-texts": ["\n<ol>\n<li>One</li>\n</ol>\n"]
+    },
+    {
+      "id": "rev3-attributes-and-query-decoding",
+      "source": "<fm-var query=\"$[?@.encoded == '&amp;lt;' &amp;&amp; @.price &lt; &#49;&#48;]\" default-zero=\"None &amp; fewer\" default-null=\"Unknown\">Affordable</fm-var>\n<fm-list query='$.items' default-zero='No items' default-null='Unavailable' format='unit'>A</fm-list>\n",
+      "element-kinds": ["fm-var", "fm-list"],
+      "diagnostic-codes": [],
+      "normalized-queries": ["$[?@.encoded == '&lt;' && @.price < 10]", "$.items"],
+      "raw-query-values": ["$[?@.encoded == '&amp;lt;' &amp;&amp; @.price &lt; &#49;&#48;]", "$.items"],
+      "default-zero-values": ["None & fewer", "No items"],
+      "default-null-values": ["Unknown", "Unavailable"],
+      "cache-texts": ["Affordable", "A"]
+    },
+    {
+      "id": "block-list-literal-fallbacks",
+      "source": "<fm-list query=\"$.steps\" format=\"ordered\" default-zero=\"No *steps*\">\r\nNo &#42;steps&#42; &amp; no blockers\r\n</fm-list>\r\n<fm-list query=\"$.reviewers\" format=\"unordered\" default-null=\"\">\r\n\r\n</fm-list>\r\n",
+      "element-kinds": ["fm-list", "fm-list"],
+      "diagnostic-codes": [],
+      "normalized-queries": ["$.steps", "$.reviewers"],
+      "default-zero-values": ["No *steps*"],
+      "default-null-values": [""],
+      "cache-texts": ["\r\nNo &#42;steps&#42; &amp; no blockers\r\n", "\r\n\r\n"]
+    },
+    {
+      "id": "block-list-fallback-rejects-child-markup",
+      "source": "<fm-list query=\"$.items\" format=\"unordered\" default-zero=\"No items\">\n<p>No items</p>\n</fm-list>\n",
+      "element-kinds": ["fm-list"],
+      "diagnostic-codes": ["fm-var.syntax.invalid-content"]
+    },
+    {
+      "id": "malformed-query-entity",
+      "source": "<fm-var query=\"$.items[&bogus;]\">old</fm-var>",
+      "element-kinds": ["fm-var"],
+      "diagnostic-codes": [
+        "fm-var.syntax.missing-attribute",
+        "fm-var.syntax.invalid-attribute"
+      ]
     },
     {
       "id": "recover-missing-close",

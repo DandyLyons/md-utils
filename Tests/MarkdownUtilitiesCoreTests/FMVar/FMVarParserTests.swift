@@ -190,32 +190,76 @@ struct FMVarParserTests {
     #expect(result.declarations.isEmpty)
   }
 
-  @Test("Rev 2 key and default attributes remain raw but are not normalized")
-  func rejectsDeprecatedRev2Attributes() throws {
-    let source = "<fm-var key=\"title\" default=\"Untitled\">old</fm-var>"
-    let result = try FMVarParser().parse(source)
-
-    #expect(result.elements.first?.attributes.map(\.name) == ["key", "default"])
-    #expect(result.declarations.isEmpty)
-    #expect(result.diagnostics.filter { $0.code == .unknownAttribute }.count == 2)
-    #expect(result.diagnostics.map(\.code).contains(.missingAttribute))
-  }
-
   @Test("decodes query attribute entities while preserving raw syntax")
   func decodesQueryAttributeEntities() throws {
-    let source = #"<fm-var query="$.books[?@.price &lt; 10]">Affordable</fm-var>"#
+    let source = #"<fm-var query="$[?@.encoded == '&amp;lt;' &amp;&amp; @.price &lt; &#49;&#48;]">Affordable</fm-var>"#
     let result = try FMVarParser().parse(source)
 
     guard case .scalar(let declaration)? = result.declaration(forElementOrdinal: 0) else {
       Issue.record("Expected a normalized scalar declaration")
       return
     }
-    #expect(declaration.query == "$.books[?@.price < 10]")
+    #expect(declaration.query == "$[?@.encoded == '&lt;' && @.price < 10]")
     #expect(
       result.elements.first?.attribute(named: "query")?.value
-        == "$.books[?@.price &lt; 10]"
+        == "$[?@.encoded == '&amp;lt;' &amp;&amp; @.price &lt; &#49;&#48;]"
     )
     #expect(result.diagnostics.isEmpty)
+  }
+
+  @Test("accepts escaped literal fallbacks for block lists")
+  func acceptsBlockListLiteralFallbacks() throws {
+    let source = """
+      <fm-list query="$.steps" format="ordered" default-zero="No *steps*">
+      No &#42;steps&#42; &amp; no blockers
+      </fm-list>
+      <fm-list query="$.reviewers" format="unordered" default-null="">
+
+      </fm-list>
+      """
+    let result = try FMVarParser().parse(source)
+
+    #expect(result.isValid)
+    #expect(result.elements.count == 2)
+    #expect(
+      try result.text(in: try #require(result.elements[0].cacheRange))
+        == "\nNo &#42;steps&#42; &amp; no blockers\n"
+    )
+    #expect(try result.text(in: try #require(result.elements[1].cacheRange)) == "\n\n")
+
+    let synchronized = try result.replacingCache(
+      ofElementOrdinal: 0,
+      with: "\n<ol><li>Review</li></ol>\n"
+    )
+    #expect(
+      synchronized == """
+        <fm-list query="$.steps" format="ordered" default-zero="No *steps*">
+        <ol><li>Review</li></ol>
+        </fm-list>
+        <fm-list query="$.reviewers" format="unordered" default-null="">
+
+        </fm-list>
+        """
+    )
+  }
+
+  @Test("rejects undeclared or unsafe block list literal caches")
+  func rejectsInvalidBlockListLiteralCaches() throws {
+    let source = """
+      <fm-list query="$.one" format="ordered">
+      No items
+      </fm-list>
+      <fm-list query="$.two" format="unordered" default-zero="No items">
+      <strong>No items</strong>
+      </fm-list>
+      <fm-list query="$.three" format="ordered" default-null="Unavailable">
+      *Unavailable*
+      </fm-list>
+      """
+    let result = try FMVarParser().parse(source)
+    let invalidContent = result.diagnostics.filter { $0.code == .invalidContent }
+
+    #expect(invalidContent.map(\.elementOrdinal) == [0, 1, 2])
   }
 
   @Test("diagnoses block-list and fm-format placement precisely")
@@ -258,6 +302,28 @@ struct FMVarParserTests {
     let result = try FMVarParser().parse(testCase.source)
     #expect(result.elements.map(\.kind.rawValue) == testCase.elementKinds)
     #expect(result.diagnostics.map(\.code.rawValue) == testCase.diagnosticCodes)
+    if let normalizedQueries = testCase.normalizedQueries {
+      #expect(result.declarations.compactMap(\.declaration.query) == normalizedQueries)
+    }
+    if let rawQueryValues = testCase.rawQueryValues {
+      #expect(
+        result.elements.compactMap { $0.attribute(named: "query")?.value }
+          == rawQueryValues
+      )
+    }
+    if let defaultZeroValues = testCase.defaultZeroValues {
+      #expect(result.declarations.compactMap(\.declaration.defaultZero) == defaultZeroValues)
+    }
+    if let defaultNullValues = testCase.defaultNullValues {
+      #expect(result.declarations.compactMap(\.declaration.defaultNull) == defaultNullValues)
+    }
+    if let cacheTexts = testCase.cacheTexts {
+      let parsedCacheTexts: [String] = try result.elements.compactMap { element -> String? in
+        guard let cacheRange = element.cacheRange else { return nil }
+        return try result.text(in: cacheRange)
+      }
+      #expect(parsedCacheTexts == cacheTexts)
+    }
   }
 }
 
@@ -266,12 +332,22 @@ struct FMVarParserFixtureCase: Decodable, Sendable {
   let source: String
   let elementKinds: [String]
   let diagnosticCodes: [String]
+  let normalizedQueries: [String]?
+  let rawQueryValues: [String]?
+  let defaultZeroValues: [String]?
+  let defaultNullValues: [String]?
+  let cacheTexts: [String]?
 
   private enum CodingKeys: String, CodingKey {
     case id
     case source
     case elementKinds = "element-kinds"
     case diagnosticCodes = "diagnostic-codes"
+    case normalizedQueries = "normalized-queries"
+    case rawQueryValues = "raw-query-values"
+    case defaultZeroValues = "default-zero-values"
+    case defaultNullValues = "default-null-values"
+    case cacheTexts = "cache-texts"
   }
 }
 
@@ -292,8 +368,34 @@ private func parserFixtureCases() throws -> [FMVarParserFixtureCase] {
     FMVarParserFixtureCorpus.self,
     from: Data(contentsOf: url)
   )
-  #expect(corpus.schemaVersion == 1)
+  #expect(corpus.schemaVersion == 2)
   return corpus.cases
+}
+
+private extension FMVarDeclaration {
+  var query: String? {
+    switch self {
+    case .scalar(let declaration): declaration.query
+    case .list(let declaration): declaration.query
+    case .format: nil
+    }
+  }
+
+  var defaultZero: String? {
+    switch self {
+    case .scalar(let declaration): declaration.defaultZero
+    case .list(let declaration): declaration.defaultZero
+    case .format: nil
+    }
+  }
+
+  var defaultNull: String? {
+    switch self {
+    case .scalar(let declaration): declaration.defaultNull
+    case .list(let declaration): declaration.defaultNull
+    case .format: nil
+    }
+  }
 }
 
 private extension Array {

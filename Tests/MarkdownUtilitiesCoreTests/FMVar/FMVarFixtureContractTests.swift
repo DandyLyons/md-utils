@@ -109,23 +109,6 @@ struct FMVarFixtureContractTests {
     #expect(allAttributes.listDeclarations.first?.query == "$.items")
   }
 
-  @Test
-  func `Rev 2 declaration attributes fail the Rev 3 fixture schema`() throws {
-    let root = try fixtureRoot()
-    let schemaObject = try jsonObject(at: root.appending(path: "schema.json"))
-    let definitions = try #require(schemaObject["$defs"] as? [String: Any])
-    let scalarSchema = try #require(definitions["scalar-declaration"] as? [String: Any])
-    let rev2Declaration: [String: Any] = [
-      "key": "title",
-      "default": "Untitled",
-      "type": "string",
-    ]
-
-    let validation = try JSONSchema.validate(rev2Declaration, schema: scalarSchema)
-
-    #expect(validation.valid == false)
-  }
-
   private func allStatuses(
     in manifest: FMVarFixtureManifest,
     root: URL

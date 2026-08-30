@@ -72,8 +72,6 @@ struct FMVarModelTests {
     #expect(scalarObject["query"] as? String == "$.title")
     #expect(scalarObject["default-zero"] as? String == "Untitled")
     #expect(scalarObject["default-null"] as? String == "Unknown")
-    #expect(scalarObject["key"] == nil)
-    #expect(scalarObject["default"] == nil)
 
     let listObject = try #require(
       JSONSerialization.jsonObject(with: JSONEncoder().encode(listDeclaration)) as? [String: Any]

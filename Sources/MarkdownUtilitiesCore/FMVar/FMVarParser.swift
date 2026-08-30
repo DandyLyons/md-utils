@@ -363,11 +363,21 @@ public struct FMVarParser: Parsing.Parser {
         switch declaration.format {
         case .ordered, .unordered:
           let expectedName = declaration.format == .ordered ? "ol" : "ul"
-          if validBlockListCache(in: cache, expectedName: expectedName, bytes: bytes) == false {
+          let hasDeclaredFallback = declaration.defaultZero != nil
+            || declaration.defaultNull != nil
+          let hasValidList = validBlockListCache(
+            in: cache,
+            expectedName: expectedName,
+            bytes: bytes
+          )
+          let hasValidFallback = hasDeclaredFallback
+            && validBlockListFallback(in: cache, bytes: bytes)
+          if hasValidList == false, hasValidFallback == false {
             diagnostics.append(invalidContentDiagnostic(
               element: element,
               range: cacheRange,
-              message: "Block list cache must contain one escaped <\(expectedName)> list"
+              message: "Block list cache must contain one escaped <\(expectedName)> list or "
+                + "escaped literal text from a declared fallback"
             ))
           }
         case .conjunction, .disjunction, .unit:
@@ -558,6 +568,26 @@ public struct FMVarParser: Parsing.Parser {
       cursor = itemEnd + itemClose.count
     }
     return true
+  }
+
+  /// Checks the literal-text serialization permitted for a declared block-list fallback.
+  ///
+  /// Standalone block tags normally place their cache on a separate line, so surrounding ASCII
+  /// whitespace is ignored. The remaining content follows the same escaping rules as a scalar
+  /// cache: it cannot contain raw Markdown delimiters, markup, line endings, invalid entities, or
+  /// XML-invalid scalars. Whether `default-zero` or `default-null` applies is decided later by the
+  /// evaluator; the parser only verifies that at least one fallback is declared and the retained
+  /// cache is safe for either outcome.
+  ///
+  /// - Parameters:
+  ///   - range: Complete cache byte range between the standalone custom-element tags.
+  ///   - bytes: Complete source snapshot.
+  /// - Returns: `true` when the trimmed cache is valid escaped literal text.
+  private func validBlockListFallback(
+    in range: Range<Int>,
+    bytes: [UInt8]
+  ) -> Bool {
+    firstInvalidInlineCacheByte(in: trimWhitespace(range, bytes: bytes), bytes: bytes) == nil
   }
 
   /// Validates the escaped text content of one serialized list item.
