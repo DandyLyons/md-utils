@@ -34,6 +34,7 @@ extension CLIEntry.FrontMatterCommands {
     )
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Option(name: .shortAndLong, help: "The key to rename")
     var key: String
@@ -47,7 +48,10 @@ extension CLIEntry.FrontMatterCommands {
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
-      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let files = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -59,7 +63,8 @@ extension CLIEntry.FrontMatterCommands {
         do {
           let parsed = try FrontMatterCLIMutator.parsedFile(
             at: file,
-            includeNonMarkdown: includeNonMD
+            includeNonMarkdown: includeNonMD,
+            lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
           )
           var doc = parsed.document
 

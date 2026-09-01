@@ -29,12 +29,16 @@ extension CLIEntry.FrontMatterCommands {
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Flag(name: .long, help: "Process mapped non-Markdown files")
     var includeNonMD = false
 
     mutating func run() async throws {
-      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let files = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -44,7 +48,11 @@ extension CLIEntry.FrontMatterCommands {
 
       for file in files {
         do {
-          let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: includeNonMD)
+          let doc = try FrontMatterCLIReader.document(
+            at: file,
+            includeNonMarkdown: includeNonMD,
+            lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+          )
 
           // Extract keys from frontmatter
           let keys = doc.frontMatter.keys.sorted()

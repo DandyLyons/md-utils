@@ -4,7 +4,16 @@ import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 
-/// Shared generated-help content for commands that support wrapped frontmatter.
+/// Explicit-file override for fixed hash-comment frontmatter.
+struct LineCommentFrontMatterOptions: ParsableArguments {
+  @Flag(
+    name: .long,
+    help: "Treat explicitly supplied regular files as fixed # line-comment frontmatter."
+  )
+  var lineCommentFrontmatter = false
+}
+
+/// Shared generated-help content for commands that support non-Markdown frontmatter.
 enum NonMarkdownFrontMatterHelp {
   /// Appends the non-Markdown frontmatter contract to a command discussion.
   ///
@@ -14,7 +23,7 @@ enum NonMarkdownFrontMatterHelp {
     discussion + "\n\n" + section
   }
 
-  /// Appends the wrapped-frontmatter contract used by `fm dump`.
+  /// Appends the non-Markdown frontmatter contract used by `fm dump`.
   ///
   /// Dump is read-only, so it discovers every shipped syntax without requiring
   /// the opt-in used by batch mutation commands.
@@ -25,7 +34,8 @@ enum NonMarkdownFrontMatterHelp {
   /// The syntax contract shared by frontmatter command help pages.
   private static let syntaxContract = """
     FRONTMATTER ON NON-MD FILES
-      A supported non-Markdown file uses the wrapper mapped from its extension.
+      A supported non-Markdown file uses the representation mapped from its
+      complete basename or extension. Exact basename mappings take precedence.
       A complete wrapped frontmatter block must contain, on separate complete LF
       lines: the mapped opening wrapper, matching YAML --- or TOML +++ delimiter
       lines, a mapping, and the matching mapped closing wrapper. For example:
@@ -45,6 +55,12 @@ enum NonMarkdownFrontMatterHelp {
       The block may occur anywhere, though placement near the beginning is
       recommended. Incomplete blocks are treated as absent; multiple complete
       blocks are invalid. Plain .txt uses ordinary Markdown-style frontmatter.
+
+      Hash-comment mappings use an exact # --- or # +++ delimiter at the legal
+      file prologue. Every nonempty metadata line begins with exactly # ; bare #
+      and physically empty lines represent empty logical lines. A block may begin
+      at line 1, immediately after a shebang, or after one empty post-shebang line.
+      These blocks follow the package's existing LF-only frontmatter policy.
     """
 
   /// The exact opt-in selection contract shown on relevant help pages.
@@ -55,6 +71,10 @@ enum NonMarkdownFrontMatterHelp {
 
       A sole explicit mapped file is selected automatically. Multi-file and
       directory operations require --include-non-md for mapped files.
+
+      --line-comment-frontmatter opts explicitly supplied regular files into the
+      hash-comment representation. It cannot be used for implicit input,
+      directories, or traversal, and never overrides Markdown or wrapped mappings.
     """
 
   /// The exact syntax and automatic-selection contract shown by `fm dump`.
@@ -77,6 +97,9 @@ enum FrontMatterFileSyntax: Equatable {
   /// YAML or TOML frontmatter enclosed by a host-language wrapper.
   case wrapped(FrontMatterSyntax)
 
+  /// YAML or TOML represented by one fixed hash comment per physical line.
+  case lineComment
+
   /// Resolves the frontmatter representation for a selected file.
   ///
   /// - Parameters:
@@ -84,15 +107,28 @@ enum FrontMatterFileSyntax: Equatable {
   ///   - includeNonMarkdown: Whether `.txt` is opted into Markdown-style parsing.
   /// - Returns: The resolved representation, or `nil` when `.txt` is not opted in
   ///   or the extension has no shipped mapping.
-  static func resolve(for path: Path, includeNonMarkdown: Bool) -> FrontMatterFileSyntax? {
+  static func resolve(
+    for path: Path,
+    includeNonMarkdown: Bool,
+    lineCommentFrontmatter: Bool = false
+  ) -> FrontMatterFileSyntax? {
     let fileExtension = path.extension?.lowercased() ?? ""
     if fileExtension == "md" || fileExtension == "markdown" {
       return .markdown
     }
+    if let shipped = NonMarkdownFrontMatterSyntax.shippedSyntax(
+      forFileName: path.lastComponent,
+      fileExtension: fileExtension
+    ) {
+      switch shipped {
+      case .wrapped(let syntax): return .wrapped(syntax)
+      case .lineComment: return .lineComment
+      }
+    }
     if fileExtension == "txt" {
       return includeNonMarkdown ? .markdown : nil
     }
-    return FrontMatterSyntax.shippedSyntax(forExtension: fileExtension).map(Self.wrapped)
+    return lineCommentFrontmatter ? .lineComment : nil
   }
 }
 
@@ -121,6 +157,12 @@ struct ParsedFrontMatterFile {
   /// The first complete wrapped block and its snapshot-relative range.
   let wrappedBlock: WrappedFrontMatterBlock?
 
+  /// The fixed-prefix line-comment block in the parsed snapshot.
+  let lineCommentFrontMatter: LineCommentFrontMatter?
+
+  /// Creation placement derived from the line-comment parser's prologue scan.
+  let lineCommentPlacement: LineCommentFrontMatterPlacement?
+
   /// The 1-based opening lines of complete wrapped blocks after the first.
   let additionalOpeningLines: [Int]
 
@@ -131,6 +173,8 @@ struct ParsedFrontMatterFile {
       return document.frontMatterFormat != nil
     case .wrapped:
       return wrappedBlock != nil
+    case .lineComment:
+      return lineCommentFrontMatter != nil
     }
   }
 
@@ -151,6 +195,8 @@ struct ParsedFrontMatterFile {
         syntax: syntax,
         document: try MarkdownDocument(content: source),
         wrappedBlock: nil,
+        lineCommentFrontMatter: nil,
+        lineCommentPlacement: nil,
         additionalOpeningLines: []
       )
     case .wrapped(let wrapper):
@@ -168,7 +214,29 @@ struct ParsedFrontMatterFile {
           frontMatterFormat: format
         ),
         wrappedBlock: scan.firstBlock,
+        lineCommentFrontMatter: nil,
+        lineCommentPlacement: nil,
         additionalOpeningLines: scan.additionalOpeningLines
+      )
+    case .lineComment:
+      let scan = LineCommentFrontMatterParser().parse(source)
+      if let diagnostic = scan.diagnostic { throw diagnostic }
+      let format = scan.frontMatter?.format
+      let frontMatter = try format.map {
+        try FrontMatterConversion.parse(scan.frontMatter?.rawFrontMatter ?? "", format: $0)
+      } ?? FrontMatter()
+      return ParsedFrontMatterFile(
+        source: source,
+        syntax: syntax,
+        document: MarkdownDocument(
+          frontMatter: frontMatter,
+          body: source,
+          frontMatterFormat: format
+        ),
+        wrappedBlock: nil,
+        lineCommentFrontMatter: scan.frontMatter,
+        lineCommentPlacement: scan.placement,
+        additionalOpeningLines: []
       )
     }
   }
@@ -195,7 +263,51 @@ struct ParsedFrontMatterFile {
       var result = source
       result.replaceSubrange(wrappedBlock.range, with: renderedBlock)
       return result
+    case .lineComment:
+      let format = updatedDocument.frontMatterFormat ?? .yaml
+      let lineEnding = lineCommentFrontMatter?.lineEnding
+        ?? lineCommentPlacement?.lineEnding
+        ?? "\n"
+      let renderedBlock = try Self.renderLineCommentBlock(
+        updatedDocument.frontMatter,
+        format: format,
+        lineEnding: lineEnding
+      )
+      if let lineCommentFrontMatter {
+        var result = source
+        result.replaceSubrange(lineCommentFrontMatter.range, with: renderedBlock)
+        return result
+      }
+      guard let placement = lineCommentPlacement else { return source }
+      var insertion = placement.needsLeadingLineEnding ? lineEnding : ""
+      insertion += renderedBlock
+      insertion += lineEnding
+      if placement.reusesFollowingEmptyLine == false,
+        placement.insertionIndex < source.endIndex
+      {
+        insertion += lineEnding
+      }
+      var result = source
+      result.insert(contentsOf: insertion, at: placement.insertionIndex)
+      return result
     }
+  }
+
+  private static func renderLineCommentBlock(
+    _ frontMatter: FrontMatter,
+    format: FrontMatterFormat,
+    lineEnding: String
+  ) throws -> String {
+    var serialized = try FrontMatterConversion.serialize(frontMatter, format: format)
+    if serialized.hasSuffix("\n") { serialized.removeLast() }
+    if serialized.hasSuffix("\r") { serialized.removeLast() }
+    let payloadLines = serialized.split(
+      separator: "\n",
+      omittingEmptySubsequences: false
+    ).map(String.init)
+    let physicalPayload = payloadLines.map { $0.isEmpty ? "#" : "# \($0)" }
+    return (["# \(format.delimiter)"] + physicalPayload + ["# \(format.delimiter)"])
+      .joined(separator: lineEnding)
   }
 
   /// Removes the complete frontmatter envelope from the original source snapshot.
@@ -209,14 +321,29 @@ struct ParsedFrontMatterFile {
       return document.body
     case .wrapped:
       guard let wrappedBlock else { return source }
-      var removalEnd = wrappedBlock.range.upperBound
-      if removalEnd < source.endIndex && source[removalEnd] == "\n" {
-        removalEnd = source.index(after: removalEnd)
-      }
+      let removalEnd = endAfterOneLineEnding(from: wrappedBlock.range.upperBound)
       var result = source
       result.removeSubrange(wrappedBlock.range.lowerBound..<removalEnd)
       return result
+    case .lineComment:
+      guard let lineCommentFrontMatter else { return source }
+      let removalEnd = endAfterOneLineEnding(from: lineCommentFrontMatter.range.upperBound)
+      var result = source
+      result.removeSubrange(lineCommentFrontMatter.range.lowerBound..<removalEnd)
+      return result
     }
+  }
+
+  private func endAfterOneLineEnding(from index: String.Index) -> String.Index {
+    guard index < source.endIndex else { return index }
+    if source[index] == "\r" {
+      let afterCarriageReturn = source.index(after: index)
+      if afterCarriageReturn < source.endIndex, source[afterCarriageReturn] == "\n" {
+        return source.index(after: afterCarriageReturn)
+      }
+      return afterCarriageReturn
+    }
+    return source[index] == "\n" ? source.index(after: index) : index
   }
 }
 
@@ -229,10 +356,15 @@ enum FrontMatterCLIReader {
   ///   - includeNonMarkdown: Whether `.txt` is opted into Markdown-style parsing.
   /// - Returns: The first frontmatter block in the existing document representation.
   /// - Throws: A filesystem, syntax-mapping, multiplicity, or YAML conversion error.
-  static func document(at path: Path, includeNonMarkdown: Bool) throws -> MarkdownDocument {
+  static func document(
+    at path: Path,
+    includeNonMarkdown: Bool,
+    lineCommentFrontmatter: Bool = false
+  ) throws -> MarkdownDocument {
     try FrontMatterCLIMutator.parsedFile(
       at: path,
-      includeNonMarkdown: includeNonMarkdown
+      includeNonMarkdown: includeNonMarkdown,
+      lineCommentFrontmatter: lineCommentFrontmatter
     ).document
   }
 }
@@ -242,12 +374,14 @@ enum FrontMatterCLIMutator {
   /// Loads one file from a single source snapshot and rejects repeated wrapped blocks.
   static func parsedFile(
     at path: Path,
-    includeNonMarkdown: Bool
+    includeNonMarkdown: Bool,
+    lineCommentFrontmatter: Bool = false
   ) throws -> ParsedFrontMatterFile {
-    let source: String = try path.read()
+    let source = try FrontMatterFileWriter.readSnapshot(from: path)
     guard let syntax = FrontMatterFileSyntax.resolve(
       for: path,
-      includeNonMarkdown: includeNonMarkdown
+      includeNonMarkdown: includeNonMarkdown,
+      lineCommentFrontmatter: lineCommentFrontmatter
     ) else {
       throw FrontMatterCommandError(
         message: "no frontmatter syntax mapping for extension \"\(path.extension ?? "")\""
@@ -271,11 +405,15 @@ enum FrontMatterCLIMutator {
     options: GlobalOptions,
     createFrontmatter: Bool
   ) throws {
-    guard case .wrapped(let wrapper) = parsed.syntax,
-      parsed.wrappedBlock == nil,
-      createFrontmatter == false
-    else {
+    guard parsed.hasFrontMatterBlock == false, createFrontmatter == false else { return }
+    let prompt: String
+    switch parsed.syntax {
+    case .markdown:
       return
+    case .wrapped(let wrapper):
+      prompt = "Create wrapped frontmatter using \(wrapper.name) (\(wrapper.openingWrapper) … \(wrapper.closingWrapper))? [y/N]"
+    case .lineComment:
+      prompt = "Create line-comment frontmatter using # prefixes? [y/N]"
     }
 
     let isSingleExplicitFile = options.paths.count == 1 && options.paths[0].isFile
@@ -285,9 +423,7 @@ enum FrontMatterCLIMutator {
       )
     }
 
-    CLIStyle.writeStderr(
-      "Create wrapped frontmatter using \(wrapper.name) (\(wrapper.openingWrapper) … \(wrapper.closingWrapper))? [y/N]"
-    )
+    CLIStyle.writeStderr(prompt)
     let response = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     guard response == "y" || response == "yes" else {
       throw FrontMatterCommandError(message: "frontmatter creation declined")
@@ -327,7 +463,19 @@ extension GlobalOptions {
   /// - Returns: Selected files after extension, hidden-file, exclusion, recursion,
   ///   and sorting rules are applied.
   /// - Throws: A validation error for missing paths or explicitly selected unmapped files.
-  func resolvedFrontMatterPaths(includeNonMarkdown: Bool) throws -> [Path] {
+  func resolvedFrontMatterPaths(
+    includeNonMarkdown: Bool,
+    lineCommentFrontmatter: Bool = false
+  ) throws -> [Path] {
+    if lineCommentFrontmatter {
+      guard paths.isEmpty == false,
+        paths.allSatisfy({ $0.exists && $0.isFile })
+      else {
+        throw ValidationError(
+          "--line-comment-frontmatter requires explicitly supplied regular files"
+        )
+      }
+    }
     let requestedPaths = paths.isEmpty ? [Path.current] : paths
     let explicitSingleFile = requestedPaths.count == 1 && requestedPaths[0].exists && requestedPaths[0].isFile
     let explicitlyNarrowedExtensions = extensions != "md,markdown"
@@ -358,20 +506,32 @@ extension GlobalOptions {
         continue
       }
 
+      let shippedSyntax = NonMarkdownFrontMatterSyntax.shippedSyntax(
+        forFileName: path.lastComponent,
+        fileExtension: fileExtension
+      )
       if fileExtension == "md" || fileExtension == "markdown" {
         selected.append(path)
+      } else if shippedSyntax == .lineComment {
+        if includeNonMarkdown || explicitSingleFile || lineCommentFrontmatter {
+          selected.append(path)
+        } else {
+          writeIgnoredHint(for: path)
+        }
       } else if fileExtension == "txt" {
         if includeNonMarkdown {
           selected.append(path)
         } else {
           writeIgnoredHint(for: path)
         }
-      } else if FrontMatterSyntax.shippedSyntax(forExtension: fileExtension) != nil {
+      } else if shippedSyntax != nil {
         if includeNonMarkdown || explicitSingleFile {
           selected.append(path)
         } else {
           writeIgnoredHint(for: path)
         }
+      } else if lineCommentFrontmatter {
+        selected.append(path)
       } else if explicitSingleFile || includeNonMarkdown {
         throw ValidationError("No frontmatter syntax mapping for extension \"\(fileExtension)\"")
       } else {
@@ -414,11 +574,17 @@ extension GlobalOptions {
       if explicitlyNarrowedExtensions && requestedExtensions.contains(fileExtension) == false {
         continue
       }
+      let shippedSyntax = NonMarkdownFrontMatterSyntax.shippedSyntax(
+        forFileName: child.lastComponent,
+        fileExtension: fileExtension
+      )
       if fileExtension == "md" || fileExtension == "markdown" {
+        result.append(child)
+      } else if includeNonMarkdown && shippedSyntax == .lineComment {
         result.append(child)
       } else if includeNonMarkdown && fileExtension == "txt" {
         result.append(child)
-      } else if includeNonMarkdown && FrontMatterSyntax.shippedSyntax(forExtension: fileExtension) != nil {
+      } else if includeNonMarkdown && shippedSyntax != nil {
         result.append(child)
       }
     }

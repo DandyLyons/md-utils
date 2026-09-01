@@ -27,6 +27,15 @@ public enum FrontMatterFileWriteError: LocalizedError, Sendable {
 /// followed by an atomic replacement, though uncoordinated external writers can
 /// still race between the final comparison and replacement.
 public enum FrontMatterFileWriter {
+  /// Reads one exact UTF-8 snapshot without discarding a leading byte-order mark.
+  public static func readSnapshot(from path: Path) throws -> String {
+    let data = try Data(contentsOf: URL(fileURLWithPath: path.absolute().string))
+    guard String(data: data, encoding: .utf8) != nil else {
+      throw FrontMatterFileWriteError.invalidUTF8
+    }
+    return String(decoding: data, as: UTF8.self)
+  }
+
   /// Replaces a file only if it still matches the snapshot used to build the edit.
   ///
   /// - Parameters:
@@ -41,7 +50,7 @@ public enum FrontMatterFileWriter {
     to path: Path,
     expectedSource: String
   ) throws {
-    let latest: String = try path.read()
+    let latest = try readSnapshot(from: path)
     guard latest == expectedSource else {
       throw FrontMatterFileWriteError.revisionMismatch
     }

@@ -41,6 +41,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     )
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Option(name: .shortAndLong, help: "The frontmatter key (must be an array)")
     var key: String
@@ -61,7 +62,10 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       var processedCount = 0
       var skippedCount = 0
       var hasErrors = false
-      let paths = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let paths = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
 
       guard !paths.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -71,7 +75,8 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         do {
           let parsed = try FrontMatterCLIMutator.parsedFile(
             at: path,
-            includeNonMarkdown: includeNonMD
+            includeNonMarkdown: includeNonMD,
+            lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
           )
           var doc = parsed.document
 

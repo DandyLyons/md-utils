@@ -46,18 +46,42 @@ package enum MarkdownRecordContentKind: Sendable {
   case plainText
   /// Non-Markdown host source using a shipped wrapped-frontmatter syntax.
   case wrapped(FrontMatterSyntax)
+  /// Non-Markdown host source using fixed hash-comment frontmatter.
+  case lineComment
   /// Non-Markdown host source without a shipped frontmatter mapping.
   case unmapped(fileExtension: String)
 
   /// Resolves rules-runtime behavior from a filename extension.
   package static func rulesKind(forExtension fileExtension: String) -> Self {
     let normalized = fileExtension.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+    return rulesKind(forFileName: normalized.isEmpty ? "" : "file.\(normalized)")
+  }
+
+  /// Resolves rules-runtime behavior from a complete basename and extension.
+  package static func rulesKind(
+    forFileName fileName: String,
+    fileExtension: String? = nil
+  ) -> Self {
+    let normalized = (fileExtension ?? inferredExtension(from: fileName))
+      .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+      .lowercased()
     if normalized == "md" || normalized == "markdown" { return .markdown }
-    if normalized == "txt" { return .plainText }
-    if let syntax = FrontMatterSyntax.shippedSyntax(forExtension: normalized) {
-      return .wrapped(syntax)
+    if let syntax = NonMarkdownFrontMatterSyntax.shippedSyntax(
+      forFileName: fileName,
+      fileExtension: normalized
+    ) {
+      switch syntax {
+      case .wrapped(let wrapped): return .wrapped(wrapped)
+      case .lineComment: return .lineComment
+      }
     }
+    if normalized == "txt" { return .plainText }
     return .unmapped(fileExtension: normalized)
+  }
+
+  private static func inferredExtension(from fileName: String) -> String {
+    guard let period = fileName.lastIndex(of: "."), period != fileName.startIndex else { return "" }
+    return String(fileName[fileName.index(after: period)...])
   }
 }
 
@@ -148,6 +172,19 @@ package enum MarkdownRecordAnalyzer {
         hasFrontmatter: scan.firstBlock != nil,
         format: scan.firstBlock?.format,
         diagnostics: diagnostics
+      )
+    case .lineComment:
+      let scan = LineCommentFrontMatterParser().parse(record.content)
+      var body = record.content
+      if let recognizedRange = scan.recognizedRange {
+        body.removeSubrange(recognizedRange)
+      }
+      parts = RecordParts(
+        rawFrontmatter: scan.frontMatter?.rawFrontMatter ?? "",
+        body: body,
+        hasFrontmatter: scan.recognizedRange != nil,
+        format: scan.frontMatter?.format,
+        diagnostics: scan.diagnostic.map { [lineCommentDiagnostic($0)] } ?? []
       )
     case .unmapped(let fileExtension):
       return AnalyzedMarkdownRecord(
@@ -317,6 +354,25 @@ package enum MarkdownRecordAnalyzer {
       domain: .frontmatter,
       location: "frontmatter",
       message: "multiple frontmatter blocks; additional block opens at line \(line)"
+    )
+  }
+
+  private static func lineCommentDiagnostic(
+    _ diagnostic: LineCommentFrontMatterDiagnostic
+  ) -> MarkdownDiagnostic {
+    let code: String
+    switch diagnostic {
+    case .mismatchedDelimiter:
+      code = "record.frontmatter.line-comment.mismatched-delimiter"
+    case .invalidCommentPrefix:
+      code = "record.frontmatter.line-comment.invalid-prefix"
+    }
+    return MarkdownDiagnostic(
+      code: code,
+      severity: .error,
+      domain: .frontmatter,
+      location: "frontmatter",
+      message: diagnostic.localizedDescription
     )
   }
 

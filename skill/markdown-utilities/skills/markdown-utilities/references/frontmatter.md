@@ -6,6 +6,24 @@ yaml|toml` and default to YAML. Do not rely on YAML or TOML comments surviving a
 mutation: both formats are parsed into structured values and serialized again.
 TOML cannot represent null, so `fm touch` is unavailable for TOML blocks.
 
+## Mapped Non-Markdown Files
+
+Shipped mappings include established host wrappers and fixed hash-comment
+frontmatter. Hash-comment YAML uses `# ---`, TOML uses `# +++`, and each nonempty
+metadata line starts with exactly `# `. Bare `#` is an empty logical line. Legal
+blocks begin at line 1, immediately after a shebang, or after one empty
+post-shebang line, using the package's LF-only frontmatter policy.
+
+Exact mapped basenames include common ignore files, Make/Ruby toolfiles,
+`requirements.txt`, `constraints.txt`, and `.env.schema`. Mapped extensions cover
+shell, Ruby, R, YAML/TOML, Make/CMake, properties, Nix, Bazel, and Terraform.
+Ordinary `.env` and `.env.*` files are not mapped.
+
+Every `fm` leaf accepts `--line-comment-frontmatter` for explicitly supplied
+regular files. The override is rejected for implicit input and directories and
+never overrides Markdown or wrapped mappings. Use `--include-non-md` to include
+shipped mappings in batch and directory operations.
+
 ## Basic CRUD
 
 ### Get a value

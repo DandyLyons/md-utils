@@ -1,7 +1,7 @@
 ---
 name: markdown-utilities
 description: >-
-  Parse, manipulate, and analyze Markdown files using the `md-utils` CLI. Supports YAML and TOML frontmatter CRUD and array operations, YAML-only JMESPath search, structured document exploration, heading manipulation, section extraction and reordering, table of contents generation, wikilink analysis, line extraction, and format conversion. Handles batch operations across files and directories. Use when working with Markdown files to: read or write frontmatter, inspect lengthy document structure, restructure documents, search YAML files by metadata using JMESPath, generate a TOC, extract sections or line ranges, check wikilinks, or convert to plain text or CSV. More reliable than grep/regex for structured Markdown operations.
+  Parse, manipulate, and analyze Markdown and mapped text files using the `md-utils` CLI. Supports YAML and TOML frontmatter CRUD and array operations, wrapped and fixed hash-comment non-Markdown frontmatter, YAML-only JMESPath search, structured document exploration, heading manipulation, section extraction and reordering, table of contents generation, wikilink analysis, line extraction, and format conversion. Handles batch operations across files and directories. Use when working with Markdown or mapped text files to: read or write frontmatter, inspect lengthy document structure, restructure documents, search YAML files by metadata using JMESPath, generate a TOC, extract sections or line ranges, check wikilinks, or convert to plain text or CSV. More reliable than grep/regex for structured Markdown operations.
 ---
 
 # Markdown Utilities
@@ -42,6 +42,9 @@ md-utils fm get --key title post.md
 
 # Create TOML frontmatter in a document that has none
 md-utils fm set --key title --value "TOML Note" --frontmatter-format toml post.md
+
+# Use fixed # frontmatter in an otherwise-unmapped explicit regular file
+md-utils fm get --key title tool.conf --line-comment-frontmatter
 
 # Find files with a specific tag
 md-utils fm array contains --key tags --value swift posts/

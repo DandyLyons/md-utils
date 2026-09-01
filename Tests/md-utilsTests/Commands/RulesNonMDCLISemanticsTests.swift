@@ -64,7 +64,7 @@ struct RulesNonMDCLISemanticsTests {
   }
 
   @Test
-  func `unmapped files support file and raw body predicates after opt in`() throws {
+  func `line-comment TOML supports frontmatter and wrapper-excluded body predicates`() throws {
     let workspace = try makeWorkspace()
     defer { removeWorkspace(workspace) }
 
@@ -75,10 +75,17 @@ struct RulesNonMDCLISemanticsTests {
     #expect(files.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines) == "Config/settings.toml")
 
     let frontmatter = try run([
-      "rules", "matching", "Config/settings.toml", "--explain",
+      "rules", "matching", "Config/settings.toml",
     ], in: workspace)
-    #expect(frontmatter.status != 0)
-    #expect((frontmatter.standardOutput + frontmatter.standardError).contains("no frontmatter syntax mapping for extension \"toml\""))
+    #expect(frontmatter.status == 0)
+    #expect(frontmatter.standardOutput.split(whereSeparator: \.isNewline).contains("toml-file"))
+    #expect(frontmatter.standardOutput.split(whereSeparator: \.isNewline).contains("toml-frontmatter"))
+
+    let validated = try run([
+      "rules", "validate", "toml-frontmatter", "--include-non-md", "--include-ok",
+    ], in: workspace)
+    #expect(validated.status == 0)
+    #expect(validated.standardOutput.contains("OK Config/settings.toml"))
   }
 
   @Test
@@ -111,6 +118,22 @@ struct RulesNonMDCLISemanticsTests {
 
     #expect(result.status != 0)
     #expect((result.standardOutput + result.standardError).contains(diagnostic))
+  }
+
+  @Test
+  func `line-comment structural diagnostics are stable and do not echo host lines`() throws {
+    let workspace = try makeWorkspace()
+    defer { removeWorkspace(workspace) }
+
+    let result = try run([
+      "rules", "validate", "malformed-line-frontmatter", "--include-non-md",
+    ], in: workspace)
+    let output = result.standardOutput + result.standardError
+
+    #expect(result.status != 0)
+    #expect(output.contains("must be empty, bare #, or begin with exactly # "))
+    #expect(output.contains("HOST_RESOLVER") == false)
+    #expect(output.contains("never-echo-this") == false)
   }
 
   @Test(arguments: ["source-heading", "source-section", "source-wikilink", "source-required-heading"])

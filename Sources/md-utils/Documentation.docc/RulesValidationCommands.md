@@ -36,13 +36,21 @@ Mapped extensions reuse the shipped wrapped-frontmatter syntaxes:
 - `python-docstring`: Python and Python interface files
 - `powershell-block`: PowerShell files
 - `lua-block`: Lua files
+- `line-comment`: shipped exact basenames and shell, Ruby, R, YAML/TOML,
+  Make/CMake, properties, Nix, Bazel, and Terraform extensions
 - `markdown-text`: `.txt`, only with `--include-non-md`
 
-Wrapped YAML or TOML supports frontmatter field predicates, JMESPath, `$md-utils` type
+Wrapped or line-comment YAML/TOML supports frontmatter field predicates, JMESPath, `$md-utils` type
 hints, and JSON Schema validation. Raw body predicates and counts operate on the
-host source after the wrapper is removed; they can therefore match comments or
+host source after the recognized envelope is removed; they can therefore match comments or
 string literals. Markdown headings, sections, heading relationships, required
 headings, and wikilinks are unsupported for non-Markdown files.
+
+Rules resolve the complete filename so exact basenames such as
+`requirements.txt` and `.env.schema` win over `.txt` or suffix behavior. They use
+shipped mappings only; `fm --line-comment-frontmatter` is intentionally not a
+rules configuration mechanism. Recognized malformed hash-comment blocks are
+excluded from raw-body predicates and produce stable structural diagnostics.
 
 Opted-in unmapped extensions can use file and raw-body predicates. A rule that
 requires frontmatter for one of those files reports that no syntax mapping exists.

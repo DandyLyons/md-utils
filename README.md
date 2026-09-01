@@ -383,11 +383,11 @@ Rules project scans remain Markdown-only by default. Use `--include-non-md` with
 `rules validate` or `rules files-matching` to include other files selected by
 configured paths. An explicit non-Markdown file passed to `rules matching` is
 selected automatically, except `.txt`, which requires `--include-non-md`.
-Mapped extensions use the same `c-block`, `html-comment`, `python-docstring`,
-`powershell-block`, and `lua-block` wrappers documented in
+Mapped files use the same `c-block`, `html-comment`, `python-docstring`,
+`powershell-block`, `lua-block`, and fixed `# ` line-comment representations documented in
 [Frontmatter in Non-Markdown Text Files](docs/common-use-cases.md#frontmatter-in-non-markdown-text-files).
-Wrapped YAML or TOML supports frontmatter predicates, JMESPath, type hints, and JSON
-Schema checks. Raw body predicates operate on wrapper-excluded host text, while
+Wrapped or line-comment YAML/TOML supports frontmatter predicates, JMESPath, type
+hints, and JSON Schema checks. Raw body predicates operate on envelope-excluded host text, while
 Markdown headings, sections, and wikilinks are explicitly unsupported.
 
 If a file matches multiple rules, all matching checks apply. Files matching no rules are ignored. Invalid YAML or TOML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed.

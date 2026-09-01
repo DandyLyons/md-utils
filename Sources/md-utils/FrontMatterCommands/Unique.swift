@@ -65,6 +65,7 @@ extension CLIEntry.FrontMatterCommands {
     var expression: String
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Option(
       name: .long,
@@ -96,7 +97,10 @@ extension CLIEntry.FrontMatterCommands {
           """)
       }
 
-      let resolved = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let resolved = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
       guard resolved.isEmpty == false else {
         throw ValidationError("No Markdown files found to process")
       }
@@ -115,7 +119,8 @@ extension CLIEntry.FrontMatterCommands {
         compiledExpression: compiledExpression,
         files: comparisonFiles,
         reference: referencePath,
-        includeNonMarkdown: includeNonMD
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
       )
       print(try UniqueRenderer.render(report, format: format, requireValue: requireValue))
 
@@ -315,10 +320,16 @@ enum UniqueAnalyzer {
     compiledExpression: JMESExpression,
     files: [Path],
     reference: Path?,
-    includeNonMarkdown: Bool = false
+    includeNonMarkdown: Bool = false,
+    lineCommentFrontmatter: Bool = false
   ) -> UniqueReport {
     let evaluations = files.map {
-      evaluate($0, using: compiledExpression, includeNonMarkdown: includeNonMarkdown)
+      evaluate(
+        $0,
+        using: compiledExpression,
+        includeNonMarkdown: includeNonMarkdown,
+        lineCommentFrontmatter: lineCommentFrontmatter
+      )
     }
     let missingPaths = evaluations.compactMap { evaluation in
       evaluation.isMissing ? evaluation.path : nil
@@ -331,7 +342,8 @@ enum UniqueAnalyzer {
       let referenceEvaluation = evaluate(
         reference,
         using: compiledExpression,
-        includeNonMarkdown: includeNonMarkdown
+        includeNonMarkdown: includeNonMarkdown,
+        lineCommentFrontmatter: lineCommentFrontmatter
       )
       var combinedMissing = missingPaths
       var combinedDiagnostics = diagnostics
@@ -399,12 +411,14 @@ enum UniqueAnalyzer {
   private static func evaluate(
     _ path: Path,
     using expression: JMESExpression,
-    includeNonMarkdown: Bool
+    includeNonMarkdown: Bool,
+    lineCommentFrontmatter: Bool
   ) -> UniqueFileEvaluation {
     do {
       let document = try FrontMatterCLIReader.document(
         at: path,
-        includeNonMarkdown: includeNonMarkdown
+        includeNonMarkdown: includeNonMarkdown,
+        lineCommentFrontmatter: lineCommentFrontmatter
       )
       let object = try FrontMatterJMESPath.object(from: document)
       let result = try expression.search(object: object)

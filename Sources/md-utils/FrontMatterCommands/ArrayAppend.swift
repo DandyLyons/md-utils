@@ -44,6 +44,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     )
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Option(name: .shortAndLong, help: "The frontmatter key (must be an array)")
     var key: String
@@ -63,14 +64,17 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     @Flag(name: .long, help: "Process mapped non-Markdown files")
     var includeNonMD = false
 
-    @Flag(name: .long, help: "Authorize creation of wrapped frontmatter in non-Markdown files")
+    @Flag(name: .long, help: "Authorize frontmatter creation in non-Markdown files")
     var createFrontmatter = false
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
       let timer = CommandTimer()
-      let paths = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let paths = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
 
       guard !paths.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -83,7 +87,8 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         do {
           let parsed = try FrontMatterCLIMutator.parsedFile(
             at: path,
-            includeNonMarkdown: includeNonMD
+            includeNonMarkdown: includeNonMD,
+            lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
           )
           var doc = parsed.document
           if let frontmatterFormat { doc.frontMatterFormat = frontmatterFormat }

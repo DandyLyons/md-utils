@@ -17,7 +17,7 @@ extension CLIEntry.FrontMatterCommands {
       commandName: "remove-frontmatter",
       abstract: "Remove the complete frontmatter block",
       discussion: NonMarkdownFrontMatterHelp.appending(to: """
-        Completely removes the frontmatter delimiters and all enclosed YAML.
+        Completely removes the frontmatter delimiters and all enclosed YAML or TOML.
 
         You will be prompted once for each file that contains frontmatter. Enter
         exactly y to confirm removal, or use -y/--yes to skip confirmation.
@@ -27,6 +27,7 @@ extension CLIEntry.FrontMatterCommands {
     )
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Flag(name: [.customShort("y"), .long], help: "Skip confirmation prompt")
     var yes = false
@@ -36,7 +37,10 @@ extension CLIEntry.FrontMatterCommands {
 
     /// Runs the command using the parsed command-line arguments.
     mutating func run() async throws {
-      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let files = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
 
       guard files.isEmpty == false else {
         throw ValidationError("No Markdown files found to process")
@@ -59,7 +63,8 @@ extension CLIEntry.FrontMatterCommands {
     private func removeFrontMatter(from path: Path) throws {
       let parsed = try FrontMatterCLIMutator.parsedFile(
         at: path,
-        includeNonMarkdown: includeNonMD
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
       )
       guard parsed.hasFrontMatterBlock else { return }
 

@@ -103,6 +103,8 @@ extension CLIEntry.FrontMatterCommands {
 
     @Flag(name: .long, help: "Process mapped non-Markdown files")
     var includeNonMD = false
+
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
@@ -112,7 +114,17 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       // Convert path strings to Path objects
-      let paths = pathStrings.isEmpty ? [Path.current] : pathStrings.map { Path($0) }
+      let explicitPaths = pathStrings.map { Path($0) }
+      if lineCommentOptions.lineCommentFrontmatter {
+        guard explicitPaths.isEmpty == false,
+          explicitPaths.allSatisfy({ $0.exists && $0.isFile })
+        else {
+          throw ValidationError(
+            "--line-comment-frontmatter requires explicitly supplied regular files"
+          )
+        }
+      }
+      let paths = explicitPaths.isEmpty ? [Path.current] : explicitPaths
       // Compile the JMESPath expression once
       let expression: JMESExpression
       do {
@@ -173,13 +185,28 @@ extension CLIEntry.FrontMatterCommands {
           allPaths.append(contentsOf: recursiveChildren.filter { candidate in
             let fileExtension = candidate.extension?.lowercased() ?? ""
             if fileExtension == "md" || fileExtension == "markdown" { return true }
-            if includeNonMD && fileExtension == "txt" { return true }
-            return includeNonMD && FrontMatterSyntax.shippedSyntax(forExtension: fileExtension) != nil
+            if includeNonMD && NonMarkdownFrontMatterSyntax.shippedSyntax(
+              forFileName: candidate.lastComponent,
+              fileExtension: fileExtension
+            ) != nil { return true }
+            return includeNonMD && fileExtension == "txt"
           })
         } else {
           let fileExtension = path.extension?.lowercased() ?? ""
+          let shippedSyntax = NonMarkdownFrontMatterSyntax.shippedSyntax(
+            forFileName: path.lastComponent,
+            fileExtension: fileExtension
+          )
           if fileExtension == "md" || fileExtension == "markdown" {
             allPaths.append(path)
+          } else if shippedSyntax != nil {
+            if includeNonMD || explicitSingleFile || lineCommentOptions.lineCommentFrontmatter {
+              allPaths.append(path)
+            } else {
+              CLIStyle.writeStderr(
+                "ignored non-Markdown file \(path.string); use --include-non-md to process mapped non-Markdown files"
+              )
+            }
           } else if fileExtension == "txt" {
             if includeNonMD {
               allPaths.append(path)
@@ -188,14 +215,8 @@ extension CLIEntry.FrontMatterCommands {
                 "ignored non-Markdown file \(path.string); use --include-non-md to process mapped non-Markdown files"
               )
             }
-          } else if FrontMatterSyntax.shippedSyntax(forExtension: fileExtension) != nil {
-            if includeNonMD || explicitSingleFile {
-              allPaths.append(path)
-            } else {
-              CLIStyle.writeStderr(
-                "ignored non-Markdown file \(path.string); use --include-non-md to process mapped non-Markdown files"
-              )
-            }
+          } else if lineCommentOptions.lineCommentFrontmatter {
+            allPaths.append(path)
           } else if explicitSingleFile || includeNonMD {
             throw ValidationError("No frontmatter syntax mapping for extension \"\(fileExtension)\"")
           }
@@ -252,19 +273,18 @@ extension CLIEntry.FrontMatterCommands {
 
       for path in paths {
         // Parse the file
-        let content: String
         let doc: MarkdownDocument
         do {
-          content = try path.read(.utf8)
-          guard let syntax = FrontMatterFileSyntax.resolve(
-            for: path,
-            includeNonMarkdown: includeNonMD
-          ) else {
+          doc = try FrontMatterCLIMutator.parsedFile(
+            at: path,
+            includeNonMarkdown: includeNonMD,
+            lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+          ).document
+          if doc.frontMatterFormat == .toml {
             throw FrontMatterCommandError(
-              message: "no frontmatter syntax mapping for extension \"\(path.extension ?? "")\""
+              message: "TOML frontmatter is not supported by fm search"
             )
           }
-          doc = try ParsedFrontMatterFile.parse(source: content, syntax: syntax).document
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")
           hadErrors = true

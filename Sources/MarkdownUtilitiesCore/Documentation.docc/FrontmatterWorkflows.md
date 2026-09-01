@@ -13,6 +13,15 @@ plus the 1-based opening lines of later complete blocks. Incomplete candidates a
 treated as absent. The parser does not model the host content as Markdown and does
 not normalize indentation.
 
+Files whose shipped mapping uses fixed hash comments use
+``LineCommentFrontMatterParser``. ``NonMarkdownFrontMatterSyntax`` resolves the
+complete basename before its extension, preserving existing wrapped mappings.
+The parser uses swift-parsing terminators to stop at the first closing delimiter
+or ordinary host line. A ``LineCommentFrontMatterScan`` contains either valid
+``LineCommentFrontMatter`` or a recognized malformed range and deterministic
+``LineCommentFrontMatterDiagnostic``. It recognizes LF-delimited blocks only,
+matching ordinary and wrapped frontmatter policy.
+
 Mutation helpers on `MarkdownDocument` update frontmatter values without changing the body or delimiter format. ``FrontMatterConversion`` parses and serializes the neutral value model; `YAMLConversion` remains available for YAML-specific interoperability.
 
 Comments are not part of the neutral value model. Parsing and rendering either YAML or TOML does not guarantee that frontmatter comments survive, so callers should avoid comments in frontmatter that will be mutated.

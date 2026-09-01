@@ -10,6 +10,21 @@ Common operations include reading values, setting values, checking for keys, rem
 
 Do not put comments in frontmatter that will be mutated by `md-utils`. YAML and TOML are parsed into a format-neutral value model and serialized again, so comments are not guaranteed to survive.
 
+## Non-Markdown Hash Comments
+
+Shipped shell, Ruby, R, YAML/TOML, Make/CMake, properties, Nix, Bazel, Terraform,
+ignore-file, toolfile, and `.env.schema` mappings use fixed `# ` prefixes. Their
+YAML and TOML delimiters are `# ---` and `# +++`. A block is legal at line 1,
+immediately after a shebang, or after one empty post-shebang line. Exact basename
+mappings take precedence over extension behavior, so `requirements.txt` uses
+hash comments while an ordinary `.txt` remains opt-in Markdown-style text.
+
+Every `fm` leaf accepts `--line-comment-frontmatter` for otherwise-unmapped
+explicit regular files. All supplied inputs must be regular files; the flag is
+rejected for implicit current-directory input, directories, and traversal. It
+does not override Markdown or shipped wrapped mappings. Project rules use shipped
+mappings only and do not honor this CLI override.
+
 ## Removing Complete Frontmatter
 
 Use `fm remove-frontmatter`, or its `rmfm` alias, to delete the complete

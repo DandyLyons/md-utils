@@ -12,7 +12,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 ## Project Brief
 
 - **Language**: Swift 6.2+
-- **Frameworks/Libraries**: Foundation, MarkdownSyntax, swift-parsing, PathKit, Yams, swift-toml, JMESPath, JSONSchema.swift, swift-argument-parser, Rainbow, Hummingbird 2, Swift Logging
+- **Frameworks/Libraries**: Foundation, MarkdownSyntax, PathKit, Yams, swift-toml, JMESPath, JSONSchema.swift, swift-argument-parser, Rainbow, Hummingbird 2, Swift Logging
+  - **parsing**: Any code that involves parsing text must use the `Parsing` library like the rest of the codebase.
 - **Package Manager / Build Tool**: Swift Package Manager
 - **Executable Targets**: `md-utils`, `md-utils-server`
 - **Library Targets**: `MarkdownUtilitiesCore`, `MarkdownUtilities`

@@ -99,6 +99,63 @@ public struct FrontMatterSyntax: Equatable, Sendable {
   private static let luaBlockExtensions: Set<String> = ["lua"]
 }
 
+/// A shipped frontmatter representation for a non-Markdown host file.
+public enum NonMarkdownFrontMatterSyntax: Equatable, Sendable {
+  /// YAML or TOML surrounded by a host-language block envelope.
+  case wrapped(FrontMatterSyntax)
+
+  /// YAML or TOML represented by a fixed hash comment on every physical line.
+  case lineComment
+
+  /// Resolves a shipped representation using exact-basename precedence.
+  ///
+  /// Basenames are case-sensitive. Extensions are compared case-insensitively
+  /// without a leading period. Existing wrapped mappings take precedence over
+  /// the line-comment extension registry.
+  public static func shippedSyntax(
+    forFileName fileName: String,
+    fileExtension: String? = nil
+  ) -> NonMarkdownFrontMatterSyntax? {
+    if lineCommentBasenames.contains(fileName) { return .lineComment }
+    let normalizedExtension = (fileExtension ?? inferredExtension(from: fileName))
+      .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+      .lowercased()
+    if let wrapped = FrontMatterSyntax.shippedSyntax(forExtension: normalizedExtension) {
+      return .wrapped(wrapped)
+    }
+    if lineCommentExtensions.contains(normalizedExtension) { return .lineComment }
+    return nil
+  }
+
+  /// All exact basenames with a shipped line-comment mapping.
+  public static let shippedLineCommentBasenames: Set<String> = lineCommentBasenames
+
+  /// All extensions with a shipped line-comment mapping.
+  public static let shippedLineCommentExtensions: Set<String> = lineCommentExtensions
+
+  private static let lineCommentBasenames: Set<String> = [
+    ".gitignore", ".dockerignore", ".ignore", ".npmignore", ".prettierignore",
+    ".eslintignore", ".stylelintignore", ".helmignore", ".gcloudignore",
+    ".vercelignore", ".cursorignore", ".git-blame-ignore-revs",
+    "Makefile", "GNUmakefile", "CMakeLists.txt", "Justfile", "Gemfile",
+    "Rakefile", "Brewfile", "Vagrantfile", "Podfile", "Fastfile", "Appfile",
+    "Dangerfile", "Guardfile", "Pipfile", "requirements.txt", "constraints.txt",
+    ".Rprofile", ".Renviron", ".env.schema",
+  ]
+
+  private static let lineCommentExtensions: Set<String> = [
+    "sh", "bash", "zsh", "fish",
+    "rb", "rake", "gemspec",
+    "r", "yaml", "yml", "toml", "mk", "cmake", "properties", "nix",
+    "bzl", "bazel", "tf", "tfvars",
+  ]
+
+  private static func inferredExtension(from fileName: String) -> String {
+    guard let period = fileName.lastIndex(of: "."), period != fileName.startIndex else { return "" }
+    return String(fileName[fileName.index(after: period)...])
+  }
+}
+
 /// A complete wrapped frontmatter block located in one exact source snapshot.
 public struct WrappedFrontMatterBlock: Equatable, Sendable {
   /// The raw metadata between the format marker lines.
@@ -127,7 +184,10 @@ public struct WrappedFrontMatterScan: Equatable, Sendable {
 }
 
 /// Finds complete delimiter-wrapped YAML or TOML frontmatter blocks in LF text.
-public struct WrappedFrontMatterParser: Sendable {
+public struct WrappedFrontMatterParser: Parsing.Parser, Sendable {
+  public typealias Input = Substring
+  public typealias Output = WrappedFrontMatterScan
+
   /// The host syntax recognized by this parser.
   public let syntax: FrontMatterSyntax
 
@@ -136,15 +196,17 @@ public struct WrappedFrontMatterParser: Sendable {
     self.syntax = syntax
   }
 
-  /// Scans the whole snapshot, returning the first block and later opening lines.
+  /// Parses and consumes a whole snapshot, returning the first block and later opening lines.
   ///
   /// The parser recognizes LF input and requires wrapper and frontmatter
   /// markers to occupy complete physical lines. Incomplete candidates are treated
   /// as absent. Returned ranges are valid only for the supplied snapshot.
   ///
-  /// - Parameter source: Complete LF text to scan.
+  /// - Parameter input: Complete LF text to scan and consume.
   /// - Returns: The first complete block and locations of later complete blocks.
-  public func parse(_ source: String) -> WrappedFrontMatterScan {
+  public func parse(_ input: inout Substring) -> WrappedFrontMatterScan {
+    let source = input
+    input = input[input.endIndex...]
     let lines = physicalLines(in: source)
     var blocks: [WrappedFrontMatterBlock] = []
     var openingIndex = 0
@@ -195,6 +257,15 @@ public struct WrappedFrontMatterParser: Sendable {
     )
   }
 
+  /// Convenience entry point for parsing a complete Swift string.
+  ///
+  /// Returned ranges remain valid for `source` because parsing operates on its
+  /// original substring storage rather than a copied string.
+  public func parse(_ source: String) -> WrappedFrontMatterScan {
+    var input = source[...]
+    return parse(&input)
+  }
+
   private func parseCompleteEnvelope(
     _ candidate: String,
     format: FrontMatterFormat
@@ -211,7 +282,7 @@ public struct WrappedFrontMatterParser: Sendable {
     return try? parser.parse(&input)
   }
 
-  private func physicalLines(in source: String) -> [PhysicalLine] {
+  private func physicalLines(in source: Substring) -> [PhysicalLine] {
     var result: [PhysicalLine] = []
     var start = source.startIndex
     while start < source.endIndex {

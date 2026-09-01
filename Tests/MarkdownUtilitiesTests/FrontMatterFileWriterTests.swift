@@ -29,6 +29,35 @@ struct FrontMatterFileWriterTests {
     #expect(preserved == "latest\n")
   }
 
+  @Test
+  func `snapshot and revision check preserve a UTF-8 BOM`() throws {
+    let fixture = try makeFixture(content: "placeholder")
+    defer { try? fixture.parent().delete() }
+    let original = "\u{FEFF}before\n"
+    try Data(original.utf8).write(to: URL(fileURLWithPath: fixture.string))
+
+    let snapshot = try FrontMatterFileWriter.readSnapshot(from: fixture)
+    #expect(snapshot == original)
+    try FrontMatterFileWriter.write(
+      "\u{FEFF}after\n",
+      to: fixture,
+      expectedSource: snapshot
+    )
+
+    #expect(try Data(contentsOf: URL(fileURLWithPath: fixture.string)) == Data("\u{FEFF}after\n".utf8))
+  }
+
+  @Test
+  func `snapshot rejects invalid UTF-8`() throws {
+    let fixture = try makeFixture(content: "placeholder")
+    defer { try? fixture.parent().delete() }
+    try Data([0xFF, 0xFE, 0xFD]).write(to: URL(fileURLWithPath: fixture.string))
+
+    #expect(throws: FrontMatterFileWriteError.self) {
+      _ = try FrontMatterFileWriter.readSnapshot(from: fixture)
+    }
+  }
+
   private func makeFixture(content: String) throws -> Path {
     let directory = Path.current + "tmp/frontmatter-file-writer-\(UUID().uuidString)/"
     try directory.mkpath()

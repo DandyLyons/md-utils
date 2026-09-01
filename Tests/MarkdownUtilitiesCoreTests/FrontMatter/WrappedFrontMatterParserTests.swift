@@ -1,8 +1,23 @@
 import MarkdownUtilitiesCore
+import Parsing
 import Testing
 
 @Suite("Wrapped frontmatter parser")
 struct WrappedFrontMatterParserTests {
+  @Test
+  func `conforms to Parsing Parser and consumes its complete input`() throws {
+    let source = "/*\n---\ntitle: Example\n---\n*/\nbody"
+    var input = source[...]
+    let scan = try parseThroughProtocol(
+      WrappedFrontMatterParser(syntax: .cBlock),
+      input: &input
+    )
+    let block = try #require(scan.firstBlock)
+
+    #expect(input.isEmpty)
+    #expect(String(source[block.range]) == "/*\n---\ntitle: Example\n---\n*/")
+  }
+
   @Test(
     arguments: [
       (FrontMatterSyntax.cBlock, "/*", "*/"),
@@ -105,4 +120,11 @@ struct WrappedFrontMatterParserTests {
     #expect(FrontMatterSyntax.shippedSyntax(forExtension: "json") == nil)
     #expect(FrontMatterSyntax.shippedSyntax(forExtension: "toml") == nil)
   }
+}
+
+private func parseThroughProtocol<P: Parsing.Parser>(
+  _ parser: P,
+  input: inout P.Input
+) throws -> P.Output {
+  try parser.parse(&input)
 }

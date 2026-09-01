@@ -67,6 +67,7 @@ extension CLIEntry.FrontMatterCommands {
     )
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Option(name: .long, help: "Inline data to use as new frontmatter")
     var data: String?
@@ -86,7 +87,7 @@ extension CLIEntry.FrontMatterCommands {
     @Flag(name: .long, help: "Process mapped non-Markdown files")
     var includeNonMD = false
 
-    @Flag(name: .long, help: "Authorize creation of wrapped frontmatter in non-Markdown files")
+    @Flag(name: .long, help: "Authorize frontmatter creation in non-Markdown files")
     var createFrontmatter = false
     /// Runs the command using the parsed command-line arguments.
     ///
@@ -133,7 +134,10 @@ extension CLIEntry.FrontMatterCommands {
       }
 
       // Process each file
-      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let files = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
 
       guard !files.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -159,7 +163,8 @@ extension CLIEntry.FrontMatterCommands {
     private func replaceInFile(path: Path, newFrontMatter: FrontMatter) throws {
       let parsed = try FrontMatterCLIMutator.parsedFile(
         at: path,
-        includeNonMarkdown: includeNonMD
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
       )
       try FrontMatterCLIMutator.authorizeCreationIfNeeded(
         for: parsed,

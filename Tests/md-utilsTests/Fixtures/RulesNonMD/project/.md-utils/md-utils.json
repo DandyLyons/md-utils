@@ -51,14 +51,19 @@
       "name": "toml-frontmatter",
       "match": {
         "paths": ["Config/settings.toml"],
-        "frontmatter": { "status": { "hasKey": true } }
+        "frontmatter": { "status": { "equals": "ready" } },
+        "frontmatterQuery": { "jmespath": "owner == 'platform'" }
       },
-      "checks": [{ "type": "maxBodyLines", "max": 100 }]
+      "checks": [
+        { "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true },
+        { "type": "maxBodyLines", "max": 100 }
+      ]
     },
     { "name": "missing-frontmatter", "match": { "paths": ["Cases/Missing.swift"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
     { "name": "incomplete-frontmatter", "match": { "paths": ["Cases/Incomplete.swift"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
     { "name": "malformed-frontmatter", "match": { "paths": ["Cases/Malformed.swift"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
     { "name": "multiple-frontmatter", "match": { "paths": ["Cases/Multiple.swift"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
+    { "name": "malformed-line-frontmatter", "match": { "paths": ["Cases/MalformedLine.sh"] }, "checks": [{ "type": "frontmatterSchema", "schema": "component.schema.json", "frontmatterRequired": true }] },
     { "name": "source-heading", "match": { "paths": ["Sources/Structural.swift"], "document": { "hasHeading": "Fake" } }, "checks": [{ "type": "maxBodyLines", "max": 100 }] },
     { "name": "source-section", "match": { "paths": ["Sources/Structural.swift"], "document": { "hasSection": "Fake" } }, "checks": [{ "type": "maxBodyLines", "max": 100 }] },
     { "name": "source-wikilink", "match": { "paths": ["Sources/Structural.swift"], "document": { "hasWikilink": "Target" } }, "checks": [{ "type": "maxBodyLines", "max": 100 }] },

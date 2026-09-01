@@ -130,6 +130,9 @@ deterministic terminal environment and captures both output streams.
 - Cover both success and refusal/error paths when a command promises filesystem safety.
 - For parsers, include absent, empty, malformed, incomplete, repeated, and delimiter-like input where applicable.
 - Preserve exact bytes outside the edited range when that is part of the feature contract.
+- Frontmatter parser tests must follow the package's LF-only delimiter policy;
+  include CRLF cases as explicit non-recognition tests rather than silently
+  introducing a second newline contract.
 
 ## Test Files
 

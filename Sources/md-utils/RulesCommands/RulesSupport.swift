@@ -1558,7 +1558,10 @@ enum RulesValidatorRunner {
   }
 
   private static func recordContentKind(for file: Path) -> MarkdownRecordContentKind {
-    MarkdownRecordContentKind.rulesKind(forExtension: file.extension ?? "")
+    MarkdownRecordContentKind.rulesKind(
+      forFileName: file.lastComponent,
+      fileExtension: file.extension
+    )
   }
 
 }

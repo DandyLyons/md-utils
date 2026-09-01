@@ -79,6 +79,7 @@ extension CLIEntry.FrontMatterCommands {
     )
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Option(name: .shortAndLong, help: "Output format (json, yaml, toml, raw, plist)")
     var format: OutputFormat = .json
@@ -93,7 +94,10 @@ extension CLIEntry.FrontMatterCommands {
     ///
     /// See <doc:FrontmatterCommands> for workflow details.
     mutating func run() async throws {
-      let files = try options.resolvedFrontMatterPaths(includeNonMarkdown: true)
+      let files = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: true,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
 
       guard !files.isEmpty else {
         throw ValidationError("No supported files found to process")
@@ -106,7 +110,11 @@ extension CLIEntry.FrontMatterCommands {
       if isSingleExplicitFile {
         let file = files[0]
         do {
-          let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: true)
+          let doc = try FrontMatterCLIReader.document(
+            at: file,
+            includeNonMarkdown: true,
+            lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+          )
 
           if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
             Swift.print(delimiter)
@@ -131,7 +139,11 @@ extension CLIEntry.FrontMatterCommands {
         for (index, file) in files.enumerated() {
           Swift.print("==> \(file) <==")
           do {
-            let doc = try FrontMatterCLIReader.document(at: file, includeNonMarkdown: true)
+            let doc = try FrontMatterCLIReader.document(
+              at: file,
+              includeNonMarkdown: true,
+              lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+            )
 
             if includeDelimiters, let delimiter = outputDelimiter(for: doc) {
               Swift.print(delimiter)
@@ -162,7 +174,8 @@ extension CLIEntry.FrontMatterCommands {
           do {
             let parsed = try FrontMatterCLIMutator.parsedFile(
               at: file,
-              includeNonMarkdown: true
+              includeNonMarkdown: true,
+              lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
             )
 
             guard parsed.hasFrontMatterBlock else {

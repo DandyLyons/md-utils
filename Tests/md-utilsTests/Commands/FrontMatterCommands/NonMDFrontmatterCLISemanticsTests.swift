@@ -29,6 +29,20 @@ struct NonMDFrontmatterCLISemanticsTests {
     #expect(result.standardOutput.contains("blocks are invalid"))
   }
 
+  @Test(arguments: [
+    "dump", "get", "has", "list", "remove", "rename", "replace", "search", "set",
+    "remove-frontmatter", "sort-keys", "touch", "unique", "array append", "array contains",
+    "array prepend", "array remove",
+  ])
+  func `every fm leaf exposes the explicit line-comment override`(_ commandPath: String) throws {
+    let result = try CLIProcessTestHelper.run(
+      ["fm"] + commandPath.split(separator: " ").map(String.init) + ["--help"]
+    )
+
+    #expect(result.status == 0)
+    #expect(result.standardOutput.contains("--line-comment-frontmatter"))
+  }
+
   @Test
   func `remaining fm subcommands mutate existing wrapped frontmatter`() throws {
     let workspace = try makeWorkspace(from: "command-parity-existing")
@@ -137,6 +151,37 @@ struct NonMDFrontmatterCLISemanticsTests {
   }
 
   @Test
+  func `line-comment rendering canonicalizes empty logical lines to bare hash`() throws {
+    let source = "# ---\n# value: old\n# ---\nHOST_BYTES=true\n"
+    let parsed = try ParsedFrontMatterFile.parse(source: source, syntax: .lineComment)
+    var document = parsed.document
+    document.frontMatter["value"] = .string("first\n\nthird")
+
+    let rendered = try parsed.rendering(document)
+
+    #expect(rendered.contains("\n#\n"))
+    #expect(rendered.hasSuffix("HOST_BYTES=true\n"))
+  }
+
+  @Test
+  func `explicit override never replaces Markdown or wrapped mappings`() {
+    #expect(
+      FrontMatterFileSyntax.resolve(
+        for: Path("note.md"),
+        includeNonMarkdown: false,
+        lineCommentFrontmatter: true
+      ) == .markdown
+    )
+    #expect(
+      FrontMatterFileSyntax.resolve(
+        for: Path("script.py"),
+        includeNonMarkdown: false,
+        lineCommentFrontmatter: true
+      ) == .wrapped(.pythonDocstring)
+    )
+  }
+
+  @Test
   func `an explicit supported non-Markdown file infers its wrapper without opt-in`() throws {
     let workspace = try makeWorkspace(from: "single-existing-swift")
     defer { removeWorkspace(workspace) }
@@ -200,7 +245,7 @@ struct NonMDFrontmatterCLISemanticsTests {
   }
 
   @Test
-  func `an explicit unsupported extension explains that no syntax mapping exists`() throws {
+  func `an explicit TOML file uses the shipped line-comment mapping`() throws {
     let workspace = try makeWorkspace(from: "single-unsupported-toml")
     defer { removeWorkspace(workspace) }
 
@@ -211,8 +256,143 @@ struct NonMDFrontmatterCLISemanticsTests {
     ])
 
     #expect(result.status != 0)
-    #expect(result.standardError.lowercased().contains("no frontmatter syntax mapping"))
+    #expect(result.standardError.contains("Create line-comment frontmatter using # prefixes? [y/N]"))
+    #expect(result.standardError.lowercased().contains("no frontmatter syntax mapping") == false)
     try expectWorkspace(workspace, matches: "single-unsupported-toml")
+  }
+
+  @Test
+  func `line-comment override reads and mutates an otherwise unmapped explicit file`() throws {
+    let workspace = try makeScratchWorkspace()
+    defer { removeWorkspace(workspace) }
+    let file = workspace.appending(path: "settings.conf")
+    try Data("# ---\n# title: Before\n# ---\nHOST_BYTES=true\n".utf8).write(to: file)
+
+    let set = try CLIProcessTestHelper.run([
+      "fm", "set", file.path, "--key", "title", "--value", "After",
+      "--line-comment-frontmatter",
+    ])
+    #expect(set.status == 0, "\(set.standardError)")
+
+    let get = try CLIProcessTestHelper.run([
+      "fm", "get", file.path, "--key", "title", "--line-comment-frontmatter",
+    ])
+    #expect(get.status == 0, "\(get.standardError)")
+    #expect(get.standardOutput.contains("After"))
+    let updated = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+    #expect(updated.contains("# title: After"))
+    #expect(updated.hasSuffix("HOST_BYTES=true\n"))
+
+    let search = try CLIProcessTestHelper.run([
+      "fm", "search", "title == `\"After\"`", file.path,
+      "--line-comment-frontmatter",
+    ])
+    #expect(search.status == 0, "\(search.standardError)")
+    #expect(search.standardOutput.contains(file.lastPathComponent))
+  }
+
+  @Test
+  func `line-comment creation preserves BOM and uses canonical placement`() throws {
+    let workspace = try makeScratchWorkspace()
+    defer { removeWorkspace(workspace) }
+    let file = workspace.appending(path: ".env.schema")
+    let original = "\u{FEFF}# @defaultSensitive=false\n# ---\nPUBLIC_URL=https://example.invalid\n"
+    try Data(original.utf8).write(to: file)
+
+    let result = try CLIProcessTestHelper.run([
+      "fm", "set", file.path, "--key", "owner", "--value", "platform",
+      "--create-frontmatter",
+    ])
+
+    #expect(result.status == 0, "\(result.standardError)")
+    let updated = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+    #expect(updated.hasPrefix("\u{FEFF}# ---\n# owner: platform\n# ---\n\n"))
+    #expect(updated.hasSuffix(String(original.dropFirst())))
+  }
+
+  @Test
+  func `line-comment creation reuses one empty post-shebang line`() throws {
+    let workspace = try makeScratchWorkspace()
+    defer { removeWorkspace(workspace) }
+    let file = workspace.appending(path: "script.sh")
+    try Data("#!/bin/sh\n\necho unchanged\n".utf8).write(to: file)
+
+    let result = try CLIProcessTestHelper.run([
+      "fm", "set", file.path, "--key", "owner", "--value", "platform",
+      "--create-frontmatter",
+    ])
+
+    #expect(result.status == 0, "\(result.standardError)")
+    let updated = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+    #expect(
+      updated
+        == "#!/bin/sh\n# ---\n# owner: platform\n# ---\n\necho unchanged\n"
+    )
+  }
+
+  @Test
+  func `structural failure leaves a line-comment file byte-for-byte unchanged`() throws {
+    let workspace = try makeScratchWorkspace()
+    defer { removeWorkspace(workspace) }
+    let file = workspace.appending(path: "script.sh")
+    let original = "# ---\n# owner: platform\n#invalid\n# ---\necho unchanged\n"
+    try Data(original.utf8).write(to: file)
+
+    let result = try CLIProcessTestHelper.run([
+      "fm", "set", file.path, "--key", "owner", "--value", "changed",
+    ])
+
+    #expect(result.status != 0)
+    #expect(result.standardError.contains("must be empty, bare #, or begin with exactly # "))
+    #expect(try Data(contentsOf: file) == Data(original.utf8))
+  }
+
+  @Test
+  func `dump automatically discovers shipped line-comment mappings`() throws {
+    let workspace = try makeScratchWorkspace()
+    defer { removeWorkspace(workspace) }
+    let file = workspace.appending(path: "Makefile")
+    try Data("# ---\n# owner: platform\n# ---\nall:\n\t@true\n".utf8).write(to: file)
+
+    let result = try CLIProcessTestHelper.run(["fm", "dump", workspace.path])
+
+    #expect(result.status == 0, "\(result.standardError)")
+    #expect(result.standardOutput.contains("platform"))
+    #expect(result.standardOutput.contains("Makefile"))
+  }
+
+  @Test
+  func `TOML mutation and complete-block removal preserve host bytes`() throws {
+    let workspace = try makeScratchWorkspace()
+    defer { removeWorkspace(workspace) }
+    let file = workspace.appending(path: "settings.toml")
+    let host = "enabled = resolver(keep-this)\n"
+    try Data(("# +++\n# owner = \"before\"\n# +++\n" + host).utf8).write(to: file)
+
+    let set = try CLIProcessTestHelper.run([
+      "fm", "set", file.path, "--key", "owner", "--value", "after",
+    ])
+    #expect(set.status == 0, "\(set.standardError)")
+    let mutated = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+    #expect(mutated.hasPrefix("# +++\n# owner = \"after\"\n# +++\n"))
+    #expect(mutated.hasSuffix(host))
+
+    let removed = try CLIProcessTestHelper.run([
+      "fm", "remove-frontmatter", file.path, "--yes",
+    ])
+    #expect(removed.status == 0, "\(removed.standardError)")
+    #expect(String(decoding: try Data(contentsOf: file), as: UTF8.self) == host)
+  }
+
+  @Test(arguments: [
+    ["fm", "dump", "--line-comment-frontmatter"],
+    ["fm", "set", ".", "--key", "title", "--value", "No", "--line-comment-frontmatter"],
+  ])
+  func `line-comment override rejects implicit and directory input`(_ arguments: [String]) throws {
+    let result = try CLIProcessTestHelper.run(arguments)
+
+    #expect(result.status != 0)
+    #expect(result.standardError.contains("requires explicitly supplied regular files"))
   }
 
   @Test
@@ -455,6 +635,20 @@ struct NonMDFrontmatterCLISemanticsTests {
       directoryHint: .isDirectory
     )
     try FileManager.default.copyItem(at: input, to: workspace)
+    return workspace
+  }
+
+  private func makeScratchWorkspace() throws -> URL {
+    let temporaryRoot = URL(
+      filePath: FileManager.default.currentDirectoryPath,
+      directoryHint: .isDirectory
+    ).appending(path: "tmp/", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
+    let workspace = temporaryRoot.appending(
+      path: "md-utils-line-comment-\(UUID().uuidString)/",
+      directoryHint: .isDirectory
+    )
+    try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
     return workspace
   }
 

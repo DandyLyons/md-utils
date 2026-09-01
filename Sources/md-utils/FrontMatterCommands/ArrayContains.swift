@@ -57,6 +57,7 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
     )
 
     @OptionGroup var options: GlobalOptions
+    @OptionGroup var lineCommentOptions: LineCommentFrontMatterOptions
 
     @Option(name: .shortAndLong, help: "The frontmatter key to check (must be an array)")
     var key: String
@@ -80,7 +81,10 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       var matchingFiles: [String] = []
       var hasErrors = false
       var searchedCount = 0
-      let paths = try options.resolvedFrontMatterPaths(includeNonMarkdown: includeNonMD)
+      let paths = try options.resolvedFrontMatterPaths(
+        includeNonMarkdown: includeNonMD,
+        lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
+      )
 
       guard !paths.isEmpty else {
         throw ValidationError("No Markdown files found to process")
@@ -95,7 +99,8 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
         do {
           doc = try FrontMatterCLIReader.document(
             at: path,
-            includeNonMarkdown: includeNonMD
+            includeNonMarkdown: includeNonMD,
+            lineCommentFrontmatter: lineCommentOptions.lineCommentFrontmatter
           )
         } catch {
           CLIStyle.writeError("\(CLIStyle.path(path.string)): \(error.localizedDescription)")

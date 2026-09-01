@@ -123,9 +123,9 @@ TOML cannot represent null, so `fm touch` is unavailable for TOML blocks.
 
 ### Frontmatter in Non-Markdown Text Files
 
-One explicitly named supported file infers its shipped wrapper mapping. Wrapped
-frontmatter can occur anywhere in the file, though placing it near the beginning
-is recommended for discoverability and faster scanning.
+One explicitly named supported file infers its shipped mapping from its complete
+basename and extension. Exact basenames win, then established wrapped extensions,
+then hash-comment extensions. Wrapped frontmatter can occur anywhere in the file.
 
 ```bash
 # Swift and JSONC use a /* … */ envelope.
@@ -134,6 +134,10 @@ md-utils fm set settings.jsonc --key reviewed --value approved
 
 # Include mapped files in multi-file or directory operations.
 md-utils fm set Sources/ --key reviewed --value approved --include-non-md
+
+# Opt an otherwise-unmapped explicit regular file into hash-comment frontmatter.
+md-utils fm set tool.conf --key reviewed --value approved \
+  --line-comment-frontmatter
 ```
 
 The shipped mappings are:
@@ -143,7 +147,32 @@ The shipped mappings are:
 - `python-docstring` (`"""` / `"""`): Python and Python interface files
 - `powershell-block` (`<#` / `#>`): PowerShell files
 - `lua-block` (`--[[` / `]]`): Lua files
+- `line-comment` (`# `): shell scripts (`.sh`, `.bash`, `.zsh`, `.fish`), Ruby
+  (`.rb`, `.rake`, `.gemspec`), R (`.r`), YAML, TOML, Make/CMake,
+  `.properties`, Nix, Bazel, and Terraform files
 - `markdown-text`: `.txt`, only with `--include-non-md`
+
+Exact line-comment basenames are `.gitignore`, `.dockerignore`, `.ignore`,
+`.npmignore`, `.prettierignore`, `.eslintignore`, `.stylelintignore`,
+`.helmignore`, `.gcloudignore`, `.vercelignore`, `.cursorignore`,
+`.git-blame-ignore-revs`, `Makefile`, `GNUmakefile`, `CMakeLists.txt`, `Justfile`,
+`Gemfile`, `Rakefile`, `Brewfile`, `Vagrantfile`, `Podfile`, `Fastfile`, `Appfile`,
+`Dangerfile`, `Guardfile`, `Pipfile`, `requirements.txt`, `constraints.txt`,
+`.Rprofile`, `.Renviron`, and `.env.schema`. The `.env.schema` mapping is exact;
+ordinary `.env` and `.env.*` files are not mapped.
+
+Hash-comment blocks use `# ---` for YAML or `# +++` for TOML. Each nonempty
+logical line removes exactly one `# ` prefix; bare `#` and physically empty lines
+are empty logical lines. Blocks are recognized only at line 1, immediately after
+a shebang, or after one empty post-shebang line. They follow the package's existing
+LF-only frontmatter policy. Mutation renders empty lines as bare `#`, preserves
+all host bytes outside the recognized block, and creates after a BOM or shebang.
+
+The mappings follow the comment conventions documented by
+[Git](https://git-scm.com/docs/gitignore),
+[Docker](https://docs.docker.com/build/concepts/context/),
+[GNU Make](https://www.gnu.org/s/make/manual/html_node/Makefile-Contents.html),
+and the corresponding language/tool specifications.
 
 Mapped non-Markdown files without an existing block require confirmation when
 they are the sole explicit input. Use `--create-frontmatter` to authorize
@@ -163,9 +192,12 @@ create frontmatter—`set`, `replace`, `touch`, `array append`, and
 `fm replace`'s separate destructive-replacement confirmation; use `--yes` for
 that confirmation when appropriate.
 
-New wrappers are inserted at line 1 followed by one blank line. Multiple complete
-blocks are diagnosed, and mutation refuses to change the file. Per-line comment
-formats, custom delimiters, and project-defined syntax mappings are not supported.
+New wrapped blocks are inserted at line 1 followed by one blank line. Multiple
+complete wrapped blocks are diagnosed, and mutation refuses to change the file.
+`--line-comment-frontmatter` is accepted only when every input is an explicitly
+supplied regular file. It cannot broaden implicit input or directory traversal,
+and never overrides Markdown or shipped wrapped mappings. Custom delimiters and
+project-defined syntax mappings are not supported.
 There is a residual race with uncoordinated external writers between the final
 revision check and the atomic replacement.
 
