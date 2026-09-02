@@ -44,11 +44,13 @@ Linux verification uses Swift 6.2 in `Dockerfile.core-linux`. A successful image
 
 The Core schema adapter performs no implicit retrieval. A caller supplies `MarkdownSchemaResourceProvider`; registry construction resolves and caches the immutable graph, rewrites external references to canonical resource identifiers, and rejects missing resources, cycles, and conflicting `$id` values before assessment. The current JSONSchema dependency passes the package's draft 2020-12 `const`, `contains`, `allOf`, required-property, and nested-reference coverage on macOS, compiles in the Linux Core container, and performs representative draft 2020-12 assessment in the WASI smoke target.
 
-DynamicJSON is the selected RFC 9535 engine for fm-var querying. This dependency-only integration
-verifies its `JSON`, `JSONPath`, and located-result API across the portable boundary; the adapter
-from `FMVarQueryArgument`, node-identity preservation, query limits, and structured failure mapping
-remain part of issue #124. JMESPath remains a separate CLI capability, and JSONSchema.swift remains
-the Core schema-validation engine.
+DynamicJSON is the selected JSONPath engine for fm-var querying. Core converts
+`FMVarQueryArgument` values to DynamicJSON, maps located results back to retained node identities,
+preserves nodelist order and duplicates, and applies deterministic outer resource guards. Invalid
+dependency outcomes, unavailable functions, each limit, empty results, and non-empty results remain
+structured and distinct. DynamicJSON's grapheme-cluster length, Foundation regex behavior, and
+strict-mode extensions are retained rather than reimplemented locally. JMESPath remains a separate
+CLI capability, and JSONSchema.swift remains the Core schema-validation engine.
 
 ## Placement Rules
 

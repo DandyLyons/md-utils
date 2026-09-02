@@ -10,6 +10,7 @@ enum WasmCoreSmokeError: Error {
   case fmVarModelMismatch
   case fmVarParserMismatch
   case dynamicJSONMismatch
+  case fmVarJSONPathMismatch
 }
 
 @main
@@ -135,6 +136,48 @@ struct WasmCoreSmoke {
       ]
     else {
       throw WasmCoreSmokeError.dynamicJSONMismatch
+    }
+
+    let firstTitle = FMVarQueryNode(
+      id: FMVarQueryNodeID(rawValue: "$['items'][0]['title']"),
+      value: .string("First"),
+      sourceScalar: FMVarSourceScalar(content: "\"First\"")
+    )
+    let secondTitle = FMVarQueryNode(
+      id: FMVarQueryNodeID(rawValue: "$['items'][1]['title']"),
+      value: .string("Second"),
+      sourceScalar: FMVarSourceScalar(content: "\"Second\"")
+    )
+    let firstItem = FMVarQueryNode(
+      id: FMVarQueryNodeID(rawValue: "$['items'][0]"),
+      value: .object([FMVarQueryObjectMember(name: "title", node: firstTitle)])
+    )
+    let secondItem = FMVarQueryNode(
+      id: FMVarQueryNodeID(rawValue: "$['items'][1]"),
+      value: .object([FMVarQueryObjectMember(name: "title", node: secondTitle)])
+    )
+    let items = FMVarQueryNode(
+      id: FMVarQueryNodeID(rawValue: "$['items']"),
+      value: .array([firstItem, secondItem])
+    )
+    let queryArgument = FMVarQueryArgument(root: FMVarQueryNode(
+      id: FMVarQueryNodeID(rawValue: "$"),
+      value: .object([FMVarQueryObjectMember(name: "items", node: items)])
+    ))
+    let fmVarJSONPathResult = FMVarJSONPathEvaluator().evaluate(
+      query: "$.items[*].title",
+      argument: queryArgument
+    )
+    guard fmVarJSONPathResult.status == .selected,
+      fmVarJSONPathResult.nodelist?.nodes.map(\.id.rawValue) == [
+        "$['items'][0]['title']",
+        "$['items'][1]['title']",
+      ],
+      fmVarJSONPathResult.nodelist?.nodes.map(\.sourceScalar?.content) == [
+        "\"First\"", "\"Second\"",
+      ]
+    else {
+      throw WasmCoreSmokeError.fmVarJSONPathMismatch
     }
 
     print("MarkdownUtilitiesCore WebAssembly smoke test passed")

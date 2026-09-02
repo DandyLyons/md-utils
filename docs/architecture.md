@@ -55,15 +55,22 @@ codes, and proposed child-text edits. UTF-8 offsets are zero-based; diagnostic l
 columns are one-based. These types are content-only and `Codable`, `Equatable`, and `Sendable`
 where used for structured reports.
 
-DynamicJSON 1.0.2 is linked directly to Core as the selected RFC 9535 engine for the next fm-var
-milestone. This dependency adoption does not add a query adapter or evaluation behavior. Issue
-#124 will implement the portable value conversion, node association, resource limits, diagnostics,
-and the documented compatibility differences for grapheme-cluster length and Foundation regular
-expressions. YAML projection, URI resolution, value coercion, formatting, escaping, host access
-policy, and mutation also remain outside this foundation. `MarkdownUtilities` and executable hosts
-retain filesystem, network-policy, and revision-checked write responsibilities. The
-language-neutral initial fixture corpus is pinned to the authoritative proposal revision and
-bundled with `MarkdownUtilitiesCoreTests`.
+DynamicJSON 1.0.2 is Core's authoritative JSONPath parser and evaluator. The portable
+`FMVarJSONPathEvaluator` converts `FMVarQueryArgument` values, maps located results back to retained
+node identities and source scalars, preserves order and duplicates, configures function
+availability, and maps invalid, unsupported, resource-limited, empty, and non-empty outcomes into
+structured fm-var results. Configurable outer guards cover query length, query/value depth,
+conservative execution work, final result count, and conservative regular-expression work without
+performing I/O.
+
+Core does not maintain a second parser, type checker, or interpreter to correct dependency
+behavior. DynamicJSON's grapheme-cluster `length()`, Foundation regular expressions, and strict-mode
+extensions remain visible and are documented compatibility constraints. Object enumeration order
+is not portable and is never sorted or deduplicated. YAML projection, URI resolution, value
+coercion, formatting, escaping, host access policy, and mutation remain downstream work.
+`MarkdownUtilities` and executable hosts retain filesystem, network-policy, and revision-checked
+write responsibilities. The language-neutral fixture corpus is pinned to the authoritative
+proposal revision and bundled with `MarkdownUtilitiesCoreTests`.
 
 ## Server Planning Library (MarkdownUtilitiesServer)
 

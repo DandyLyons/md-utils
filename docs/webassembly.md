@@ -62,6 +62,8 @@ CoreFoundation also requires the WASI signal and memory-mapping emulation defini
 
 DynamicJSON 1.0.2 compiles and runs under WASI without a package patch. Its smoke assertion parses
 a strict RFC 9535 query and evaluates the ordered located results against an in-memory JSON value.
+The Core adapter performs only in-memory value conversion, outer limit checks, evaluation, and
+location-to-node association, so it introduces no host filesystem or network dependency.
 
 ## Smoke Coverage
 
