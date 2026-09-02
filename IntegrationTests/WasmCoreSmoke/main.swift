@@ -1,3 +1,4 @@
+import DynamicJSON
 import MarkdownUtilitiesCore
 
 enum WasmCoreSmokeError: Error {
@@ -8,6 +9,7 @@ enum WasmCoreSmokeError: Error {
   case typeAssessmentFailed
   case fmVarModelMismatch
   case fmVarParserMismatch
+  case dynamicJSONMismatch
 }
 
 @main
@@ -116,6 +118,23 @@ struct WasmCoreSmoke {
         == "é\r\n<fm-var query=\"$.title\">new</fm-var>"
     else {
       throw WasmCoreSmokeError.fmVarParserMismatch
+    }
+
+    let dynamicJSON: JSON = [
+      "items": [
+        ["title": "First"],
+        ["title": "Second"],
+      ]
+    ]
+    let dynamicJSONPath = try JSONPath(query: "$.items[*].title", strict: true)
+    let dynamicJSONResults = try dynamicJSON.query(dynamicJSONPath)
+    guard dynamicJSONResults.map(\.value) == [.string("First"), .string("Second")],
+      dynamicJSONResults.map(\.location.description) == [
+        "$['items'][0]['title']",
+        "$['items'][1]['title']",
+      ]
+    else {
+      throw WasmCoreSmokeError.dynamicJSONMismatch
     }
 
     print("MarkdownUtilitiesCore WebAssembly smoke test passed")

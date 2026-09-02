@@ -593,6 +593,7 @@ docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 - [swift-argument-parser](https://github.com/apple/swift-argument-parser) — CLI argument parsing
 - [PathKit](https://github.com/kylef/PathKit) — File path handling
 - [JSONSchema.swift](https://github.com/kylef/JSONSchema.swift) — JSON Schema validation
+- [DynamicJSON](https://github.com/objecthub/swift-dynamicjson) — Apache-2.0-licensed RFC 9535 JSONPath engine for portable fm-var querying
 - [Yams](https://github.com/jpsim/Yams) — YAML parsing and serialization
 - [swift-toml](https://github.com/mattt/swift-toml) — TOML parsing and serialization
 - [jmespath.swift](https://github.com/nicktmro/jmespath.swift) — JMESPath query language for JSON

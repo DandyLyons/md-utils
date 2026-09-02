@@ -36,6 +36,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.1"),
     .package(url: "https://github.com/kylef/PathKit", from: "1.0.1"),
     .package(url: "https://github.com/kylef/JSONSchema.swift", from: "0.6.0"),
+    .package(url: "https://github.com/objecthub/swift-dynamicjson.git", from: "1.0.2"),
     .package(url: "https://github.com/jpsim/Yams.git", from: "6.1.0"),
     .package(url: "https://github.com/mattt/swift-toml.git", from: "2.0.0"),
     .package(url: "https://github.com/adam-fowler/jmespath.swift.git", from: "1.0.3"),
@@ -57,6 +58,7 @@ let package = Package(
         .product(name: "MarkdownSyntax", package: "MarkdownSyntax"),
         .product(name: "Parsing", package: "swift-parsing"),
         .product(name: "JSONSchema", package: "JSONSchema.swift"),
+        .product(name: "DynamicJSON", package: "swift-dynamicjson"),
         "Yams",
         .product(name: "TOML", package: "swift-toml"),
       ]
@@ -67,6 +69,7 @@ let package = Package(
         "MarkdownUtilitiesCore",
         .product(name: "MarkdownSyntax", package: "MarkdownSyntax"),
         .product(name: "JSONSchema", package: "JSONSchema.swift"),
+        .product(name: "DynamicJSON", package: "swift-dynamicjson"),
         "Yams",
       ],
       resources: [
@@ -75,7 +78,10 @@ let package = Package(
     ),
     .executableTarget(
       name: "MarkdownUtilitiesCoreWasmSmoke",
-      dependencies: ["MarkdownUtilitiesCore"],
+      dependencies: [
+        "MarkdownUtilitiesCore",
+        .product(name: "DynamicJSON", package: "swift-dynamicjson"),
+      ],
       path: "IntegrationTests/WasmCoreSmoke/",
       linkerSettings: [
         .linkedLibrary("wasi-emulated-signal", .when(platforms: [.wasi])),

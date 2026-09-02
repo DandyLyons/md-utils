@@ -55,12 +55,15 @@ codes, and proposed child-text edits. UTF-8 offsets are zero-based; diagnostic l
 columns are one-based. These types are content-only and `Codable`, `Equatable`, and `Sendable`
 where used for structured reports.
 
-YAML projection, JSONPath evaluation, URI resolution, value coercion, formatting, escaping, host
-access policy, and mutation are deliberately outside this foundation. Later Core milestones will
-implement portable evaluation, while `MarkdownUtilities` and executable hosts retain filesystem,
-network-policy, and revision-checked write responsibilities. The language-neutral initial fixture
-corpus is pinned to the authoritative proposal revision and bundled with
-`MarkdownUtilitiesCoreTests`.
+DynamicJSON 1.0.2 is linked directly to Core as the selected RFC 9535 engine for the next fm-var
+milestone. This dependency adoption does not add a query adapter or evaluation behavior. Issue
+#124 will implement the portable value conversion, node association, resource limits, diagnostics,
+and the documented compatibility differences for grapheme-cluster length and Foundation regular
+expressions. YAML projection, URI resolution, value coercion, formatting, escaping, host access
+policy, and mutation also remain outside this foundation. `MarkdownUtilities` and executable hosts
+retain filesystem, network-policy, and revision-checked write responsibilities. The
+language-neutral initial fixture corpus is pinned to the authoritative proposal revision and
+bundled with `MarkdownUtilitiesCoreTests`.
 
 ## Server Planning Library (MarkdownUtilitiesServer)
 
@@ -304,6 +307,8 @@ The following features are **NOT YET IMPLEMENTED**:
 - **swift-parsing** (0.14.1+) - Parser combinators
 - **swift-argument-parser** (1.6.1+) - CLI argument parsing
 - **PathKit** (1.0.1+) - File path handling
+- **JSONSchema.swift** (0.6.0+) - JSON Schema validation
+- **DynamicJSON** (1.0.2+, Apache-2.0) - RFC 9535 JSONPath parsing and evaluation for portable fm-var work
 - **Yams** (6.1.0+) - YAML parsing and serialization
 - **swift-toml** (2.0.0+) - TOML parsing and serialization
 - **jmespath.swift** (1.0.3+) - JMESPath query language for JSON (used by `fm search`)

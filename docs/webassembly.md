@@ -36,7 +36,7 @@ The script:
 
 1. verifies that the matching WebAssembly SDK is installed;
 2. resolves the versions in `Package.resolved`;
-3. applies version-checked WASI compatibility patches to the Yams and JSONSchema SwiftPM checkouts;
+3. applies version-checked WASI compatibility patches to the Yams, JSONSchema.swift, and swift-toml SwiftPM checkouts;
 4. compiles `MarkdownUtilitiesCore` for WASI; and
 5. builds and runs `MarkdownUtilitiesCoreWasmSmoke.wasm` with Swift's bundled WasmKit runtime.
 
@@ -50,19 +50,18 @@ Debug artifacts are written beneath `.build/wasm32-unknown-wasip1/debug/`. The s
 
 ## Compatibility Patches
 
-The current resolved dependencies need two narrow source-level adaptations:
+The current resolved dependencies need three narrow source-level adaptations:
 
 - Yams 6.2.0 uses `DBL_DECIMAL_DIG`, which is not imported into Swift by the WASI Foundation module. The WASI branch uses 17 significant decimal digits, the round-trip requirement for an IEEE 754 binary64 value.
 - JSONSchema.swift 0.6.0 passes `NSNumber` directly to `CFNumberIsFloatType` outside Linux. WASI uses the package's existing Linux-compatible integer check instead.
+- swift-toml's toml++ parser is a C++ target, while the WASI SDK's C++ runtime has exceptions disabled. The WASI branch selects toml++'s exception-free parse-result path, and the build passes `-fno-exceptions` for C++ sources.
 
-The patches live in `scripts/wasm-patches/`. The build script verifies the exact dependency revisions before applying them and fails rather than patching an unknown version. Both changes are conditional on `os(WASI)` and do not alter native behavior.
+The patches live in `scripts/wasm-patches/`. The build script verifies the exact dependency revisions before applying them and fails rather than patching an unknown version. All three changes are conditional on WASI and do not alter native behavior.
 
 CoreFoundation also requires the WASI signal and memory-mapping emulation definitions while compiling. The smoke target links the corresponding `wasi-emulated-signal` and `wasi-emulated-mman` libraries only on WASI.
 
-swift-toml's toml++ parser is a C++ target, while the WASI SDK's C++ runtime has
-exceptions disabled. The version-checked compatibility patch selects toml++'s
-exception-free parse-result path and the build passes `-fno-exceptions` for WASI
-C++ sources. Native behavior is unchanged.
+DynamicJSON 1.0.2 compiles and runs under WASI without a package patch. Its smoke assertion parses
+a strict RFC 9535 query and evaluates the ordered located results against an in-memory JSON value.
 
 ## Smoke Coverage
 
@@ -71,7 +70,8 @@ C++ sources. Native behavior is unchanged.
 - YAML frontmatter through Yams/libYAML and TOML frontmatter through swift-toml;
 - Markdown AST parsing of headings, task lists, and tables through MarkdownSyntax and swift-cmark;
 - Markdown rendering; and
-- draft 2020-12 JSON Schema and Markdown type assessment.
+- draft 2020-12 JSON Schema and Markdown type assessment; and
+- strict RFC 9535 parsing and ordered nodelist evaluation through DynamicJSON.
 
 The root package owns the smoke target, so it uses the same `Package.resolved` versions as the library. A separate path-dependent integration package would resolve its own transitive dependency versions.
 
