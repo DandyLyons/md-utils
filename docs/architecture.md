@@ -63,14 +63,28 @@ structured fm-var results. Configurable outer guards cover query length, query/v
 conservative execution work, final result count, and conservative regular-expression work without
 performing I/O.
 
+Core's `FMVarURIResolver` performs strict, fragment-free RFC 3986 parsing and Section 5.2 resolution.
+Its `FMVarYAMLProjector` configures Yams from `Resolver.basic` with YAML 1.2.2 Core Schema rules and
+projects Yams nodes into the existing I-JSON query model. Yams remains the only YAML syntax parser,
+scalar decoder, representation composer, and alias implementation; the projector only assigns
+portable types, validates RFC 001 constraints, retains `Node.Scalar.string`, and creates
+deterministic JSON-location node identities.
+
+`MarkdownUtilities` owns `FMVarSourceResolver`, the adapter between portable resolution and a
+host-supplied async `FMVarResourceProvider`. The provider supplies an authorized immutable byte
+snapshot; no concrete filesystem or network provider is included. Omitted and empty references
+reuse the containing snapshot when they resolve to its identifier, while `self` is an ordinary
+relative path. Recognized content type is authoritative and extension is a fallback only for absent
+or generic types. Processing stops after decoding and projecting one resource.
+
 Core does not maintain a second parser, type checker, or interpreter to correct dependency
 behavior. DynamicJSON's grapheme-cluster `length()`, Foundation regular expressions, and strict-mode
 extensions remain visible and are documented compatibility constraints. Object enumeration order
-is not portable and is never sorted or deduplicated. YAML projection, URI resolution, value
-coercion, formatting, escaping, host access policy, and mutation remain downstream work.
-`MarkdownUtilities` and executable hosts retain filesystem, network-policy, and revision-checked
-write responsibilities. The language-neutral fixture corpus is pinned to the authoritative
-proposal revision and bundled with `MarkdownUtilitiesCoreTests`.
+is not portable and is never sorted or deduplicated. Value coercion, formatting, escaping, concrete
+host access policy, and mutation remain downstream work. `MarkdownUtilities` and executable hosts
+retain filesystem, network-policy, and revision-checked write responsibilities. The
+language-neutral fixture corpus is pinned to the authoritative proposal revision and bundled with
+`MarkdownUtilitiesCoreTests`.
 
 ## Server Planning Library (MarkdownUtilitiesServer)
 

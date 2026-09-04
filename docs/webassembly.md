@@ -6,7 +6,7 @@
 - Swift SDK: `swift-6.3.1-RELEASE_wasm`
 - target: `wasm32-unknown-wasip1`
 
-The WebAssembly target remains computation-focused. It parses and renders supplied Markdown content, mutates document structures, and performs type and rule assessment without owning filesystem, network, or host runtime behavior.
+The WebAssembly target remains computation-focused. It parses and renders supplied Markdown content, mutates document structures, performs type and rule assessment, resolves RFC 3986 identifiers, and projects supplied YAML without owning filesystem, network, or host runtime behavior.
 
 ## Install the SDK
 
@@ -65,6 +65,11 @@ a strict RFC 9535 query and evaluates the ordered located results against an in-
 The Core adapter performs only in-memory value conversion, outer limit checks, evaluation, and
 location-to-node association, so it introduces no host filesystem or network dependency.
 
+The fm-var source primitives also remain host-neutral. Core resolves identifiers and composes YAML
+from supplied strings; a WASI embedding is responsible for providing an absolute containing URI and
+authorized immutable resource bytes. Concrete filesystem and network providers are intentionally
+outside the WASI Core target.
+
 ## Smoke Coverage
 
 `IntegrationTests/WasmCoreSmoke/` verifies representative behavior across the dependency boundary:
@@ -73,7 +78,8 @@ location-to-node association, so it introduces no host filesystem or network dep
 - Markdown AST parsing of headings, task lists, and tables through MarkdownSyntax and swift-cmark;
 - Markdown rendering; and
 - draft 2020-12 JSON Schema and Markdown type assessment; and
-- strict RFC 9535 parsing and ordered nodelist evaluation through DynamicJSON.
+- strict RFC 9535 parsing and ordered nodelist evaluation through DynamicJSON; and
+- RFC 3986 source resolution plus YAML 1.2.2 Core Schema projection through Yams.
 
 The root package owns the smoke target, so it uses the same `Package.resolved` versions as the library. A separate path-dependent integration package would resolve its own transitive dependency versions.
 

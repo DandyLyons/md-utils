@@ -29,6 +29,7 @@ Use this target for content-only Markdown operations that must run on Apple plat
 - <doc:MarkdownCodable>
 - <doc:FMVarModels>
 - <doc:ParsingFMVarElements>
+- <doc:ResolvingFMVarSources>
 - <doc:EvaluatingFMVarJSONPath>
 
 ### Sections

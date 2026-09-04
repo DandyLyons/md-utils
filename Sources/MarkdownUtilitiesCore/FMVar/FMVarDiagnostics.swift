@@ -84,14 +84,52 @@ public struct FMVarDiagnosticCode: RawRepresentable, Codable, Equatable, Hashabl
   public static let invalidContent = Self(rawValue: "fm-var.syntax.invalid-content")
   /// A `src` value was not a valid fragment-free RFC 3986 URI reference.
   public static let invalidSourceReference = Self(rawValue: "fm-var.source.invalid-reference")
+  /// The containing document did not provide a valid absolute base URI.
+  public static let invalidBaseURI = Self(rawValue: "fm-var.source.invalid-base-uri")
   /// Host policy denied access to the resolved source.
   public static let sourceAccessDenied = Self(rawValue: "fm-var.source.access-denied")
   /// The host does not support the resolved source kind or scheme.
   public static let unsupportedSource = Self(rawValue: "fm-var.source.unsupported")
   /// An authorized source could not be read or decoded.
   public static let unreadableSource = Self(rawValue: "fm-var.source.unreadable")
+  /// Resource metadata and URI extension did not identify Markdown or YAML.
+  public static let unsupportedResourceKind = Self(rawValue: "fm-var.source.unsupported-kind")
+  /// A Markdown source did not contain YAML frontmatter.
+  public static let missingYAMLFrontmatter = Self(rawValue: "fm-var.source.missing-frontmatter")
+  /// A Markdown source used a non-YAML frontmatter format.
+  public static let unsupportedFrontmatterFormat = Self(
+    rawValue: "fm-var.source.unsupported-frontmatter-format"
+  )
+  /// A Markdown YAML frontmatter envelope was incomplete.
+  public static let malformedYAMLFrontmatter = Self(
+    rawValue: "fm-var.source.malformed-frontmatter"
+  )
   /// YAML data could not be projected to an I-JSON-compatible query argument.
   public static let invalidQueryArgument = Self(rawValue: "fm-var.query-argument.invalid")
+  /// Yams rejected the YAML stream or document syntax.
+  public static let malformedYAML = Self(rawValue: "fm-var.query-argument.malformed-yaml")
+  /// A standalone YAML stream did not contain a document root.
+  public static let emptyYAMLDocument = Self(rawValue: "fm-var.query-argument.empty-document")
+  /// A YAML mapping repeated a key.
+  public static let duplicateYAMLKey = Self(rawValue: "fm-var.query-argument.duplicate-key")
+  /// A YAML mapping key did not resolve to a string.
+  public static let nonStringYAMLKey = Self(rawValue: "fm-var.query-argument.non-string-key")
+  /// A YAML alias was cyclic, forward, self-referential, or undefined.
+  public static let invalidYAMLAlias = Self(rawValue: "fm-var.query-argument.invalid-alias")
+  /// A YAML node used a tag outside the supported Core Schema types.
+  public static let unsupportedYAMLTag = Self(rawValue: "fm-var.query-argument.unsupported-tag")
+  /// A YAML scalar was not valid for its resolved or explicit tag.
+  public static let invalidYAMLScalar = Self(rawValue: "fm-var.query-argument.invalid-scalar")
+  /// A YAML float was infinite or NaN.
+  public static let nonFiniteYAMLFloat = Self(rawValue: "fm-var.query-argument.non-finite-float")
+  /// A YAML integer exceeded RFC 001's interoperable range.
+  public static let yamlIntegerOutOfRange = Self(rawValue: "fm-var.query-argument.integer-out-of-range")
+  /// A YAML float overflowed finite IEEE 754 binary64.
+  public static let yamlFloatOverflow = Self(rawValue: "fm-var.query-argument.float-overflow")
+  /// Markdown YAML frontmatter did not have a mapping root.
+  public static let invalidYAMLFrontmatterRoot = Self(
+    rawValue: "fm-var.query-argument.invalid-frontmatter-root"
+  )
   /// A JSONPath query was malformed or invalid under RFC 9535.
   public static let invalidQuery = Self(rawValue: "fm-var.query.invalid")
   /// A valid JSONPath query requires an unavailable capability.

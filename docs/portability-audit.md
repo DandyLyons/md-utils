@@ -1,6 +1,6 @@
 # MarkdownUtilities Portability Audit
 
-**Last updated:** 2026-09-02
+**Last updated:** 2026-09-03
 
 ## Target Boundary
 
@@ -16,7 +16,9 @@
 | Portable Core | `FormatConversion/Protocols/`; `FormatConversion/Shared/`; `FormatConversion/PlainText/`; `FormatConversion/MarkdownDocument+FormatConversion.swift` | Pure conversion contracts and Markdown-to-text transformations. |
 | Portable Core | `Wikilink/Wikilink.swift`, `WikilinkAnchor.swift`, `WikilinkParser.swift`, `WikilinkScanner.swift`, and `MarkdownDocument+Wikilink.swift` | Parses supplied content without resolving against a filesystem. |
 | Portable Core | Every Swift file under `Types/` and `Rules/` | Operates on canonical record strings, explicit logical context, supplied definitions, and host-provided schema resources. It does not discover or mutate host state. |
+| Portable Core | Every Swift file under `FMVar/` | Parses elements and RFC 3986 identifiers, configures Yams' YAML 1.2.2 Core Schema resolver, projects supplied YAML nodes, and evaluates supplied query arguments without host I/O. |
 | Native integration | Every Swift file under `Types/` | Loads definitions and schema resources from native paths, adapts files to records, and performs atomic filesystem writes. |
+| Native integration | Every Swift file under `FMVar/` | Coordinates containing snapshots and a host-supplied resource provider without defining filesystem, network, or authorization policy. |
 | Native integration | Every Swift file under `FileMetadata/` | Reads filesystem attributes and, on Darwin, extended attributes. |
 | Native integration | `FormatConversion/CSV/CSVConverter.swift` and `CSVOptions.swift` | Absolute and relative metadata columns currently use PathKit and implicit current-working-directory context. |
 | Native integration | `Wikilink/WikilinkResolver.swift` and `ResolvedWikilink.swift` | Scans directories and exposes PathKit paths in the public API. |
@@ -51,6 +53,13 @@ dependency outcomes, unavailable functions, each limit, empty results, and non-e
 structured and distinct. DynamicJSON's grapheme-cluster length, Foundation regex behavior, and
 strict-mode extensions are retained rather than reimplemented locally. JMESPath remains a separate
 CLI capability, and JSONSchema.swift remains the Core schema-validation engine.
+
+fm-var source handling follows the same supplied-resource boundary. Core resolves absolute,
+fragment-free identifiers and projects Yams-composed YAML under explicit YAML 1.2.2 Core Schema
+rules. `MarkdownUtilities` requests at most one external immutable snapshot through
+`FMVarResourceProvider`; it does not access files or networks directly. A WASI or server host can
+apply its own authorization and loading policy while reusing identical URI, YAML, diagnostic, and
+node-association behavior.
 
 ## Placement Rules
 

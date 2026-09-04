@@ -11,6 +11,8 @@ enum WasmCoreSmokeError: Error {
   case fmVarParserMismatch
   case dynamicJSONMismatch
   case fmVarJSONPathMismatch
+  case fmVarURIResolutionMismatch
+  case fmVarYAMLProjectionMismatch
 }
 
 @main
@@ -178,6 +180,28 @@ struct WasmCoreSmoke {
       ]
     else {
       throw WasmCoreSmokeError.fmVarJSONPathMismatch
+    }
+
+    let resolvedIdentifier = try FMVarURIResolver().resolve(
+      reference: "../data.yaml?revision=2",
+      relativeTo: FMVarResourceIdentifier(rawValue: "https://example.test/docs/page.md")
+    )
+    guard resolvedIdentifier.rawValue == "https://example.test/data.yaml?revision=2" else {
+      throw WasmCoreSmokeError.fmVarURIResolutionMismatch
+    }
+
+    let yamlProjection = FMVarYAMLProjector().project(yaml: """
+      date: 2001-12-15
+      enabled: true
+      ratio: 1.2300
+      """)
+    guard let yamlRoot = yamlProjection.argument?.root,
+      case .object(let yamlMembers) = yamlRoot.value,
+      yamlMembers.first(where: { $0.name == "date" })?.node.value == .string("2001-12-15"),
+      yamlMembers.first(where: { $0.name == "enabled" })?.node.value == .boolean(true),
+      yamlMembers.first(where: { $0.name == "ratio" })?.node.sourceScalar?.content == "1.2300"
+    else {
+      throw WasmCoreSmokeError.fmVarYAMLProjectionMismatch
     }
 
     print("MarkdownUtilitiesCore WebAssembly smoke test passed")

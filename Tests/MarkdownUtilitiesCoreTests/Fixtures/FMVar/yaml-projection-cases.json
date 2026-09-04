@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "cases": [
+    { "name": "timestamp remains a string", "yaml": "2001-12-15", "kind": "string", "source": "2001-12-15" },
+    { "name": "YAML 1.1 yes remains a string", "yaml": "yes", "kind": "string", "source": "yes" },
+    { "name": "YAML 1.1 on remains a string", "yaml": "ON", "kind": "string", "source": "ON" },
+    { "name": "Core Boolean", "yaml": "true", "kind": "boolean", "source": "true" },
+    { "name": "Core octal", "yaml": "0o17", "kind": "integer", "source": "0o17" },
+    { "name": "decimal float spelling", "yaml": "1.2300", "kind": "number", "source": "1.2300" }
+  ]
+}
