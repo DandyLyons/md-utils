@@ -89,6 +89,7 @@ Query-argument codes include `fm-var.query-argument.malformed-yaml`,
 `fm-var.query-argument.non-finite-float`, `fm-var.query-argument.integer-out-of-range`,
 `fm-var.query-argument.float-overflow`, and `fm-var.query-argument.invalid-frontmatter-root`.
 
-Authorization, redirects, symlink and root policy, credentials, size and time limits, concrete
-filesystem and network providers, coercion, formatting, escaping, cache mutation, and CLI workflows
-remain host or later-pipeline responsibilities.
+Authorization remains a host responsibility. The native `MarkdownUtilities` target supplies an
+explicit local-only `FMVarHostPolicy` and `FileFMVarResourceProvider`; other hosts can implement the
+provider protocol with different policies. Redirects, network providers, coercion, formatting,
+escaping, cache mutation, and CLI workflows remain later-pipeline responsibilities.

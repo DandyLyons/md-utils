@@ -88,10 +88,20 @@ public struct FMVarDiagnosticCode: RawRepresentable, Codable, Equatable, Hashabl
   public static let invalidBaseURI = Self(rawValue: "fm-var.source.invalid-base-uri")
   /// Host policy denied access to the resolved source.
   public static let sourceAccessDenied = Self(rawValue: "fm-var.source.access-denied")
+  /// The decoded, normalized local source path was outside the allowed root.
+  public static let sourceOutsideAllowedRoot = Self(
+    rawValue: "fm-var.source.outside-allowed-root"
+  )
+  /// A local source escaped the allowed root after symlink resolution.
+  public static let sourceSymlinkEscape = Self(rawValue: "fm-var.source.symlink-escape")
   /// The host does not support the resolved source kind or scheme.
   public static let unsupportedSource = Self(rawValue: "fm-var.source.unsupported")
+  /// An authorized local source did not exist.
+  public static let sourceNotFound = Self(rawValue: "fm-var.source.not-found")
   /// An authorized source could not be read or decoded.
   public static let unreadableSource = Self(rawValue: "fm-var.source.unreadable")
+  /// A source representation exceeded the configured byte limit.
+  public static let excessiveSourceSize = Self(rawValue: "fm-var.source.excessive-size")
   /// Resource metadata and URI extension did not identify Markdown or YAML.
   public static let unsupportedResourceKind = Self(rawValue: "fm-var.source.unsupported-kind")
   /// A Markdown source did not contain YAML frontmatter.

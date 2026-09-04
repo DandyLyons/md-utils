@@ -280,8 +280,12 @@ struct FMVarSourceResolverTests {
 
   @Test(arguments: [
     (FMVarResourceAccessFailureReason.denied, FMVarSourceFailureReason.accessDenied, FMVarDiagnosticCode.sourceAccessDenied),
+    (.outsideAllowedRoot, .outsideAllowedRoot, .sourceOutsideAllowedRoot),
+    (.symlinkEscape, .symlinkEscape, .sourceSymlinkEscape),
     (.unsupported, .unsupportedSource, .unsupportedSource),
+    (.notFound, .sourceNotFound, .sourceNotFound),
     (.unreadable, .unreadableSource, .unreadableSource),
+    (.excessiveSize, .excessiveSourceSize, .excessiveSourceSize),
   ])
   func `provider failures remain typed`(
     accessReason: FMVarResourceAccessFailureReason,

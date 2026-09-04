@@ -18,7 +18,7 @@
 | Portable Core | Every Swift file under `Types/` and `Rules/` | Operates on canonical record strings, explicit logical context, supplied definitions, and host-provided schema resources. It does not discover or mutate host state. |
 | Portable Core | Every Swift file under `FMVar/` | Parses elements and RFC 3986 identifiers, configures Yams' YAML 1.2.2 Core Schema resolver, projects supplied YAML nodes, and evaluates supplied query arguments without host I/O. |
 | Native integration | Every Swift file under `Types/` | Loads definitions and schema resources from native paths, adapts files to records, and performs atomic filesystem writes. |
-| Native integration | Every Swift file under `FMVar/` | Coordinates containing snapshots and a host-supplied resource provider without defining filesystem, network, or authorization policy. |
+| Native integration | Every Swift file under `FMVar/` | Coordinates containing snapshots and a host-supplied resource provider; the file provider enforces an explicit canonical allowed root, bounded local Markdown/YAML reads, and no network access. |
 | Native integration | Every Swift file under `FileMetadata/` | Reads filesystem attributes and, on Darwin, extended attributes. |
 | Native integration | `FormatConversion/CSV/CSVConverter.swift` and `CSVOptions.swift` | Absolute and relative metadata columns currently use PathKit and implicit current-working-directory context. |
 | Native integration | `Wikilink/WikilinkResolver.swift` and `ResolvedWikilink.swift` | Scans directories and exposes PathKit paths in the public API. |
@@ -57,9 +57,10 @@ CLI capability, and JSONSchema.swift remains the Core schema-validation engine.
 fm-var source handling follows the same supplied-resource boundary. Core resolves absolute,
 fragment-free identifiers and projects Yams-composed YAML under explicit YAML 1.2.2 Core Schema
 rules. `MarkdownUtilities` requests at most one external immutable snapshot through
-`FMVarResourceProvider`; it does not access files or networks directly. A WASI or server host can
-apply its own authorization and loading policy while reusing identical URI, YAML, diagnostic, and
-node-association behavior.
+`FMVarResourceProvider`; it does not access files or networks directly. The native target's
+`FileFMVarResourceProvider` supplies an 8 MiB-bounded, allowed-root-confined local policy. A WASI
+or server host can apply its own authorization and loading policy while reusing identical URI,
+YAML, diagnostic, and node-association behavior.
 
 ## Placement Rules
 

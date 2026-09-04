@@ -78,6 +78,8 @@ differences are therefore intentionally retained:
 - strict mode accepts dependency extensions including arithmetic expressions, the `pi` variable,
   and additional registered functions.
 
-Only the five RFC functions are modeled by ``FMVarJSONPathFunction`` for host capability control;
-additional DynamicJSON behavior is passed through. Compatibility changes should be made by
-updating or configuring DynamicJSON, not by adding a second query implementation here.
+Only the five RFC functions are modeled by ``FMVarJSONPathFunction`` for host capability control.
+Additional DynamicJSON functions are removed from the evaluation environment and report an
+unsupported capability. Other dependency syntax behavior, including arithmetic expressions and
+the `pi` variable, remains visible. Compatibility changes should be made by updating or configuring
+DynamicJSON, not by adding a second query implementation here.

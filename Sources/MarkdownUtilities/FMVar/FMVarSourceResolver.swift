@@ -4,8 +4,8 @@ import MarkdownUtilitiesCore
 /// Resolves one fm-var source through an injected provider and projects its YAML authority.
 ///
 /// This adapter performs no filesystem or network access itself. Hosts supply already-authorized
-/// bytes through ``FMVarResourceProvider``. See `ResolvingFMVarSources` in MarkdownUtilitiesCore
-/// documentation for the portable source contract.
+/// bytes through `FMVarResourceProvider`. See `ResolvingFMVarSources` in
+/// MarkdownUtilitiesCore documentation for the portable source contract.
 public struct FMVarSourceResolver: Sendable {
   private let uriResolver: FMVarURIResolver
   private let projector: FMVarYAMLProjector
@@ -273,12 +273,24 @@ public struct FMVarSourceResolver: Sendable {
     case .denied:
       reason = .accessDenied
       code = .sourceAccessDenied
+    case .outsideAllowedRoot:
+      reason = .outsideAllowedRoot
+      code = .sourceOutsideAllowedRoot
+    case .symlinkEscape:
+      reason = .symlinkEscape
+      code = .sourceSymlinkEscape
     case .unsupported:
       reason = .unsupportedSource
       code = .unsupportedSource
+    case .notFound:
+      reason = .sourceNotFound
+      code = .sourceNotFound
     case .unreadable:
       reason = .unreadableSource
       code = .unreadableSource
+    case .excessiveSize:
+      reason = .excessiveSourceSize
+      code = .excessiveSourceSize
     }
     return failed(
       reference: reference,

@@ -11,6 +11,23 @@ public struct FMVarResourceIdentifier: RawRepresentable, Codable, Equatable, Has
 
   /// Creates a resource identifier from its URI spelling.
   public init(rawValue: String) { self.rawValue = rawValue }
+
+  /// A bounded identifier spelling suitable for diagnostics and logs.
+  ///
+  /// URI credentials and query contents can contain secrets. This representation removes user
+  /// information and replaces any query with a fixed marker while retaining enough location
+  /// context to explain a source-policy decision.
+  public var diagnosticDescription: String {
+    guard var components = URLComponents(string: rawValue) else {
+      return "<unprintable-source>"
+    }
+    components.user = nil
+    components.password = nil
+    if components.query != nil {
+      components.query = "redacted"
+    }
+    return components.string ?? "<unprintable-source>"
+  }
 }
 
 /// Immutable bytes and representation metadata supplied by an fm-var host.
@@ -52,10 +69,18 @@ public struct FMVarResourceRequest: Codable, Equatable, Sendable {
 public enum FMVarResourceAccessFailureReason: String, Codable, Equatable, Sendable, CaseIterable {
   /// Host access policy denied the request.
   case denied
+  /// The decoded, normalized path was outside the configured allowed root.
+  case outsideAllowedRoot = "outside-allowed-root"
+  /// A lexically in-root path resolved through a symlink to a target outside the allowed root.
+  case symlinkEscape = "symlink-escape"
   /// The host does not implement the requested scheme, origin, or resource capability.
   case unsupported
+  /// The authorized local source does not exist.
+  case notFound = "not-found"
   /// An authorized resource could not be read.
   case unreadable
+  /// The source representation exceeded the configured byte limit.
+  case excessiveSize = "excessive-size"
 }
 
 /// Host-provided details for a resource access failure.
@@ -105,10 +130,18 @@ public enum FMVarSourceFailureReason: String, Codable, Equatable, Sendable, Case
   case invalidReference = "invalid-reference"
   /// Host access policy denied the resolved resource.
   case accessDenied = "access-denied"
+  /// The decoded, normalized local path was outside the host's allowed root.
+  case outsideAllowedRoot = "outside-allowed-root"
+  /// A local path escaped the allowed root after symlink resolution.
+  case symlinkEscape = "symlink-escape"
   /// The host or decoder does not support the resource.
   case unsupportedSource = "unsupported-source"
+  /// The authorized local source does not exist.
+  case sourceNotFound = "source-not-found"
   /// The source representation could not be read or decoded.
   case unreadableSource = "unreadable-source"
+  /// The source representation exceeded the host's byte limit.
+  case excessiveSourceSize = "excessive-source-size"
   /// Resource metadata and URI path did not identify Markdown or YAML.
   case unsupportedResourceKind = "unsupported-resource-kind"
   /// Markdown did not contain YAML frontmatter.

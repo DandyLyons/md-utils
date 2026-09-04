@@ -188,10 +188,8 @@ public struct FMVarJSONPathEvaluator: Sendable {
 
   private func makeEnvironment() -> JSONPathEnvironment {
     let environment = JSONPathEnvironment()
-    for function in FMVarJSONPathFunction.allCases
-    where availableFunctions.contains(function) == false {
-      environment.functions.removeValue(forKey: function.rawValue)
-    }
+    let allowedNames = Set(availableFunctions.map(\.rawValue))
+    environment.functions = environment.functions.filter { allowedNames.contains($0.key) }
     return environment
   }
 

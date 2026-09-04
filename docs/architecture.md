@@ -71,18 +71,22 @@ portable types, validates RFC 001 constraints, retains `Node.Scalar.string`, and
 deterministic JSON-location node identities.
 
 `MarkdownUtilities` owns `FMVarSourceResolver`, the adapter between portable resolution and a
-host-supplied async `FMVarResourceProvider`. The provider supplies an authorized immutable byte
-snapshot; no concrete filesystem or network provider is included. Omitted and empty references
-reuse the containing snapshot when they resolve to its identifier, while `self` is an ordinary
-relative path. Recognized content type is authoritative and extension is a fallback only for absent
-or generic types. Processing stops after decoding and projecting one resource.
+host-supplied async `FMVarResourceProvider`. Its native `FMVarHostPolicy` and
+`FileFMVarResourceProvider` provide the initial concrete host: a required canonical allowed root,
+an 8 MiB source limit, and local Markdown/YAML access only. Relative, absolute-path, and `file:`
+references must remain under the root both before and after symlink resolution. Network schemes,
+authorities, credentials, URI queries, redirects, and other file kinds are disabled. Omitted and
+empty references reuse a containing snapshot loaded through the same policy, while `self` is an
+ordinary relative path. Recognized content type is authoritative and extension is a fallback only
+for absent or generic types. Processing stops after decoding and projecting one resource.
 
 Core does not maintain a second parser, type checker, or interpreter to correct dependency
 behavior. DynamicJSON's grapheme-cluster `length()`, Foundation regular expressions, and strict-mode
-extensions remain visible and are documented compatibility constraints. Object enumeration order
-is not portable and is never sorted or deduplicated. Value coercion, formatting, escaping, concrete
-host access policy, and mutation remain downstream work. `MarkdownUtilities` and executable hosts
-retain filesystem, network-policy, and revision-checked write responsibilities. The
+syntax extensions remain visible and are documented compatibility constraints, but dependency-only
+functions are removed from the evaluation environment. Object enumeration order is not portable
+and is never sorted or deduplicated. Value coercion, formatting, escaping, and mutation remain
+downstream work. `MarkdownUtilities` owns filesystem policy, while executable hosts retain policy
+selection and revision-checked write responsibilities. The
 language-neutral fixture corpus is pinned to the authoritative proposal revision and bundled with
 `MarkdownUtilitiesCoreTests`.
 

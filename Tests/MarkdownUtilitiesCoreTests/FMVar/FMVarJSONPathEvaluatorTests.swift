@@ -146,12 +146,18 @@ struct FMVarJSONPathEvaluatorTests {
       query: "$[?length(@.name) == 5]",
       argument: functionArgument()
     )
+    let dependencyOnly = FMVarJSONPathEvaluator().evaluate(
+      query: "$[?values(@.tags[*])]",
+      argument: functionArgument()
+    )
 
     #expect(unknown.status == .unsupportedCapability)
     #expect(unknown.failure?.reason == .unsupportedFunction)
     #expect(unknown.failure?.functionName == "custom")
     #expect(unavailable.status == .unsupportedCapability)
     #expect(unavailable.failure?.functionName == "length")
+    #expect(dependencyOnly.status == .unsupportedCapability)
+    #expect(dependencyOnly.failure?.functionName == "values")
   }
 
   @Test
