@@ -9,8 +9,9 @@ syntax, normalized reference and formatting declarations, effective formatting p
 structured diagnostics, query arguments and nodelists, statuses, result metadata, and proposed
 child-text replacements. Use ``FMVarParser`` to scan source and <doc:ParsingFMVarElements> for its
 placement and recovery rules. Use ``FMVarJSONPathEvaluator`` and <doc:EvaluatingFMVarJSONPath> to
-evaluate projected query arguments. The feature does not load URI references, project YAML,
-coerce or format values, or escape cached text at this stage.
+evaluate projected query arguments. Use ``FMVarScalarCoercer`` and <doc:CoercingFMVarScalars> to
+interpret selected scalar content and produce locale-independent default output. The feature does
+not apply locale formatting, escape cached text, or mutate reference caches at this stage.
 
 YAML frontmatter is authoritative under the v1 specification. TOML frontmatter support in other
 parts of `MarkdownUtilitiesCore` does not extend the fm-var source model.
@@ -80,6 +81,8 @@ result contract. `manifest.json` records each case and pins its provenance to:
 `parser-cases.json` adds language-neutral syntax, placement, exclusion-context, recovery, Unicode,
 and CRLF cases for ``FMVarParser``. `jsonpath-cases.json` adds language-neutral selector,
 Unicode-member, duplicate-result, and zero-result cases for ``FMVarJSONPathEvaluator``.
+`scalar-coercion-cases.json` covers every portable scalar type, YAML quoting, numeric spelling,
+and RFC 3339 temporal defaults for ``FMVarScalarCoercer``.
 
 The initial corpus is maintained in `md-utils` because the specification repository has no
 conformance directory yet. Accepted portable cases may later be copied upstream. A downstream

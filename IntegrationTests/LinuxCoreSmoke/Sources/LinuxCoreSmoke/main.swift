@@ -6,6 +6,7 @@ enum LinuxCoreSmokeError: Error {
   case emptyAST
   case renderMismatch
   case typeAssessmentFailed
+  case fmVarScalarCoercionFailed
 }
 
 @main
@@ -59,6 +60,18 @@ struct LinuxCoreSmoke {
     let assessment = try await checker.assess(MarkdownRecord(content: content), as: "LinuxDocument")
     guard assessment.conforms else {
       throw LinuxCoreSmokeError.typeAssessmentFailed
+    }
+
+    let scalar = FMVarQueryNode(
+      id: FMVarQueryNodeID(rawValue: "$['published']"),
+      value: .string("2026-09-05T08:07:06-00:00"),
+      sourceScalar: FMVarSourceScalar(content: "2026-09-05T08:07:06-00:00")
+    )
+    guard FMVarScalarCoercer().coerce(
+      scalar,
+      as: .timestamp
+    ).scalar?.defaultSerialization == "2026-09-05T08:07:06-00:00" else {
+      throw LinuxCoreSmokeError.fmVarScalarCoercionFailed
     }
 
     print("MarkdownUtilitiesCore Linux smoke test passed")

@@ -86,7 +86,7 @@ struct FMVarDiagnosticTests {
       .invalidQueryArgument,
       .invalidQuery, .unsupportedQueryCapability, .queryResourceLimitExceeded,
       .unresolvedZeroResult, .unresolvedNullResult, .wrongNodelistCardinality,
-      .wrongValueShape, .unsupportedItemShape, .coercionFailed,
+      .wrongValueShape, .unsupportedItemShape, .coercionFailed, .missingScalarSourceAssociation,
       .invalidFormat, .incompatibleFormat, .missingLocale, .formattingFailed,
       .unsupportedCharacter, .staleCache,
     ]

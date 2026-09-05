@@ -13,6 +13,7 @@ enum WasmCoreSmokeError: Error {
   case fmVarJSONPathMismatch
   case fmVarURIResolutionMismatch
   case fmVarYAMLProjectionMismatch
+  case fmVarScalarCoercionMismatch
 }
 
 @main
@@ -194,6 +195,7 @@ struct WasmCoreSmoke {
       date: 2001-12-15
       enabled: true
       ratio: 1.2300
+      published: 2026-09-05t08:07:06.120z
       """)
     guard let yamlRoot = yamlProjection.argument?.root,
       case .object(let yamlMembers) = yamlRoot.value,
@@ -202,6 +204,17 @@ struct WasmCoreSmoke {
       yamlMembers.first(where: { $0.name == "ratio" })?.node.sourceScalar?.content == "1.2300"
     else {
       throw WasmCoreSmokeError.fmVarYAMLProjectionMismatch
+    }
+
+    guard let ratioNode = yamlMembers.first(where: { $0.name == "ratio" })?.node,
+      let publishedNode = yamlMembers.first(where: { $0.name == "published" })?.node,
+      FMVarScalarCoercer().coerce(ratioNode, as: .number).scalar?.defaultSerialization == "1.2300",
+      FMVarScalarCoercer().coerce(
+        publishedNode,
+        as: .timestamp
+      ).scalar?.defaultSerialization == "2026-09-05T08:07:06.120Z"
+    else {
+      throw WasmCoreSmokeError.fmVarScalarCoercionMismatch
     }
 
     print("MarkdownUtilitiesCore WebAssembly smoke test passed")

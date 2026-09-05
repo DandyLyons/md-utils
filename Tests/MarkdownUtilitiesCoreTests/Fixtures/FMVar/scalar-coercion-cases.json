@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "cases": [
+    { "name": "empty quoted string", "yaml": "value: \"\"", "query": "$.value", "type": "string", "output": "" },
+    { "name": "unquoted Boolean false", "yaml": "value: false", "query": "$.value", "type": "boolean", "output": "FALSE" },
+    { "name": "quoted Boolean true", "yaml": "value: \"TrUe\"", "query": "$.value", "type": "boolean", "output": "TRUE" },
+    { "name": "signed decimal integer", "yaml": "value: +00042", "query": "$.value", "type": "integer", "output": "42" },
+    { "name": "quoted negative zero integer", "yaml": "value: \"-0\"", "query": "$.value", "type": "integer", "output": "0" },
+    { "name": "unquoted decimal spelling", "yaml": "value: 1.2300", "query": "$.value", "type": "number", "output": "1.2300" },
+    { "name": "quoted exponent spelling", "yaml": "value: \"-0.00e+02\"", "query": "$.value", "type": "number", "output": "-0.00e+02" },
+    { "name": "leap date", "yaml": "value: 2024-02-29", "query": "$.value", "type": "date", "output": "2024-02-29" },
+    { "name": "local datetime fraction", "yaml": "value: \"2026-09-05t08:07:06.1200\"", "query": "$.value", "type": "datetime", "output": "2026-09-05T08:07:06.1200" },
+    { "name": "UTC timestamp", "yaml": "value: 2026-09-05t08:07:06.120z", "query": "$.value", "type": "timestamp", "output": "2026-09-05T08:07:06.120Z" },
+    { "name": "numeric offset timestamp", "yaml": "value: \"2026-09-05T08:07:60-00:00\"", "query": "$.value", "type": "timestamp", "output": "2026-09-05T08:07:60-00:00" }
+  ]
+}

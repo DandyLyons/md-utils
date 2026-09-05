@@ -162,6 +162,10 @@ public struct FMVarDiagnosticCode: RawRepresentable, Codable, Equatable, Hashabl
   public static let unsupportedItemShape = Self(rawValue: "fm-var.value.unsupported-item-shape")
   /// A selected scalar could not be interpreted as its declared type.
   public static let coercionFailed = Self(rawValue: "fm-var.coercion.failed")
+  /// A selected scalar lost the YAML source association required for portable coercion.
+  public static let missingScalarSourceAssociation = Self(
+    rawValue: "fm-var.coercion.missing-source-association"
+  )
   /// A formatting option or value was not valid.
   public static let invalidFormat = Self(rawValue: "fm-var.format.invalid")
   /// A formatting option was incompatible with the targeted value type.
