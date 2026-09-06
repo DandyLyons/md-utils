@@ -183,7 +183,22 @@ public struct FMVarJSONPathEvaluator: Sendable {
       }
       nodes.append(node)
     }
-    return FMVarJSONPathEvaluation(status: .selected, nodelist: FMVarNodelist(nodes: nodes))
+    // This deliberately over-approximates: an object elsewhere in the argument may never be
+    // visited by the selector. Do not evaluate the query again or impose an object-member order.
+    let hasObject = conversion.nodesByLocation.values.contains { $0.value.shape == .mapping }
+    let mayEnumerate = path.segments.contains { segment in
+      segment.isDescendant || segment.selectors.contains { selector in
+        switch selector {
+        case .wildcard, .filter: true
+        default: false
+        }
+      }
+    }
+    return FMVarJSONPathEvaluation(
+      status: .selected,
+      nodelist: FMVarNodelist(nodes: nodes),
+      mayEnumerateObjectMembers: hasObject && mayEnumerate
+    )
   }
 
   private func makeEnvironment() -> JSONPathEnvironment {

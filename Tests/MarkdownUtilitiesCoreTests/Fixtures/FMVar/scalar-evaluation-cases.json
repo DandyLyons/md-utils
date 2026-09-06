@@ -1,0 +1,389 @@
+{
+  "version": "1.0.0",
+  "cases": [
+    {
+      "name": "zero fallback",
+      "yaml": "other: 1",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"none\" default-null=\"null\">old</fm-var>",
+      "status": "zero-result-fallback",
+      "expected": "none",
+      "codes": [],
+      "count": 0
+    },
+    {
+      "name": "null fallback",
+      "yaml": "v: null",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"none\" default-null=\"null\">old</fm-var>",
+      "status": "null-result-fallback",
+      "expected": "null",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "zero cannot use null fallback",
+      "yaml": "other: 1",
+      "markdown": "<fm-var query=\"$.v\" default-null=\"null\">old</fm-var>",
+      "status": "unresolved-zero-result",
+      "expected": null,
+      "codes": [
+        "fm-var.value.unresolved-zero-result"
+      ],
+      "count": 0
+    },
+    {
+      "name": "null cannot use zero fallback",
+      "yaml": "v: null",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"none\">old</fm-var>",
+      "status": "unresolved-null-result",
+      "expected": null,
+      "codes": [
+        "fm-var.value.unresolved-null-result"
+      ],
+      "count": 1
+    },
+    {
+      "name": "empty fallback is present",
+      "yaml": "other: 1",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"\">old</fm-var>",
+      "status": "zero-result-fallback",
+      "expected": "",
+      "codes": [],
+      "count": 0
+    },
+    {
+      "name": "fresh fallback retains status",
+      "yaml": "v: null",
+      "markdown": "<fm-var query=\"$.v\" default-null=\"old\">old</fm-var>",
+      "status": "null-result-fallback",
+      "expected": "old",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "empty",
+      "yaml": "v: \"\"",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "stale",
+      "expected": "",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "zero",
+      "yaml": "v: 0",
+      "markdown": "<fm-var query=\"$.v\" type=\"integer\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "stale",
+      "expected": "0",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "false",
+      "yaml": "v: false",
+      "markdown": "<fm-var query=\"$.v\" type=\"boolean\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "stale",
+      "expected": "FALSE",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "fallback bypasses type and format",
+      "yaml": "v: null",
+      "markdown": "<fm-var query=\"$.v\" type=\"integer\" format=\"custom\" default-null=\"not an integer\">old</fm-var>",
+      "status": "null-result-fallback",
+      "expected": "not an integer",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "fallback entities decode once",
+      "yaml": "other: 1",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"&amp;lt;&lt;b&gt;&#42;\">old</fm-var>",
+      "status": "zero-result-fallback",
+      "expected": "&amp;lt;&lt;b&gt;&#42;",
+      "codes": [],
+      "count": 0
+    },
+    {
+      "name": "closing tag and delimiters",
+      "yaml": "v: '</fm-var><script>&amp; \\`*_~[]| Café 😀'",
+      "markdown": "<fm-var query=\"$.v\">old</fm-var>",
+      "status": "stale",
+      "expected": "&lt;/fm-var&gt;&lt;script&gt;&amp;amp; &#92;&#96;&#42;&#95;&#126;&#91;&#93;&#124; Café 😀",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "numeric entity spelling becomes canonical",
+      "yaml": "v: '*'",
+      "markdown": "<fm-var query=\"$.v\">&#x2A;</fm-var>",
+      "status": "stale",
+      "expected": "&#42;",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "byte distinct unicode",
+      "yaml": "v: 'é'",
+      "markdown": "<fm-var query=\"$.v\">é</fm-var>",
+      "status": "stale",
+      "expected": "é",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "fresh unicode",
+      "yaml": "v: 'é'",
+      "markdown": "<fm-var query=\"$.v\">é</fm-var>",
+      "status": "valid",
+      "expected": "é",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "mapping",
+      "yaml": "v: {a: 1}",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "wrong-value-shape",
+      "expected": null,
+      "codes": [
+        "fm-var.value.wrong-shape"
+      ],
+      "count": 1
+    },
+    {
+      "name": "sequence",
+      "yaml": "v: []",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "wrong-value-shape",
+      "expected": null,
+      "codes": [
+        "fm-var.value.wrong-shape"
+      ],
+      "count": 1
+    },
+    {
+      "name": "type",
+      "yaml": "v: nope",
+      "markdown": "<fm-var query=\"$.v\" type=\"integer\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "invalid",
+      "expected": null,
+      "codes": [
+        "fm-var.coercion.failed"
+      ],
+      "count": 1
+    },
+    {
+      "name": "format",
+      "yaml": "v: text",
+      "markdown": "<fm-var query=\"$.v\" format=\"custom\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "unsupported",
+      "expected": null,
+      "codes": [
+        "fm-var.format.unsupported"
+      ],
+      "count": 1
+    },
+    {
+      "name": "newline",
+      "yaml": "v: \"line\\nfeed\"",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "invalid",
+      "expected": null,
+      "codes": [
+        "fm-var.escaping.unsupported-character"
+      ],
+      "count": 1
+    },
+    {
+      "name": "control",
+      "yaml": "v: \"\\0\"",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "invalid",
+      "expected": null,
+      "codes": [
+        "fm-var.escaping.unsupported-character"
+      ],
+      "count": 1
+    },
+    {
+      "name": "projection",
+      "yaml": "v: 1\nv: 2",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "invalid-query-argument",
+      "expected": null,
+      "codes": [
+        "fm-var.query-argument.duplicate-key"
+      ],
+      "count": null
+    },
+    {
+      "name": "first scalar",
+      "yaml": "v: [b, a, b]",
+      "markdown": "<fm-var query=\"$.v[2,0,2]\" default-null=\"fallback\">old</fm-var>",
+      "status": "stale",
+      "expected": "b",
+      "codes": [
+        "fm-var.value.additional-nodes"
+      ],
+      "count": 3
+    },
+    {
+      "name": "first null",
+      "yaml": "v: [null, good]",
+      "markdown": "<fm-var query=\"$.v[*]\" default-null=\"fallback\">old</fm-var>",
+      "status": "null-result-fallback",
+      "expected": "fallback",
+      "codes": [
+        "fm-var.value.additional-nodes"
+      ],
+      "count": 2
+    },
+    {
+      "name": "first mapping",
+      "yaml": "v: [{a: 1}, good]",
+      "markdown": "<fm-var query=\"$.v[*]\" default-null=\"fallback\">old</fm-var>",
+      "status": "wrong-value-shape",
+      "expected": null,
+      "codes": [
+        "fm-var.value.additional-nodes"
+      ],
+      "count": 2
+    },
+    {
+      "name": "object order",
+      "yaml": "v: {z: same, a: same}",
+      "markdown": "<fm-var query=\"$.v.*\" default-null=\"fallback\">old</fm-var>",
+      "status": "stale",
+      "expected": "same",
+      "codes": [
+        "fm-var.value.additional-nodes",
+        "fm-var.query.object-enumeration-order"
+      ],
+      "count": 2
+    },
+    {
+      "name": "decoded query",
+      "yaml": "v: ['a&b', 'z']",
+      "markdown": "<fm-var query=\"$.v[?@ == 'a&amp;b']\">old</fm-var>",
+      "status": "stale",
+      "expected": "a&amp;b",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "invalid query",
+      "yaml": "v: 1",
+      "markdown": "<fm-var query=\"$[\" default-zero=\"fallback\">old</fm-var>",
+      "status": "invalid-query",
+      "expected": null,
+      "codes": [
+        "fm-var.query.invalid"
+      ],
+      "count": null
+    },
+    {
+      "name": "fallback newline",
+      "yaml": "v: null",
+      "markdown": "<fm-var query=\"$.v\" default-null=\"a&#10;b\">old</fm-var>",
+      "status": "invalid",
+      "expected": null,
+      "codes": [
+        "fm-var.escaping.unsupported-character"
+      ],
+      "count": 1
+    },
+    {
+      "name": "unused fallback newline",
+      "yaml": "v: good",
+      "markdown": "<fm-var query=\"$.v\" default-null=\"a&#10;b\">old</fm-var>",
+      "status": "stale",
+      "expected": "good",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "query decoded exactly once",
+      "yaml": "v: {'a&amp;b': correct, 'a&b': wrong}",
+      "markdown": "<fm-var query=\"$.v['a&amp;amp;b']\">old</fm-var>",
+      "status": "stale",
+      "expected": "correct",
+      "codes": [],
+      "count": 1
+    },
+    {
+      "name": "source denial",
+      "yaml": "v: text",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "denied",
+      "expected": null,
+      "codes": [
+        "fm-var.source.access-denied"
+      ],
+      "count": null,
+      "sourceFailure": {
+        "reason": "access-denied",
+        "code": "fm-var.source.access-denied",
+        "message": "Denied by host"
+      }
+    },
+    {
+      "name": "missing source",
+      "yaml": "v: text",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "invalid",
+      "expected": null,
+      "codes": [
+        "fm-var.source.not-found"
+      ],
+      "count": null,
+      "sourceFailure": {
+        "reason": "source-not-found",
+        "code": "fm-var.source.not-found",
+        "message": "Missing source"
+      }
+    },
+    {
+      "name": "unavailable query function",
+      "yaml": "v: text",
+      "markdown": "<fm-var query=\"$.v[?length(@) > 0]\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "unsupported-query",
+      "expected": null,
+      "codes": [
+        "fm-var.query.unsupported-capability"
+      ],
+      "count": null,
+      "availableFunctions": []
+    },
+    {
+      "name": "query resource limit",
+      "yaml": "v: text",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "query-resource-limited",
+      "expected": null,
+      "codes": [
+        "fm-var.query.resource-limit-exceeded"
+      ],
+      "count": null,
+      "limits": {
+        "maximum-query-length": 1,
+        "maximum-nesting-depth": 128,
+        "maximum-execution-work": 1000000,
+        "maximum-result-count": 10000,
+        "maximum-regular-expression-work": 1000000
+      }
+    },
+    {
+      "name": "formatter failure",
+      "yaml": "v: text",
+      "markdown": "<fm-var query=\"$.v\" default-zero=\"fallback\" default-null=\"fallback\">old</fm-var>",
+      "status": "invalid",
+      "expected": null,
+      "codes": [
+        "fm-var.format.failed"
+      ],
+      "count": 1,
+      "failFormatter": true
+    }
+  ]
+}

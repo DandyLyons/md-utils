@@ -63,6 +63,14 @@ structured fm-var results. Configurable outer guards cover query length, query/v
 conservative execution work, final result count, and conservative regular-expression work without
 performing I/O.
 
+Core's `FMVarScalarEvaluator` connects injected source resolution to JSONPath, first-node
+selection, coercion, an injectable scalar formatter, and literal cache serialization. It keeps
+zero/null fallbacks separate from UTF-8 cache freshness and produces only child-range edits on
+stale success. Source, query, coercion, formatting, and security failures produce no edit.
+`FMVarLiteralCacheSerializer` escapes markup and Markdown delimiters for both values and
+fallbacks. See [scalar evaluation](../Sources/MarkdownUtilitiesCore/Documentation.docc/EvaluatingFMVarScalars.md)
+for ordering caveats, diagnostics, and the current default-only formatting boundary.
+
 Core's `FMVarURIResolver` performs strict, fragment-free RFC 3986 parsing and Section 5.2 resolution.
 Its `FMVarYAMLProjector` configures Yams from `Resolver.basic` with YAML 1.2.2 Core Schema rules and
 projects Yams nodes into the existing I-JSON query model. Yams remains the only YAML syntax parser,

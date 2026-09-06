@@ -7,6 +7,7 @@ enum LinuxCoreSmokeError: Error {
   case renderMismatch
   case typeAssessmentFailed
   case fmVarScalarCoercionFailed
+  case fmVarScalarEvaluationFailed
 }
 
 @main
@@ -72,6 +73,23 @@ struct LinuxCoreSmoke {
       as: .timestamp
     ).scalar?.defaultSerialization == "2026-09-05T08:07:06-00:00" else {
       throw LinuxCoreSmokeError.fmVarScalarCoercionFailed
+    }
+
+    let scalarSnapshot = try FMVarParser().parse(
+      "<fm-var query=\"$.value\">old</fm-var>"
+    )
+    guard let argument = FMVarYAMLProjector().project(yaml: "value: '<b>*new*</b>'").argument else {
+      throw LinuxCoreSmokeError.fmVarScalarEvaluationFailed
+    }
+    let scalarEvaluation = FMVarScalarEvaluator().evaluate(
+      scalarSnapshot,
+      elementOrdinal: 0,
+      sourceResolution: FMVarSourceResolution(status: .resolved, reference: nil, queryArgument: argument)
+    )
+    guard scalarEvaluation.status == .stale,
+      scalarEvaluation.edit?.replacement == "&lt;b&gt;&#42;new&#42;&lt;/b&gt;"
+    else {
+      throw LinuxCoreSmokeError.fmVarScalarEvaluationFailed
     }
 
     print("MarkdownUtilitiesCore Linux smoke test passed")

@@ -88,7 +88,8 @@ struct FMVarDiagnosticTests {
       .unresolvedZeroResult, .unresolvedNullResult, .wrongNodelistCardinality,
       .wrongValueShape, .unsupportedItemShape, .coercionFailed, .missingScalarSourceAssociation,
       .invalidFormat, .incompatibleFormat, .missingLocale, .formattingFailed,
-      .unsupportedCharacter, .staleCache,
+      .unsupportedCharacter, .staleCache, .invalidEvaluationInput, .additionalScalarNodes,
+      .objectEnumerationOrder, .unsupportedScalarFormat,
     ]
   }
 

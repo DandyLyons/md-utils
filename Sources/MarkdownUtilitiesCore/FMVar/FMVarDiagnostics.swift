@@ -179,6 +179,15 @@ public struct FMVarDiagnosticCode: RawRepresentable, Codable, Equatable, Hashabl
   /// Cached child text differs from the current serialized presentation.
   public static let staleCache = Self(rawValue: "fm-var.cache.stale")
 
+  /// Caller supplied an incomplete or inconsistent evaluation input.
+  public static let invalidEvaluationInput = Self(rawValue: "fm-var.evaluation.invalid-input")
+  /// Scalar selection ignored nodes after the first.
+  public static let additionalScalarNodes = Self(rawValue: "fm-var.value.additional-nodes")
+  /// The query may depend on implementation-defined object-member enumeration.
+  public static let objectEnumerationOrder = Self(rawValue: "fm-var.query.object-enumeration-order")
+  /// The default scalar formatter cannot honor an explicit format override.
+  public static let unsupportedScalarFormat = Self(rawValue: "fm-var.format.unsupported")
+
   /// Orders codes lexically by their stable raw values.
   public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 }

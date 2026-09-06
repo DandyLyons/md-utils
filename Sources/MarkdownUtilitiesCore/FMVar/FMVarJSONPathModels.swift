@@ -134,14 +134,25 @@ public struct FMVarJSONPathEvaluation: Codable, Equatable, Sendable {
   /// Structured failure when evaluation did not produce a nodelist.
   public let failure: FMVarJSONPathFailure?
 
+  /// Conservative warning: this query may enumerate object members in implementation-dependent order.
+  /// `nil` means ordering was not assessed by the provider.
+  public let mayEnumerateObjectMembers: Bool?
+
   /// Creates a structured evaluation result.
   public init(
     status: FMVarQueryEvaluationStatus,
     nodelist: FMVarNodelist? = nil,
-    failure: FMVarJSONPathFailure? = nil
+    failure: FMVarJSONPathFailure? = nil,
+    mayEnumerateObjectMembers: Bool? = nil
   ) {
     self.status = status
     self.nodelist = nodelist
     self.failure = failure
+    self.mayEnumerateObjectMembers = mayEnumerateObjectMembers
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case status, nodelist, failure
+    case mayEnumerateObjectMembers = "may-enumerate-object-members"
   }
 }

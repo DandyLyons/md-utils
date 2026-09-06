@@ -14,6 +14,7 @@ enum WasmCoreSmokeError: Error {
   case fmVarURIResolutionMismatch
   case fmVarYAMLProjectionMismatch
   case fmVarScalarCoercionMismatch
+  case fmVarScalarEvaluationMismatch
 }
 
 @main
@@ -215,6 +216,22 @@ struct WasmCoreSmoke {
       ).scalar?.defaultSerialization == "2026-09-05T08:07:06.120Z"
     else {
       throw WasmCoreSmokeError.fmVarScalarCoercionMismatch
+    }
+
+    let scalarSnapshot = try FMVarParser().parse(
+      "<fm-var query=\"$.missing\" default-zero=\"&lt;none&gt;*\">old</fm-var>"
+    )
+    let scalarResult = FMVarScalarEvaluator().evaluate(
+      scalarSnapshot,
+      elementOrdinal: 0,
+      sourceResolution: FMVarSourceResolution(
+        status: .resolved, reference: nil, queryArgument: yamlProjection.argument
+      )
+    )
+    guard scalarResult.status == .zeroResultFallback,
+      scalarResult.edit?.replacement == "&lt;none&gt;&#42;"
+    else {
+      throw WasmCoreSmokeError.fmVarScalarEvaluationMismatch
     }
 
     print("MarkdownUtilitiesCore WebAssembly smoke test passed")

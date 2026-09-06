@@ -278,7 +278,7 @@ public struct FMVarScalarCoercer: Sendable {
         message: "The selected scalar has no retained YAML source association."
       )
     }
-    guard Self.isSupportedText(sourceContent) else {
+    guard FMVarLiteralCacheSerializer.isSupportedText(sourceContent) else {
       return failed(
         .unsupportedCharacter,
         node: node,
@@ -318,18 +318,6 @@ public struct FMVarScalarCoercer: Sendable {
       requestedType: type,
       message: message
     ))
-  }
-
-  private static func isSupportedText(_ value: String) -> Bool {
-    value.unicodeScalars.allSatisfy { scalar in
-      switch scalar.value {
-      case 0x09: true
-      case 0x20...0xD7FF: true
-      case 0xE000...0xFFFD: true
-      case 0x10000...0x10FFFF: true
-      default: false
-      }
-    }
   }
 }
 
