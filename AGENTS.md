@@ -99,6 +99,26 @@ cp skill/markdown-utilities/skills/markdown-utilities/SKILL.md \
 ```
 Then commit both files. A Swift test enforces this and will fail if they drift.
 
+## Refreshing Official fm-var Fixtures
+
+The conformance fixtures are owned by [`DandyLyons/fm-var-tag`](https://github.com/DandyLyons/fm-var-tag). Do not add or edit consumer-specific cases under `Tests/MarkdownUtilitiesCoreTests/Fixtures/FMVar/cases/`; refresh the checked-in copy from the upstream repository instead. The upstream `fixtures/` directory is copied to `Tests/MarkdownUtilitiesCoreTests/Fixtures/FMVar/official-fixtures/`.
+
+To fetch the latest upstream fixtures, use a project-local temporary directory (the temporary directory must not be committed):
+
+```bash
+fixture_tmp="$(mktemp -d ./tmp/fm-var-tag-fixtures.XXXXXX)"
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/DandyLyons/fm-var-tag.git "$fixture_tmp/repo"
+git -C "$fixture_tmp/repo" sparse-checkout set fixtures
+rm -rf Tests/MarkdownUtilitiesCoreTests/Fixtures/FMVar/official-fixtures
+mkdir -p Tests/MarkdownUtilitiesCoreTests/Fixtures/FMVar/official-fixtures
+cp -R "$fixture_tmp/repo/fixtures/." \
+  Tests/MarkdownUtilitiesCoreTests/Fixtures/FMVar/official-fixtures/
+rm -rf "$fixture_tmp"
+```
+
+Review the resulting diff, then run `swift test --filter MarkdownUtilitiesCoreTests` (or `swift test`) before committing. The upstream fixture README defines the fixture contract; diagnostic wording and host-specific behavior remain the consumer's responsibility.
+
 ## Status
 
 This project is on a `0.x.x` release and is not yet API stable. Breaking changes will be documented in release notes.

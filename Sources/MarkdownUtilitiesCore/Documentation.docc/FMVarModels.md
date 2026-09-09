@@ -69,14 +69,12 @@ text and quote delimiter separately from normalized declarations.
 
 ## Conformance Fixtures
 
-The language-neutral corpus is bundled at
-`Tests/MarkdownUtilitiesCoreTests/Fixtures/FMVar/`. `schema.json` defines the manifest and expected
-result contract. `manifest.json` records each case and pins its provenance to:
+The official language-neutral synchronization fixtures are bundled at
+`Tests/MarkdownUtilitiesCoreTests/Fixtures/FMVar/official-fixtures/` and are maintained upstream
+in the `fixtures/` directory of `DandyLyons/fm-var-tag`:
 
 - Repository: `DandyLyons/fm-var-tag`
-- Document: `PROPOSAL.md`
-- Proposal commit: `18604853843d6edf22aba927c98697f5c956a0f3`
-- Proposal blob: `c612cb01262ac527236dd6dc60b9db5fb46622f5`
+- Document: `PROPOSAL.md` (as referenced by the upstream fixture README)
 
 `parser-cases.json` adds language-neutral syntax, placement, exclusion-context, recovery, Unicode,
 and CRLF cases for ``FMVarParser``. `jsonpath-cases.json` adds language-neutral selector,
@@ -84,7 +82,7 @@ Unicode-member, duplicate-result, and zero-result cases for ``FMVarJSONPathEvalu
 `scalar-coercion-cases.json` covers every portable scalar type, YAML quoting, numeric spelling,
 and RFC 3339 temporal defaults for ``FMVarScalarCoercer``.
 
-The initial corpus is maintained in `md-utils` because the specification repository has no
-conformance directory yet. Accepted portable cases may later be copied upstream. A downstream
-synchronization must preserve accepted case bytes and update both provenance identifiers whenever
-the authoritative proposal or upstream fixtures change.
+Each official case describes one synchronization pass from `before.md` to `after.md`. Consumers
+should refresh their local copy from upstream and preserve the fixture bytes outside the cache
+edits described by each case. Diagnostic wording and host-specific formatting remain consumer
+responsibilities.

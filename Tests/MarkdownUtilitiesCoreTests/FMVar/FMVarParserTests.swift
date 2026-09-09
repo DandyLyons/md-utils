@@ -6,42 +6,21 @@ import Testing
 
 @Suite("fm-var lossless parser")
 struct FMVarParserTests {
-  @Test("parses every RFC 001 Rev 3 attribute from the conformance corpus")
-  func parsesAllV1Attributes() throws {
+  @Test("parses the official inline-context fixture")
+  func parsesOfficialInlineContextFixture() throws {
     let root = try #require(Bundle.module.url(forResource: "FMVar", withExtension: nil))
     let inputURL = root
-      .appendingPathComponent("cases")
-      .appendingPathComponent("all-v1-attributes")
-      .appendingPathComponent("input.md")
+      .appendingPathComponent("official-fixtures")
+      .appendingPathComponent("01-inline-contexts")
+      .appendingPathComponent("before.md")
     let source = try String(contentsOf: inputURL, encoding: .utf8)
     let result = try FMVarParser().parse(source)
 
     #expect(result.isValid)
-    #expect(result.elements.map(\.kind) == [.format, .variable, .list])
-    #expect(result.elements[0].attributes.count == 23)
-    #expect(result.elements[1].attributes.count == 7)
-    #expect(result.elements[2].attributes.count == 8)
-
-    guard case .format(let format)? = result.declaration(forElementOrdinal: 0),
-      case .scalar(let scalar)? = result.declaration(forElementOrdinal: 1),
-      case .list(let list)? = result.declaration(forElementOrdinal: 2)
-    else {
-      Issue.record("Expected normalized declarations for all three fixture elements")
-      return
-    }
-    #expect(format.targets == [.date, .datetime, .timestamp, .array])
-    #expect(format.options.fractionalSecondDigits == 3)
-    #expect(format.options.hour12 == false)
-    #expect(scalar.type == .timestamp)
-    #expect(scalar.source == "self")
-    #expect(scalar.query == "$.published")
-    #expect(scalar.defaultZero == "Unknown")
-    #expect(scalar.defaultNull == "Not published")
-    #expect(list.format == .conjunction)
-    #expect(list.listStyle == .long)
-    #expect(list.query == "$.items")
-    #expect(list.defaultZero == "No items")
-    #expect(list.defaultNull == "Items unavailable")
+    #expect(result.elements.count == 6)
+    #expect(result.elements.allSatisfy { $0.kind == .variable })
+    #expect(result.elements.compactMap { $0.attribute(named: "query")?.value } ==
+      ["$.title", "$.author", "$.version", "$.title", "$.author", "$.version"])
   }
 
   @Test("parses conforming inline block and configuration elements losslessly")
