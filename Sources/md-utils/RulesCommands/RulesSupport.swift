@@ -1070,6 +1070,7 @@ enum RulesConfigBootstrapper {
     try projectDirectory.mkpath()
     try schemaDirectory.mkpath()
     try typesDirectory.mkpath()
+    try (projectDirectory + "rules").mkpath()
     try copyBundledConfigSchema(to: configSchemaFile)
 
     let configCreated = configFile.exists == false

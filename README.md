@@ -378,7 +378,7 @@ md-utils rules remove books
 md-utils rules remove books --delete-schema
 ```
 
-`config init` bootstraps `.md-utils/`, including empty `.md-utils/schemas/` and `.md-utils/types/` directories, without adding a rule or type. `rules add` adds a frontmatter schema rule to existing config. `rules describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema when the rule has one; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `rules remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
+`config init` bootstraps `.md-utils/`, including empty `.md-utils/schemas/`, `.md-utils/types/`, and `.md-utils/rules/` directories, without adding a rule or type. The empty rules directory prepares the proposed standalone format; existing configurations still load their embedded rules. `rules add` adds a frontmatter schema rule to existing config. `rules describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema when the rule has one; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `rules remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
 
 Rules project scans remain Markdown-only by default. Use `--include-non-md` with
 `rules validate` or `rules files-matching` to include other files selected by

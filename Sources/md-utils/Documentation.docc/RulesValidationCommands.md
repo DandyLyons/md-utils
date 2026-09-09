@@ -6,7 +6,7 @@ Validate files against project-level rules.
 
 The `rules` command group manages `.md-utils/` project configuration and validates files. Configuration is read from the current working directory; `md-utils` does not search parent directories for a project root.
 
-Use `md-utils config init` to create the project configuration along with empty `.md-utils/schemas/` and `.md-utils/types/` directories. Initialization does not add a rule or type.
+Use `md-utils config init` to create the project configuration along with empty `.md-utils/schemas/`, `.md-utils/types/`, and `.md-utils/rules/` directories. Initialization does not add a rule or type. Legacy configurations continue loading embedded rules; creating the directory does not opt a project into the proposed standalone format.
 
 Rules match files by project-relative glob patterns, optional file metadata conditions, optional frontmatter conditions, optional whole-frontmatter queries, and optional document conditions. Files can match more than one rule, in which case every matching check applies.
 

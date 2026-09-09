@@ -37,6 +37,7 @@ struct ConfigCommandsTests {
     #expect(schemaPath.exists)
     #expect((project + ".md-utils/schemas/").isDirectory)
     #expect((project + ".md-utils/types/").isDirectory)
+    #expect((project + ".md-utils/rules/").isDirectory)
     #expect(try MdUtilsConfig.load(from: configPath).schemaRules.isEmpty)
 
     let originalConfig = try configPath.read(.utf8)
