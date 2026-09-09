@@ -143,6 +143,84 @@ struct MarkdownRuleCheckerTests {
     MarkdownRuleChecker(registry: try MarkdownRuleCompiler(typeRegistry: typeRegistry).compile([rule]))
   }
 
+  @Test
+  func `Type enforcement fails selected nonconforming records and preserves diagnostics`() async throws {
+    let name = MarkdownTypeName(rawValue: "Book")
+    let types = try MarkdownTypeRegistry(definitions: [MarkdownTypeDefinition(
+      name: name,
+      version: "1",
+      body: MarkdownConstraintGroup(
+        requirements: [.init(id: "title", predicate: .heading(.init(text: "Book")))],
+        recommendations: [.init(id: "reviews", predicate: .heading(.init(text: "Reviews")))]
+      )
+    )])
+    let rules = try checker(for: MarkdownRuleDefinition(
+      name: "books",
+      applicability: .init(paths: ["books/**"]),
+      checks: [.init(id: "contract", predicate: .typeConformance(name))]
+    ), typeRegistry: types)
+
+    for content in ["# Book\n", "# Missing\n", "---\ninvalid: [\n---\n# Book\n"] {
+      let input = MarkdownRecord(content: content, context: .init(path: try MarkdownRecordPath("books/a.md")))
+      let expected = try await MarkdownTypeChecker(registry: types).assess(input, as: name)
+      let actual = try await rules.assess(input, ruleNamed: "books")
+      #expect(actual.applicable)
+      #expect(actual.passes == expected.conforms)
+      #expect(actual.diagnostics == expected.diagnostics)
+      #expect(actual.typeAssessments["contract"] == expected)
+    }
+    let outside = try await rules.assess(record(path: "notes/a.md"), ruleNamed: "books")
+    #expect(outside.status == .notApplicable)
+  }
+
+  @Test
+  func `Unknown enforced type fails compilation at check source`() throws {
+    let rule = MarkdownRuleDefinition(
+      name: "books",
+      checks: [.init(id: "contract", predicate: .typeConformance(.init(rawValue: "Missing")))],
+      source: "rules/books.mdrule.json"
+    )
+    let error = try #require(throws: MarkdownRuleCompilationError.self) {
+      try MarkdownRuleCompiler().compile([rule])
+    }
+    #expect(error.diagnostics.map(\.code) == [.missingType])
+    #expect(error.diagnostics.first?.location == "rules[0].checks[0]")
+    #expect(error.diagnostics.first?.message.contains("rules/books.mdrule.json") == true)
+    #expect(error.diagnostics.first?.message.contains("Missing") == true)
+  }
+
+  @Test
+  func `Multiple rules enforce shared schema types with original fix its`() async throws {
+    let name = MarkdownTypeName(rawValue: "Book")
+    let types = try MarkdownTypeRegistry(definitions: [.init(
+      name: name,
+      version: "1",
+      frontmatter: .init(schemas: [.inline(.object([
+        "type": .string("object"),
+        "required": .array([.string("kind")]),
+        "properties": .object(["kind": .object(["const": .string("book")])]),
+      ]))])
+    )])
+    let definitions = ["first", "second"].map { ruleName in
+      MarkdownRuleDefinition(
+        name: ruleName,
+        applicability: .init(paths: ["books/**"]),
+        checks: [.init(id: "contract", predicate: .typeConformance(name))]
+      )
+    }
+    let rules = MarkdownRuleChecker(registry: try MarkdownRuleCompiler(typeRegistry: types).compile(definitions))
+    let input = MarkdownRecord(content: "---\ntitle: Dune\n---\n# Book", context: .init(path: try MarkdownRecordPath("books/dune.md")))
+    let expected = try await MarkdownTypeChecker(registry: types).assess(input, as: name)
+    #expect(expected.conforms == false)
+    #expect(expected.diagnostics.flatMap(\.fixIts).isEmpty == false)
+    for definition in definitions {
+      let actual = try await rules.assess(input, ruleNamed: definition.name)
+      #expect(actual.status == .failed)
+      #expect(actual.typeAssessments["contract"] == expected)
+      #expect(actual.diagnostics == expected.diagnostics)
+    }
+  }
+
   /// Creates a canonical record with a portable logical path.
   private func record(path: String) throws -> MarkdownRecord {
     MarkdownRecord(

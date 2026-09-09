@@ -3,6 +3,17 @@ import Testing
 
 @Suite("Markdown rule configuration normalization")
 struct MarkdownRuleConfigurationTests {
+  @Test(arguments: ["0.1.0", "0.2.0"])
+  func `Legacy formats refuse type enforcement without silently dropping it`(_ version: String) {
+    let configuration = MarkdownRuleConfiguration(configVersion: version, rules: [.init(
+      name: "readmes",
+      applicability: .init(paths: ["**/README.md"]),
+      checks: [.init(id: "contract", predicate: .typeConformance(.init(rawValue: "README")))]
+    )])
+    #expect(throws: MarkdownRuleConfigurationError.self) {
+      try MarkdownRuleConfigurationEncoder.encode(configuration)
+    }
+  }
   @Test
   func `Equivalent 0_1 and 0_2 configurations normalize identically`() throws {
     let legacy = """

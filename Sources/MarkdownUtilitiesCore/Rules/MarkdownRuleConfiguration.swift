@@ -595,6 +595,10 @@ public enum MarkdownRuleConfigurationEncoder {
 
   private static func checkObject(_ check: MarkdownRuleCheck) throws -> [String: Any] {
     switch check.predicate {
+    case .typeConformance:
+      throw MarkdownRuleConfigurationError.unsupportedFeature(
+        "Type conformance checks are not representable in config 0.2.0"
+      )
     case .frontmatterSchema(let source, let presence):
       guard case .reference(let schema) = source else {
         throw MarkdownRuleConfigurationError.unsupportedFeature("Inline schemas are not representable in config 0.2.0")

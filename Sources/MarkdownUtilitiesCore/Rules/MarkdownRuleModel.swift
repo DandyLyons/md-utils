@@ -222,6 +222,9 @@ public struct MarkdownRuleApplicability: Equatable, Sendable {
 
 /// A normalized policy check evaluated after a rule is applicable.
 public enum MarkdownRuleCheckPredicate: Equatable, Sendable {
+  /// Enforces a compiled type contract after applicability succeeds.
+  /// Type requirements and recommendations retain their own severities.
+  case typeConformance(MarkdownTypeName)
   case frontmatterSchema(source: MarkdownJSONSchemaSource, presence: MarkdownFrontmatterPresence)
   case markdown(MarkdownPredicate)
 }
@@ -303,19 +306,23 @@ public struct MarkdownRuleAssessment: Equatable, Sendable {
   public var evidence: [MarkdownRulePredicateEvidence]
   public var applicabilityDiagnostics: [MarkdownDiagnostic]
   public var diagnostics: [MarkdownDiagnostic]
+  /// Original type assessments indexed by the originating rule check identifier.
+  public var typeAssessments: [String: MarkdownTypeAssessment]
 
   public init(
     ruleName: String,
     status: MarkdownRuleAssessmentStatus,
     evidence: [MarkdownRulePredicateEvidence] = [],
     applicabilityDiagnostics: [MarkdownDiagnostic] = [],
-    diagnostics: [MarkdownDiagnostic] = []
+    diagnostics: [MarkdownDiagnostic] = [],
+    typeAssessments: [String: MarkdownTypeAssessment] = [:]
   ) {
     self.ruleName = ruleName
     self.status = status
     self.evidence = evidence
     self.applicabilityDiagnostics = applicabilityDiagnostics
     self.diagnostics = diagnostics
+    self.typeAssessments = typeAssessments
   }
 
   public var applicable: Bool { status != .notApplicable }

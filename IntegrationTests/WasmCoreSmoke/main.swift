@@ -86,9 +86,24 @@ struct WasmCoreSmoke {
         )
       ])
     )
-    let checker = try MarkdownTypeChecker(
-      registry: MarkdownTypeRegistry(definitions: [definition])
+    let typeRegistry = try MarkdownTypeRegistry(definitions: [definition])
+    let checker = MarkdownTypeChecker(registry: typeRegistry)
+    let rule = MarkdownRuleDefinition(
+      name: "contract",
+      checks: [.init(id: "type", predicate: .typeConformance(definition.name))]
     )
+    let rules = MarkdownRuleChecker(
+      registry: try MarkdownRuleCompiler(typeRegistry: typeRegistry).compile([rule])
+    )
+    for value in [content, "# Invalid"] {
+      let record = MarkdownRecord(content: value)
+      let expected = try await checker.assess(record, as: definition.name)
+      let actual = try await rules.assess(record, ruleNamed: "contract")
+      guard actual.applicable, actual.passes == expected.conforms,
+        actual.typeAssessments["type"] == expected else {
+        throw WasmCoreSmokeError.typeAssessmentFailed
+      }
+    }
     let assessment = try await checker.assess(
       MarkdownRecord(content: content),
       as: "WasmDocument"

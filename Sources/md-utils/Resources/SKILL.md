@@ -68,6 +68,10 @@ Use `md-utils rules` when a repository has `.md-utils/md-utils.json` or needs Ma
 
 Important predicate semantics: missing frontmatter keys are not inequality, so `doesntEqual`, `notIncludes`, and `notIn` do not match missing keys; use `doesntHaveKey` for absence. Date predicates support `YYYY-MM-DD` and RFC 3339 timestamps with `Z` or numeric offsets and compare at the operand's precision. Logical grouping predicates `all`, `any`, and `not`, plus `hasBrokenWikilink`, are not part of config schema `0.2.0`.
 
+Core library callers can use `MarkdownRuleCheckPredicate.typeConformance` to enforce
+a compiled mdtype after selection. This is not a supported 0.1.0/0.2.0 config check:
+do not insert `typeConformance` or the proposed 0.3.0 `types` field into legacy configs.
+
 ## Reading Long Markdown Files
 
 Prefer `md-utils explore` before reading especially lengthy Markdown files, such as files around 400+ lines or 1000+ words. Start with a whole-document structure view, then expand only the relevant sections by heading line number.

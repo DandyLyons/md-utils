@@ -57,6 +57,11 @@ requires frontmatter for one of those files reports that no syntax mapping exist
 
 ## Supported Checks
 
+The following are the serialized 0.2.0 checks. Core additionally supports programmatic
+`typeConformance` checks, which enforce a type after selection and retain its original
+diagnostics and fix-its. This capability is not accepted by the legacy config schemas;
+the proposed 0.3.0 file-based configuration integration is separate work.
+
 - `frontmatterSchema`: validates parsed YAML or TOML frontmatter against a JSON Schema file.
 - `requiredHeading`: requires an exact Markdown heading text in a Markdown body.
 - `maxBodyLines`: limits Markdown body line count.

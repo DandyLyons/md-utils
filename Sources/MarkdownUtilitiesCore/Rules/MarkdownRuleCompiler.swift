@@ -155,6 +155,17 @@ public struct MarkdownRuleCompiler: Sendable {
         ))
       }
 
+      for (checkIndex, check) in definition.checks.enumerated() {
+        if case .typeConformance(let type) = check.predicate,
+          typeRegistry?.definition(named: type) == nil {
+          ruleDiagnostics.append(diagnostic(
+            .missingType,
+            "\(location).checks[\(checkIndex)]",
+            "Rule \"\(definition.name)\" from \(definition.source ?? location) references unavailable Markdown type \"\(type.rawValue)\""
+          ))
+        }
+      }
+
       for type in definition.applicability.anyTypes + definition.applicability.allTypes {
         if typeRegistry?.definition(named: type) == nil {
           ruleDiagnostics.append(diagnostic(
@@ -253,7 +264,11 @@ public struct MarkdownRuleCompiler: Sendable {
       }
     }
 
-    let typeNames = Set(definition.applicability.anyTypes + definition.applicability.allTypes)
+    let enforcedTypes = definition.checks.compactMap { check -> MarkdownTypeName? in
+      guard case .typeConformance(let name) = check.predicate else { return nil }
+      return name
+    }
+    let typeNames = Set(definition.applicability.anyTypes + definition.applicability.allTypes + enforcedTypes)
     for typeName in typeNames {
       guard let type = typeRegistry?.definition(named: typeName) else { continue }
       let constraints = type.body.requirements + type.body.recommendations

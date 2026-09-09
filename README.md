@@ -393,6 +393,17 @@ Markdown headings, sections, and wikilinks are explicitly unsupported.
 
 If a file matches multiple rules, all matching checks apply. Files matching no rules are ignored. Invalid YAML or TOML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed.
 
+### Programmatic type enforcement
+
+Core callers can enforce an existing Markdown type with a
+`MarkdownRuleCheck(id: "contract", predicate: .typeConformance(MarkdownTypeName(rawValue: "Book")))`.
+Supply the type registry to `MarkdownRuleCompiler`. The check runs after selection,
+retains the type's diagnostics and fix-its, and fails selected nonconforming records.
+`MarkdownRuleAssessment.typeAssessments` preserves the originating check ID and type assessment.
+This is currently a library capability. The CLI's 0.1.0/0.2.0 schemas do not accept it;
+the file-based 0.3.0 configuration integration is specified in
+[RFC 0002](docs/rfcs/0002-config-v0.3.md) and tracked with issues #71, #96, and #109.
+
 ## GitHub Pages
 
 The static project site lives in `site/` and deploys to `https://dandylyons.github.io/md-utils/` through `.github/workflows/pages.yml`. GitHub Pages should be configured to use GitHub Actions as its deployment source.

@@ -41,6 +41,21 @@ let assessment = try await MarkdownRuleChecker(registry: registry).assess(
 
 Includes use any-of semantics, exclusions take precedence, and applicability requirements use all-of semantics. ``MarkdownRulePredicateEvidence`` retains their deterministic evaluation order for explanation output.
 
+## Enforcing a Markdown type
+
+Programmatic rules can use `.typeConformance(MarkdownTypeName(rawValue: "Book"))`
+as a check predicate. Supply the corresponding type registry to `MarkdownRuleCompiler`.
+Unknown types fail compilation. A selected nonconforming record fails the rule;
+it does not become inapplicable. Assessment reuses analyzed content and retains the
+type's requirements, advisories, diagnostic identifiers, and fix-its. The enclosing
+check's severity does not override type-contract severities.
+
+`MarkdownRuleAssessment.typeAssessments` associates each original type assessment
+with its rule check ID, while `diagnostics` also exposes the diagnostics for existing
+consumers. This foundation is a Core API capability: legacy 0.1.0 and 0.2.0 config
+formats do not encode type-conformance checks. Config 0.3.0 serialization and recursive
+type expressions are separate work described in RFC 0002.
+
 ## Topics
 
 ### Lifecycle

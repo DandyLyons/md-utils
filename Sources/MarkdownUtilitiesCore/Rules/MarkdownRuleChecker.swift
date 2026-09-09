@@ -58,9 +58,17 @@ public struct MarkdownRuleChecker: Sendable {
     }
 
     var diagnostics: [MarkdownDiagnostic] = []
+    var typeAssessments: [String: MarkdownTypeAssessment] = [:]
     var skippedChecks = 0
     for check in rule.definition.checks {
       switch check.predicate {
+      case .typeConformance(let name):
+        guard let types = registry.typeRegistry else {
+          throw MarkdownTypeCheckerError.unknownType(name.rawValue)
+        }
+        let assessment = try MarkdownTypeChecker(registry: types).assess(record, as: name)
+        typeAssessments[check.id] = assessment
+        diagnostics.append(contentsOf: assessment.diagnostics)
       case .frontmatterSchema(_, let presence):
         if let fileExtension = record.unavailableFrontmatterExtension {
           diagnostics.append(frontmatterSyntaxUnavailableDiagnostic(
@@ -158,7 +166,8 @@ public struct MarkdownRuleChecker: Sendable {
       ruleName: rule.definition.name,
       status: status,
       evidence: applicability.evidence,
-      diagnostics: diagnostics
+      diagnostics: diagnostics,
+      typeAssessments: typeAssessments
     )
   }
 

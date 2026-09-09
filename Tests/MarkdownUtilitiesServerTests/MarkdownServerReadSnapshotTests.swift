@@ -6,6 +6,34 @@ import Testing
 @Suite("Markdown server read snapshot")
 struct MarkdownServerReadSnapshotTests {
   @Test
+  func `Rule type enforcement retains selected invalid server records`() async throws {
+    let type = MarkdownTypeDefinition(
+      name: .init(rawValue: "Book"), version: "1",
+      body: .init(requirements: [.init(id: "title", predicate: .heading(.init(text: "Book")))])
+    )
+    let types = try MarkdownTypeRegistry(definitions: [type])
+    let rule = MarkdownRuleDefinition(
+      name: "books", applicability: .init(paths: ["books/**"]),
+      checks: [.init(id: "contract", predicate: .typeConformance(type.name))]
+    )
+    let rules = try makeRuleRegistry([rule], typeRegistry: types)
+    let plan = try makePlan(registry: types, rules: [rule], resources: [
+      resource(name: "books", route: "/books", selection: .rule(name: "books"))
+    ])
+    let input = try record(identity: "bad", path: "books/bad.md", content: "# Note")
+    let direct = try await MarkdownRuleChecker(registry: rules).assess(input, ruleNamed: "books")
+    let snapshot = try await MarkdownServerReadSnapshotBuilder(
+      store: InMemoryRecordStore(records: [input]), plan: plan,
+      ruleRegistry: rules, typeRegistry: types
+    ).build()
+    let output = try #require(snapshot.resource(named: "books")?.records.first)
+    #expect(direct.applicable)
+    #expect(direct.passes == false)
+    #expect(output.valid == direct.passes)
+    #expect(output.memberships.first?.ruleAssessment?.passes == direct.passes)
+    #expect(output.diagnostics.contains { $0.ruleName == "books" && $0.code == "body.heading.missing" })
+  }
+  @Test
   func `All selection modes share canonical records and retain invalid rule candidates`() async throws {
     let book = MarkdownTypeDefinition(
       name: MarkdownTypeName(rawValue: "Book"),
