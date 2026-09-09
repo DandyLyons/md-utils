@@ -131,6 +131,21 @@ public struct MarkdownRuleCompiler: Sendable {
       let location = "rules[\(index)]"
       var ruleDiagnostics: [MarkdownRuleCompilationDiagnostic] = []
       let selectionLeaves = definition.matchExpression?.leaves ?? [definition.applicability]
+      if let expression = definition.typeExpression {
+        do {
+          _ = try MarkdownRuleTypeExpression.decode(expression.jsonValue, source: definition.source ?? location)
+        } catch {
+          ruleDiagnostics.append(diagnostic(.invalidOperand, location + ".types", error.localizedDescription))
+        }
+        for reference in expression.references {
+          guard let name = definition.typeBindings[reference],
+            typeRegistry?.definition(named: name) != nil else {
+            ruleDiagnostics.append(diagnostic(.missingType, location + ".types",
+              "Rule \"\(definition.name)\" from \(definition.source ?? location) references unavailable type resource \"\(reference)\""))
+            continue
+          }
+        }
+      }
       if let expression = definition.matchExpression {
         do {
           try expression.validate(source: definition.source ?? location)
@@ -281,7 +296,8 @@ public struct MarkdownRuleCompiler: Sendable {
       guard case .typeConformance(let name) = check.predicate else { return nil }
       return name
     }
-    let typeNames = Set(selectionLeaves.flatMap { $0.anyTypes + $0.allTypes } + enforcedTypes)
+    let expressionTypes = definition.typeExpression?.references.compactMap { definition.typeBindings[$0] } ?? []
+    let typeNames = Set(selectionLeaves.flatMap { $0.anyTypes + $0.allTypes } + enforcedTypes + expressionTypes)
     for typeName in typeNames {
       guard let type = typeRegistry?.definition(named: typeName) else { continue }
       let constraints = type.body.requirements + type.body.recommendations

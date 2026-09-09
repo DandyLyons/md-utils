@@ -254,6 +254,10 @@ public struct MarkdownRuleDefinition: Equatable, Sendable {
   public var applicability: MarkdownRuleApplicability
   /// RFC 0002 selection expression. When present, replaces flat applicability.
   public var matchExpression: MarkdownRuleMatchExpression?
+  /// Standalone-file type policy, evaluated after selection.
+  public var typeExpression: MarkdownRuleTypeExpression?
+  /// Exact resource references mapped by the host to declared type identities.
+  public var typeBindings: [String: MarkdownTypeName]
   public var checks: [MarkdownRuleCheck]
   /// Optional source used to resolve relative JSON Schema references.
   public var source: String?
@@ -263,11 +267,15 @@ public struct MarkdownRuleDefinition: Equatable, Sendable {
     applicability: MarkdownRuleApplicability = MarkdownRuleApplicability(),
     checks: [MarkdownRuleCheck] = [],
     source: String? = nil,
-    matchExpression: MarkdownRuleMatchExpression? = nil
+    matchExpression: MarkdownRuleMatchExpression? = nil,
+    typeExpression: MarkdownRuleTypeExpression? = nil,
+    typeBindings: [String: MarkdownTypeName] = [:]
   ) {
     self.name = name
     self.applicability = applicability
     self.matchExpression = matchExpression
+    self.typeExpression = typeExpression
+    self.typeBindings = typeBindings
     self.checks = checks
     self.source = source
   }
@@ -312,6 +320,8 @@ public struct MarkdownRuleAssessment: Equatable, Sendable {
   public var diagnostics: [MarkdownDiagnostic]
   /// Original type assessments indexed by the originating rule check identifier.
   public var typeAssessments: [String: MarkdownTypeAssessment]
+  /// Full branch evidence, including failures suppressed by successful alternatives.
+  public var typeExpressionAssessment: MarkdownRuleTypeExpressionAssessment?
 
   public init(
     ruleName: String,
@@ -319,7 +329,8 @@ public struct MarkdownRuleAssessment: Equatable, Sendable {
     evidence: [MarkdownRulePredicateEvidence] = [],
     applicabilityDiagnostics: [MarkdownDiagnostic] = [],
     diagnostics: [MarkdownDiagnostic] = [],
-    typeAssessments: [String: MarkdownTypeAssessment] = [:]
+    typeAssessments: [String: MarkdownTypeAssessment] = [:],
+    typeExpressionAssessment: MarkdownRuleTypeExpressionAssessment? = nil
   ) {
     self.ruleName = ruleName
     self.status = status
@@ -327,6 +338,7 @@ public struct MarkdownRuleAssessment: Equatable, Sendable {
     self.applicabilityDiagnostics = applicabilityDiagnostics
     self.diagnostics = diagnostics
     self.typeAssessments = typeAssessments
+    self.typeExpressionAssessment = typeExpressionAssessment
   }
 
   public var applicable: Bool { status != .notApplicable }

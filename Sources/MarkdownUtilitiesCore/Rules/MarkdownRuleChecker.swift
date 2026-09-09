@@ -153,11 +153,15 @@ public struct MarkdownRuleChecker: Sendable {
       }
     }
 
+    let expressionAssessment = try rule.definition.typeExpression.map {
+      try assessTypes($0, bindings: rule.definition.typeBindings, record: record)
+    }
+    if let expressionAssessment { diagnostics.append(contentsOf: expressionAssessment.diagnostics) }
     let hasErrors = diagnostics.contains { $0.severity == .error }
     let status: MarkdownRuleAssessmentStatus
     if hasErrors {
       status = .failed
-    } else if rule.definition.checks.isEmpty == false && skippedChecks == rule.definition.checks.count {
+    } else if expressionAssessment == nil && rule.definition.checks.isEmpty == false && skippedChecks == rule.definition.checks.count {
       status = .skipped
     } else {
       status = .passed
@@ -167,7 +171,8 @@ public struct MarkdownRuleChecker: Sendable {
       status: status,
       evidence: applicability.evidence,
       diagnostics: diagnostics,
-      typeAssessments: typeAssessments
+      typeAssessments: typeAssessments,
+      typeExpressionAssessment: expressionAssessment
     )
   }
 

@@ -60,7 +60,9 @@ struct LinuxCoreSmoke {
     let rule = MarkdownRuleDefinition(
       name: "contract",
       checks: [.init(id: "type", predicate: .typeConformance(definition.name))],
-      matchExpression: .allOf([.leaf(.init()), .not(.leaf(.init(paths: ["never/**"])))])
+      matchExpression: .allOf([.leaf(.init()), .not(.leaf(.init(paths: ["never/**"])))]),
+      typeExpression: .not(.not(.reference("contract.mdtype.json"))),
+      typeBindings: ["contract.mdtype.json": definition.name]
     )
     let rules = MarkdownRuleChecker(
       registry: try MarkdownRuleCompiler(typeRegistry: typeRegistry).compile([rule])

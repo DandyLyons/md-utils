@@ -4,6 +4,15 @@ Apply reusable policies with one normalized, compiled rule model.
 
 ## Overview
 
+RFC 0002 standalone rules use ``MarkdownRuleDefinition/typeExpression`` with exact
+host-supplied ``MarkdownRuleDefinition/typeBindings``. Recursive `allOf`, `anyOf`,
+`oneOf`, and `not` assess selected records after matching. The compiler validates
+every branch, including unused alternatives. ``MarkdownRuleAssessment/typeExpressionAssessment``
+retains resource references, expression locations, and original leaf assessments.
+Only outcome-relevant diagnostics appear at the top level; detailed evidence keeps
+suppressed failures without combining alternative fix-its. Parse and evaluation
+errors remain distinct from ordinary nonconformance, including under negation.
+
 A Markdown type asks whether a record conforms to a named structural contract. A rule first selects records through ``MarkdownRuleApplicability`` and then evaluates its ``MarkdownRuleCheck`` values. Applicability, successful policy validation, and unavailable runtime context remain distinct outcomes in ``MarkdownRuleAssessmentStatus``.
 
 ``MarkdownRuleDefinition`` is the sole executable rule definition. Decode configurations into definitions, compile all definitions before processing records, and give the resulting ``MarkdownRuleRegistry`` to ``MarkdownRuleChecker``. This prevents configuration validation and runtime evaluation from drifting between hosts.
@@ -53,8 +62,8 @@ check's severity does not override type-contract severities.
 `MarkdownRuleAssessment.typeAssessments` associates each original type assessment
 with its rule check ID, while `diagnostics` also exposes the diagnostics for existing
 consumers. This foundation is a Core API capability: legacy 0.1.0 and 0.2.0 config
-formats do not encode type-conformance checks. Config 0.3.0 serialization and recursive
-type expressions are separate work described in RFC 0002.
+formats do not encode type-conformance checks. Config 0.3.0 uses recursive `types`
+expressions and exact filename bindings through the shared native project loader.
 
 ## Recursive selection
 

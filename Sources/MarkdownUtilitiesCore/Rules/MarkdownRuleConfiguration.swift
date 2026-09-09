@@ -527,8 +527,8 @@ public enum MarkdownRuleConfigurationEncoder {
     _ rule: MarkdownRuleDefinition,
     version: String = MarkdownRuleConfigurationSchemaVersion.current
   ) throws -> [String: Any] {
-    guard rule.matchExpression == nil else {
-      throw MarkdownRuleConfigurationError.unsupportedFeature("Grouped matching cannot be encoded in legacy configuration")
+    guard rule.matchExpression == nil && rule.typeExpression == nil else {
+      throw MarkdownRuleConfigurationError.unsupportedFeature("Grouped matching and type expressions cannot be encoded in legacy configuration")
     }
     let match = try matchObject(rule.applicability)
     if version == MarkdownRuleConfigurationSchemaVersion.legacy {
