@@ -32,9 +32,13 @@ public struct MarkdownRuleFileStore {
 
   /// Resolves explicit type filenames to declared identities without basename search.
   public func typeBindings(for rule: MarkdownRuleFile) throws -> [String: MarkdownTypeName] {
+    try typeBindings(for: rule, registry: MarkdownTypeFileRegistryLoader.load(projectRoot: projectRoot))
+  }
+
+  /// Binds against the same immutable registry used to compile the project.
+  public func typeBindings(for rule: MarkdownRuleFile, registry: MarkdownTypeRegistry) throws -> [String: MarkdownTypeName] {
     let types = projectRoot + ".md-utils/types"
     try requireContained(types, under: projectRoot)
-    let registry = try MarkdownTypeFileRegistryLoader.load(projectRoot: projectRoot)
     var result: [String: MarkdownTypeName] = [:]
     for reference in rule.types.references where result[reference] == nil {
       let path = types + reference

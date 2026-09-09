@@ -50,6 +50,42 @@ struct MarkdownServerProjectLoaderTests {
   }
 
   @Test
+  func `Standalone project loader retains selected nonconforming records`() async throws {
+    let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
+    defer { try? root.delete() }
+    try (root + ".md-utils/server/").mkpath()
+    try (root + ".md-utils/types/").mkpath()
+    try (root + ".md-utils/rules/").mkpath()
+    try (root + ".md-utils/server/server.yaml").write("""
+      serverConfigVersion: "1"
+      resources:
+        - name: books
+          route: /books
+          operations: [list, get]
+          selection:
+            mode: rule
+            rule: books
+          identityPolicy:
+            source: frontmatter
+            path: [slug]
+            format: string
+            logicalPathFallbackEnabled: true
+      """)
+    try (root + ".md-utils/md-utils.json").write("{\"configVersion\":\"0.3.0\"}")
+    try (root + ".md-utils/types/book.mdtype.json").write("""
+      {"md-utils-type-schema":"1","name":"Book","version":"1","frontmatter":{"presence":"required"},"body":{"requirements":[],"recommendations":[]},"context":{"requirements":[],"recommendations":[]}}
+      """)
+    try (root + ".md-utils/rules/books.mdrule.json").write("""
+      {"name":"books","match":{"not":{"paths":["ignored/**"]}},"types":{"not":{"not":"book.mdtype.json"}}}
+      """)
+    try (root + "bad.md").write("# Missing frontmatter")
+    let runtime = try await MarkdownServerProjectLoader(projectRoot: root).load()
+    let books = try #require(runtime.snapshot.resource(named: "books"))
+    #expect(books.records.count == 1)
+    #expect(books.records.first?.valid == false)
+  }
+
+  @Test
   func `Default YAML loads rules and recursively imports Markdown once`() async throws {
     let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
     defer { try? root.delete() }

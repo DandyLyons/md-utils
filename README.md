@@ -357,7 +357,7 @@ Predicate semantics:
 - `contains` is string containment. `includes` is array membership.
 - Date/time predicates support `YYYY-MM-DD` and RFC 3339 timestamps with `Z` or numeric offsets. Date-only operands compare at date precision. Date-time operands compare at date-time precision. A value with more precision can match a less precise rule; a value with less precision does not match a more precise rule.
 - Regex predicates use Swift `NSRegularExpression` syntax.
-- Logical grouping predicates `all`, `any`, and `not` are deferred to config schema `0.3.0`. `hasBrokenWikilink` is also deferred.
+- Recursive `allOf`, `anyOf`, `oneOf`, and `not` groups require config schema `0.3.0`. `hasBrokenWikilink` remains deferred.
 
 Rules commands:
 
@@ -400,8 +400,8 @@ Core callers can enforce an existing Markdown type with a
 Supply the type registry to `MarkdownRuleCompiler`. The check runs after selection,
 retains the type's diagnostics and fix-its, and fails selected nonconforming records.
 `MarkdownRuleAssessment.typeAssessments` preserves the originating check ID and type assessment.
-This is currently a library capability. The CLI's 0.1.0/0.2.0 schemas do not accept it;
-the file-based 0.3.0 configuration integration is specified in
+The CLI's 0.1.0/0.2.0 schemas do not accept this check spelling. Opt-in 0.3.0 rules
+use filename-based `types` expressions, as specified in
 [RFC 0002](docs/rfcs/0002-config-v0.3.md) and tracked with issues #71, #96, and #109.
 
 ### Grouped matching foundation
@@ -412,10 +412,15 @@ Native schema-reference migration planning preserves the original resource while
 rewriting it relative to the generated mdtype. `.md-utils/schemas/` remains an optional
 shared-resource convention in the proposed format.
 
-Draft 0.3.0 project/rule schemas are bundled and checked into `site/schemas/0.3.0/`.
-They follow RFC 0002 (standalone rules and no project `schemaDirectory`). The CLI still
-loads/generates 0.1.0/0.2.0 configurations; default-version activation, command wiring,
-and migration writes remain part of #135. The `latest` schema alias remains 0.2.0.
+Opt-in 0.3.0 project/rule schemas are bundled and checked into `site/schemas/0.3.0/`.
+The CLI and server load standalone rules with recursive `match` and `types` expressions.
+`rules add --type book.mdtype.json` creates a rule referencing an existing type;
+inspection, validation, matching explanations, and removal operate on individual files.
+Migration supports required-schema-only rules, preserves legacy artifacts, and warns
+that malformed type hints newly fail. Valid name-based hints remain supported.
+See the [0.3.0 guide](docs/config-v0.3.md) for complete examples, supported conversions,
+backup requirements, and interruption recovery. Default initialization and the `latest`
+schema alias remain 0.2.0 pending the format-wide release in #135.
 
 ## GitHub Pages
 

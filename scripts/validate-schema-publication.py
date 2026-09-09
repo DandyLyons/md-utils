@@ -64,6 +64,17 @@ def main() -> None:
     compare_files(bundled, versioned)
     compare_files(bundled, named_versioned)
 
+    # Opt-in standalone schemas are published without moving the default/latest alias.
+    for name in ["md-utils", "mdrule"]:
+        resource = repo_root / "Sources/md-utils/Resources" / f"0.3.0_{name}.schema.json"
+        public = repo_root / "site/schemas/0.3.0" / f"{name}.schema.json"
+        compare_files(resource, public)
+        expected_id = f"https://dandylyons.github.io/md-utils/schemas/0.3.0/{name}.schema.json"
+        if load_json(resource).get("$id") != expected_id:
+            fail(f"schema $id must be {expected_id}")
+        if args.check_published and fetch_json(expected_id) != load_json(public):
+            fail(f"published schema differs from local schema: {expected_id}")
+
     schema = load_json(bundled)
     if schema.get("$id") != VERSIONED_SCHEMA_URL:
         fail(f"schema $id must be {VERSIONED_SCHEMA_URL}")

@@ -27,6 +27,7 @@ extension CLIEntry.RulesCommands {
 
     @Flag(name: .long, help: "Include a plain .txt or other non-Markdown file")
     var includeNonMD = false
+    @OptionGroup var project: RuleProjectOptions
 
     @Flag(name: .long, help: "Explain why each configured rule matched or did not match")
     var explain = false
@@ -43,7 +44,9 @@ extension CLIEntry.RulesCommands {
       }
       let evaluations = try await RulesValidatorRunner.rulesMatching(
         fileName: fileName,
-        includeNonMarkdown: includeNonMD
+        includeNonMarkdown: includeNonMD,
+        configPath: project.configPath,
+        projectRoot: project.root
       )
       print(RulesMatchingFormatter.render(
         evaluations,

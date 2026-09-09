@@ -215,13 +215,13 @@ The serialized 0.2.0 checks are `frontmatterSchema`, `requiredHeading`, `maxBody
 | Custom `schemaDirectory: shared/schemas/` with `schema: book.schema.json` becomes a root-level type reference `../../shared/schemas/book.schema.json` | The same resource remains under the project root; nested schema references remain relative to that schema | Rewrite from the actual resolved resource; retain project containment checks |
 | Several required schema checks become multiple schemas in one type | All schemas are conjunctive; one shared presence policy suffices when all are required | Diagnostic differences remain; differing presence policies require a separate conversion decision |
 
-For an ordinary schema-only rule, the complete candidate generated type has this shape (the generated contract-version value remains to be assigned):
+For a supported required-schema-only rule, the generated type has this shape:
 
 ```json
 {
   "md-utils-type-schema": "1",
   "name": "books",
-  "version": "migration-version-to-be-assigned",
+  "version": "1.0.0",
   "frontmatter": {
     "presence": "required",
     "schemas": [{ "ref": "../schemas/book.schema.json" }]
@@ -245,12 +245,12 @@ The user explicitly approved newly rejecting malformed type hints after migratio
 
 Issue #135 remains open until the format is implemented, related work is completed or explicitly deferred, compatibility and migration behavior are tested, and schemas and documentation agree.
 
-## Remaining specification work
+## Implementation decisions and remaining release work
 
-- Finalize rule discovery suffix case handling consistently across hosts.
-- Confirm the automatic migration subset with focused invalid-record cases; diagnostic changes are allowed, while selection and pass/fail/skipped outcomes must be preserved.
-- Assign public rule-schema URLs and the generated migration type contract version.
+- Rule discovery matches the `.mdrule.json` suffix case-insensitively across native hosts.
+- The initial automatic migration subset is required-schema-only rules (one or more required schema checks), plus empty projects. Optional-schema and body-check conversions are refused. The malformed-hint exception above applies.
+- Public schemas use `schemas/0.3.0/md-utils.schema.json` and `schemas/0.3.0/mdrule.schema.json`; generated type contracts start at `1.0.0`.
 
-These details must be settled before declaring the format implementation-ready. The directory, syntax, identity, and migration decisions above provide the shared design target.
+The format is opt-in while #135 coordinates release activation. Default initialization and the `latest` schema alias remain 0.2.0; this does not prevent loading or explicitly migrating to 0.3.0. See `docs/config-v0.3.md` for the implemented workflow and supported conversion subset.
 
 Dedicated expression depth/size limits are deferred; they are not a prerequisite for 0.3.0 at the project's current scale.

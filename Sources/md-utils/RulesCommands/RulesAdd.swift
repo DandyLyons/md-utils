@@ -23,6 +23,10 @@ extension CLIEntry.RulesCommands {
     @Option(name: .long, help: "Schema filename to create inside schemaDirectory")
     var schema: String?
 
+    @Option(name: .long, help: "Existing .mdtype filename relative to types/ (config 0.3.0)")
+    var type: String?
+    @OptionGroup var project: RuleProjectOptions
+
     @Option(name: .long, help: "Glob pattern for files matched by this rule")
     var path: String = "**/*.md"
 
@@ -39,13 +43,22 @@ extension CLIEntry.RulesCommands {
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
+      if let type {
+        guard schema == nil && frontmatterRequired else {
+          throw ValidationError("With --type, configure schema and frontmatter presence in the type definition")
+        }
+        let file = try RuleManager.addStandaloneRule(name: name, type: type, path: path, tag: tag,
+          configPath: project.configPath, projectRoot: project.root)
+        print("Created rule \"\(name)\": \(file.string)")
+        return
+      }
       let schemaFile = try RuleManager.addRule(RuleOptions(
         name: name,
         schema: schema,
         path: path,
         tag: tag,
         frontmatterRequired: frontmatterRequired,
-      ))
+      ), configPath: project.configPath, projectRoot: project.root)
 
       print("\(CLIStyle.success("Created rule")) \"\(name)\"")
       print("\(CLIStyle.metadata("Config:")) \(CLIStyle.path(RulesPaths.configFile.string))")

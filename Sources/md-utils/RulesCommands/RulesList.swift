@@ -19,12 +19,13 @@ extension CLIEntry.RulesCommands {
 
     @Flag(name: .long, help: "Show rule details")
     var verbose = false
+    @OptionGroup var project: RuleProjectOptions
 
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      let config = try MdUtilsConfig.load()
+      let config = try project.load()
       print(RulesListFormatter.render(config, verbose: verbose))
     }
   }
@@ -47,6 +48,11 @@ enum RulesListFormatter {
     var lines: [String] = []
     for rule in config.schemaRules {
       lines.append(CLIStyle.heading(rule.name))
+      if let file = rule.standaloneFile {
+        lines.append("  Source: \(file.source)")
+        lines.append((try? file.encoded()) ?? "Unable to encode rule")
+        continue
+      }
       if !rule.schema.isEmpty {
         let schemaPath = RulesPaths.schemaFile(rule: rule, config: config)
         lines.append("  \(CLIStyle.metadata("schema:")) \(CLIStyle.path(schemaPath.string))")

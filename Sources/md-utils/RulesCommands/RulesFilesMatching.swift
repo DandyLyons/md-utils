@@ -30,6 +30,7 @@ extension CLIEntry.RulesCommands {
 
     @Flag(name: .long, help: "Include non-Markdown files selected by the configured rule")
     var includeNonMD = false
+    @OptionGroup var project: RuleProjectOptions
 
     /// Runs the command using the parsed command-line arguments.
     ///
@@ -37,9 +38,12 @@ extension CLIEntry.RulesCommands {
     mutating func run() async throws {
       let files = try await RulesValidatorRunner.filesMatching(
         ruleName: ruleName,
-        includeNonMarkdown: includeNonMD
+        includeNonMarkdown: includeNonMD,
+        configPath: project.configPath,
+        projectRoot: project.root
       )
-      print(RulesFilesMatchingFormatter.render(files, ruleName: ruleName, absolute: absolute))
+      let root = try project.load().standaloneProject?.projectRoot ?? .current
+      print(RulesFilesMatchingFormatter.render(files, ruleName: ruleName, root: root, absolute: absolute))
     }
   }
 }

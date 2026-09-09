@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dandylyons.github.io/md-utils/schemas/0.3.0/mdrule.schema.json",
-  "title": "md-utils standalone rule 0.3.0 (proposed)",
+  "title": "md-utils standalone rule 0.3.0",
   "type": "object",
   "additionalProperties": false,
   "required": [

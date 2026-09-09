@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dandylyons.github.io/md-utils/schemas/0.3.0/md-utils.schema.json",
-  "title": "md-utils project configuration 0.3.0 (proposed)",
-  "description": "RFC 0002 standalone layout. Runtime activation is tracked by issue 135.",
+  "title": "md-utils project configuration 0.3.0",
+  "description": "Opt-in RFC 0002 standalone layout. Default release activation is tracked by issue 135.",
   "type": "object",
   "additionalProperties": false,
   "required": [

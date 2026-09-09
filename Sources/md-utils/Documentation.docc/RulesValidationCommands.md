@@ -10,7 +10,17 @@ Use `md-utils config init` to create the project configuration along with empty 
 
 Rules match files by project-relative glob patterns, optional file metadata conditions, optional frontmatter conditions, optional whole-frontmatter queries, and optional document conditions. Files can match more than one rule, in which case every matching check applies.
 
-Version `0.2.0` configs use a `rules` array. Version `0.1.0` configs using `schemaRules` still load as legacy configs. Both versions normalize through `MarkdownUtilitiesCore` into one compiled registry before files are scanned; unknown versions or fields fail without being discarded. There is no version `0.3.0` syntax.
+Version `0.2.0` configs use a `rules` array. Version `0.1.0` configs using `schemaRules` still load as legacy configs. Both versions normalize through `MarkdownUtilitiesCore` into one compiled registry before files are scanned; unknown versions or fields fail without being discarded.
+
+## Opt-in 0.3.0
+
+Use `{"configVersion":"0.3.0"}` project settings and individual `.mdrule.json` files under `.md-utils/rules/`, recursively excluding `rules/legacy/`. Each rule has `name`, optional `match`, and required `types`. For example, `{"name":"books","match":{"paths":["Books/**"]},"types":"book.mdtype.json"}` requires the existing `.md-utils/types/book.mdtype.json` contract after selection. Selected invalid files fail rather than disappear.
+
+Both expressions support recursive `allOf`, `anyOf`, `oneOf`, and `not`. Group arrays are nonempty, and a group cannot mix operators or leaf fields. Evaluation errors are distinct from nonconformance and cannot be inverted into success. Explanations retain branch evidence. Type references require explicit filenames relative to `types/`; nested filenames are supported. Schemas remain definition-relative resources, and `schemas/` is optional. Valid `$md-utils.typeHints` still refer to declared type names, not filenames.
+
+`rules add books --type book.mdtype.json` creates a standalone rule. List, describe, validate, matching, and removal use individual files. Removal preserves types and schemas; `--delete-schema` is unavailable in 0.3.0. Initialization still defaults to 0.2.0.
+
+Back up `.md-utils/`, then run `config migrate --to 0.3.0 --dry-run` before applying. Automatic conversion currently supports required-schema-only rules. Unsupported checks, unsafe resources, and collisions fail before writes. Original config bytes and legacy rule payloads are retained; active config is replaced last. No staging or manifest is used, and multi-file atomicity is not promised. Interrupted writes report completed files: restore the backup or inspect artifacts before retrying. Migrated rules may newly reject malformed type hints and use different diagnostics; other pass/fail/skipped changes are not permitted. See the repository's `docs/config-v0.3.md` for full examples and recovery details.
 
 ```bash
 md-utils config init
@@ -60,7 +70,7 @@ requires frontmatter for one of those files reports that no syntax mapping exist
 The following are the serialized 0.2.0 checks. Core additionally supports programmatic
 `typeConformance` checks, which enforce a type after selection and retain its original
 diagnostics and fix-its. This capability is not accepted by the legacy config schemas;
-the proposed 0.3.0 file-based configuration integration is separate work.
+0.3.0 instead uses the `types` expression described above.
 
 - `frontmatterSchema`: validates parsed YAML or TOML frontmatter against a JSON Schema file.
 - `requiredHeading`: requires an exact Markdown heading text in a Markdown body.
@@ -81,7 +91,7 @@ Date/time predicates support date-only `YYYY-MM-DD` operands and RFC 3339 date-t
 
 Whole-frontmatter predicates live under `rules[].match.frontmatterQuery`. Version `0.2.0` supports `jmespath`, evaluated by the CLI's serialized capability provider with truthiness defined by Core. The JMESPath dependency is intentionally not linked into portable Core or server targets.
 
-Logical grouping predicates `all`, `any`, and `not` are deferred to config schema `0.3.0`.
+Recursive `allOf`, `anyOf`, `oneOf`, and `not` groups are available only in config 0.3.0.
 
 ## Document Predicates
 

@@ -23,11 +23,13 @@ extension CLIEntry.RulesCommands {
 
     @Flag(name: .long, help: "Delete the removed rule's schema file when it is safe")
     var deleteSchema: Bool = false
+    @OptionGroup var project: RuleProjectOptions
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      let result = try RuleManager.removeRule(named: name, deleteSchema: deleteSchema)
+      let result = try RuleManager.removeRule(named: name, deleteSchema: deleteSchema,
+        configPath: project.configPath, projectRoot: project.root)
 
       print("\(CLIStyle.success("Removed rule")) \"\(result.removed.name)\"")
       if deleteSchema {

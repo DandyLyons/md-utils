@@ -11,6 +11,19 @@ import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 import Yams
+
+/// Explicit config selection shared by standalone rule commands.
+struct RuleProjectOptions: ParsableArguments {
+  @Option(name: .long, help: "Path to project config")
+  var config: String = RulesPaths.configFile.string
+
+  @Option(name: .long, help: "Project root for a nonstandard 0.3.0 config location")
+  var projectRoot: String?
+
+  var configPath: Path { Path(config) }
+  var root: Path? { projectRoot.map { Path($0) } }
+  func load() throws -> MdUtilsConfig { try MdUtilsConfig.load(from: configPath, projectRoot: root) }
+}
 /// Stores project-level md-utils rules validation configuration.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
@@ -23,6 +36,7 @@ struct MdUtilsConfig {
   var schemaDirectory: String
   var schemaRules: [Rule]
   private var normalizedRules: [MarkdownRuleDefinition]?
+  var standaloneProject: MarkdownStandaloneRuleProject?
   /// Creates a configured instance.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
@@ -41,7 +55,7 @@ struct MdUtilsConfig {
   /// Loads the requested data from disk.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  static func load(from path: Path = RulesPaths.configFile) throws -> MdUtilsConfig {
+  static func load(from path: Path = RulesPaths.configFile, projectRoot: Path? = nil) throws -> MdUtilsConfig {
     guard path.exists else {
       throw ValidationError("Project config not found: \(path.string). Run md-utils config init first.")
     }
@@ -60,6 +74,17 @@ struct MdUtilsConfig {
       throw ValidationError("Project config is invalid for configVersion \"\(configVersion)\": \(message)")
     }
 
+    if configVersion == "0.3.0" {
+      let project = try MarkdownStandaloneRuleProject(configPath: path, projectRoot: projectRoot)
+      var config = MdUtilsConfig(configVersion: configVersion, schemaReference: object["$schema"] as? String,
+        schemaRules: project.files.map { file in
+          var rule = Rule(name: file.name, schema: "", match: RuleMatch(paths: []), checks: [])
+          rule.standaloneFile = file
+          return rule
+        })
+      config.standaloneProject = project
+      return config
+    }
     let normalized = try MarkdownRuleConfigurationDecoder.decode(
       String(decoding: data, as: UTF8.self)
     )
@@ -81,6 +106,13 @@ struct MdUtilsConfig {
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
   func save(to path: Path = RulesPaths.configFile) throws {
+    if configVersion == "0.3.0" {
+      var object: [String: Any] = ["configVersion": configVersion]
+      if let schemaReference { object["$schema"] = schemaReference }
+      let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+      try data.write(to: URL(fileURLWithPath: path.string), options: .atomic)
+      return
+    }
     let definitions = try schemaRules.map { try $0.normalizedDefinition() }
     let configuration = MarkdownRuleConfiguration(
       configVersion: configVersion,
@@ -95,6 +127,10 @@ struct MdUtilsConfig {
 extension MdUtilsConfig {
   /// Compiles the normalized project rules for the native CLI runtime.
   func compiledRuleRegistry(root: Path) throws -> MarkdownRuleRegistry {
+    if let standaloneProject {
+      return try standaloneProject.compile(capabilities: [.modificationDate, .frontmatterJMESPath],
+        queryProvider: JMESPathRuleCapabilityProvider())
+    }
     let absoluteRoot = root.absolute().normalize()
     let schemaDirectoryPath = Path(schemaDirectory).isAbsolute
       ? Path(schemaDirectory)
@@ -126,7 +162,7 @@ extension MdUtilsConfig {
 enum ConfigSchemaRegistry {
   static let defaultVersion = "0.2.0"
   static let legacyVersion = "0.1.0"
-  static let supportedVersions = ["0.1.0", "0.2.0"]
+  static let supportedVersions = ["0.1.0", "0.2.0", "0.3.0"]
 
   static func detectVersion(in object: [String: Any], path: Path) throws -> String {
     guard let rawVersion = object["configVersion"] else {
@@ -209,6 +245,7 @@ enum ConfigInfoFormatter {
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
 struct Rule {
+  var standaloneFile: MarkdownRuleFile?
   var name: String
   var schema: String
   var frontmatterRequired: Bool
@@ -255,7 +292,12 @@ struct Rule {
   }
 
   var jsonObject: [String: Any] {
-    [
+    if let standaloneFile {
+      var object: [String: Any] = ["name": standaloneFile.name, "types": standaloneFile.types.jsonValue.foundationValue]
+      if let match = standaloneFile.match { object["match"] = match.foundationValue }
+      return object
+    }
+    return [
       "name": name,
       "match": match.jsonObject,
       "checks": checks.map(\.jsonObject),
@@ -275,6 +317,9 @@ struct Rule {
 extension Rule {
   /// Normalizes the project configuration DTO into the shared Core rule model.
   func normalizedDefinition(source: String? = nil) throws -> MarkdownRuleDefinition {
+    guard standaloneFile == nil else {
+      throw ValidationError("Standalone rules must be compiled with their project type bindings")
+    }
     var requirements: [MarkdownRuleRequirement] = []
     for (key, matcher) in match.frontmatter.sorted(by: { $0.key < $1.key }) {
       for (operatorName, operand) in matcher.operators.sorted(by: { $0.key < $1.key }) {
@@ -1104,11 +1149,26 @@ struct RuleOptions {
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
 enum RuleManager {
+  static func addStandaloneRule(name: String, type: String, path: String, tag: String?, configPath: Path = RulesPaths.configFile, projectRoot: Path? = nil) throws -> Path {
+    let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
+    guard let project = config.standaloneProject else {
+      throw ValidationError("--type requires configVersion 0.3.0")
+    }
+    var match: [String: Any] = ["paths": [path]]
+    if let tag { match["frontmatter"] = ["tags": ["includes": tag]] }
+    let data = try JSONSerialization.data(withJSONObject: ["name": name, "match": match, "types": type])
+    let file = try MarkdownRuleFileStore(projectRoot: project.projectRoot)
+      .create(String(decoding: data, as: UTF8.self), relativePath: name + ".mdrule.json")
+    return Path(file.source)
+  }
   /// Adds a rule to the project configuration.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  static func addRule(_ options: RuleOptions) throws -> Path {
-    var config = try MdUtilsConfig.load()
+  static func addRule(_ options: RuleOptions, configPath: Path = RulesPaths.configFile, projectRoot: Path? = nil) throws -> Path {
+    var config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
+    guard config.standaloneProject == nil else {
+      throw ValidationError("0.3.0 rules require --type with an existing .mdtype filename; put validation constraints in that type")
+    }
     if config.schemaRules.contains(where: { $0.name == options.name }) {
       throw ValidationError("Rule already exists: \"\(options.name)\"")
     }
@@ -1133,19 +1193,26 @@ enum RuleManager {
       match: RuleMatch(paths: [options.path], frontmatter: frontmatterMatchers)
     )
     config.schemaRules.append(rule)
-    try config.save()
+    try config.save(to: configPath)
     return schemaFile
   }
   /// Removes a rule from the project configuration.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  static func removeRule(named name: String, deleteSchema: Bool) throws -> (removed: Rule, deletedSchema: Bool, schemaPath: Path) {
-    var config = try MdUtilsConfig.load()
+  static func removeRule(named name: String, deleteSchema: Bool, configPath: Path = RulesPaths.configFile, projectRoot: Path? = nil) throws -> (removed: Rule, deletedSchema: Bool, schemaPath: Path) {
+    var config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
     guard let index = config.schemaRules.firstIndex(where: { $0.name == name }) else {
       throw ValidationError("Rule not found: \"\(name)\"")
     }
 
     let removed = config.schemaRules.remove(at: index)
+    if let project = config.standaloneProject {
+      guard !deleteSchema else {
+        throw ValidationError("--delete-schema is unavailable for 0.3.0 rules; shared type and schema resources are preserved")
+      }
+      let file = try MarkdownRuleFileStore(projectRoot: project.projectRoot).remove(named: name)
+      return (removed, false, Path(file.source))
+    }
     let schemaPath = RulesPaths.schemaFile(rule: removed, config: config)
     var deletedSchema = false
 
@@ -1157,7 +1224,7 @@ enum RuleManager {
       }
     }
 
-    try config.save()
+    try config.save(to: configPath)
     return (removed, deletedSchema, schemaPath)
   }
   /// Builds starter JSON Schema content for a new frontmatter rule.
@@ -1369,9 +1436,11 @@ enum RulesValidatorRunner {
     ruleName: String? = nil,
     includeNonMarkdown: Bool = false,
     root: Path = .current,
-    configPath: Path = RulesPaths.configFile
+    configPath: Path = RulesPaths.configFile,
+    projectRoot: Path? = nil
   ) async throws -> RuleValidationSummary {
-    let config = try MdUtilsConfig.load(from: configPath)
+    let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
+    let root = config.standaloneProject?.projectRoot ?? root
     let rules: [Rule]
     if let ruleName {
       guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
@@ -1477,9 +1546,11 @@ enum RulesValidatorRunner {
     ruleName: String,
     includeNonMarkdown: Bool = false,
     root: Path = .current,
-    configPath: Path = RulesPaths.configFile
+    configPath: Path = RulesPaths.configFile,
+    projectRoot: Path? = nil
   ) async throws -> [Path] {
-    let config = try MdUtilsConfig.load(from: configPath)
+    let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
+    let root = config.standaloneProject?.projectRoot ?? root
     guard config.schemaRules.contains(where: { $0.name == ruleName }) else {
       throw ValidationError("Rule not found: \"\(ruleName)\"")
     }
@@ -1516,9 +1587,11 @@ enum RulesValidatorRunner {
     fileName: String,
     includeNonMarkdown: Bool = false,
     root: Path = .current,
-    configPath: Path = RulesPaths.configFile
+    configPath: Path = RulesPaths.configFile,
+    projectRoot: Path? = nil
   ) async throws -> [RuleMatchEvaluation] {
-    let config = try MdUtilsConfig.load(from: configPath)
+    let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
+    let root = config.standaloneProject?.projectRoot ?? root
     let file = Path(fileName)
     guard file.exists else {
       throw ValidationError("File not found: \(fileName)")
@@ -1552,7 +1625,8 @@ enum RulesValidatorRunner {
         rule: rule,
         matched: assessment.status != .notApplicable && assessment.applicabilityDiagnostics.isEmpty,
         reasons: assessment.evidence.map(\.message)
-          + assessment.applicabilityDiagnostics.map(\.message),
+          + assessment.applicabilityDiagnostics.map(\.message)
+          + (assessment.typeExpressionAssessment?.explanation ?? []),
         diagnostics: pathCandidate ? assessment.applicabilityDiagnostics.map(\.message) : []
       )
     }

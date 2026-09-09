@@ -25,11 +25,13 @@ extension CLIEntry.RulesCommands {
 
     @Option(name: .long, help: "Output format: text, markdown, or json")
     var format: RuleDescribeOutputFormat = .text
+    @OptionGroup var project: RuleProjectOptions
     /// Runs the command using the parsed command-line arguments.
     ///
     /// See <doc:RulesValidationCommands> for workflow details.
     mutating func run() async throws {
-      let description = try RuleDescriptionBuilder.describe(ruleName: ruleName)
+      let description = try RuleDescriptionBuilder.describe(ruleName: ruleName,
+        configPath: project.configPath, projectRoot: project.root)
       switch format {
       case .text:
         print(RuleDescriptionFormatter.render(description))
@@ -59,8 +61,8 @@ struct RuleDescription {
 /// Loads configured rule details and the referenced JSON Schema.
 enum RuleDescriptionBuilder {
   /// Loads the requested rule and referenced JSON Schema from disk.
-  static func describe(ruleName: String) throws -> RuleDescription {
-    let config = try MdUtilsConfig.load()
+  static func describe(ruleName: String, configPath: Path = RulesPaths.configFile, projectRoot: Path? = nil) throws -> RuleDescription {
+    let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
     guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
       throw ValidationError("Rule not found: \"\(ruleName)\"")
     }
@@ -79,6 +81,9 @@ enum RuleDescriptionJSONRenderer {
   /// Returns a JSON-compatible object for command output.
   static func render(_ description: RuleDescription) -> [String: Any] {
     let rule = description.rule
+    if let file = rule.standaloneFile {
+      return ["rule": rule.jsonObject, "source": file.source]
+    }
     return [
       "rule": [
         "name": rule.name,
@@ -103,6 +108,10 @@ enum RuleDescriptionFormatter {
   static func render(_ description: RuleDescription) -> String {
     var lines: [String] = []
     let rule = description.rule
+
+    if rule.standaloneFile != nil {
+      return RuleDescriptionSummarizer.lines(rule, schemaPath: nil).joined(separator: "\n\n")
+    }
 
     lines.append("\(CLIStyle.metadata("Rule Name:")) \(CLIStyle.schemaDescribeRuleName(rule.name))")
     lines.append("")
@@ -132,6 +141,10 @@ enum RuleDescriptionMarkdownFormatter {
     var lines: [String] = []
     let rule = description.rule
 
+    if let file = rule.standaloneFile {
+      return "# Rule: \(file.name)\n\nSource: \(file.source)\n\n```json\n\((try? file.encoded()) ?? "{}")```\n"
+    }
+
     lines.append("# Rule Name: \(rule.name)")
     lines.append("")
     lines.append("## Rule")
@@ -159,6 +172,9 @@ enum RuleDescriptionMarkdownFormatter {
 enum RuleDescriptionSummarizer {
   /// Returns concise lines describing which files the rule affects.
   static func lines(_ rule: Rule, schemaPath: Path?) -> [String] {
+    if let file = rule.standaloneFile {
+      return ["Source: \(file.source)", (try? file.encoded()) ?? "Unable to encode rule"]
+    }
     var lines: [String] = []
 
     if rule.match.paths.isEmpty {

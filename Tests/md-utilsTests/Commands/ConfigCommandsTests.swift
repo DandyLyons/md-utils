@@ -253,7 +253,7 @@ struct ConfigCommandsTests {
 
     #expect(object["cliVersion"] as? String == "0.1.0-alpha")
     #expect(object["defaultConfigVersion"] as? String == "0.2.0")
-    #expect(object["supportedConfigVersions"] as? [String] == ["0.1.0", "0.2.0"])
+    #expect(object["supportedConfigVersions"] as? [String] == ["0.1.0", "0.2.0", "0.3.0"])
   }
 
   @Test

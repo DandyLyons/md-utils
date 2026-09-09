@@ -70,12 +70,26 @@ Important predicate semantics: missing frontmatter keys are not inequality, so `
 
 Core library callers can use `MarkdownRuleCheckPredicate.typeConformance` to enforce
 a compiled mdtype after selection. This is not a supported 0.1.0/0.2.0 config check:
-do not insert `typeConformance` or the proposed 0.3.0 `types` field into legacy configs.
+do not insert `typeConformance` or the 0.3.0 `types` field into legacy configs.
 
 The standalone rule parser and Core runtime support recursive `allOf`, `anyOf`,
 `oneOf`, and `not` matcher expressions through `MarkdownRuleMatchExpression`.
-This is a library capability pending config 0.3.0 activation; legacy CLI configs
-must continue using their existing flat matcher syntax.
+Opt-in 0.3.0 projects use `{"configVersion":"0.3.0"}` and standalone `.mdrule.json`
+files recursively under `.md-utils/rules/`, excluding `rules/legacy/`. Each rule has
+`name`, optional `match`, and required `types`. Both expressions support these four
+operators; type leaves are explicit `.mdtype.json/.yaml/.yml/.toml` filenames relative
+to `types/`. Nested references are supported. `rules add books --type book.mdtype.json`
+references an existing type. List, describe, validate, matching explanations, and
+remove operate on standalone files; removal preserves type/schema resources.
+
+Valid `$md-utils.typeHints` remain name-based and do not establish conformance.
+Back up `.md-utils/` before `config migrate --to 0.3.0`; preview with `--dry-run`.
+Automatic migration supports required-schema-only rules and refuses incompatible
+conversions before writes. It preserves legacy config and rule artifacts, replaces
+active config last, and warns that malformed hints newly fail. There is no staging,
+manifest, or multi-file atomicity guarantee. On interruption restore the backup or
+inspect reported generated files before retrying. Default init and legacy configs
+remain 0.2.0 and retain their existing syntax and behavior.
 
 ## Reading Long Markdown Files
 

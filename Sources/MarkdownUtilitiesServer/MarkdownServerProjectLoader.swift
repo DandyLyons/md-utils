@@ -208,6 +208,13 @@ public struct MarkdownServerProjectLoader: @unchecked Sendable {
     let configurationPath = projectRoot + Path(".md-utils/md-utils.json")
     let configuration: MarkdownRuleConfiguration
     if configurationPath.exists {
+      let data = try Data(contentsOf: URL(fileURLWithPath: configurationPath.string))
+      if let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        object["configVersion"] as? String == "0.3.0" {
+        return try MarkdownStandaloneRuleProject(configPath: configurationPath, projectRoot: projectRoot, typeRegistry: typeRegistry)
+          .compile(capabilities: [.modificationDate, .frontmatterJMESPath],
+            queryProvider: NativeJMESPathRuleCapabilityProvider())
+      }
       configuration = try MarkdownRuleConfigurationDecoder.decode(
         configurationPath.read(.utf8)
       )

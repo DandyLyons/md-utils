@@ -25,6 +25,9 @@ extension CLIEntry.ConfigCommands {
     @Option(name: .long, help: "Path to md-utils config file")
     var config: String = RulesPaths.configFile.string
 
+    @Option(name: .long, help: "Project root for a nonstandard config location")
+    var projectRoot: String?
+
     @Flag(name: .long, help: "Preview the migration without writing files")
     var dryRun = false
 
@@ -32,11 +35,15 @@ extension CLIEntry.ConfigCommands {
     var format: ConfigMigrateOutputFormat = .text
 
     mutating func run() async throws {
+      if to == "0.3.0" && !dryRun {
+        FileHandle.standardError.write(Data("Back up the complete .md-utils/ directory before migration. Use --dry-run to review changes first.\n".utf8))
+      }
       let result = try ConfigMigrator.migrate(
         configPath: Path(config),
         from: from,
         to: to,
-        dryRun: dryRun
+        dryRun: dryRun,
+        projectRoot: projectRoot.map { Path($0) }
       )
 
       switch format {
@@ -62,6 +69,8 @@ struct ConfigMigrationResult {
   var dryRun: Bool
   var updatedSchemaReference: Bool
   var updatedLocalSchema: Bool
+  var files: [String] = []
+  var warnings: [String] = []
 }
 
 enum ConfigMigrator {
@@ -69,7 +78,8 @@ enum ConfigMigrator {
     configPath: Path = RulesPaths.configFile,
     from expectedFrom: String? = nil,
     to targetVersion: String,
-    dryRun: Bool = false
+    dryRun: Bool = false,
+    projectRoot: Path? = nil
   ) throws -> ConfigMigrationResult {
     guard ConfigSchemaRegistry.supportedVersions.contains(targetVersion) else {
       throw ValidationError("Unsupported target md-utils configVersion \"\(targetVersion)\"")
@@ -78,7 +88,7 @@ enum ConfigMigrator {
       throw ValidationError("Unsupported source md-utils configVersion \"\(expectedFrom)\"")
     }
 
-    var config = try MdUtilsConfig.load(from: configPath)
+    var config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
     let sourceVersion = config.configVersion
     if let expectedFrom, expectedFrom != sourceVersion {
       throw ValidationError("Expected source configVersion \"\(expectedFrom)\", found \"\(sourceVersion)\"")
@@ -96,7 +106,10 @@ enum ConfigMigrator {
       )
     }
 
-    guard sourceVersion == ConfigSchemaRegistry.legacyVersion && targetVersion == ConfigSchemaRegistry.defaultVersion else {
+    if targetVersion == "0.3.0" {
+      return try StandaloneConfigMigration.migrate(config: config, path: configPath, root: projectRoot, dryRun: dryRun)
+    }
+    guard sourceVersion == ConfigSchemaRegistry.legacyVersion && targetVersion == "0.2.0" else {
       throw ValidationError("Unsupported config migration path: \(sourceVersion) -> \(targetVersion)")
     }
 
@@ -148,6 +161,8 @@ enum ConfigMigrateFormatter {
     if result.updatedLocalSchema {
       lines.append("\(schemaPrefix) local schema \(ConfigMigrator.localSchemaPath(for: Path(result.configPath)).string).")
     }
+    lines.append(contentsOf: result.warnings)
+    lines.append(contentsOf: result.files.map { "\(result.dryRun ? "Would write/reuse" : "Wrote/reused"): \($0)" })
     return lines.joined(separator: "\n")
   }
 
@@ -160,6 +175,8 @@ enum ConfigMigrateFormatter {
       "to": result.to,
       "updatedLocalSchema": result.updatedLocalSchema,
       "updatedSchemaReference": result.updatedSchemaReference,
+      "files": result.files,
+      "warnings": result.warnings,
     ]
     let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
     guard let json = String(data: data, encoding: .utf8) else {
