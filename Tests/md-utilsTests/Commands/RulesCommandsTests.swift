@@ -17,14 +17,15 @@ struct RulesCommandsTests {
     let config = CLIEntry.RulesCommands.configuration
 
     #expect(config.commandName == "rules")
-    #expect(config.subcommands.count == 7)
+    #expect(config.subcommands.count == 8)
     #expect(config.subcommands[0] is CLIEntry.RulesCommands.Add.Type)
-    #expect(config.subcommands[1] is CLIEntry.RulesCommands.Remove.Type)
-    #expect(config.subcommands[2] is CLIEntry.RulesCommands.List.Type)
-    #expect(config.subcommands[3] is CLIEntry.RulesCommands.FilesMatching.Type)
-    #expect(config.subcommands[4] is CLIEntry.RulesCommands.Matching.Type)
-    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Describe.Type)
-    #expect(config.subcommands[6] is CLIEntry.RulesCommands.Validate.Type)
+    #expect(config.subcommands[1] is CLIEntry.RulesCommands.Interactive.Type)
+    #expect(config.subcommands[2] is CLIEntry.RulesCommands.Remove.Type)
+    #expect(config.subcommands[3] is CLIEntry.RulesCommands.List.Type)
+    #expect(config.subcommands[4] is CLIEntry.RulesCommands.FilesMatching.Type)
+    #expect(config.subcommands[5] is CLIEntry.RulesCommands.Matching.Type)
+    #expect(config.subcommands[6] is CLIEntry.RulesCommands.Describe.Type)
+    #expect(config.subcommands[7] is CLIEntry.RulesCommands.Validate.Type)
   }
 
   @Test

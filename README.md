@@ -418,6 +418,10 @@ The CLI and server load standalone rules with recursive `match` and `types` expr
 inspection, validation, matching explanations, and removal operate on individual files.
 Migration supports required-schema-only rules, preserves legacy artifacts, and warns
 that malformed type hints newly fail. Valid name-based hints remain supported.
+`types interactive` and `rules interactive` provide Noora prompts for 0.3.0 CRUD,
+complete previews, validation, and cancellation. Rule authoring can draft a new
+type in the same session. Schema authoring remains external.
+
 See the [0.3.0 guide](docs/config-v0.3.md) for complete examples, supported conversions,
 backup requirements, and interruption recovery. Default initialization and the `latest`
 schema alias remain 0.2.0 pending the format-wide release in #135.

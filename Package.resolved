@@ -1,5 +1,5 @@
 {
-  "originHash" : "7a6f2b322a48448adc4b16e54a19eddf11662a4284fea2bc47b2e0581feca61e",
+  "originHash" : "8b6c758041e90f4d0c6e670693fc633eb217279671ecb76313413ce9e66e58db",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -47,12 +47,30 @@
       }
     },
     {
+      "identity" : "noora",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tuist/Noora",
+      "state" : {
+        "revision" : "70c6d1477a982f3e4cd46ed2d122e04e9d0a0b59",
+        "version" : "0.56.0"
+      }
+    },
+    {
       "identity" : "openapikit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mattpolzin/OpenAPIKit.git",
       "state" : {
         "revision" : "57b6318128e3f901c93f4fbf98d1c1464ec168d3",
         "version" : "6.2.0"
+      }
+    },
+    {
+      "identity" : "path",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tuist/path",
+      "state" : {
+        "revision" : "7c74ac435e03a927c3a73134c48b61e60221abcb",
+        "version" : "0.3.8"
       }
     },
     {

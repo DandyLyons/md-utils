@@ -83,6 +83,12 @@ references an existing type. List, describe, validate, matching explanations, an
 remove operate on standalone files; removal preserves type/schema resources.
 
 Valid `$md-utils.typeHints` remain name-based and do not establish conformance.
+`types interactive` and `rules interactive` require 0.3.0 and a terminal. They
+provide CRUD with validated previews and confirmation; a rule can draft a new
+type in-process. Existing resource paths and unrelated files are preserved.
+Cancel or decline confirmation to discard all drafts. JSON Schema authoring stays
+external (`sourcemeta/jsonschema`, `ajv-cli`, `check-jsonschema`, `swaggest/json-cli`).
+
 Back up `.md-utils/` before `config migrate --to 0.3.0`; preview with `--dry-run`.
 Automatic migration supports required-schema-only rules and refuses incompatible
 conversions before writes. It preserves legacy config and rule artifacts, replaces

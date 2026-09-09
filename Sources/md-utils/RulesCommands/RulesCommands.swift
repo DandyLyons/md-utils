@@ -15,6 +15,7 @@ extension CLIEntry {
       abstract: "Validate files with configured rules",
       subcommands: [
         Add.self,
+        Interactive.self,
         Remove.self,
         List.self,
         FilesMatching.self,

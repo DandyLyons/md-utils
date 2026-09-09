@@ -108,3 +108,16 @@ Supported file metadata matcher operators are `pathRegex`, `filenameEquals`, `ex
 ## Failure Behavior
 
 Invalid YAML or TOML frontmatter is reported as an error for matched rules because frontmatter predicates and schema checks cannot proceed. Files without required frontmatter fail when the matched `frontmatterSchema` check requires frontmatter, and are skipped for optional frontmatter schema checks.
+
+## Interactive authoring
+
+For 0.3.0 projects, `md-utils types interactive` and `md-utils rules interactive`
+provide Create, Edit, and Remove through Noora prompts. Rule authoring can enter
+the shared type editor and return with an in-memory draft. Recursive type and
+match expressions, existing schema references, and type constraints are supported.
+Complete changes are validated and previewed before confirmation; cancellation
+discards all drafts. Edits retain the resolved source path and preserve unrelated
+resources. Individual writes are atomic; multi-file saves report partial failures.
+
+Use external JSON Schema tools such as `sourcemeta/jsonschema`, `ajv-cli`,
+`check-jsonschema`, or `swaggest/json-cli`; md-utils does not edit schema contents.

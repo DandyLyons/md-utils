@@ -8,6 +8,7 @@ extension CLIEntry {
       abstract: "Work with structural Markdown record types",
       subcommands: [
         Add.self,
+        Interactive.self,
         List.self,
         Describe.self,
         Doctor.self,
