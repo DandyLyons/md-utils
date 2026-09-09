@@ -90,7 +90,8 @@ struct WasmCoreSmoke {
     let checker = MarkdownTypeChecker(registry: typeRegistry)
     let rule = MarkdownRuleDefinition(
       name: "contract",
-      checks: [.init(id: "type", predicate: .typeConformance(definition.name))]
+      checks: [.init(id: "type", predicate: .typeConformance(definition.name))],
+      matchExpression: .allOf([.leaf(.init()), .not(.leaf(.init(paths: ["never/**"])))])
     )
     let rules = MarkdownRuleChecker(
       registry: try MarkdownRuleCompiler(typeRegistry: typeRegistry).compile([rule])

@@ -176,7 +176,10 @@ public struct MarkdownRuleChecker: Sendable {
     _ path: MarkdownRecordPath?,
     for rule: CompiledMarkdownRule
   ) -> Bool {
-    isPathCandidate(path, for: rule.definition.applicability)
+    if let expression = rule.definition.matchExpression {
+      return pathOutcome(path, expression: expression) != .notMatched
+    }
+    return isPathCandidate(path, for: rule.definition.applicability)
   }
 
   /// Returns the expensive derived record state needed to assess a compiled rule.
@@ -188,13 +191,19 @@ public struct MarkdownRuleChecker: Sendable {
 
   private func assessApplicability(
     _ record: AnalyzedMarkdownRecord,
-    rule: MarkdownRuleDefinition
+    rule: MarkdownRuleDefinition,
+    outcomeBased: Bool = false
   ) throws -> (
     matches: Bool,
     unavailable: Bool,
     evidence: [MarkdownRulePredicateEvidence],
     diagnostics: [MarkdownDiagnostic]
   ) {
+    if let expression = rule.matchExpression {
+      let result = try assessMatch(expression, record: record, location: "match")
+      return (result.status == .matched, result.status == .unavailable,
+        result.evidence, result.status == .unavailable ? result.diagnostics : [])
+    }
     var evidence: [MarkdownRulePredicateEvidence] = []
     var diagnostics: [MarkdownDiagnostic] = []
     var matches = true
@@ -235,7 +244,22 @@ public struct MarkdownRuleChecker: Sendable {
     }
 
     for requirement in rule.applicability.requirements {
-      let result = try evaluate(requirement, record: record)
+      let result: (evidence: MarkdownRulePredicateEvidence, diagnostic: MarkdownDiagnostic?)
+      do {
+        if outcomeBased, case .frontmatterJMESPath = requirement.predicate,
+          let parseError = record.parseDiagnostics.first(where: { $0.domain == .frontmatter }) {
+          result = (.init(id: requirement.id, status: .unavailable, message: parseError.message), parseError)
+        } else {
+          result = try evaluate(requirement, record: record)
+        }
+      } catch is CancellationError {
+        throw CancellationError()
+      } catch {
+        guard outcomeBased else { throw error }
+        result = (.init(id: requirement.id, status: .unavailable, message: error.localizedDescription),
+          .init(code: "rule.match.evaluation-error", severity: .error, domain: .record,
+            constraintID: requirement.id, location: requirement.id, message: error.localizedDescription))
+      }
       evidence.append(result.evidence)
       switch result.evidence.status {
       case .matched:
@@ -294,6 +318,64 @@ public struct MarkdownRuleChecker: Sendable {
     }
 
     return (matches, unavailable, evidence, diagnostics)
+  }
+
+  private struct MatchResult {
+    var status: MarkdownRuleEvidenceStatus
+    var evidence: [MarkdownRulePredicateEvidence]
+    var diagnostics: [MarkdownDiagnostic]
+  }
+
+  private func assessMatch(
+    _ expression: MarkdownRuleMatchExpression,
+    record: AnalyzedMarkdownRecord,
+    location: String
+  ) throws -> MatchResult {
+    if case .leaf(let leaf) = expression {
+      let result = try assessApplicability(record, rule: MarkdownRuleDefinition(name: location, applicability: leaf), outcomeBased: true)
+      let status: MarkdownRuleEvidenceStatus = result.matches == false ? .notMatched
+        : result.unavailable ? .unavailable : .matched
+      let evidence = result.evidence.map {
+        MarkdownRulePredicateEvidence(id: "\(location).\($0.id)", status: $0.status, message: $0.message)
+      }
+      return MatchResult(status: status, evidence: evidence, diagnostics: result.diagnostics)
+    }
+    let children: [MarkdownRuleMatchExpression]
+    let key: String
+    let combine: ([MarkdownRuleEvidenceStatus]) -> MarkdownRuleEvidenceStatus
+    switch expression {
+    case .leaf: return MatchResult(status: .unavailable, evidence: [], diagnostics: [])
+    case .allOf(let values):
+      children = values; key = "allOf"; combine = MarkdownRuleMatchComposition.all
+    case .anyOf(let values):
+      children = values; key = "anyOf"; combine = MarkdownRuleMatchComposition.any
+    case .oneOf(let values):
+      children = values; key = "oneOf"; combine = MarkdownRuleMatchComposition.one
+    case .not(let value):
+      children = [value]; key = "not"
+      combine = { MarkdownRuleMatchComposition.not($0.first ?? .unavailable) }
+    }
+    let results = try children.enumerated().map {
+      try assessMatch($0.element, record: record,
+        location: key == "not" ? "\(location).not" : "\(location).\(key)[\($0.offset)]")
+    }
+    let status = combine(results.map(\.status))
+    var evidence = results.flatMap(\.evidence)
+    evidence.append(.init(id: "\(location).\(key)", status: status,
+      message: "\(key): \(results.filter { $0.status == .matched }.count) of \(results.count) branches matched"))
+    return MatchResult(status: status, evidence: evidence, diagnostics: results.flatMap(\.diagnostics))
+  }
+
+  private func pathOutcome(_ path: MarkdownRecordPath?, expression: MarkdownRuleMatchExpression) -> MarkdownRuleEvidenceStatus {
+    switch expression {
+    case .leaf(let leaf):
+      guard isPathCandidate(path, for: leaf) else { return .notMatched }
+      return leaf.requirements.isEmpty && leaf.anyTypes.isEmpty && leaf.allTypes.isEmpty ? .matched : .unavailable
+    case .allOf(let children): return MarkdownRuleMatchComposition.all(children.map { pathOutcome(path, expression: $0) })
+    case .anyOf(let children): return MarkdownRuleMatchComposition.any(children.map { pathOutcome(path, expression: $0) })
+    case .oneOf(let children): return MarkdownRuleMatchComposition.one(children.map { pathOutcome(path, expression: $0) })
+    case .not(let child): return MarkdownRuleMatchComposition.not(pathOutcome(path, expression: child))
+    }
   }
 
   private func evaluate(

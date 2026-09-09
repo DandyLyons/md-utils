@@ -252,6 +252,8 @@ public struct MarkdownRuleCheck: Equatable, Sendable {
 public struct MarkdownRuleDefinition: Equatable, Sendable {
   public var name: String
   public var applicability: MarkdownRuleApplicability
+  /// RFC 0002 selection expression. When present, replaces flat applicability.
+  public var matchExpression: MarkdownRuleMatchExpression?
   public var checks: [MarkdownRuleCheck]
   /// Optional source used to resolve relative JSON Schema references.
   public var source: String?
@@ -260,10 +262,12 @@ public struct MarkdownRuleDefinition: Equatable, Sendable {
     name: String,
     applicability: MarkdownRuleApplicability = MarkdownRuleApplicability(),
     checks: [MarkdownRuleCheck] = [],
-    source: String? = nil
+    source: String? = nil,
+    matchExpression: MarkdownRuleMatchExpression? = nil
   ) {
     self.name = name
     self.applicability = applicability
+    self.matchExpression = matchExpression
     self.checks = checks
     self.source = source
   }

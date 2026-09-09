@@ -130,6 +130,18 @@ public struct MarkdownRuleCompiler: Sendable {
     for (index, definition) in definitions.enumerated() {
       let location = "rules[\(index)]"
       var ruleDiagnostics: [MarkdownRuleCompilationDiagnostic] = []
+      let selectionLeaves = definition.matchExpression?.leaves ?? [definition.applicability]
+      if let expression = definition.matchExpression {
+        do {
+          try expression.validate(source: definition.source ?? location)
+          if definition.applicability != MarkdownRuleApplicability() {
+            ruleDiagnostics.append(diagnostic(.invalidOperand, location + ".match",
+              "Use either matchExpression or flat applicability, not both"))
+          }
+        } catch {
+          ruleDiagnostics.append(diagnostic(.invalidOperand, location + ".match", error.localizedDescription))
+        }
+      }
       if definition.name.isEmpty
         || definition.name.trimmingCharacters(in: .whitespacesAndNewlines) != definition.name {
         ruleDiagnostics.append(diagnostic(
@@ -166,7 +178,7 @@ public struct MarkdownRuleCompiler: Sendable {
         }
       }
 
-      for type in definition.applicability.anyTypes + definition.applicability.allTypes {
+      for type in selectionLeaves.flatMap({ $0.anyTypes + $0.allTypes }) {
         if typeRegistry?.definition(named: type) == nil {
           ruleDiagnostics.append(diagnostic(
             .missingType,
@@ -177,7 +189,7 @@ public struct MarkdownRuleCompiler: Sendable {
       }
 
       var requiredCapabilities: Set<MarkdownRuleRuntimeCapability> = []
-      for (requirementIndex, requirement) in definition.applicability.requirements.enumerated() {
+      for (requirementIndex, requirement) in selectionLeaves.flatMap(\.requirements).enumerated() {
         let requirementLocation = "\(location).applicability.requirements[\(requirementIndex)]"
         validate(
           requirement.predicate,
@@ -255,7 +267,8 @@ public struct MarkdownRuleCompiler: Sendable {
     for definition: MarkdownRuleDefinition
   ) -> MarkdownRecordAnalysisRequirements {
     var result: MarkdownRecordAnalysisRequirements = []
-    for requirement in definition.applicability.requirements {
+    let selectionLeaves = definition.matchExpression?.leaves ?? [definition.applicability]
+    for requirement in selectionLeaves.flatMap(\.requirements) {
       result.formUnion(.required(by: requirement.predicate))
     }
     for check in definition.checks {
@@ -268,7 +281,7 @@ public struct MarkdownRuleCompiler: Sendable {
       guard case .typeConformance(let name) = check.predicate else { return nil }
       return name
     }
-    let typeNames = Set(definition.applicability.anyTypes + definition.applicability.allTypes + enforcedTypes)
+    let typeNames = Set(selectionLeaves.flatMap { $0.anyTypes + $0.allTypes } + enforcedTypes)
     for typeName in typeNames {
       guard let type = typeRegistry?.definition(named: typeName) else { continue }
       let constraints = type.body.requirements + type.body.recommendations

@@ -99,7 +99,7 @@ public struct MarkdownRuleFile: Equatable, Sendable {
       guard let rawTypes = object["types"] else {
         throw MarkdownRuleFileError(source: source, location: "types", message: "A type expression is required")
       }
-      if let match = object["match"] { try validateMatch(match, source: source, location: "match") }
+      if let match = object["match"] { _ = try MarkdownRuleMatchExpression.decode(match, source: source) }
       return Self(name: name, match: object["match"],
         types: try .decode(rawTypes, source: source), schemaReference: object["$schema"]?.stringValue,
         source: source)
@@ -118,41 +118,9 @@ public struct MarkdownRuleFile: Equatable, Sendable {
     return String(decoding: data, as: UTF8.self) + "\n"
   }
 
-  private static func validateMatch(_ value: JSONValue, source: String, location: String) throws {
-    guard case .object(let object) = value else {
-      throw MarkdownRuleFileError(source: source, location: location, message: "Expected a matcher object")
-    }
-    let operators = Set(object.keys).intersection(["allOf", "anyOf", "oneOf", "not"])
-    if let key = operators.sorted().first {
-      guard object.count == 1, let operand = object[key] else {
-        throw MarkdownRuleFileError(source: source, location: location, message: "A group must contain exactly one operator and no leaf fields")
-      }
-      if key == "not" { return try validateMatch(operand, source: source, location: "\(location).not") }
-      guard case .array(let children) = operand, children.isEmpty == false else {
-        throw MarkdownRuleFileError(source: source, location: location, message: "\(key) requires a nonempty array")
-      }
-      for (index, child) in children.enumerated() {
-        try validateMatch(child, source: source, location: "\(location).\(key)[\(index)]")
-      }
-      return
-    }
-    if object.isEmpty { return }
-    // Reuse versioned leaf validation; temporary defaults only satisfy the old
-    // decoder's required selection/check envelope and are never persisted.
-    var leaf = object.mapValues(\.foundationValue)
-    if leaf["paths"] == nil || (leaf["paths"] as? [String])?.isEmpty == true {
-      leaf["paths"] = ["**"]
-    }
-    let envelope: [String: Any] = ["configVersion": "0.2.0", "rules": [[
-      "name": "rule-file-leaf", "match": leaf,
-      "checks": [["type": "maxBodyWords", "max": 0]],
-    ]]]
-    do {
-      let data = try JSONSerialization.data(withJSONObject: envelope)
-      _ = try MarkdownRuleConfigurationDecoder.decode(String(decoding: data, as: UTF8.self))
-    } catch {
-      throw MarkdownRuleFileError(source: source, location: location, message: error.localizedDescription)
-    }
+  /// Parsed selection for compilation by native, server, or in-memory hosts.
+  public func decodedMatch() throws -> MarkdownRuleMatchExpression {
+    try .decode(match ?? .object([:]), source: source)
   }
 }
 

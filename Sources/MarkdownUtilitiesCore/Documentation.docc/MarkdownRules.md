@@ -56,6 +56,26 @@ consumers. This foundation is a Core API capability: legacy 0.1.0 and 0.2.0 conf
 formats do not encode type-conformance checks. Config 0.3.0 serialization and recursive
 type expressions are separate work described in RFC 0002.
 
+## Recursive selection
+
+`MarkdownRuleMatchExpression` parses and evaluates the RFC 0002 `allOf`, `anyOf`,
+`oneOf`, and `not` matcher vocabulary. Obtain it with `MarkdownRuleFile.decodedMatch()`
+and set `MarkdownRuleDefinition.matchExpression` when compiling programmatic rules.
+Use an expression or flat `applicability`, not both. Empty objects select all host
+candidates; multiple fields in a leaf remain conjunctive. Legacy versioned decoders
+continue rejecting grouped syntax and preserve their historical semantics.
+
+Compilation checks all branches, including regular expressions, referenced types,
+and runtime capabilities. Evaluation retains nested evidence paths for explanation.
+`anyOf` succeeds when any branch succeeds; `allOf` fails when any branch fails;
+`oneOf` fails when two branches succeed. Otherwise an evaluation error prevents a
+definitive result. `not` preserves errors. Errors in irrelevant branches remain
+explanation evidence without failing a decisive result; cancellation propagates.
+
+Path prefiltering is conservative under alternatives and negation. The compiler
+collects body-analysis requirements across every leaf so grouping cannot suppress
+required AST analysis.
+
 ## Topics
 
 ### Lifecycle

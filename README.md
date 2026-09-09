@@ -404,6 +404,19 @@ This is currently a library capability. The CLI's 0.1.0/0.2.0 schemas do not acc
 the file-based 0.3.0 configuration integration is specified in
 [RFC 0002](docs/rfcs/0002-config-v0.3.md) and tracked with issues #71, #96, and #109.
 
+### Grouped matching foundation
+
+Core supports `MarkdownRuleMatchExpression` with recursive `allOf`, `anyOf`, `oneOf`,
+and `not`, including outcome-based error propagation and nested explanation evidence.
+Native schema-reference migration planning preserves the original resource while
+rewriting it relative to the generated mdtype. `.md-utils/schemas/` remains an optional
+shared-resource convention in the proposed format.
+
+Draft 0.3.0 project/rule schemas are bundled and checked into `site/schemas/0.3.0/`.
+They follow RFC 0002 (standalone rules and no project `schemaDirectory`). The CLI still
+loads/generates 0.1.0/0.2.0 configurations; default-version activation, command wiring,
+and migration writes remain part of #135. The `latest` schema alias remains 0.2.0.
+
 ## GitHub Pages
 
 The static project site lives in `site/` and deploys to `https://dandylyons.github.io/md-utils/` through `.github/workflows/pages.yml`. GitHub Pages should be configured to use GitHub Actions as its deployment source.

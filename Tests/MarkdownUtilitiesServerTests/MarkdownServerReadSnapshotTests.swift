@@ -13,8 +13,12 @@ struct MarkdownServerReadSnapshotTests {
     )
     let types = try MarkdownTypeRegistry(definitions: [type])
     let rule = MarkdownRuleDefinition(
-      name: "books", applicability: .init(paths: ["books/**"]),
-      checks: [.init(id: "contract", predicate: .typeConformance(type.name))]
+      name: "books",
+      checks: [.init(id: "contract", predicate: .typeConformance(type.name))],
+      matchExpression: .allOf([
+        .anyOf([.leaf(.init(paths: ["books/**"])), .leaf(.init(paths: ["articles/**"]))]),
+        .not(.leaf(.init(paths: ["books/archive/**"])))
+      ])
     )
     let rules = try makeRuleRegistry([rule], typeRegistry: types)
     let plan = try makePlan(registry: types, rules: [rule], resources: [

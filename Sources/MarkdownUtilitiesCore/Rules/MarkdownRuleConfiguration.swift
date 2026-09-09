@@ -35,6 +35,9 @@ public struct MarkdownRuleConfiguration: Equatable, Sendable {
 ///
 /// See <doc:RuleConfigurationVersions>.
 public enum MarkdownRuleConfigurationDecoder {
+  package static func decodeMatchLeaf(_ object: [String: JSONValue], location: String) throws -> MarkdownRuleApplicability {
+    try parseApplicability(object.mapValues(\.foundationValue), ruleName: location, allowUnconditional: true)
+  }
   public static func decode(_ content: String, source: String? = nil) throws -> MarkdownRuleConfiguration {
     guard let data = content.data(using: .utf8) else {
       throw MarkdownRuleConfigurationError.invalidSerialization("Configuration is not UTF-8")
@@ -139,7 +142,8 @@ public enum MarkdownRuleConfigurationDecoder {
 
   private static func parseApplicability(
     _ object: [String: Any],
-    ruleName: String
+    ruleName: String,
+    allowUnconditional: Bool = false
   ) throws -> MarkdownRuleApplicability {
     try validateKeys(
       object,
@@ -247,7 +251,7 @@ public enum MarkdownRuleConfigurationDecoder {
       throw MarkdownRuleConfigurationError.invalidField("Rule \"\(ruleName)\" match.document must be an object")
     }
 
-    if paths.isEmpty && requirements.isEmpty {
+    if paths.isEmpty && requirements.isEmpty && allowUnconditional == false {
       throw MarkdownRuleConfigurationError.invalidField("Rule \"\(ruleName)\" must define at least one match condition")
     }
     return MarkdownRuleApplicability(
@@ -523,6 +527,9 @@ public enum MarkdownRuleConfigurationEncoder {
     _ rule: MarkdownRuleDefinition,
     version: String = MarkdownRuleConfigurationSchemaVersion.current
   ) throws -> [String: Any] {
+    guard rule.matchExpression == nil else {
+      throw MarkdownRuleConfigurationError.unsupportedFeature("Grouped matching cannot be encoded in legacy configuration")
+    }
     let match = try matchObject(rule.applicability)
     if version == MarkdownRuleConfigurationSchemaVersion.legacy {
       guard rule.checks.count == 1,

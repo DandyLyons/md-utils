@@ -4,12 +4,31 @@
 //
 
 import Foundation
+import JSONSchema
 import PathKit
 import Testing
 @testable import md_utils
 
 @Suite("config commands", .serialized)
 struct ConfigCommandsTests {
+  @Test
+  func `Draft standalone schemas agree with bundled copies and reject embedded legacy fields`() throws {
+    for name in ["md-utils", "mdrule"] {
+      let bundled = repoRoot().appending(path: "Sources/md-utils/Resources/0.3.0_\(name).schema.json")
+      let published = repoRoot().appending(path: "site/schemas/0.3.0/\(name).schema.json")
+      #expect(try Data(contentsOf: bundled) == Data(contentsOf: published))
+    }
+    let projectData = try Data(contentsOf: repoRoot().appending(path: "Sources/md-utils/Resources/0.3.0_md-utils.schema.json"))
+    let project = try #require(JSONSerialization.jsonObject(with: projectData) as? [String: Any])
+    #expect(try JSONSchema.validate(["configVersion": "0.3.0"], schema: project).valid)
+    #expect(try JSONSchema.validate(["configVersion": "0.3.0", "rules": []] as [String: Any], schema: project).valid == false)
+    #expect(try JSONSchema.validate(["configVersion": "0.3.0", "schemaDirectory": ".md-utils/schemas/"], schema: project).valid == false)
+    let ruleData = try Data(contentsOf: repoRoot().appending(path: "Sources/md-utils/Resources/0.3.0_mdrule.schema.json"))
+    let ruleSchema = try #require(JSONSerialization.jsonObject(with: ruleData) as? [String: Any])
+    let rule: [String: Any] = ["name": "books", "types": "Book.MDTYPE.JSON", "match": ["allOf": [["paths": ["Books/**"]], ["not": ["frontmatter": ["draft": ["equals": true]]]]]]]
+    #expect(try JSONSchema.validate(rule, schema: ruleSchema).valid)
+    #expect(try JSONSchema.validate(["name": "books", "types": "books"], schema: ruleSchema).valid == false)
+  }
   @Test
   func `config command group has correct configuration`() {
     let config = CLIEntry.ConfigCommands.configuration
