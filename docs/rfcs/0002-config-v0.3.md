@@ -235,6 +235,12 @@ The existing 0.1.0-to-0.2.0 migration fixture writes a schema reference without 
 
 Start with the four representative cases above plus existing dry-run/collision tests. Do not introduce an API migration framework or change mdtype v1 to accommodate hypothetical advisory configs. Diagnostic changes are approved subject to the compatibility boundary above. Optional-schema-only and body-only conversions with known outcome differences must be rejected until those differences are resolved. Required-schema conversions remain candidates pending focused invalid-record checks, rather than being declared safe from shape alone.
 
+#### Executed invalid-record follow-up
+
+The focused test `Required schema migration changes malformed type hint outcomes` confirms an additional incompatibility even for required-schema rules. Given valid YAML containing `title: Dune` and `$md-utils: { typeHints: invalid }`, a legacy required object-schema check passes, while the equivalent required-schema mdtype fails with `type.hint.malformed`. Legacy schema checks inspect frontmatter-domain parsing errors; mdtype assessment includes type-hint errors too. Both validate the same user frontmatter after reserved metadata is removed.
+
+Consequently, required-schema conversion is not generally safe solely because presence and schema resources match. The existing migration contract requires refusing this conversion unless equivalence can be established. This is not merely an allowed diagnostic change: it changes pass/fail. A broader automatic conversion requires an explicit compatibility decision; do not weaken existing type checking or silently change legacy validation to make the migration pass.
+
 Issue #135 remains open until the format is implemented, related work is completed or explicitly deferred, compatibility and migration behavior are tested, and schemas and documentation agree.
 
 ## Remaining specification work

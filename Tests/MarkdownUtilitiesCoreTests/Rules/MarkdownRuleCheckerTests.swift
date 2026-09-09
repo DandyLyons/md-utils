@@ -221,6 +221,30 @@ struct MarkdownRuleCheckerTests {
     }
   }
 
+  @Test
+  func `Required schema migration changes malformed type hint outcomes`() async throws {
+    let schema = MarkdownJSONSchemaSource.inline(.object(["type": .string("object")]))
+    let name = MarkdownTypeName(rawValue: "Book")
+    let types = try MarkdownTypeRegistry(definitions: [.init(
+      name: name, version: "1",
+      frontmatter: .init(presence: .required, schemas: [schema])
+    )])
+    let rules = MarkdownRuleChecker(registry: try MarkdownRuleCompiler(typeRegistry: types).compile([
+      .init(name: "legacy", checks: [
+        .init(id: "schema", predicate: .frontmatterSchema(source: schema, presence: .required))
+      ]),
+      .init(name: "converted", checks: [
+        .init(id: "contract", predicate: .typeConformance(name))
+      ]),
+    ]))
+    let input = MarkdownRecord(content: "---\ntitle: Dune\n$md-utils:\n  typeHints: invalid\n---\n# Book")
+    let legacy = try await rules.assess(input, ruleNamed: "legacy")
+    let converted = try await rules.assess(input, ruleNamed: "converted")
+    #expect(legacy.status == .passed)
+    #expect(converted.status == .failed)
+    #expect(converted.diagnostics.contains { $0.code == "type.hint.malformed" })
+  }
+
   /// Creates a canonical record with a portable logical path.
   private func record(path: String) throws -> MarkdownRecord {
     MarkdownRecord(
