@@ -149,3 +149,16 @@ mint install DandyLyons/md-utils@0.x.y
 - The project follows [Semantic Versioning](https://semver.org/)
 - While on `0.x.x`, breaking changes may occur between minor versions
 - Breaking changes are documented in release notes
+
+## Publishing JSON Schemas
+
+Bundled files in `Sources/md-utils/Resources/` are the canonical source for
+each schema version. Generate and validate public copies with:
+
+```bash
+python3 scripts/sync-schema-publication.py
+python3 scripts/validate-schema-publication.py
+```
+
+The 0.1.0 and 0.2.0 named aliases are generated for compatibility. Existing
+versioned URLs are immutable; add a new versioned directory for changes.

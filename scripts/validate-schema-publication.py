@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -12,8 +13,6 @@ from pathlib import Path
 
 CURRENT_VERSION = "0.2.0"
 SCHEMA_FILE = "md-utils.schema.json"
-BUNDLED_SCHEMA_FILE = f"{CURRENT_VERSION}_md-utils.schema.json"
-VERSIONED_SCHEMA_FILE = f"md-utils-{CURRENT_VERSION}.schema.json"
 VERSIONED_SCHEMA_URL = (
     f"https://dandylyons.github.io/md-utils/schemas/{CURRENT_VERSION}/{SCHEMA_FILE}"
 )
@@ -53,16 +52,19 @@ def main() -> None:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
-    bundled = repo_root / "Sources/md-utils/Resources" / BUNDLED_SCHEMA_FILE
+    sync_script = repo_root / "scripts/sync-schema-publication.py"
+    result = subprocess.run(
+        [sys.executable, str(sync_script), "--check"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        fail(result.stderr.strip() or "schema publication copies are out of date")
+    bundled = repo_root / "Sources/md-utils/Resources" / f"{CURRENT_VERSION}_md-utils.schema.json"
     versioned = repo_root / "site/schemas" / CURRENT_VERSION / SCHEMA_FILE
-    named_versioned = repo_root / "site/schemas" / CURRENT_VERSION / VERSIONED_SCHEMA_FILE
-
-    for path in [bundled, versioned, named_versioned]:
-        if not path.exists():
-            fail(f"missing schema file: {path}")
-
-    compare_files(bundled, versioned)
-    compare_files(bundled, named_versioned)
+    if not bundled.exists() or not versioned.exists():
+        fail("current schema publication is incomplete")
 
     # Opt-in standalone schemas are published without moving the default/latest alias.
     for name in ["md-utils", "mdrule"]:
