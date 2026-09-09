@@ -180,7 +180,9 @@ Legacy loading remains available whether or not automatic migration is possible.
 
 ### Approved compatibility boundary
 
-Automatic migration MUST preserve file selection and rule pass/fail/skipped outcomes. It MUST reject conversions known to change these outcomes before writing. Checking only the project's currently valid records is insufficient evidence that a conversion preserves behavior for future records.
+Automatic migration MUST preserve file selection and rule pass/fail/skipped outcomes, except for the explicitly approved malformed-type-hint exception below. It MUST reject other conversions known to change these outcomes before writing. Checking only the project's currently valid records is insufficient evidence that a conversion preserves behavior for future records.
+
+**Approved exception: malformed type hints.** Migration may newly reject records with malformed `$md-utils.typeHints` metadata by enforcing RFC 0001's existing `type.hint.malformed` error. The migration preview and documentation MUST disclose this behavior change and explain that correcting the malformed metadata is required. Valid name-based type hints remain supported without changing their meaning; hints nominate types but do not establish conformance. This exception does not authorize changes to selection, optional-frontmatter skipped behavior, unrelated parsing errors, or other validation outcomes. Do not weaken mdtype assessment or change legacy-version behavior to hide this difference.
 
 Documented diagnostic changes are permitted: migrated rules may report mdtype diagnostic codes, constraint IDs, wording, locations, additional explanatory detail, and fix-it proposals. The migration preview and migration documentation MUST explain this transition. Such changes MUST NOT turn advisory guidance into a failing requirement or otherwise change the validation outcome. The runtime MUST still preserve the originating mdtype diagnostics when wrapping them with rule/expression provenance, as specified above.
 
@@ -239,7 +241,7 @@ Start with the four representative cases above plus existing dry-run/collision t
 
 The focused test `Required schema migration changes malformed type hint outcomes` confirms an additional incompatibility even for required-schema rules. Given valid YAML containing `title: Dune` and `$md-utils: { typeHints: invalid }`, a legacy required object-schema check passes, while the equivalent required-schema mdtype fails with `type.hint.malformed`. Legacy schema checks inspect frontmatter-domain parsing errors; mdtype assessment includes type-hint errors too. Both validate the same user frontmatter after reserved metadata is removed.
 
-Consequently, required-schema conversion is not generally safe solely because presence and schema resources match. The existing migration contract requires refusing this conversion unless equivalence can be established. This is not merely an allowed diagnostic change: it changes pass/fail. A broader automatic conversion requires an explicit compatibility decision; do not weaken existing type checking or silently change legacy validation to make the migration pass.
+The user explicitly approved newly rejecting malformed type hints after migration. This resolves that specific pass/fail discrepancy through the exception above; the test remains evidence of the intentional difference. Required-schema conversions still need to preserve all other outcomes and resource identities. The approval does not make optional-schema-only or body-only conversions with unrelated outcome differences safe.
 
 Issue #135 remains open until the format is implemented, related work is completed or explicitly deferred, compatibility and migration behavior are tested, and schemas and documentation agree.
 
