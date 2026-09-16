@@ -12,18 +12,19 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 ## Project Brief
 
 - **Language**: Swift 6.2+
+- **Native indexing prototype**: `MarkdownUtilitiesIndex` uses upstream GRDB with system SQLite through SwiftPM; JSON, expression indexes, and FTS5 are probed before opening index files. Core and WASM have no GRDB/SQLite dependency. See `docs/sqlite-index-packaging.md` for runtime requirements, measurements, and the optional SwiftPM bundled-runtime fallback. Xcode-based database integration is rejected.
 - **Frameworks/Libraries**: Foundation, MarkdownSyntax, PathKit, Yams, swift-toml, JMESPath, DynamicJSON, JSONSchema.swift, swift-argument-parser, Noora (interactive CLI authoring), Rainbow, Hummingbird 2, Swift Logging
   - **parsing**: Any code that involves parsing text must use the `Parsing` library like the rest of the codebase.
 - **Package Manager / Build Tool**: Swift Package Manager
 - **Executable Targets**: `md-utils`, `md-utils-server`
-- **Library Targets**: `MarkdownUtilitiesCore`, `MarkdownUtilities`
+- **Library Targets**: `MarkdownUtilitiesCore`, `MarkdownUtilities`, `MarkdownUtilitiesServer`, `MarkdownUtilitiesIndex`
 - **Test Framework**: Swift Testing, not XCTest
 - **Build Command**: `swift build`
 - **Test Command**: `swift test`; native Linux server route smoke test with `swift run MarkdownUtilitiesServerLinuxSmoke`
 - **Formatter/Linter**: No dedicated formatter or linter is configured in-package
 - **Documentation**: README.md, AGENTS.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
 - **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/TOML/JSON parsing failures as user-visible errors
-- **CI/Coverage**: Schema publication, Pages, WebAssembly, and native Linux server workflows are configured; local Linux server verification uses `Dockerfile.server-linux`; no coverage command is documented
+- **CI/Coverage**: Schema publication, Pages, WebAssembly, native Linux server, and native SQLite workflows are configured; local verification uses `Dockerfile.server-linux` and `Dockerfile.sqlite-index`; no coverage command is documented
 
 ## Requirements
 

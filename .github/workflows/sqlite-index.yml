@@ -1,0 +1,34 @@
+name: Native SQLite
+on:
+  pull_request:
+    paths:
+      - 'Package.swift'
+      - 'Package.resolved'
+      - 'Sources/MarkdownUtilitiesIndex/**'
+      - 'Tests/MarkdownUtilitiesIndexTests/**'
+      - 'IntegrationTests/SQLiteIndexSmoke/**'
+      - 'scripts/*sqlite*'
+      - 'Dockerfile.sqlite-index'
+      - '.github/workflows/sqlite-index.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      matrix:
+        os: [macos-26, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Linux capabilities, failure semantics, measurements, and linkage
+        if: runner.os == 'Linux'
+        run: docker build --file Dockerfile.sqlite-index --tag md-utils-sqlite .
+      - name: macOS capabilities and failure semantics
+        if: runner.os == 'macOS'
+        run: |
+          swift run -c release SQLiteIndexSmoke
+          swift test --filter MarkdownUtilitiesIndexTests
+          python3 scripts/measure-sqlite.py
