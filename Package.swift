@@ -9,6 +9,7 @@ let package = Package(
     .macOS(.v13), .iOS(.v16), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16),
   ],
   products: [
+    .library(name: "MarkdownUtilitiesIndex", targets: ["MarkdownUtilitiesIndex"]),
     .library(
       name: "MarkdownUtilitiesCore",
       targets: ["MarkdownUtilitiesCore"]
@@ -31,6 +32,7 @@ let package = Package(
     ),
   ],
   dependencies: [
+    .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
     .package(url: "https://github.com/hebertialmeida/MarkdownSyntax", from: "1.3.0"),
     .package(url: "https://github.com/pointfreeco/swift-parsing.git", from: "0.14.1"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.1"),
@@ -52,6 +54,23 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
+    // Native indexing is opt-in; Core, WASM, and existing commands do not link SQLite.
+    .target(
+      name: "MarkdownUtilitiesIndex",
+      dependencies: [
+        .product(name: "GRDB", package: "GRDB.swift"),
+        .product(name: "GRDBSQLite", package: "GRDB.swift"),
+      ]
+    ),
+    .testTarget(name: "MarkdownUtilitiesIndexTests", dependencies: ["MarkdownUtilitiesIndex"]),
+    .executableTarget(
+      name: "SQLiteIndexSmoke",
+      dependencies: [
+        "MarkdownUtilitiesIndex",
+        .product(name: "GRDBSQLite", package: "GRDB.swift"),
+      ],
+      path: "IntegrationTests/SQLiteIndexSmoke/"
+    ),
     // MARK: MarkdownUtilitiesCore
     .target(
       name: "MarkdownUtilitiesCore",

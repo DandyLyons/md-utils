@@ -1,0 +1,8 @@
+FROM swift:6.2-noble
+RUN apt-get update && apt-get install -y --no-install-recommends python3 libsqlite3-dev binutils && rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace/
+COPY Package.swift Package.resolved ./
+RUN swift package resolve
+COPY . .
+RUN swift run -c release SQLiteIndexSmoke
+RUN python3 scripts/measure-sqlite.py
