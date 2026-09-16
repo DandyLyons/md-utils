@@ -5,4 +5,5 @@ COPY Package.swift Package.resolved ./
 RUN swift package resolve
 COPY . .
 RUN swift run -c release SQLiteIndexSmoke
+RUN swift test --filter 'MarkdownUtilitiesIndexTests|IndexCommandsTests'
 RUN python3 scripts/measure-sqlite.py

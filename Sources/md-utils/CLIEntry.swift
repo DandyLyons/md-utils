@@ -30,6 +30,7 @@ public struct CLIEntry: AsyncParsableCommand {
       FrontMatterCommands.self,
       GenerateTOC.self,
       HeadingCommands.self,
+      Index.self,
       LinkCommands.self,
       Lines.self,
       OKFCommands.self,

@@ -213,6 +213,19 @@ Run `swift run md-utils --help` or `swift run md-utils <command> --help` for ful
 
 Human-facing CLI output may use ANSI color to distinguish status, errors, warnings, paths, and metadata from Markdown content. Machine-readable output such as JSON, YAML, PropertyList, raw path lists, and extracted Markdown content remains unstyled. Color handling is provided by Rainbow, which automatically emits plain text when output is redirected; use `NO_COLOR=1` to disable color or `FORCE_COLOR=1` to force color when supported by Rainbow.
 
+## SQLite Collection Index
+
+Create or refresh a rebuildable collection cache with `md-utils index update ./notes/`.
+Use `md-utils index type Book ./notes/` to retain conforming documents or
+`md-utils index rule books` to retain rule-selected documents, including invalid members.
+`md-utils index update --verify-hashes` checks for edits missed by mtime/size;
+`md-utils index update --rebuild` regenerates all saved scopes while preserving
+SQL field indexes and views. Files remain authoritative.
+
+The cache is stored in `.md-utils/index.sqlite`. See
+[collection indexing](docs/collection-index.md) for project/config resolution,
+non-Markdown support, diagnostics, and freshness guarantees.
+
 ## Open Knowledge Format
 
 `md-utils okf` currently targets the Open Knowledge Format (OKF) v0.1 draft. The draft spec is readable at https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md.

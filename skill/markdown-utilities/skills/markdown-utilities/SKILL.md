@@ -24,6 +24,21 @@ The `md-utils` CLI provides structured operations on Markdown files. Add `--help
 | `md-utils links` | List, check, or find backlinks for wikilinks |
 | `md-utils meta` | Read file metadata |
 | `md-utils rules` | Validate Markdown files with project-level rules |
+| `md-utils index` | Maintain a rebuildable SQLite collection cache with type/rule assessments |
+
+## Collection Indexing
+
+`md-utils index update ./notes/` registers a directory scope and refreshes all
+saved scopes in `.md-utils/index.sqlite`. `index type Book ./notes/` selects only
+conforming documents; `index rule books` preserves rule-selected invalid members.
+Use `index update --verify-hashes` to detect stat-preserving edits, or
+`index update --rebuild` to regenerate all scopes while retaining SQL field indexes
+and views. Files remain authoritative. Use `--project-root <directory>/` and
+`--config <file>` for explicit configuration; nonstandard configs require a root.
+`--include-non-md` is saved per scope. Scans skip hidden files and symlinks.
+Incomplete scans retain unavailable rows and report errors. Query
+`current_documents` for current parsed members, and inspect `assessments` and
+`diagnostics` for nonconformance, parsing/evaluation errors, and advisories.
 
 ## Batch Operations
 

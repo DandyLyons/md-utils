@@ -3,8 +3,9 @@
 Issue #137 establishes the database dependency for the indexing phase of #93.
 `MarkdownUtilitiesIndex` is an opt-in native library using upstream GRDB through
 SwiftPM and the operating system's SQLite runtime. It provides a checked
-connection foundation; indexing, queries, refresh, and server integration remain
-in #138–#141. Files remain authoritative.
+connection foundation and the incremental collection cache from #138. The CLI
+links the index target; queries and server integration remain follow-up work.
+See [collection indexing](collection-index.md). Files remain authoritative.
 
 ## Decision and alternatives
 
@@ -43,7 +44,8 @@ in the runtime build. [SQLite JSON](https://sqlite.org/json1.html#compiling_in_j
 | iOS 16+, tvOS 16+, watchOS 9+, Mac Catalyst 16+ | Package minimums are unchanged. The prototype has not validated these SDKs/runtimes; do not infer index support from the manifest alone. |
 | Windows, Android | Not supported by this prototype. |
 | `MarkdownUtilitiesCore` and Core WASM smoke | No dependency path to GRDB or SQLite. |
-| `MarkdownUtilities`, CLI, server | Do not yet depend on the index target; existing commands do not run database probes. |
+| `MarkdownUtilities`, server | Do not depend on the index target. |
+| CLI | Links the index target; only index commands open databases or run capability probes. |
 
 Linux source builds require SQLite development headers and a linker library
 (Ubuntu/Debian: `libsqlite3-dev`); deployment requires the runtime library

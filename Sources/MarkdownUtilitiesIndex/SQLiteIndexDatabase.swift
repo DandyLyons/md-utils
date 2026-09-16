@@ -2,14 +2,19 @@ import GRDB
 import GRDBSQLite
 
 /// A native SQLite connection reserved for the rebuildable file index.
-/// GRDB serializes access to the connection. Indexing operations will be added here.
+/// GRDB serializes access and commits collection changes transactionally.
 public final class SQLiteIndexDatabase {
-    private let databaseQueue: DatabaseQueue
+    let databaseQueue: DatabaseQueue
 
     /// The system SQLite runtime used by GRDB, not a bundled version.
     public static var sqliteVersion: String { String(cString: sqlite3_libversion()) }
 
     /// Checks the linked runtime in memory before creating or opening an index file.
+    ///
+    /// The parent directory must already exist. Collection tables are created by
+    /// ``prepareCollection(root:)``, which ``CollectionIndexer`` calls automatically.
+    /// - Parameter path: SQLite database file path, or `:memory:` for an ephemeral cache.
+    /// - Throws: ``SQLiteIndexError`` if required capabilities or file access are unavailable.
     public convenience init(path: String) throws {
         try self.init(path: path, probe: Self.checkCapabilities)
     }
@@ -25,6 +30,8 @@ public final class SQLiteIndexDatabase {
 
     /// Exercises JSON queries, JSON expression indexes, and FTS5 reads and writes.
     /// No index file is touched by this probe.
+    ///
+    /// - Throws: ``SQLiteIndexError`` identifying the failed capability and linked runtime.
     public static func checkCapabilities() throws {
         try checkCapabilities(probes: capabilityProbes)
     }
@@ -65,7 +72,10 @@ public final class SQLiteIndexDatabase {
     ]
 }
 
+/// An index failure with a human-readable explanation and recovery context.
 public struct SQLiteIndexError: Error, CustomStringConvertible, Sendable {
+    /// Explains the runtime, filesystem, scope, or cache-state problem.
     public let message: String
+    /// The same actionable explanation exposed through `CustomStringConvertible`.
     public var description: String { message }
 }

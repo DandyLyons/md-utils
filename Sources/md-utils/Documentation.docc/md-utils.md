@@ -21,6 +21,10 @@ The executable target wraps the `MarkdownUtilities` library in a Swift Argument 
 
 - <doc:TypesCommands>
 
+### Collection Indexing
+
+- <doc:IndexCommands>
+
 ### Open Knowledge Format
 
 - <doc:OKFCommands>

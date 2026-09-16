@@ -105,6 +105,8 @@ enum FrontMatterFileSyntax: Equatable {
   /// - Parameters:
   ///   - path: The file whose extension determines the representation.
   ///   - includeNonMarkdown: Whether `.txt` is opted into Markdown-style parsing.
+  ///   - lineCommentFrontmatter: Whether otherwise unmapped files may use fixed
+  ///     hash-comment frontmatter. Markdown, `.txt`, and shipped mappings take precedence.
   /// - Returns: The resolved representation, or `nil` when `.txt` is not opted in
   ///   or the extension has no shipped mapping.
   static func resolve(
@@ -354,6 +356,7 @@ enum FrontMatterCLIReader {
   /// - Parameters:
   ///   - path: The selected file to read.
   ///   - includeNonMarkdown: Whether `.txt` is opted into Markdown-style parsing.
+  ///   - lineCommentFrontmatter: Whether otherwise unmapped files may use fixed hash-comment frontmatter.
   /// - Returns: The first frontmatter block in the existing document representation.
   /// - Throws: A filesystem, syntax-mapping, multiplicity, or YAML conversion error.
   static func document(
@@ -458,8 +461,11 @@ extension GlobalOptions {
   /// true. Explicit ignored files emit an opt-in hint; directory-discovered files
   /// are ignored silently.
   ///
-  /// - Parameter includeNonMarkdown: Whether mapped non-Markdown files and `.txt`
-  ///   participate in batch selection.
+  /// - Parameters:
+  ///   - includeNonMarkdown: Whether mapped non-Markdown files and `.txt`
+  ///     participate in batch selection.
+  ///   - lineCommentFrontmatter: Whether to require explicit regular files and
+  ///     select them for fixed hash-comment frontmatter parsing.
   /// - Returns: Selected files after extension, hidden-file, exclusion, recursion,
   ///   and sorting rules are applied.
   /// - Throws: A validation error for missing paths or explicitly selected unmapped files.

@@ -33,6 +33,7 @@ let package = Package(
   ],
   dependencies: [
     .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
+    .package(url: "https://github.com/apple/swift-crypto.git", from: "4.5.1"),
     .package(url: "https://github.com/hebertialmeida/MarkdownSyntax", from: "1.3.0"),
     .package(url: "https://github.com/pointfreeco/swift-parsing.git", from: "0.14.1"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.1"),
@@ -54,10 +55,11 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
-    // Native indexing is opt-in; Core, WASM, and existing commands do not link SQLite.
+    // SQLite remains outside Core, WASM, and the server.
     .target(
       name: "MarkdownUtilitiesIndex",
       dependencies: [
+        .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "GRDB", package: "GRDB.swift"),
         .product(name: "GRDBSQLite", package: "GRDB.swift"),
       ]
@@ -191,6 +193,7 @@ let package = Package(
     .executableTarget(
       name: "md-utils",
       dependencies: [
+        "MarkdownUtilitiesIndex",
         "MarkdownUtilitiesCore",
         "MarkdownUtilities",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),

@@ -5,6 +5,8 @@ on:
       - 'Package.swift'
       - 'Package.resolved'
       - 'Sources/MarkdownUtilitiesIndex/**'
+      - 'Sources/md-utils/IndexCommands.swift'
+      - 'Tests/md-utilsTests/Commands/IndexCommandsTests.swift'
       - 'Tests/MarkdownUtilitiesIndexTests/**'
       - 'IntegrationTests/SQLiteIndexSmoke/**'
       - 'scripts/*sqlite*'
@@ -30,5 +32,5 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           swift run -c release SQLiteIndexSmoke
-          swift test --filter MarkdownUtilitiesIndexTests
+          swift test --filter 'MarkdownUtilitiesIndexTests|IndexCommandsTests'
           python3 scripts/measure-sqlite.py

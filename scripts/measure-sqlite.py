@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 pins = json.loads((ROOT / "Package.resolved").read_text())["pins"]
 pin = next(pin for pin in pins if pin["identity"] == "grdb.swift")
 version = pin["state"]["version"]
+crypto_version = next(pin for pin in pins if pin["identity"] == "swift-crypto")["state"]["version"]
 scratch = ROOT / "tmp/"
 scratch.mkdir(exist_ok=True)
 work = Path(tempfile.mkdtemp(prefix="grdb-measure-", dir=scratch))
@@ -37,9 +38,13 @@ import PackageDescription
 let package = Package(
     name: "SQLiteMeasurement",
     platforms: [.macOS(.v13)],
-    dependencies: [.package(url: "https://github.com/groue/GRDB.swift.git", exact: "VERSION")],
+    dependencies: [
+        .package(url: "https://github.com/groue/GRDB.swift.git", exact: "GRDB_VERSION"),
+        .package(url: "https://github.com/apple/swift-crypto.git", exact: "CRYPTO_VERSION"),
+    ],
     targets: [
         .target(name: "MarkdownUtilitiesIndex", dependencies: [
+            .product(name: "Crypto", package: "swift-crypto"),
             .product(name: "GRDB", package: "GRDB.swift"),
             .product(name: "GRDBSQLite", package: "GRDB.swift"),
         ]),
@@ -52,7 +57,7 @@ let package = Package(
         .testTarget(name: "MarkdownUtilitiesIndexTests", dependencies: ["MarkdownUtilitiesIndex"]),
     ]
 )
-'''.replace("VERSION", version))
+'''.replace("GRDB_VERSION", version).replace("CRYPTO_VERSION", crypto_version))
 
 def run(arguments):
     print("+", " ".join(map(str, arguments)), flush=True)

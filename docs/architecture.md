@@ -14,6 +14,13 @@ The Markdown type system follows the same boundary. Core owns canonical `Markdow
 
 The full source and dependency classification is recorded in the [portability audit](portability-audit.md).
 
+`MarkdownUtilitiesIndex` provides the native SQLite collection cache, persisted
+selection scopes, incremental filesystem scanning, and transactional FTS updates.
+It depends on GRDB/system SQLite and Swift Crypto. The CLI injects existing Core
+parsers and type/rule evaluators; Core, WASM, and the server do not depend on the
+index target. See [collection indexing](collection-index.md) for its freshness
+and failure contract.
+
 ## Core Library (MarkdownUtilitiesCore)
 
 ### MarkdownDocument
