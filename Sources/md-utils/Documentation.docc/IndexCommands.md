@@ -11,6 +11,10 @@ md-utils index rule books
 md-utils index update
 md-utils index update --verify-hashes
 md-utils index update --rebuild
+md-utils index query "SELECT path FROM current_documents"
+md-utils index field add '$.status'
+md-utils index explain "SELECT path FROM documents WHERE json_extract(metadata, '$.status')='draft'"
+md-utils index status
 ```
 
 The database lives at `.md-utils/index.sqlite` under the project root. Each
@@ -43,3 +47,21 @@ their selection records but are excluded from current parsed results.
 
 Files remain authoritative. SQLite is neither a folder backup nor an atomic
 filesystem snapshot, and no index command writes changes back to source files.
+
+## Query and accelerate fields
+
+`index query` and `index explain` refresh every saved scope before executing one
+read-only statement. Refresh failures prevent the query; mutations are rejected.
+JSON output is the default, with JSONL and CSV available through `--format`.
+Queries return at most 1,000 rows by default; `--limit` accepts 1 through 10,000.
+Use `--database <file>` to select a cache other than the project default.
+
+`index field add <json-path>` creates an explicit expression index. Use the exact
+expression printed by `index field list` in predicates. Managed fields also become
+columns in deterministic `type_<normalized-name>` views backed by complete,
+successful type memberships. Arrays are indexed as whole JSON values; use
+`json_each` for element membership, which is not accelerated by that index.
+
+`index status` reports generation, refresh timestamps, and saved scope states.
+The public schema uses standard SQLite JSON, FTS5, views, and expression indexes
+without md-utils-only SQL functions.

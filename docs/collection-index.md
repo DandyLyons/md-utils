@@ -10,6 +10,10 @@ md-utils index rule books
 md-utils index update
 md-utils index update --verify-hashes
 md-utils index update --rebuild
+md-utils index query "SELECT path FROM current_documents ORDER BY path"
+md-utils index explain "SELECT path FROM documents WHERE json_extract(metadata, '$.status') = 'draft'"
+md-utils index field add '$.status'
+md-utils index status
 ```
 
 `update <directory>/` registers an unrestricted directory collection. `type`
@@ -72,6 +76,22 @@ database also deletes these declarations; register scopes again after deletion.
 Migrations are transactional; databases from newer versions are rejected rather
 than reset automatically.
 
+`index query` and `index explain` always perform the same incremental refresh of
+every saved scope before opening a serialized read snapshot. Any incomplete scan,
+parse failure, or evaluation failure exits unsuccessfully without running the SQL;
+there is intentionally no `--no-update` option. Exactly one SQLite read-only
+statement is accepted. SQLite's statement classifier plus `PRAGMA query_only`
+reject mutations. Results default to JSON with `columns`, typed `rows`, and a
+`truncated` flag; `--format jsonl` and `--format csv` are also available. The
+default limit is 1,000 rows and the accepted range is 1 through 10,000. BLOBs are
+base64 objects in JSON and base64 text in CSV. Use column aliases for unique JSONL
+keys.
+
+All index commands use `<project-root>/.md-utils/index.sqlite` by default.
+`--database <file>` selects another cache, which must be bound to the same project
+root. `index status` reports the generation, last started and fully completed
+refresh times, and every saved scope's state and error.
+
 ## SQLite contract
 
 | Object | Contents |
@@ -100,9 +120,24 @@ WHERE documents_fts MATCH 'search terms';
 ```
 
 Field indexes are ordinary SQLite acceleration structures, distinct from
-collection membership. For example, an explicitly created
-`CREATE INDEX document_title ON documents(json_extract(metadata, '$.title'))`
-survives rebuild. SQL views survive too. There is no JMESPath-to-SQL translation,
+collection membership. `index field add '$.status'` creates a managed expression
+index on the exact documented expression `json_extract(metadata, '$.status')`.
+Use `index field list` to see projected column names and expressions, and
+`index field remove '$.status'` to remove one. Query predicates must use the same
+expression for SQLite's planner to select the index. SQLite scalars retain their
+native SQL types; objects and arrays are JSON text. An index on an entire array
+does **not** accelerate individual membership through `json_each`; model and query
+array membership explicitly.
+
+Each registered type gets a deterministic `type_<normalized-name>` view (for
+example, `Book` becomes `type_book`). It includes `path`, JSON `metadata`, `body`,
+and one `json_extract` projection for every managed field. Views use only
+successful `conforms` memberships from complete scopes, and one document may
+appear in several overlapping type views. `type_views` records the exact mapping
+when normalized type names collide. These views, tables, indexes, and FTS use only
+JSON text and standard SQLite facilities, so compatible external SQLite tools can
+query the same file without md-utils custom functions. Unmanaged SQL indexes and
+views also survive refresh and rebuild. There is no JMESPath-to-SQL translation,
 schema-validation extension, definition catalog, or bidirectional file writing.
 
 See [native SQLite packaging](sqlite-index-packaging.md) for runtime requirements.

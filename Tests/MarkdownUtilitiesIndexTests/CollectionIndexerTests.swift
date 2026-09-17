@@ -167,6 +167,7 @@ struct CollectionIndexerTests {
         let report = try await fixture.indexer.update(fingerprint: "v1", evaluate: selectAll)
         #expect(report.errors.count == 1)
         #expect(try fixture.database.selectedPaths().isEmpty)
+        #expect(!(try fixture.database.freshness().isCurrent))
         #expect(try fixture.count("diagnostics") == 1)
         try fixture.write("notes/one.md", "recovered")
         _ = try await fixture.indexer.update(fingerprint: "v1", evaluate: selectAll)
@@ -202,7 +203,7 @@ struct CollectionIndexerTests {
         let fixture = try IndexFixture()
         defer { fixture.remove() }
         try fixture.database.prepareCollection(root: fixture.root.path)
-        #expect(try fixture.count("grdb_migrations") == 1)
+        #expect(try fixture.count("grdb_migrations") == 2)
         #expect(throws: SQLiteIndexError.self) { try fixture.database.prepareCollection(root: "/different") }
     }
 
@@ -223,7 +224,7 @@ struct CollectionIndexerTests {
             try db.execute(sql: "INSERT INTO grdb_migrations VALUES ('collection-v2')")
         }
         #expect(throws: SQLiteIndexError.self) { try fixture.database.prepareCollection(root: fixture.root.path) }
-        #expect(try fixture.count("grdb_migrations") == 2)
+        #expect(try fixture.count("grdb_migrations") == 3)
     }
 
     @Test func `failed migration rolls back tables and can be retried`() throws {
@@ -257,5 +258,103 @@ struct CollectionIndexerTests {
             try Int.fetchOne($0, sql: "SELECT count(*) FROM documents_fts WHERE documents_fts MATCH 'search'")
         }
         #expect(matches == 1000)
+    }
+
+    @Test func `bounded queries preserve SQLite types and reject mutations`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "first")
+        try fixture.write("notes/two.md", "second")
+        _ = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1") {
+            _, path, content, _ in
+            let number = path == "notes/one.md" ? 1 : 2
+            return IndexEvaluation(metadata: "{\"number\":\(number),\"nothing\":null}", body: content,
+                assessment: IndexAssessment(selected: true, status: "selected"))
+        }
+
+        let result = try fixture.database.query("SELECT path,json_extract(metadata,'$.number'),json_extract(metadata,'$.nothing') FROM current_documents ORDER BY path", limit: 1)
+        #expect(result.columns == ["path", "json_extract(metadata,'$.number')", "json_extract(metadata,'$.nothing')"])
+        #expect(result.rows == [[.text("notes/one.md"), .integer(1), .null]])
+        #expect(result.truncated)
+        do {
+            _ = try fixture.database.query("DELETE FROM documents")
+            Issue.record("Expected SQL mutation rejection")
+        } catch let error as SQLiteIndexError {
+            #expect(error.description.contains("SQL mutations are not allowed"))
+        }
+        #expect(throws: SQLiteIndexError.self) { try fixture.database.query("SELECT 1; SELECT 2") }
+        #expect(try fixture.count("documents") == 2)
+        let freshness = try fixture.database.freshness()
+        #expect(freshness.isCurrent)
+        #expect(freshness.lastStartedAt != nil)
+        #expect(freshness.lastCompletedAt != nil)
+    }
+
+    @Test func `managed field indexes match documented expressions and type view projections`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "searchable original")
+        let book = IndexScope(kind: .type, path: "notes/", name: "Book")
+        _ = try await fixture.indexer.update(adding: book, fingerprint: "v1") { _, _, content, _ in
+            IndexEvaluation(metadata: "{\"status\":\"draft\",\"tags\":[\"swift\",\"sqlite\"]}", body: content,
+                assessment: IndexAssessment(selected: true, status: "conforms"))
+        }
+        let status = try fixture.database.addField(jsonPath: "$.status")
+        let tags = try fixture.database.addField(jsonPath: "$.tags")
+        #expect(throws: SQLiteIndexError.self) { try fixture.database.addField(jsonPath: "$.path") }
+        #expect(status.columnName == "status")
+        #expect(status.queryExpression == "json_extract(metadata, '$.status')")
+        #expect(tags.columnName == "tags")
+
+        let plan = try fixture.database.query("EXPLAIN QUERY PLAN SELECT path FROM documents WHERE json_extract(metadata, '$.status')='draft'")
+        #expect(plan.rows.flatMap { $0 }.contains { value in
+            if case .text(let detail) = value { return detail.contains(status.name) }
+            return false
+        })
+        let view = try fixture.database.query("SELECT path,status,tags FROM type_book")
+        #expect(view.rows == [[.text("notes/one.md"), .text("draft"), .text("[\"swift\",\"sqlite\"]")]])
+        #expect(try fixture.database.fields() == [status, tags].sorted { $0.columnName < $1.columnName })
+
+        try fixture.write("notes/one.md", "searchable changed")
+        _ = try await fixture.indexer.update(fingerprint: "v1") { _, _, content, _ in
+            IndexEvaluation(metadata: "{\"status\":\"published\",\"tags\":[\"swift\"]}", body: content,
+                assessment: IndexAssessment(selected: true, status: "conforms"))
+        }
+        #expect(try fixture.database.query("SELECT count(*) FROM documents_fts WHERE documents_fts MATCH 'changed'").rows == [[.integer(1)]])
+        #expect(try fixture.database.query("SELECT status FROM type_book").rows == [[.text("published")]])
+        #expect(try fixture.database.removeField("$.tags"))
+        #expect(try fixture.database.fields() == [status])
+        #expect(try fixture.database.query("SELECT * FROM pragma_table_info('type_book') WHERE name='tags'").rows.isEmpty)
+        try FileManager.default.removeItem(at: fixture.root.appendingPathComponent("notes/one.md"))
+        _ = try await fixture.indexer.update(fingerprint: "v1", evaluate: selectAll)
+        #expect(try fixture.database.query("SELECT count(*) FROM documents_fts").rows == [[.integer(0)]])
+        #expect(try fixture.database.query("SELECT count(*) FROM type_book").rows == [[.integer(0)]])
+    }
+
+    @Test func `type views overlap and use only complete successful memberships`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/shared.md", "shared")
+        let book = IndexScope(kind: .type, path: "notes/", name: "Book")
+        let article = IndexScope(kind: .type, path: "notes/", name: "Article")
+        _ = try await fixture.indexer.update(adding: book, fingerprint: "v1") { _, _, content, _ in
+            IndexEvaluation(metadata: "{}", body: content,
+                assessment: IndexAssessment(selected: true, status: "conforms"))
+        }
+        _ = try await fixture.indexer.update(adding: article, fingerprint: "v1") { _, _, content, _ in
+            IndexEvaluation(metadata: "{}", body: content,
+                assessment: IndexAssessment(selected: true, status: "conforms"))
+        }
+        #expect(try fixture.database.query("SELECT path FROM type_book").rows == [[.text("notes/shared.md")]])
+        #expect(try fixture.database.query("SELECT path FROM type_article").rows == [[.text("notes/shared.md")]])
+        let schema = try fixture.database.query("SELECT sql FROM sqlite_master WHERE name IN ('type_book','type_article') ORDER BY name")
+        #expect(schema.rows.count == 2)
+        #expect(schema.rows.allSatisfy { row in
+            guard case .text(let sql) = row[0] else { return false }
+            return sql.contains("json_extract") && !sql.contains("md_utils")
+        })
+        try fixture.database.invalidate(message: "configuration unavailable")
+        #expect(try fixture.database.query("SELECT count(*) FROM type_book").rows == [[.integer(0)]])
+        #expect(!(try fixture.database.freshness().isCurrent))
     }
 }

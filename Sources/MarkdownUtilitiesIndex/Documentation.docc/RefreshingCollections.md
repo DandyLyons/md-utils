@@ -66,3 +66,10 @@ For SQL reads, `current_documents` excludes parse failures and incomplete scopes
 selected rule nonconformance remains visible when parsing succeeded. Raw tables
 retain diagnostic records and unavailable data. Join FTS results to
 `current_documents` before treating them as current content.
+
+Use ``SQLiteIndexDatabase/query(_:limit:)`` for one typed, bounded, read-only SQL
+statement. Hosts must complete a refresh and reject a report containing errors
+before calling it when claiming fresh results. ``SQLiteIndexDatabase/addField(jsonPath:columnName:)``
+creates an explicit JSON expression index and regenerates standard-SQL type views;
+``SQLiteIndexDatabase/freshness()`` exposes the persisted generation, timestamps,
+runtime version, and scope states.

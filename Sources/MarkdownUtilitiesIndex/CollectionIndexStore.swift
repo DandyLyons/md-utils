@@ -186,6 +186,17 @@ extension SQLiteIndexDatabase {
                     WHERE a.path=d.path AND a.selected=1 AND s.state='complete');
                 """)
         }
+        migrator.registerMigration("collection-v2-query-schema") { db in
+            try db.execute(sql: """
+                CREATE TABLE index_fields(
+                  name TEXT PRIMARY KEY,
+                  json_path TEXT NOT NULL UNIQUE,
+                  column_name TEXT NOT NULL UNIQUE);
+                CREATE TABLE type_views(
+                  type_name TEXT PRIMARY KEY,
+                  view_name TEXT NOT NULL UNIQUE);
+                """)
+        }
         guard try databaseQueue.read({ try migrator.hasBeenSuperseded($0) }) == false else {
             throw SQLiteIndexError(message: "Index schema was created by a newer md-utils version. Upgrade md-utils before updating this index.")
         }
@@ -196,6 +207,7 @@ extension SQLiteIndexDatabase {
                 throw SQLiteIndexError(message: "Index belongs to a different project root: \(existing ?? "").")
             }
             try db.execute(sql: "INSERT OR IGNORE INTO index_metadata VALUES ('root', ?)", arguments: [root])
+            try refreshTypeViews(db)
         }
     }
 
@@ -240,6 +252,8 @@ extension SQLiteIndexDatabase {
             }
             let generation = (try Int.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='generation'") ?? 0) + 1
             try db.execute(sql: "UPDATE index_metadata SET value=? WHERE key='generation'", arguments: [String(generation)])
+            try db.execute(sql: "INSERT INTO index_metadata VALUES('last_started_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                arguments: [String(Date().timeIntervalSince1970)])
             for scope in scopes {
                 let definition = String(decoding: try JSONEncoder().encode(scope), as: UTF8.self)
                 try db.execute(sql: """
@@ -304,6 +318,16 @@ extension SQLiteIndexDatabase {
             try db.execute(sql: "DELETE FROM files WHERE NOT EXISTS(SELECT 1 FROM assessments a WHERE a.path=files.path)")
             try db.execute(sql: "INSERT INTO index_metadata VALUES('runtime',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 arguments: [IndexFingerprint.runtimeVersion])
+            let completed = scopes.allSatisfy { result in
+                result.error == nil && result.changes.allSatisfy {
+                    $0.evaluation.parseState == "ok" && $0.evaluation.assessment.status != "evaluation-error"
+                }
+            }
+            if completed {
+                try db.execute(sql: "INSERT INTO index_metadata VALUES('last_completed_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    arguments: [String(Date().timeIntervalSince1970)])
+            }
+            try refreshTypeViews(db)
         }
     }
 

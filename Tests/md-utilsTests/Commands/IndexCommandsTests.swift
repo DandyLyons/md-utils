@@ -200,7 +200,57 @@ struct IndexCommandsTests {
         try await update.run()
         try fixture.write("custom.json", "invalid")
         await #expect(throws: (any Error).self) { try await update.run() }
+        var query = try #require(CLIEntry.parseAsRoot(["index", "query", "SELECT path FROM current_documents",
+            "--project-root", fixture.root.string]) as? CLIEntry.Index.Query)
+        await #expect(throws: (any Error).self) { try await query.run() }
         #expect(try fixture.database().selectedPaths().isEmpty)
         #expect(try fixture.read { try String.fetchOne($0, sql: "SELECT state FROM scopes") } == "incomplete")
+    }
+
+    @Test func `query refreshes before read only SQL and exposes field and freshness commands`() async throws {
+        let fixture = try IndexCommandFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/book.md", "---\ntitle: First\nstatus: draft\n---\nold body")
+        var update = try #require(CLIEntry.parseAsRoot(["index", "update", (fixture.root + "notes/").string,
+            "--project-root", fixture.root.string]) as? CLIEntry.Index.Update)
+        try await update.run()
+        try fixture.write("notes/book.md", "---\ntitle: Updated\nstatus: published\n---\nnew body")
+
+        let query = try CLIProcessTestHelper.run(["index", "query",
+            "SELECT json_extract(metadata, '$.title') AS title, body FROM current_documents",
+            "--project-root", fixture.root.string], workingDirectory: URL(fileURLWithPath: fixture.root.string))
+        #expect(query.status == 0)
+        let output = try #require(JSONSerialization.jsonObject(with: Data(query.standardOutput.utf8)) as? [String: Any])
+        #expect(output["columns"] as? [String] == ["title", "body"])
+        let rows = try #require(output["rows"] as? [[Any]])
+        #expect(rows.first?[0] as? String == "Updated")
+        #expect(rows.first?[1] as? String == "new body")
+
+        let mutation = try CLIProcessTestHelper.run(["index", "query", "DELETE FROM documents",
+            "--project-root", fixture.root.string], workingDirectory: URL(fileURLWithPath: fixture.root.string))
+        #expect(mutation.status != 0)
+        #expect(mutation.standardError.contains("read-only"))
+        #expect(try fixture.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM documents") } == 1)
+
+        let field = try CLIProcessTestHelper.run(["index", "field", "add", "$.status",
+            "--project-root", fixture.root.string], workingDirectory: URL(fileURLWithPath: fixture.root.string))
+        #expect(field.status == 0)
+        #expect(field.standardOutput.contains("json_extract(metadata, '$.status')"))
+        let status = try CLIProcessTestHelper.run(["index", "status", "--project-root", fixture.root.string],
+            workingDirectory: URL(fileURLWithPath: fixture.root.string))
+        #expect(status.status == 0)
+        #expect(status.standardOutput.contains("current: yes"))
+    }
+
+    @Test func `query renderers preserve machine readable shapes`() throws {
+        let result = IndexQueryResult(columns: ["name", "count"],
+            rows: [[.text("a,b"), .integer(2)], [.text("quoted \"value\""), .null]], truncated: false)
+        let jsonl = try IndexQueryRenderer.render(result, format: .jsonl)
+        #expect(jsonl.contains("{\"count\":2,\"name\":\"a,b\"}"))
+        let csv = try IndexQueryRenderer.render(result, format: .csv)
+        #expect(csv == "name,count\n\"a,b\",2\n\"quoted \"\"value\"\"\",\n")
+        #expect(throws: (any Error).self) {
+            try IndexQueryRenderer.render(IndexQueryResult(columns: ["value", "value"], rows: [], truncated: false), format: .jsonl)
+        }
     }
 }

@@ -39,6 +39,12 @@ and views. Files remain authoritative. Use `--project-root <directory>/` and
 Incomplete scans retain unavailable rows and report errors. Query
 `current_documents` for current parsed members, and inspect `assessments` and
 `diagnostics` for nonconformance, parsing/evaluation errors, and advisories.
+Use `index query '<sql>'` for bounded read-only SQL that refreshes every scope
+first, `index explain '<sql>'` for query plans, `index field add '$.field'` for an
+explicit JSON expression index and type-view projection, and `index status` for
+freshness. Type views are named `type_<normalized-name>`. Arrays require explicit
+`json_each` membership queries; indexing the whole JSON array does not accelerate
+individual elements.
 
 ## Batch Operations
 

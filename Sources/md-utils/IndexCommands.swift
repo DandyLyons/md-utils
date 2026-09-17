@@ -13,7 +13,7 @@ extension CLIEntry {
         /// Registers directory, type, and rule selection entry points.
         static let configuration = CommandConfiguration(commandName: "index",
             abstract: "Maintain a rebuildable SQLite collection cache",
-            subcommands: [Update.self, SelectType.self, SelectRule.self])
+            subcommands: [Update.self, SelectType.self, SelectRule.self, Query.self, Explain.self, Field.self, Status.self])
 
         /// Refreshes every saved scope and optionally registers a directory collection.
         struct Update: AsyncParsableCommand {
@@ -60,6 +60,141 @@ extension CLIEntry {
                 try await options.run(kind: .rule, directory: nil, name: name)
             }
         }
+
+        /// Refreshes every scope, then executes one bounded read-only SQL statement.
+        struct Query: AsyncParsableCommand {
+            static let configuration = CommandConfiguration(abstract: "Refresh the index and run read-only SQL")
+            @Argument(help: "One read-only SQL statement") var sql: String
+            @OptionGroup var options: IndexOptions
+            @Option(help: "Maximum rows to return (1...10000)") var limit = 1_000
+            @Option(help: "Output format: json, jsonl, or csv") var format: IndexQueryFormat = .json
+
+            mutating func run() async throws {
+                let database = try await options.run(kind: .directory, directory: nil, name: "", quiet: true)
+                print(try IndexQueryRenderer.render(database.query(sql, limit: limit), format: format), terminator: "")
+            }
+        }
+
+        /// Refreshes every scope and prints SQLite's plan for a read-only statement.
+        struct Explain: AsyncParsableCommand {
+            static let configuration = CommandConfiguration(abstract: "Refresh the index and explain a read-only SQL query")
+            @Argument(help: "Read-only SQL statement to explain") var sql: String
+            @OptionGroup var options: IndexOptions
+            @Option(help: "Maximum plan rows to return (1...10000)") var limit = 1_000
+            @Option(help: "Output format: json, jsonl, or csv") var format: IndexQueryFormat = .json
+
+            mutating func run() async throws {
+                let database = try await options.run(kind: .directory, directory: nil, name: "", quiet: true)
+                let result = try database.query("EXPLAIN QUERY PLAN \(sql)", limit: limit)
+                print(try IndexQueryRenderer.render(result, format: format), terminator: "")
+            }
+        }
+
+        /// Manages explicit JSON expression indexes and type-view projections.
+        struct Field: ParsableCommand {
+            static let configuration = CommandConfiguration(abstract: "Manage JSON field indexes",
+                subcommands: [Add.self, Remove.self, List.self])
+
+            struct Add: ParsableCommand {
+                @Argument(help: "SQLite JSON path, such as $.status") var jsonPath: String
+                @Option(help: "Projected SQL column name (lowercase letters, numbers, underscores)") var name: String?
+                @OptionGroup var options: IndexOptions
+                mutating func run() throws {
+                    let field = try options.context().database.addField(jsonPath: jsonPath, columnName: name)
+                    print("\(field.columnName)\t\(field.queryExpression)\t\(field.name)")
+                }
+            }
+
+            struct Remove: ParsableCommand {
+                @Argument(help: "JSON path or projected column name") var field: String
+                @OptionGroup var options: IndexOptions
+                mutating func run() throws {
+                    guard try options.context().database.removeField(field) else {
+                        throw ValidationError("No managed field found for \(field).")
+                    }
+                }
+            }
+
+            struct List: ParsableCommand {
+                @OptionGroup var options: IndexOptions
+                mutating func run() throws {
+                    for field in try options.context().database.fields() {
+                        print("\(field.columnName)\t\(field.jsonPath)\t\(field.queryExpression)\t\(field.name)")
+                    }
+                }
+            }
+        }
+
+        /// Shows whether all saved scopes completed and when refreshes ran.
+        struct Status: ParsableCommand {
+            static let configuration = CommandConfiguration(abstract: "Inspect index freshness and saved scopes")
+            @OptionGroup var options: IndexOptions
+            mutating func run() throws {
+                let status = try options.context().database.freshness()
+                print("current: \(status.isCurrent ? "yes" : "no")")
+                print("generation: \(status.generation)")
+                print("failures: \(status.hasFailures ? "yes" : "no")")
+                print("last-started: \(status.lastStartedAt.map { String($0) } ?? "never")")
+                print("last-completed: \(status.lastCompletedAt.map { String($0) } ?? "never")")
+                for scope in status.scopes {
+                    let label = scope.definition.name.isEmpty ? scope.definition.path : scope.definition.name
+                    print("\(scope.definition.kind.rawValue)\t\(label)\t\(scope.state)\t\(scope.error ?? "")")
+                }
+            }
+        }
+    }
+}
+
+enum IndexQueryFormat: String, ExpressibleByArgument {
+    case json
+    case jsonl
+    case csv
+}
+
+enum IndexQueryRenderer {
+    static func render(_ result: IndexQueryResult, format: IndexQueryFormat) throws -> String {
+        switch format {
+        case .json:
+            let object: [String: Any] = ["columns": result.columns,
+                "rows": result.rows.map { $0.map(jsonValue) }, "truncated": result.truncated]
+            return String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self) + "\n"
+        case .jsonl:
+            guard Set(result.columns).count == result.columns.count else {
+                throw ValidationError("JSONL output requires unique SQL column names; add aliases to duplicate columns.")
+            }
+            return try result.rows.map { row in
+                let object = Dictionary(uniqueKeysWithValues: zip(result.columns, row.map(jsonValue)))
+                return String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
+            }.joined(separator: "\n") + (result.rows.isEmpty ? "" : "\n")
+        case .csv:
+            return ([result.columns.map(csv).joined(separator: ",")] + result.rows.map { $0.map(textValue).map(csv).joined(separator: ",") })
+                .joined(separator: "\n") + "\n"
+        }
+    }
+
+    private static func jsonValue(_ value: IndexQueryValue) -> Any {
+        switch value {
+        case .null: NSNull()
+        case .integer(let value): value
+        case .real(let value): value
+        case .text(let value): value
+        case .blob(let data): ["base64": data.base64EncodedString()]
+        }
+    }
+
+    private static func textValue(_ value: IndexQueryValue) -> String {
+        switch value {
+        case .null: ""
+        case .integer(let value): String(value)
+        case .real(let value): String(value)
+        case .text(let value): value
+        case .blob(let data): data.base64EncodedString()
+        }
+    }
+
+    private static func csv(_ value: String) -> String {
+        guard value.contains(where: { $0 == "," || $0 == "\"" || $0.isNewline }) else { return value }
+        return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
     }
 }
 
@@ -69,6 +204,8 @@ struct IndexOptions: ParsableArguments {
     @Option(help: "Path to project config; saved for subsequent updates") var config: String?
     /// Required root override for a nonstandard config path.
     @Option(help: "Project root directory (defaults to current directory or conventional config root)") var projectRoot: String?
+    /// Alternate SQLite cache path; the stored root must match this project.
+    @Option(help: "SQLite index path (defaults to <project-root>/.md-utils/index.sqlite)") var database: String?
     /// Saved per newly registered scope; existing declarations retain their setting.
     @Flag(name: .customLong("include-non-md"), help: "Include other UTF-8 text files with existing wrapper/comment extraction") var includeNonMD = false
     /// Enables content verification for all scopes in this invocation.
@@ -78,7 +215,47 @@ struct IndexOptions: ParsableArguments {
     ///
     /// Configuration failures invalidate existing scopes. Recoverable scan failures
     /// commit explicit diagnostics and then produce a failing process exit status.
-    func run(kind: IndexScope.Kind, directory: String?, name: String, rebuild: Bool = false) async throws {
+    @discardableResult
+    func run(kind: IndexScope.Kind, directory: String?, name: String, rebuild: Bool = false,
+        quiet: Bool = false) async throws -> SQLiteIndexDatabase {
+        let context = try context()
+        let root = context.root
+        let canonicalRoot = context.canonicalRoot
+        let database = context.database
+        let indexer = context.indexer
+        let configPath = context.configPath
+        let persistedConfig = try database.configurationPath(context.explicitConfig?.string)
+        let resolvedConfigPath = Path(persistedConfig ?? configPath.string)
+        let scope: IndexScope?
+        if let directory {
+            let selected = URL(fileURLWithPath: Path(directory).absolute().normalize().string).resolvingSymlinksInPath()
+            guard selected.path == canonicalRoot.path || selected.path.hasPrefix(canonicalRoot.path + "/") else {
+                throw ValidationError("Index scope must be inside --project-root.")
+            }
+            let relative = selected.path == canonicalRoot.path ? "" : String(selected.path.dropFirst(canonicalRoot.path.count + 1)) + "/"
+            scope = IndexScope(kind: kind, path: relative, name: name, includeNonMarkdown: includeNonMD)
+        } else if kind == .rule {
+            scope = IndexScope(kind: kind, name: name, includeNonMarkdown: includeNonMD)
+        } else { scope = nil }
+        let evaluator: IndexProjectEvaluator
+        do {
+            evaluator = try IndexProjectEvaluator(root: root, configPath: resolvedConfigPath)
+            for candidate in try database.scopes() + (scope.map { [$0] } ?? []) { try evaluator.validate(candidate) }
+        } catch {
+            try database.invalidate(message: String(describing: error))
+            throw error
+        }
+        let report = try await indexer.update(adding: scope, fingerprint: evaluator.fingerprint,
+            rebuild: rebuild, verifyHashes: verifyHashes, evaluate: evaluator.evaluate)
+        if !quiet {
+            print("Index: \(report.evaluated) evaluated, \(report.cached) cached, \(report.hashed) hashed; \(try database.selectedPaths().count) current documents.")
+        }
+        for error in report.errors { FileHandle.standardError.write(Data("\(error)\n".utf8)) }
+        if !report.errors.isEmpty { throw ExitCode.failure }
+        return database
+    }
+
+    func context() throws -> IndexCommandContext {
         let explicitConfig = config.map { Path($0).absolute().normalize() }
         let root: Path
         if let projectRoot { root = Path(projectRoot).absolute().normalize() }
@@ -95,35 +272,23 @@ struct IndexOptions: ParsableArguments {
             throw ValidationError("The .md-utils/ directory must remain inside the project root.")
         }
         try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
-        let database = try SQLiteIndexDatabase(path: cacheDirectory.appendingPathComponent("index.sqlite").path)
-        let indexer = try CollectionIndexer(database: database, root: canonicalRoot)
-        let persistedConfig = try database.configurationPath(explicitConfig?.string)
-        let configPath = Path(persistedConfig ?? cacheDirectory.appendingPathComponent("md-utils.json").path)
-        let scope: IndexScope?
-        if let directory {
-            let selected = URL(fileURLWithPath: Path(directory).absolute().normalize().string).resolvingSymlinksInPath()
-            guard selected.path == canonicalRoot.path || selected.path.hasPrefix(canonicalRoot.path + "/") else {
-                throw ValidationError("Index scope must be inside --project-root.")
-            }
-            let relative = selected.path == canonicalRoot.path ? "" : String(selected.path.dropFirst(canonicalRoot.path.count + 1)) + "/"
-            scope = IndexScope(kind: kind, path: relative, name: name, includeNonMarkdown: includeNonMD)
-        } else if kind == .rule {
-            scope = IndexScope(kind: kind, name: name, includeNonMarkdown: includeNonMD)
-        } else { scope = nil }
-        let evaluator: IndexProjectEvaluator
-        do {
-            evaluator = try IndexProjectEvaluator(root: Path(canonicalRoot.path), configPath: configPath)
-            for candidate in try database.scopes() + (scope.map { [$0] } ?? []) { try evaluator.validate(candidate) }
-        } catch {
-            try database.invalidate(message: String(describing: error))
-            throw error
-        }
-        let report = try await indexer.update(adding: scope, fingerprint: evaluator.fingerprint,
-            rebuild: rebuild, verifyHashes: verifyHashes, evaluate: evaluator.evaluate)
-        print("Index: \(report.evaluated) evaluated, \(report.cached) cached, \(report.hashed) hashed; \(try database.selectedPaths().count) current documents.")
-        for error in report.errors { FileHandle.standardError.write(Data("\(error)\n".utf8)) }
-        if !report.errors.isEmpty { throw ExitCode.failure }
+        let databasePath = database.map { Path($0).absolute().normalize().string }
+            ?? cacheDirectory.appendingPathComponent("index.sqlite").path
+        let indexDatabase = try SQLiteIndexDatabase(path: databasePath)
+        let indexer = try CollectionIndexer(database: indexDatabase, root: canonicalRoot)
+        return IndexCommandContext(root: Path(canonicalRoot.path), canonicalRoot: canonicalRoot,
+            database: indexDatabase, indexer: indexer,
+            configPath: Path(cacheDirectory.appendingPathComponent("md-utils.json").path), explicitConfig: explicitConfig)
     }
+}
+
+struct IndexCommandContext {
+    let root: Path
+    let canonicalRoot: URL
+    let database: SQLiteIndexDatabase
+    let indexer: CollectionIndexer
+    let configPath: Path
+    let explicitConfig: Path?
 }
 
 /// Adapts the same parsed records and full evaluators used by types find and rules validate.
