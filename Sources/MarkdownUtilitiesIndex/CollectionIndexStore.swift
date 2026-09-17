@@ -137,24 +137,40 @@ extension SQLiteIndexDatabase {
     /// - Parameter root: Canonical absolute project directory, matching future opens.
     /// - Throws: A root mismatch, a newer unsupported migration, or a SQLite migration error.
     public func prepareCollection(root: String) throws {
+        try prepareCollection(root: root, checkFTSCapability: Self.checkFTSCapability)
+    }
+
+    func prepareCollection(root: String, checkFTSCapability: (Database) throws -> Void) throws {
         let existingCollection = try databaseQueue.read { database in
             try Bool.fetchOne(database,
                 sql: "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='index_metadata')") ?? false
         }
-        let recordedEncoding: IndexMetadataEncoding? = try databaseQueue.read { database in
-            guard existingCollection,
-                let value = try String.fetchOne(database,
-                    sql: "SELECT value FROM index_metadata WHERE key='metadata_encoding'") else { return nil }
-            return IndexMetadataEncoding(rawValue: value)
+        let recordedPolicy: (encoding: IndexMetadataEncoding?, bodyMode: IndexBodyMode?) = try databaseQueue.read { database in
+            guard existingCollection else { return (nil, nil) }
+            let rows = try Row.fetchAll(database,
+                sql: "SELECT key,value FROM index_metadata WHERE key IN ('metadata_encoding','body_mode')")
+            let values = Dictionary(uniqueKeysWithValues: rows.map { ($0["key"] as String, $0["value"] as String) })
+            let encoding = values["metadata_encoding"].flatMap(IndexMetadataEncoding.init(rawValue:))
+            let bodyMode = values["body_mode"].flatMap(IndexBodyMode.init(rawValue:))
+            if values["metadata_encoding"] != nil && encoding == nil {
+                throw SQLiteIndexError(message: "Index has an unsupported metadata encoding. Upgrade md-utils before opening it.")
+            }
+            if values["body_mode"] != nil && bodyMode == nil {
+                throw SQLiteIndexError(message: "Index has an unsupported body mode. Upgrade md-utils before opening it.")
+            }
+            return (encoding, bodyMode)
         }
         let jsonbAvailable = try databaseQueue.read { supportsJSONB($0) }
-        if recordedEncoding == .jsonb && !jsonbAvailable {
+        if recordedPolicy.encoding == .jsonb && !jsonbAvailable {
             throw SQLiteIndexError(message: "This cache stores SQLite JSONB, but linked SQLite \(Self.sqliteVersion) cannot read JSONB. Rebuild the cache explicitly as JSON text with a JSONB-capable md-utils runtime.")
         }
-        let selectedEncoding = recordedEncoding ?? (existingCollection ? .text : (jsonbAvailable ? .jsonb : .text))
-        let selectedBodyMode: IndexBodyMode = existingCollection ? .fts : .metadataOnly
+        let selectedEncoding = recordedPolicy.encoding ?? (existingCollection ? .text : (jsonbAvailable ? .jsonb : .text))
+        // A collection without a recorded mode predates the storage-policy
+        // migration and retained searchable bodies. Migrated collections must
+        // honor their persisted policy so metadata-only reopen never needs FTS5.
+        let selectedBodyMode = recordedPolicy.bodyMode ?? (existingCollection ? .fts : .metadataOnly)
         if selectedBodyMode == .fts {
-            try databaseQueue.write { try Self.checkFTSCapability($0) }
+            try databaseQueue.write { try checkFTSCapability($0) }
         }
         var migrator = DatabaseMigrator()
         migrator.registerMigration("collection-v1") { db in

@@ -345,6 +345,25 @@ struct CollectionIndexerTests {
         #expect(throws: SQLiteIndexError.self) { try fixture.database.prepareCollection(root: "/different") }
     }
 
+    @Test func `metadata only reopen skips FTS capability while FTS reopen requires it`() throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        var probeCount = 0
+        let unavailableFTS: (Database) throws -> Void = { _ in
+            probeCount += 1
+            throw SQLiteIndexError(message: "simulated missing FTS5")
+        }
+
+        try fixture.database.prepareCollection(root: fixture.root.path, checkFTSCapability: unavailableFTS)
+        #expect(probeCount == 0)
+
+        try fixture.database.setBodyMode(.fts)
+        #expect(throws: SQLiteIndexError.self) {
+            try fixture.database.prepareCollection(root: fixture.root.path, checkFTSCapability: unavailableFTS)
+        }
+        #expect(probeCount == 1)
+    }
+
     @Test func `legacy body cache migrates to external FTS and JSON text policy`() throws {
         let fixture = try IndexFixture()
         defer { fixture.remove() }
