@@ -8,12 +8,13 @@ private struct IndexFixture {
     let database: SQLiteIndexDatabase
     let indexer: CollectionIndexer
 
-    init() throws {
+    init(bodyMode: IndexBodyMode = .metadataOnly) throws {
         root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("tmp/index-tests/\(UUID().uuidString)/", isDirectory: true)
         try FileManager.default.createDirectory(at: root.appendingPathComponent("notes/"), withIntermediateDirectories: true)
         database = try SQLiteIndexDatabase(path: root.appendingPathComponent("index.sqlite").path)
         indexer = try CollectionIndexer(database: database, root: root)
+        if bodyMode != .metadataOnly { try database.setBodyMode(bodyMode) }
     }
 
     func write(_ path: String, _ text: String) throws {
@@ -35,8 +36,145 @@ private func selectAll(_ scope: IndexScope, _ path: String, _ content: String, _
 
 @Suite("Incremental collection indexing")
 struct CollectionIndexerTests {
-    @Test func `creation refresh edits additions deletions and rebuild preserve declared SQL`() async throws {
+    @Test func `new caches are metadata only and expose ordinary JSON without body surfaces`() async throws {
         let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "private body")
+        _ = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1") {
+            _, _, content, _ in
+            IndexEvaluation(metadata: "{\"title\":\"One\",\"nested\":{\"body\":true}}", body: content,
+                assessment: IndexAssessment(selected: true, status: "selected"))
+        }
+        let policy = try fixture.database.storagePolicy()
+        #expect(policy.bodyMode == .metadataOnly)
+        #expect(try fixture.database.query("SELECT metadata FROM current_documents").rows
+            == [[.text("{\"title\":\"One\",\"nested\":{\"body\":true}}")]])
+        #expect(try fixture.database.query("SELECT json_extract(metadata,'$.nested.body') FROM current_documents").rows
+            == [[.integer(1)]])
+        let rawBody = try await fixture.database.databaseQueue.read {
+            try String.fetchOne($0, sql: "SELECT body FROM documents")
+        }
+        #expect(rawBody == nil)
+        let objects = try fixture.database.query("SELECT name FROM sqlite_master WHERE name='documents_fts'")
+        #expect(objects.rows.isEmpty)
+        let columns = try fixture.database.query("SELECT name FROM pragma_table_info('current_documents') ORDER BY cid")
+        #expect(columns.rows == [[.text("path")], [.text("metadata")]])
+        do {
+            _ = try fixture.database.query("SELECT body FROM current_documents")
+            Issue.record("Expected an explicit metadata-only body error")
+        } catch let error as SQLiteIndexError {
+            #expect(error.description.contains("metadata-only"))
+        }
+        #expect(throws: SQLiteIndexError.self) {
+            try fixture.database.query("SELECT \"body\" FROM documents")
+        }
+        do {
+            _ = try fixture.database.query("SELECT * FROM documents_fts WHERE documents_fts MATCH 'private'")
+            Issue.record("Expected an explicit metadata-only FTS error")
+        } catch let error as SQLiteIndexError {
+            #expect(error.description.contains("metadata-only"))
+        }
+        let rawType = try fixture.database.query("SELECT typeof(metadata) FROM documents")
+        #expect(rawType.rows == [[.text(policy.metadataEncoding == .jsonb ? "blob" : "text")]])
+    }
+
+    @Test func `opt in search uses one external content body and disable removes it`() async throws {
+        let fixture = try IndexFixture(bodyMode: .fts)
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "searchable original")
+        _ = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1", evaluate: selectAll)
+        let definition = try fixture.database.query("SELECT sql FROM sqlite_master WHERE name='documents_fts'")
+        #expect(definition.rows.first?.first == .text("CREATE VIRTUAL TABLE documents_fts USING fts5(body, content='documents', content_rowid='rowid')"))
+        #expect(try fixture.database.query("SELECT body FROM documents").rows == [[.text("searchable original")]])
+        #expect(throws: SQLiteIndexError.self) {
+            try fixture.database.streamQuery("SELECT body FROM current_documents",
+                limits: IndexQueryLimits(rows: 10, bytes: 100, valueBytes: 5)) { _ in }
+        }
+        #expect(try fixture.database.query("SELECT count(*) FROM documents_fts WHERE documents_fts MATCH 'searchable'").rows
+            == [[.integer(1)]])
+        let triggers = try fixture.database.query("SELECT sql FROM sqlite_master WHERE type='trigger' AND name LIKE 'documents_fts_update%' ORDER BY name")
+        #expect(triggers.rows.allSatisfy { row in
+            guard case .text(let sql) = row[0] else { return false }
+            return sql.contains("UPDATE OF body") && sql.contains("old.body IS NOT new.body")
+        })
+        try fixture.database.setBodyMode(.metadataOnly)
+        let removedBody = try await fixture.database.databaseQueue.read {
+            try String.fetchOne($0, sql: "SELECT body FROM documents")
+        }
+        #expect(removedBody == nil)
+        #expect(try fixture.database.query("SELECT name FROM sqlite_master WHERE name='documents_fts'").rows.isEmpty)
+    }
+
+    @Test func `streamed queries enforce independent bounds and cancellation`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "one")
+        try fixture.write("notes/two.md", "two")
+        _ = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1", evaluate: selectAll)
+        var rows: [[IndexQueryValue]] = []
+        let summary = try fixture.database.streamQuery("SELECT path FROM current_documents ORDER BY path",
+            limits: IndexQueryLimits(rows: 1, bytes: 100, valueBytes: 100)) { rows.append($0) }
+        #expect(rows == [[.text("notes/one.md")]])
+        #expect(summary.truncated)
+        #expect(summary.rowCount == 1)
+        var byteBounded: [[IndexQueryValue]] = []
+        let byteSummary = try fixture.database.streamQuery("SELECT path FROM current_documents ORDER BY path",
+            limits: IndexQueryLimits(rows: 10, bytes: 13, valueBytes: 13)) { byteBounded.append($0) }
+        #expect(byteBounded == [[.text("notes/one.md")]])
+        #expect(byteSummary.truncated)
+        #expect(throws: SQLiteIndexError.self) {
+            try fixture.database.streamQuery("SELECT path FROM current_documents",
+                limits: IndexQueryLimits(rows: 10, bytes: 100, valueBytes: 3)) { _ in }
+        }
+        var delivered = 0
+        #expect(throws: CancellationError.self) {
+            try fixture.database.streamQuery("SELECT path FROM current_documents ORDER BY path",
+                shouldCancel: { delivered == 1 }) { _ in delivered += 1 }
+        }
+        #expect(delivered == 1)
+    }
+
+    @Test func `source read limit records an explicit retryable failure`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "three")
+        var called = false
+        let report = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1",
+            limits: IndexRefreshLimits(fileBytes: 3)) { _, _, _, _ in
+            called = true
+            return IndexEvaluation(metadata: "{}", body: "",
+                assessment: IndexAssessment(selected: true, status: "selected"))
+        }
+        #expect(!called)
+        #expect(report.errors.contains { $0.contains("3-byte refresh limit") })
+        #expect(try fixture.database.selectedPaths().isEmpty)
+        #expect(!(try fixture.database.freshness().isCurrent))
+        #expect(try fixture.count("diagnostics") == 1)
+    }
+
+    @Test func `overlapping scopes share one extraction call`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "one")
+        let first = IndexScope(kind: .type, path: "notes/", name: "First")
+        let second = IndexScope(kind: .type, path: "notes/", name: "Second")
+        _ = try await fixture.indexer.update(adding: first, fingerprint: "v1", evaluate: selectAll)
+        var calls = 0
+        let report = try await fixture.indexer.updateMany(adding: second, fingerprint: "v2", rebuild: true) {
+            scopes, _, content, _ in
+            calls += 1
+            return Dictionary(uniqueKeysWithValues: scopes.map { scope in
+                (scope.id, IndexEvaluation(metadata: "{}", body: content,
+                    assessment: IndexAssessment(selected: true, status: "conforms")))
+            })
+        }
+        #expect(calls == 1)
+        #expect(report.evaluated == 2)
+        #expect(try fixture.count("assessments") == 2)
+    }
+
+    @Test func `creation refresh edits additions deletions and rebuild preserve declared SQL`() async throws {
+        let fixture = try IndexFixture(bodyMode: .fts)
         defer { fixture.remove() }
         try fixture.write("notes/one.md", "first")
         let scope = IndexScope(path: "notes/")
@@ -66,7 +204,7 @@ struct CollectionIndexerTests {
     }
 
     @Test func `full hashing catches same size same mtime edits and fingerprint invalidates cache`() async throws {
-        let fixture = try IndexFixture()
+        let fixture = try IndexFixture(bodyMode: .fts)
         defer { fixture.remove() }
         try fixture.write("notes/one.md", "aaaa")
         try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1234)],
@@ -98,7 +236,7 @@ struct CollectionIndexerTests {
     }
 
     @Test func `negative assessments stay cached while overlapping memberships survive`() async throws {
-        let fixture = try IndexFixture()
+        let fixture = try IndexFixture(bodyMode: .fts)
         defer { fixture.remove() }
         try fixture.write("notes/one.md", "Book Article")
         let book = IndexScope(kind: .type, path: "notes/", name: "Book")
@@ -176,7 +314,7 @@ struct CollectionIndexerTests {
     }
 
     @Test func `interruption and failed commit leave old rows unavailable and recover transactionally`() async throws {
-        let fixture = try IndexFixture()
+        let fixture = try IndexFixture(bodyMode: .fts)
         defer { fixture.remove() }
         try fixture.write("notes/one.md", "original")
         _ = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1", evaluate: selectAll)
@@ -203,28 +341,81 @@ struct CollectionIndexerTests {
         let fixture = try IndexFixture()
         defer { fixture.remove() }
         try fixture.database.prepareCollection(root: fixture.root.path)
-        #expect(try fixture.count("grdb_migrations") == 2)
+        #expect(try fixture.count("grdb_migrations") == 4)
         #expect(throws: SQLiteIndexError.self) { try fixture.database.prepareCollection(root: "/different") }
+    }
+
+    @Test func `legacy body cache migrates to external FTS and JSON text policy`() throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        let path = fixture.root.appendingPathComponent("legacy.sqlite").path
+        let database = try SQLiteIndexDatabase(path: path)
+        let scope = IndexScope(path: "notes/")
+        let definition = String(decoding: try JSONEncoder().encode(scope), as: UTF8.self)
+        try database.databaseQueue.write { db in
+            try db.execute(sql: """
+                CREATE TABLE grdb_migrations(identifier TEXT NOT NULL PRIMARY KEY);
+                INSERT INTO grdb_migrations VALUES('collection-v1'),('collection-v2-query-schema');
+                CREATE TABLE index_metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                INSERT INTO index_metadata VALUES('generation','1'),('root',?);
+                CREATE TABLE scopes(id TEXT PRIMARY KEY, definition TEXT NOT NULL,
+                  state TEXT NOT NULL, error TEXT, fingerprint TEXT NOT NULL DEFAULT '');
+                CREATE TABLE files(path TEXT PRIMARY KEY, mtime REAL NOT NULL, size INTEGER NOT NULL,
+                  hash TEXT NOT NULL, state TEXT NOT NULL);
+                CREATE TABLE assessments(scope_id TEXT NOT NULL REFERENCES scopes(id) ON DELETE CASCADE,
+                  path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+                  selected INTEGER NOT NULL, status TEXT NOT NULL,
+                  detail TEXT NOT NULL CHECK(json_valid(detail)), PRIMARY KEY(scope_id,path));
+                CREATE TABLE diagnostics(scope_id TEXT NOT NULL,path TEXT NOT NULL,category TEXT NOT NULL,
+                  severity TEXT NOT NULL,code TEXT NOT NULL,location TEXT NOT NULL,message TEXT NOT NULL,
+                  FOREIGN KEY(scope_id,path) REFERENCES assessments(scope_id,path) ON DELETE CASCADE);
+                CREATE TABLE documents(path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
+                  metadata TEXT NOT NULL CHECK(json_valid(metadata)),body TEXT NOT NULL);
+                CREATE INDEX assessments_path ON assessments(path);
+                CREATE VIEW current_documents AS SELECT d.path,d.metadata,d.body FROM documents d JOIN files f USING(path)
+                  WHERE f.state='ok' AND EXISTS(SELECT 1 FROM assessments a JOIN scopes s ON s.id=a.scope_id
+                    WHERE a.path=d.path AND a.selected=1 AND s.state='complete');
+                CREATE VIEW titles AS SELECT json_extract(metadata,'$.title') AS title FROM documents;
+                CREATE VIRTUAL TABLE documents_fts USING fts5(path UNINDEXED,body);
+                CREATE TABLE index_fields(name TEXT PRIMARY KEY,json_path TEXT NOT NULL UNIQUE,column_name TEXT NOT NULL UNIQUE);
+                CREATE TABLE type_views(type_name TEXT PRIMARY KEY,view_name TEXT NOT NULL UNIQUE);
+                INSERT INTO scopes VALUES(?,?,'complete',NULL,'v1');
+                INSERT INTO files VALUES('notes/one.md',1,4,'hash','ok');
+                INSERT INTO assessments VALUES(?,'notes/one.md',1,'selected','{}');
+                INSERT INTO documents VALUES('notes/one.md','{"title":"One"}','body search');
+                INSERT INTO documents_fts VALUES('notes/one.md','body search');
+                """, arguments: [fixture.root.path, scope.id, definition, scope.id])
+        }
+        try database.prepareCollection(root: fixture.root.path)
+        #expect(try database.storagePolicy() == IndexStoragePolicy(bodyMode: .fts, metadataEncoding: .text))
+        #expect(try database.query("SELECT metadata,body FROM current_documents").rows
+            == [[.text("{\"title\":\"One\"}"), .text("body search")]])
+        #expect(try database.query("SELECT count(*) FROM documents_fts WHERE documents_fts MATCH 'search'").rows
+            == [[.integer(1)]])
+        #expect(try database.query("SELECT title FROM titles").rows == [[.text("One")]])
+        #expect(try database.databaseQueue.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM grdb_migrations") } == 4)
     }
 
     @Test func `superseded scan cannot overwrite a newer generation`() throws {
         let fixture = try IndexFixture()
         defer { fixture.remove() }
         let scope = IndexScope(path: "notes/")
-        let first = try fixture.database.begin(scopes: [scope])
-        let second = try fixture.database.begin(scopes: [scope])
-        try fixture.database.commit([], fingerprint: "v2", generation: second.generation)
-        #expect(throws: SQLiteIndexError.self) { try fixture.database.commit([], fingerprint: "v1", generation: first.generation) }
+        let first = try fixture.database.beginStagedRefresh(scopes: [scope], fingerprint: "v1")
+        let second = try fixture.database.beginStagedRefresh(scopes: [scope], fingerprint: "v2")
+        try fixture.database.commitStagedRefresh(scopes: [scope], errors: [:], fingerprint: "v2", generation: second)
+        #expect(throws: SQLiteIndexError.self) {
+            try fixture.database.commitStagedRefresh(scopes: [scope], errors: [:], fingerprint: "v1", generation: first)
+        }
     }
 
     @Test func `newer migration is refused without changing indexed data`() throws {
         let fixture = try IndexFixture()
         defer { fixture.remove() }
         try fixture.database.databaseQueue.write { db in
-            try db.execute(sql: "INSERT INTO grdb_migrations VALUES ('collection-v2')")
+            try db.execute(sql: "INSERT INTO grdb_migrations VALUES ('collection-v999')")
         }
         #expect(throws: SQLiteIndexError.self) { try fixture.database.prepareCollection(root: fixture.root.path) }
-        #expect(try fixture.count("grdb_migrations") == 3)
+        #expect(try fixture.count("grdb_migrations") == 5)
     }
 
     @Test func `failed migration rolls back tables and can be retried`() throws {
@@ -245,7 +436,7 @@ struct CollectionIndexerTests {
     }
 
     @Test func `thousand document collection caches and rebuilds without duplicate FTS entries`() async throws {
-        let fixture = try IndexFixture()
+        let fixture = try IndexFixture(bodyMode: .fts)
         defer { fixture.remove() }
         for index in 0..<1000 { try fixture.write("notes/\(index).md", "# Document \(index)\n\nCollection search text.") }
         let initial = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1", evaluate: selectAll)
@@ -291,7 +482,7 @@ struct CollectionIndexerTests {
     }
 
     @Test func `managed field indexes match documented expressions and type view projections`() async throws {
-        let fixture = try IndexFixture()
+        let fixture = try IndexFixture(bodyMode: .fts)
         defer { fixture.remove() }
         try fixture.write("notes/one.md", "searchable original")
         let book = IndexScope(kind: .type, path: "notes/", name: "Book")

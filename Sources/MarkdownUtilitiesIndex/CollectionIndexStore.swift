@@ -130,19 +130,6 @@ struct IndexFileChange {
     var evaluation: IndexEvaluation
 }
 
-struct IndexScopeChange {
-    var scope: IndexScope
-    var seen: Set<String>
-    var changes: [IndexFileChange]
-    var error: String?
-}
-
-struct IndexCacheSnapshot {
-    var generation: Int
-    var files: [String: CachedIndexFile]
-    var assessments: [String: Set<String>]
-}
-
 extension SQLiteIndexDatabase {
     /// Upgrades an empty runtime-probe database without dropping user field indexes or views.
     ///
@@ -150,6 +137,25 @@ extension SQLiteIndexDatabase {
     /// - Parameter root: Canonical absolute project directory, matching future opens.
     /// - Throws: A root mismatch, a newer unsupported migration, or a SQLite migration error.
     public func prepareCollection(root: String) throws {
+        let existingCollection = try databaseQueue.read { database in
+            try Bool.fetchOne(database,
+                sql: "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='index_metadata')") ?? false
+        }
+        let recordedEncoding: IndexMetadataEncoding? = try databaseQueue.read { database in
+            guard existingCollection,
+                let value = try String.fetchOne(database,
+                    sql: "SELECT value FROM index_metadata WHERE key='metadata_encoding'") else { return nil }
+            return IndexMetadataEncoding(rawValue: value)
+        }
+        let jsonbAvailable = try databaseQueue.read { supportsJSONB($0) }
+        if recordedEncoding == .jsonb && !jsonbAvailable {
+            throw SQLiteIndexError(message: "This cache stores SQLite JSONB, but linked SQLite \(Self.sqliteVersion) cannot read JSONB. Rebuild the cache explicitly as JSON text with a JSONB-capable md-utils runtime.")
+        }
+        let selectedEncoding = recordedEncoding ?? (existingCollection ? .text : (jsonbAvailable ? .jsonb : .text))
+        let selectedBodyMode: IndexBodyMode = existingCollection ? .fts : .metadataOnly
+        if selectedBodyMode == .fts {
+            try databaseQueue.write { try Self.checkFTSCapability($0) }
+        }
         var migrator = DatabaseMigrator()
         migrator.registerMigration("collection-v1") { db in
             try db.execute(sql: """
@@ -168,20 +174,10 @@ extension SQLiteIndexDatabase {
                   location TEXT NOT NULL, message TEXT NOT NULL,
                   FOREIGN KEY(scope_id, path) REFERENCES assessments(scope_id, path) ON DELETE CASCADE);
                 CREATE TABLE documents(path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
-                  metadata TEXT NOT NULL CHECK(json_valid(metadata)), body TEXT NOT NULL);
-                CREATE VIRTUAL TABLE documents_fts USING fts5(path UNINDEXED, body);
-                CREATE TRIGGER documents_insert AFTER INSERT ON documents BEGIN
-                  INSERT INTO documents_fts(rowid,path,body) VALUES(new.rowid,new.path,new.body);
-                END;
-                CREATE TRIGGER documents_delete AFTER DELETE ON documents BEGIN
-                  DELETE FROM documents_fts WHERE rowid=old.rowid;
-                END;
-                CREATE TRIGGER documents_update AFTER UPDATE ON documents BEGIN
-                  DELETE FROM documents_fts WHERE rowid=old.rowid;
-                  INSERT INTO documents_fts(rowid,path,body) VALUES(new.rowid,new.path,new.body);
-                END;
+                  metadata TEXT NOT NULL CHECK(json_valid(metadata)), body TEXT);
                 CREATE INDEX assessments_path ON assessments(path);
-                CREATE VIEW current_documents AS SELECT d.* FROM documents d JOIN files f USING(path)
+                CREATE VIEW current_documents AS SELECT d.path,json(d.metadata) AS metadata,d.body
+                  FROM documents d JOIN files f USING(path)
                   WHERE f.state='ok' AND EXISTS(SELECT 1 FROM assessments a JOIN scopes s ON s.id=a.scope_id
                     WHERE a.path=d.path AND a.selected=1 AND s.state='complete');
                 """)
@@ -195,6 +191,68 @@ extension SQLiteIndexDatabase {
                 CREATE TABLE type_views(
                   type_name TEXT PRIMARY KEY,
                   view_name TEXT NOT NULL UNIQUE);
+                """)
+        }
+        migrator.registerMigration("collection-v3-storage-policy") { database in
+            let preservedViews = try Row.fetchAll(database, sql: """
+                SELECT name,sql FROM sqlite_master
+                WHERE type='view' AND name!='current_documents' AND sql IS NOT NULL ORDER BY name
+                """).map { ($0["name"] as String, $0["sql"] as String) }
+            let preservedIndexes = try String.fetchAll(database, sql: """
+                SELECT sql FROM sqlite_master
+                WHERE type='index' AND tbl_name='documents' AND sql IS NOT NULL ORDER BY name
+                """)
+            for (name, _) in preservedViews {
+                try database.execute(sql: "DROP VIEW \(Self.identifier(name))")
+            }
+            try database.execute(sql: "DROP VIEW current_documents")
+            try Self.dropFTS(database)
+            try database.execute(sql: "ALTER TABLE documents RENAME TO documents_legacy")
+            try database.execute(sql: """
+                CREATE TABLE documents(
+                  path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
+                  metadata BLOB NOT NULL CHECK(json_valid(json(metadata))),
+                  body TEXT);
+                """)
+            let metadataExpression = selectedEncoding == .jsonb ? "jsonb(metadata)" : "json(metadata)"
+            let bodyExpression = selectedBodyMode == .fts ? "body" : "NULL"
+            try database.execute(sql: """
+                INSERT INTO documents(path,metadata,body)
+                SELECT path,\(metadataExpression),\(bodyExpression) FROM documents_legacy;
+                DROP TABLE documents_legacy;
+                """)
+            try database.execute(sql: "INSERT INTO index_metadata VALUES('body_mode',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                arguments: [selectedBodyMode.rawValue])
+            try database.execute(sql: "INSERT INTO index_metadata VALUES('metadata_encoding',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                arguments: [selectedEncoding.rawValue])
+            try Self.createCurrentDocumentsView(database, bodyMode: selectedBodyMode)
+            for sql in preservedIndexes { try database.execute(sql: sql) }
+            for (_, sql) in preservedViews { try database.execute(sql: sql) }
+            if selectedBodyMode == .fts { try Self.createFTS(database) }
+        }
+        migrator.registerMigration("collection-v4-refresh-staging") { database in
+            try database.execute(sql: """
+                CREATE TABLE refresh_seen(
+                  generation INTEGER NOT NULL, scope_id TEXT NOT NULL, path TEXT NOT NULL,
+                  PRIMARY KEY(generation,scope_id,path));
+                CREATE INDEX refresh_seen_path ON refresh_seen(generation,path);
+                CREATE TABLE refresh_scopes(
+                  generation INTEGER NOT NULL, scope_id TEXT NOT NULL, reusable INTEGER NOT NULL,
+                  PRIMARY KEY(generation,scope_id));
+                CREATE TABLE refresh_files(
+                  generation INTEGER NOT NULL, path TEXT NOT NULL, mtime REAL NOT NULL,
+                  size INTEGER NOT NULL, hash TEXT NOT NULL, state TEXT NOT NULL,
+                  metadata TEXT NOT NULL CHECK(json_valid(metadata)), body TEXT,
+                  PRIMARY KEY(generation,path));
+                CREATE TABLE refresh_assessments(
+                  generation INTEGER NOT NULL, scope_id TEXT NOT NULL, path TEXT NOT NULL,
+                  selected INTEGER NOT NULL, status TEXT NOT NULL,
+                  detail TEXT NOT NULL CHECK(json_valid(detail)),
+                  PRIMARY KEY(generation,scope_id,path));
+                CREATE TABLE refresh_diagnostics(
+                  generation INTEGER NOT NULL, scope_id TEXT NOT NULL, path TEXT NOT NULL,
+                  category TEXT NOT NULL, severity TEXT NOT NULL, code TEXT NOT NULL,
+                  location TEXT NOT NULL, message TEXT NOT NULL);
                 """)
         }
         guard try databaseQueue.read({ try migrator.hasBeenSuperseded($0) }) == false else {
@@ -237,34 +295,6 @@ extension SQLiteIndexDatabase {
         }
     }
 
-    /// Marks old results unavailable before scanning, including when the process is interrupted.
-    func begin(scopes: [IndexScope], fingerprint: String = "") throws -> IndexCacheSnapshot {
-        try databaseQueue.write { db in
-            let files = Dictionary(uniqueKeysWithValues: try Row.fetchAll(db, sql: "SELECT * FROM files").map { row in
-                (row["path"] as String, CachedIndexFile(mtime: row["mtime"], size: row["size"], hash: row["hash"], state: row["state"]))
-            })
-            var assessments: [String: Set<String>] = [:]
-            for row in try Row.fetchAll(db, sql: """
-                SELECT a.scope_id,a.path FROM assessments a JOIN scopes s ON s.id=a.scope_id
-                WHERE s.fingerprint=? AND s.state='complete' AND a.status!='evaluation-error'
-                """, arguments: [fingerprint]) {
-                assessments[row["scope_id"], default: []].insert(row["path"])
-            }
-            let generation = (try Int.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='generation'") ?? 0) + 1
-            try db.execute(sql: "UPDATE index_metadata SET value=? WHERE key='generation'", arguments: [String(generation)])
-            try db.execute(sql: "INSERT INTO index_metadata VALUES('last_started_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                arguments: [String(Date().timeIntervalSince1970)])
-            for scope in scopes {
-                let definition = String(decoding: try JSONEncoder().encode(scope), as: UTF8.self)
-                try db.execute(sql: """
-                    INSERT INTO scopes(id,definition,state) VALUES(?,?,'updating')
-                    ON CONFLICT(id) DO UPDATE SET state='updating', error=NULL
-                    """, arguments: [scope.id, definition])
-            }
-            return IndexCacheSnapshot(generation: generation, files: files, assessments: assessments)
-        }
-    }
-
     /// Makes every scope unavailable and supersedes active scans after a host-level failure.
     ///
     /// Use this when configuration cannot be loaded. Existing content and membership
@@ -275,59 +305,6 @@ extension SQLiteIndexDatabase {
         try databaseQueue.write { db in
             try db.execute(sql: "UPDATE scopes SET state='incomplete', error=?", arguments: [message])
             try db.execute(sql: "UPDATE index_metadata SET value=CAST(value AS INTEGER)+1 WHERE key='generation'")
-        }
-    }
-
-    func commit(_ scopes: [IndexScopeChange], fingerprint: String, generation: Int) throws {
-        try databaseQueue.write { db in
-            guard try Int.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='generation'") == generation else {
-                throw SQLiteIndexError(message: "Another index update started during this scan; retry the update.")
-            }
-            for result in scopes {
-                let scopeID = result.scope.id
-                // Failed enumeration never prunes membership, even during rebuild.
-                if result.error == nil {
-                    let old = try String.fetchAll(db, sql: "SELECT path FROM assessments WHERE scope_id=?", arguments: [scopeID])
-                    for path in old where !result.seen.contains(path) {
-                        try db.execute(sql: "DELETE FROM assessments WHERE scope_id=? AND path=?", arguments: [scopeID, path])
-                    }
-                }
-                for file in result.changes {
-                    let assessment = file.evaluation.assessment
-                    try db.execute(sql: """
-                        INSERT INTO files VALUES(?,?,?,?,?) ON CONFLICT(path) DO UPDATE SET
-                          mtime=excluded.mtime,size=excluded.size,hash=excluded.hash,state=excluded.state
-                        """, arguments: [file.path, file.mtime, file.size, file.hash, file.evaluation.parseState])
-                    try db.execute(sql: "DELETE FROM assessments WHERE scope_id=? AND path=?", arguments: [scopeID, file.path])
-                    try db.execute(sql: "INSERT INTO assessments VALUES(?,?,?,?,?)",
-                        arguments: [scopeID, file.path, assessment.selected, assessment.status, assessment.detail])
-                    for diagnostic in assessment.diagnostics {
-                        try db.execute(sql: "INSERT INTO diagnostics VALUES(?,?,?,?,?,?,?)", arguments: [scopeID, file.path,
-                            diagnostic.category, diagnostic.severity, diagnostic.code, diagnostic.location, diagnostic.message])
-                    }
-                    // Refresh a retained document even when this particular scope no longer selects it.
-                    try db.execute(sql: """
-                        INSERT INTO documents(path,metadata,body) VALUES(?,?,?) ON CONFLICT(path) DO UPDATE SET
-                          metadata=excluded.metadata,body=excluded.body
-                        """, arguments: [file.path, file.evaluation.metadata, file.evaluation.body])
-                }
-                try db.execute(sql: "UPDATE scopes SET state=?,error=?,fingerprint=? WHERE id=?",
-                    arguments: [result.error == nil ? "complete" : "incomplete", result.error, fingerprint, scopeID])
-            }
-            try db.execute(sql: "DELETE FROM documents WHERE NOT EXISTS(SELECT 1 FROM assessments a WHERE a.path=documents.path AND a.selected=1)")
-            try db.execute(sql: "DELETE FROM files WHERE NOT EXISTS(SELECT 1 FROM assessments a WHERE a.path=files.path)")
-            try db.execute(sql: "INSERT INTO index_metadata VALUES('runtime',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                arguments: [IndexFingerprint.runtimeVersion])
-            let completed = scopes.allSatisfy { result in
-                result.error == nil && result.changes.allSatisfy {
-                    $0.evaluation.parseState == "ok" && $0.evaluation.assessment.status != "evaluation-error"
-                }
-            }
-            if completed {
-                try db.execute(sql: "INSERT INTO index_metadata VALUES('last_completed_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                    arguments: [String(Date().timeIntervalSince1970)])
-            }
-            try refreshTypeViews(db)
         }
     }
 

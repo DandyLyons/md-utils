@@ -221,8 +221,11 @@ Use `md-utils index type Book ./notes/` to retain conforming documents or
 `md-utils index update --verify-hashes` checks for edits missed by mtime/size;
 `md-utils index update --rebuild` regenerates all saved scopes while preserving
 SQL field indexes and views. `md-utils index query '<sql>'` refreshes first and
-executes bounded read-only SQL; `index field add '$.status'` adds an explicit JSON
-expression index, and `index status` reports freshness. Files remain authoritative.
+streams bounded read-only SQL; `index field add '$.status'` adds an explicit JSON
+expression index, and `index status` reports freshness. New caches retain metadata
+only. Run `md-utils index search enable` to opt into one retained body per document
+and an external-content FTS5 index; `index search disable --vacuum` removes them.
+Files remain authoritative.
 
 The cache is stored in `.md-utils/index.sqlite`. See
 [collection indexing](docs/collection-index.md) for project/config resolution,

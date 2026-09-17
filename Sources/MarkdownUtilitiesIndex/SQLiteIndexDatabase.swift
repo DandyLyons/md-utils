@@ -9,7 +9,7 @@ public final class SQLiteIndexDatabase {
     /// The system SQLite runtime used by GRDB, not a bundled version.
     public static var sqliteVersion: String { String(cString: sqlite3_libversion()) }
 
-    /// Checks the linked runtime in memory before creating or opening an index file.
+    /// Checks baseline JSON support before creating or opening an index file.
     ///
     /// The parent directory must already exist. Collection tables are created by
     /// ``prepareCollection(root:)``, which ``CollectionIndexer`` calls automatically.
@@ -28,8 +28,8 @@ public final class SQLiteIndexDatabase {
         }
     }
 
-    /// Exercises JSON queries, JSON expression indexes, and FTS5 reads and writes.
-    /// No index file is touched by this probe.
+    /// Exercises baseline JSON queries and expression indexes. FTS5 is checked
+    /// only for an index whose recorded policy enables body search.
     ///
     /// - Throws: ``SQLiteIndexError`` identifying the failed capability and linked runtime.
     public static func checkCapabilities() throws {
@@ -44,7 +44,7 @@ public final class SQLiteIndexDatabase {
                     do {
                         try database.execute(sql: sql)
                     } catch {
-                        throw SQLiteIndexError(message: "System SQLite \(sqliteVersion) failed the required \(capability) check: \(error). Use a supported OS or distribution SQLite package with JSON, expression indexes, and FTS5 enabled. Updating GRDB alone does not update SQLite. The index was not opened.")
+                        throw SQLiteIndexError(message: "System SQLite \(sqliteVersion) failed the required \(capability) check: \(error). Use a supported OS or distribution SQLite package with JSON and expression indexes enabled. Updating GRDB alone does not update SQLite. The index was not opened.")
                     }
                 }
             }
@@ -63,11 +63,6 @@ public final class SQLiteIndexDatabase {
         CREATE TABLE assertions(ok INTEGER CHECK(ok = 1));
         INSERT INTO assertions SELECT count(*) = 1 FROM records
           INDEXED BY record_title WHERE json_extract(document, '$.title') = 'hello';
-        """),
-        ("FTS5", """
-        CREATE VIRTUAL TABLE search USING fts5(body);
-        INSERT INTO search VALUES ('hello indexing');
-        INSERT INTO assertions SELECT count(*) = 1 FROM search WHERE search MATCH 'indexing';
         """),
     ]
 }

@@ -31,10 +31,10 @@ for the rationale and the separate, deferred StructuredQueries decision.
 
 ## Runtime requirements and supported targets
 
-The linked SQLite must support JSON functions, JSON expression indexes, and
-FTS5. A version string or GRDB Swift compilation flag does not establish those
-capabilities. Modern SQLite includes JSON unless omitted; FTS5 must be enabled
-in the runtime build. [SQLite JSON](https://sqlite.org/json1.html#compiling_in_json_support),
+The linked SQLite must support JSON functions and JSON expression indexes. FTS
+mode additionally requires FTS5. A version string or GRDB Swift compilation flag
+does not establish those capabilities. Modern SQLite includes JSON unless omitted;
+FTS5 must be enabled in the runtime build when search is used. [SQLite JSON](https://sqlite.org/json1.html#compiling_in_json_support),
 [SQLite FTS5](https://sqlite.org/fts5.html).
 
 | Platform or product | Policy |
@@ -65,23 +65,29 @@ or process-global SQLite reconfiguration.
 ## Capability and failure contract
 
 `SQLiteIndexDatabase(path:)` first opens an in-memory GRDB `DatabaseQueue`.
-It creates and queries a JSON expression index and creates, writes, and searches
-an FTS5 table. SQL CHECK assertions validate query results. Only after those
+It creates and queries a JSON expression index. SQL CHECK assertions validate
+query results. Only after those
 operations succeed does it open the requested index file. No migration or schema
 change is attempted before the probe succeeds.
+
+FTS5 is probed on the actual linked connection only when opening an existing
+FTS-mode cache or enabling search. Metadata-only caches therefore do not require
+FTS5. JSONB is also probed on the actual connection: new caches record JSONB when
+available and JSON text otherwise. A cache recorded as JSONB fails before mutation
+when opened by an incompatible runtime.
 
 On failure, `SQLiteIndexError` identifies the system runtime version, failed
 capability, SQLite error, and OS/distribution remediation. Updating GRDB alone
 does not update SQLite. There is no silent reduced-functionality mode or bundled
-fallback. Tests use real failing statements and check incorrect query results,
+fallback for required features. Tests use real failing statements and check incorrect query results,
 preservation of existing file bytes, and absence of newly created files. Open
 errors identify the path and suggest checking parent directories and permissions.
 Existing non-index commands remain usable when index capabilities are missing.
 
 All future index mutations must use the checked initializer. Do not open a
-separate unchecked GRDB connection before probing. Keep public schemas based on
-JSON text, standard expression indexes, and FTS5, without GRDB-only SQL functions
-or custom extensions. External tools use their own SQLite runtime and must
+separate unchecked GRDB connection before probing. Keep public views based on
+ordinary JSON text, standard expression indexes, and optional external-content
+FTS5, without GRDB-only SQL functions or custom extensions. External tools use their own SQLite runtime and must
 independently support those facilities; installing md-utils does not upgrade
 GUI browsers or the `sqlite3` command.
 

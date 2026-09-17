@@ -37,12 +37,21 @@ definitions, and fully resolved transitive schemas in deterministic order.
 Include a host version component when custom extraction or evaluation changes.
 The database keeps fingerprints and runtime provenance, not a definition catalog.
 
+For overlapping scopes, prefer
+``CollectionIndexer/updateMany(adding:fingerprint:rebuild:verifyHashes:limits:evaluate:)``.
+It reads and hashes one changed file once and passes every scope needing assessment
+to one closure, allowing the host to parse/extract once and evaluate many policies.
+
 ## Refresh and rebuild
 
 Every update refreshes all registered scopes. Normal refreshes reuse successful
 assessments when file mtime, size, and the fingerprint match. Enable `verifyHashes`
 to hash every candidate and detect stat-preserving edits. A timestamp change
 still triggers evaluation even when content bytes remain the same.
+
+Discovery paths and changed results are staged in SQLite instead of corpus-sized
+arrays. ``IndexRefreshLimits`` independently bounds candidate batches, discovery
+path bytes, and one source-file read. Publication remains a set-based transaction.
 
 Set `rebuild` to reevaluate all candidates. Rebuilding retains saved scopes,
 configuration paths, SQL expression indexes, and views. Removing the database
@@ -57,7 +66,7 @@ enumeration permits missing candidates to be removed from that scope.
 
 Scopes become unavailable before scanning. Cancellation or a failed transaction
 leaves old rows unavailable until a subsequent refresh succeeds. Content,
-assessments, diagnostics, and FTS entries commit together. Concurrent scans use
+assessments, diagnostics, and optional FTS entries commit together. Concurrent scans use
 a generation check; a superseded scan fails instead of overwriting newer data.
 Filesystem scans are observations over time, not atomic snapshots.
 
@@ -67,8 +76,15 @@ selected rule nonconformance remains visible when parsing succeeded. Raw tables
 retain diagnostic records and unavailable data. Join FTS results to
 `current_documents` before treating them as current content.
 
-Use ``SQLiteIndexDatabase/query(_:limit:)`` for one typed, bounded, read-only SQL
-statement. Hosts must complete a refresh and reject a report containing errors
+New databases are metadata-only. Use ``SQLiteIndexDatabase/setBodyMode(_:)`` to
+opt into FTS before rebuilding; this retains one body in `documents` and creates
+external-content FTS. Disabling it drops FTS and clears all bodies.
+
+Use ``SQLiteIndexDatabase/streamQuery(_:limits:shouldCancel:columns:yield:)`` for
+one typed, bounded, read-only SQL statement with one-row memory use, callback
+backpressure, cancellation, and independent row/aggregate-byte/value limits. The
+collecting ``SQLiteIndexDatabase/query(_:limit:)`` wrapper remains available for
+small results. Hosts must complete a refresh and reject a report containing errors
 before calling it when claiming fresh results. ``SQLiteIndexDatabase/addField(jsonPath:columnName:)``
 creates an explicit JSON expression index and regenerates standard-SQL type views;
 ``SQLiteIndexDatabase/freshness()`` exposes the persisted generation, timestamps,

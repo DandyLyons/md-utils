@@ -34,6 +34,28 @@ public struct IndexQueryResult: Equatable, Sendable {
     }
 }
 
+/// Independent row, byte, and single-value bounds for streamed SQL results.
+public struct IndexQueryLimits: Equatable, Sendable {
+    public var rows: Int
+    public var bytes: Int
+    public var valueBytes: Int
+
+    public init(rows: Int = 1_000, bytes: Int = 64 * 1_024 * 1_024,
+        valueBytes: Int = 16 * 1_024 * 1_024) {
+        self.rows = rows
+        self.bytes = bytes
+        self.valueBytes = valueBytes
+    }
+}
+
+/// Final counters from a streamed query snapshot.
+public struct IndexQuerySummary: Equatable, Sendable {
+    public var columns: [String]
+    public var rowCount: Int
+    public var valueBytes: Int
+    public var truncated: Bool
+}
+
 /// A managed expression index projected into generated type views.
 public struct IndexField: Equatable, Sendable {
     public var name: String
@@ -75,14 +97,27 @@ public struct IndexFreshness: Equatable, Sendable {
 }
 
 extension SQLiteIndexDatabase {
-    /// Executes exactly one result-producing, read-only SQL statement.
+    /// Streams one read-only statement from a consistent snapshot.
     ///
-    /// SQLite's own statement classifier rejects writes, while `readOnly` also
-    /// enables `PRAGMA query_only` for defense in depth. The cursor reads at most
-    /// `limit + 1` rows from one serialized database snapshot.
-    public func query(_ sql: String, limit: Int = 1_000) throws -> IndexQueryResult {
-        guard (1...10_000).contains(limit) else {
-            throw SQLiteIndexError(message: "Query limit must be between 1 and 10000 rows.")
+    /// The callback provides backpressure because SQLite does not advance until
+    /// it returns. At most one row is materialized by this method. Cancellation
+    /// is checked between rows, and row count, aggregate value bytes, and each
+    /// individual text/blob value are bounded independently.
+    public func streamQuery(_ sql: String, limits: IndexQueryLimits = IndexQueryLimits(),
+        shouldCancel: () -> Bool = { false }, columns: ([String]) throws -> Void = { _ in },
+        yield: ([IndexQueryValue]) throws -> Void) throws -> IndexQuerySummary {
+        guard (1...10_000_000).contains(limits.rows) else {
+            throw SQLiteIndexError(message: "Query row limit must be between 1 and 10000000.")
+        }
+        guard limits.bytes > 0, limits.valueBytes > 0, limits.valueBytes <= limits.bytes else {
+            throw SQLiteIndexError(message: "Query byte limits must be positive, and the single-value limit cannot exceed the total byte limit.")
+        }
+        let policy = try storagePolicy()
+        if policy.bodyMode == .metadataOnly && Self.containsSQLIdentifier("documents_fts", in: sql) {
+            throw SQLiteIndexError(message: "Full-text search is unavailable because this index is metadata-only. Enable FTS and rebuild the index before querying documents_fts.")
+        }
+        if policy.bodyMode == .metadataOnly && Self.containsSQLIdentifier("body", in: sql) {
+            throw SQLiteIndexError(message: "Document bodies are unavailable because this index is metadata-only. Enable FTS and rebuild before selecting body content.")
         }
         do {
             return try databaseQueue.read { database in
@@ -94,21 +129,61 @@ extension SQLiteIndexDatabase {
                     guard !statement.columnNames.isEmpty else {
                         throw SQLiteIndexError(message: "Index query must produce rows.")
                     }
+                    try columns(statement.columnNames)
                     let cursor = try Row.fetchCursor(statement)
-                    var rows: [[IndexQueryValue]] = []
-                    while rows.count <= limit, let row = try cursor.next() {
-                        rows.append(row.map { IndexQueryValue($0.1) })
+                    var count = 0
+                    var bytes = 0
+                    var truncated = false
+                    while let row = try cursor.next() {
+                        if shouldCancel() { throw CancellationError() }
+                        if count == limits.rows {
+                            truncated = true
+                            break
+                        }
+                        let values = row.map { IndexQueryValue($0.1) }
+                        var rowBytes = 0
+                        for value in values {
+                            let valueBytes = value.storageBytes
+                            guard valueBytes <= limits.valueBytes else {
+                                throw SQLiteIndexError(message: "Query value exceeds the \(limits.valueBytes)-byte single-value limit. Raise --max-value-bytes deliberately to retrieve it.")
+                            }
+                            rowBytes += valueBytes
+                        }
+                        if bytes + rowBytes > limits.bytes {
+                            truncated = true
+                            break
+                        }
+                        try yield(values)
+                        count += 1
+                        bytes += rowBytes
                     }
-                    let truncated = rows.count > limit
-                    if truncated { rows.removeLast() }
-                    return IndexQueryResult(columns: statement.columnNames, rows: rows, truncated: truncated)
+                    if shouldCancel() { throw CancellationError() }
+                    return IndexQuerySummary(columns: statement.columnNames, rowCount: count,
+                        valueBytes: bytes, truncated: truncated)
                 }
             }
         } catch let error as SQLiteIndexError {
             throw error
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             throw SQLiteIndexError(message: "Index query failed: \(error)")
         }
+    }
+
+    /// Executes exactly one result-producing, read-only SQL statement.
+    ///
+    /// SQLite's own statement classifier rejects writes, while `readOnly` also
+    /// enables `PRAGMA query_only` for defense in depth. The cursor reads at most
+    /// `limit + 1` rows from one serialized database snapshot.
+    public func query(_ sql: String, limit: Int = 1_000) throws -> IndexQueryResult {
+        guard (1...10_000).contains(limit) else {
+            throw SQLiteIndexError(message: "Query limit must be between 1 and 10000 rows.")
+        }
+        var rows: [[IndexQueryValue]] = []
+        let summary = try streamQuery(sql,
+            limits: IndexQueryLimits(rows: limit, bytes: Int.max, valueBytes: Int.max)) { rows.append($0) }
+        return IndexQueryResult(columns: summary.columns, rows: rows, truncated: summary.truncated)
     }
 
     /// Creates an explicit JSON expression index and projects it into type views.
@@ -200,6 +275,7 @@ extension SQLiteIndexDatabase {
             sql: "SELECT name,json_path,column_name FROM index_fields ORDER BY column_name").map {
             IndexField(name: $0["name"], jsonPath: $0["json_path"], columnName: $0["column_name"])
         }
+        let bodyColumn = try storagePolicy(database).bodyMode == .fts ? ",d.body" : ""
         for typeName in typeNames {
             let base = "type_\(Self.identifierSlug(typeName))"
             let prior = try String.fetchOne(database,
@@ -231,7 +307,7 @@ extension SQLiteIndexDatabase {
             }.joined()
             try database.execute(sql: """
                 CREATE VIEW \(Self.identifier(viewName)) AS
-                SELECT d.path,d.metadata,d.body\(projections) FROM current_documents d
+                SELECT d.path,d.metadata\(bodyColumn)\(projections) FROM current_documents d
                 WHERE EXISTS(SELECT 1 FROM assessments a JOIN scopes s ON s.id=a.scope_id
                   WHERE a.path=d.path AND a.selected=1 AND a.status='conforms' AND s.state='complete'
                     AND json_extract(s.definition, '$.kind')='type'
@@ -277,4 +353,88 @@ extension SQLiteIndexDatabase {
     }
 
     static func identifier(_ value: String) -> String { "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\"" }
+
+    /// Finds an unquoted SQL identifier while ignoring literals and comments.
+    static func containsSQLIdentifier(_ sought: String, in sql: String) -> Bool {
+        let characters = Array(sql)
+        var offset = 0
+        while offset < characters.count {
+            let character = characters[offset]
+            if character == "'" {
+                let closing = character
+                offset += 1
+                while offset < characters.count {
+                    if characters[offset] == closing {
+                        if offset + 1 < characters.count, characters[offset + 1] == closing {
+                            offset += 2
+                            continue
+                        }
+                        offset += 1
+                        break
+                    }
+                    offset += 1
+                }
+                continue
+            }
+            if character == "\"" || character == "`" || character == "[" {
+                let closing: Character = character == "[" ? "]" : character
+                var identifier = ""
+                offset += 1
+                while offset < characters.count {
+                    if characters[offset] == closing {
+                        if closing != "]", offset + 1 < characters.count, characters[offset + 1] == closing {
+                            identifier.append(closing)
+                            offset += 2
+                            continue
+                        }
+                        offset += 1
+                        break
+                    }
+                    identifier.append(characters[offset])
+                    offset += 1
+                }
+                if identifier.caseInsensitiveCompare(sought) == .orderedSame { return true }
+                continue
+            }
+            if character == "-", offset + 1 < characters.count, characters[offset + 1] == "-" {
+                offset += 2
+                while offset < characters.count, !characters[offset].isNewline { offset += 1 }
+                continue
+            }
+            if character == "/", offset + 1 < characters.count, characters[offset + 1] == "*" {
+                offset += 2
+                while offset + 1 < characters.count {
+                    if characters[offset] == "*", characters[offset + 1] == "/" {
+                        offset += 2
+                        break
+                    }
+                    offset += 1
+                }
+                continue
+            }
+            if character.isLetter || character == "_" {
+                let start = offset
+                offset += 1
+                while offset < characters.count,
+                    characters[offset].isLetter || characters[offset].isNumber || characters[offset] == "_" {
+                    offset += 1
+                }
+                if String(characters[start..<offset]).caseInsensitiveCompare(sought) == .orderedSame { return true }
+                continue
+            }
+            offset += 1
+        }
+        return false
+    }
+}
+
+private extension IndexQueryValue {
+    var storageBytes: Int {
+        switch self {
+        case .null: 0
+        case .integer, .real: 8
+        case .text(let value): value.utf8.count
+        case .blob(let value): value.count
+        }
+    }
 }

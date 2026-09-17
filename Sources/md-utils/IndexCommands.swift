@@ -13,7 +13,8 @@ extension CLIEntry {
         /// Registers directory, type, and rule selection entry points.
         static let configuration = CommandConfiguration(commandName: "index",
             abstract: "Maintain a rebuildable SQLite collection cache",
-            subcommands: [Update.self, SelectType.self, SelectRule.self, Query.self, Explain.self, Field.self, Status.self])
+            subcommands: [Update.self, SelectType.self, SelectRule.self, Query.self, Explain.self,
+                Field.self, Search.self, Status.self])
 
         /// Refreshes every saved scope and optionally registers a directory collection.
         struct Update: AsyncParsableCommand {
@@ -66,12 +67,16 @@ extension CLIEntry {
             static let configuration = CommandConfiguration(abstract: "Refresh the index and run read-only SQL")
             @Argument(help: "One read-only SQL statement") var sql: String
             @OptionGroup var options: IndexOptions
-            @Option(help: "Maximum rows to return (1...10000)") var limit = 1_000
-            @Option(help: "Output format: json, jsonl, or csv") var format: IndexQueryFormat = .json
+            @Option(help: "Maximum rows to return") var limit = 1_000
+            @Option(help: "Maximum aggregate SQLite value bytes") var maxBytes = 64 * 1_024 * 1_024
+            @Option(help: "Maximum bytes in one text or BLOB value") var maxValueBytes = 16 * 1_024 * 1_024
+            @Option(help: "Output format: json, jsonl, csv, or nul") var format: IndexQueryFormat = .json
 
             mutating func run() async throws {
                 let database = try await options.run(kind: .directory, directory: nil, name: "", quiet: true)
-                print(try IndexQueryRenderer.render(database.query(sql, limit: limit), format: format), terminator: "")
+                try IndexStreamingQueryRenderer.render(database: database, sql: sql, format: format,
+                    limits: IndexQueryLimits(rows: limit, bytes: maxBytes, valueBytes: maxValueBytes),
+                    shouldCancel: { Task.isCancelled })
             }
         }
 
@@ -80,13 +85,16 @@ extension CLIEntry {
             static let configuration = CommandConfiguration(abstract: "Refresh the index and explain a read-only SQL query")
             @Argument(help: "Read-only SQL statement to explain") var sql: String
             @OptionGroup var options: IndexOptions
-            @Option(help: "Maximum plan rows to return (1...10000)") var limit = 1_000
-            @Option(help: "Output format: json, jsonl, or csv") var format: IndexQueryFormat = .json
+            @Option(help: "Maximum plan rows to return") var limit = 1_000
+            @Option(help: "Maximum aggregate SQLite value bytes") var maxBytes = 64 * 1_024 * 1_024
+            @Option(help: "Maximum bytes in one text or BLOB value") var maxValueBytes = 16 * 1_024 * 1_024
+            @Option(help: "Output format: json, jsonl, csv, or nul") var format: IndexQueryFormat = .json
 
             mutating func run() async throws {
                 let database = try await options.run(kind: .directory, directory: nil, name: "", quiet: true)
-                let result = try database.query("EXPLAIN QUERY PLAN \(sql)", limit: limit)
-                print(try IndexQueryRenderer.render(result, format: format), terminator: "")
+                try IndexStreamingQueryRenderer.render(database: database, sql: "EXPLAIN QUERY PLAN \(sql)", format: format,
+                    limits: IndexQueryLimits(rows: limit, bytes: maxBytes, valueBytes: maxValueBytes),
+                    shouldCancel: { Task.isCancelled })
             }
         }
 
@@ -125,6 +133,44 @@ extension CLIEntry {
             }
         }
 
+        /// Manages opt-in body retention and FTS5 search.
+        struct Search: AsyncParsableCommand {
+            static let configuration = CommandConfiguration(abstract: "Manage optional full-text body indexing",
+                subcommands: [Enable.self, Disable.self, Status.self])
+
+            struct Enable: AsyncParsableCommand {
+                @OptionGroup var options: IndexOptions
+                mutating func run() async throws {
+                    let database = try options.context().database
+                    try database.setBodyMode(.fts)
+                    guard !(try database.scopes()).isEmpty else {
+                        print("FTS enabled; register a scope to populate search content.")
+                        return
+                    }
+                    _ = try await options.run(kind: .directory, directory: nil, name: "", rebuild: true)
+                }
+            }
+
+            struct Disable: ParsableCommand {
+                @OptionGroup var options: IndexOptions
+                @Flag(help: "Run VACUUM after removing cached bodies and FTS pages") var vacuum = false
+                mutating func run() throws {
+                    let database = try options.context().database
+                    try database.setBodyMode(.metadataOnly)
+                    if vacuum { try database.vacuum() }
+                }
+            }
+
+            struct Status: ParsableCommand {
+                @OptionGroup var options: IndexOptions
+                mutating func run() throws {
+                    let policy = try options.context().database.storagePolicy()
+                    print("body-mode: \(policy.bodyMode.rawValue)")
+                    print("metadata-encoding: \(policy.metadataEncoding.rawValue)")
+                }
+            }
+        }
+
         /// Shows whether all saved scopes completed and when refreshes ran.
         struct Status: ParsableCommand {
             static let configuration = CommandConfiguration(abstract: "Inspect index freshness and saved scopes")
@@ -149,30 +195,11 @@ enum IndexQueryFormat: String, ExpressibleByArgument {
     case json
     case jsonl
     case csv
+    case nul
 }
 
-enum IndexQueryRenderer {
-    static func render(_ result: IndexQueryResult, format: IndexQueryFormat) throws -> String {
-        switch format {
-        case .json:
-            let object: [String: Any] = ["columns": result.columns,
-                "rows": result.rows.map { $0.map(jsonValue) }, "truncated": result.truncated]
-            return String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self) + "\n"
-        case .jsonl:
-            guard Set(result.columns).count == result.columns.count else {
-                throw ValidationError("JSONL output requires unique SQL column names; add aliases to duplicate columns.")
-            }
-            return try result.rows.map { row in
-                let object = Dictionary(uniqueKeysWithValues: zip(result.columns, row.map(jsonValue)))
-                return String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
-            }.joined(separator: "\n") + (result.rows.isEmpty ? "" : "\n")
-        case .csv:
-            return ([result.columns.map(csv).joined(separator: ",")] + result.rows.map { $0.map(textValue).map(csv).joined(separator: ",") })
-                .joined(separator: "\n") + "\n"
-        }
-    }
-
-    private static func jsonValue(_ value: IndexQueryValue) -> Any {
+enum IndexQueryValueRenderer {
+    static func jsonValue(_ value: IndexQueryValue) -> Any {
         switch value {
         case .null: NSNull()
         case .integer(let value): value
@@ -182,7 +209,7 @@ enum IndexQueryRenderer {
         }
     }
 
-    private static func textValue(_ value: IndexQueryValue) -> String {
+    static func textValue(_ value: IndexQueryValue) -> String {
         switch value {
         case .null: ""
         case .integer(let value): String(value)
@@ -192,10 +219,62 @@ enum IndexQueryRenderer {
         }
     }
 
-    private static func csv(_ value: String) -> String {
+    static func csv(_ value: String) -> String {
         guard value.contains(where: { $0 == "," || $0 == "\"" || $0.isNewline }) else { return value }
         return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
     }
+}
+
+enum IndexStreamingQueryRenderer {
+    static func render(database: SQLiteIndexDatabase, sql: String, format: IndexQueryFormat,
+        limits: IndexQueryLimits, shouldCancel: () -> Bool,
+        output: FileHandle = .standardOutput) throws {
+        var columnNames: [String] = []
+        var firstJSONRow = true
+        let summary = try database.streamQuery(sql, limits: limits, shouldCancel: shouldCancel, columns: { columns in
+            columnNames = columns
+            switch format {
+            case .json:
+                let encoded = try JSONSerialization.data(withJSONObject: columns)
+                write(Data("{\"columns\":".utf8), to: output)
+                write(encoded, to: output)
+                write(Data(",\"rows\":[".utf8), to: output)
+            case .jsonl:
+                guard Set(columns).count == columns.count else {
+                    throw ValidationError("JSONL output requires unique SQL column names; add aliases to duplicate columns.")
+                }
+            case .csv:
+                write(Data((columns.map(IndexQueryValueRenderer.csv).joined(separator: ",") + "\n").utf8), to: output)
+            case .nul:
+                guard columns.count == 1 else { throw ValidationError("NUL output requires exactly one SQL column.") }
+            }
+        }, yield: { row in
+            switch format {
+            case .json:
+                if !firstJSONRow { write(Data(",".utf8), to: output) }
+                write(try JSONSerialization.data(withJSONObject: row.map(IndexQueryValueRenderer.jsonValue)), to: output)
+                firstJSONRow = false
+            case .jsonl:
+                let object = Dictionary(uniqueKeysWithValues: zip(columnNames, row.map(IndexQueryValueRenderer.jsonValue)))
+                write(try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), to: output)
+                write(Data("\n".utf8), to: output)
+            case .csv:
+                let line = row.map(IndexQueryValueRenderer.textValue).map(IndexQueryValueRenderer.csv).joined(separator: ",") + "\n"
+                write(Data(line.utf8), to: output)
+            case .nul:
+                guard case .text(let path) = row[0] else {
+                    throw ValidationError("NUL output requires a text path column.")
+                }
+                write(Data(path.utf8), to: output)
+                write(Data([0]), to: output)
+            }
+        })
+        if format == .json {
+            write(Data("],\"truncated\":\(summary.truncated ? "true" : "false")}\n".utf8), to: output)
+        }
+    }
+
+    private static func write(_ data: Data, to output: FileHandle) { output.write(data) }
 }
 
 /// Shared project resolution and verification settings for index commands.
@@ -245,7 +324,7 @@ struct IndexOptions: ParsableArguments {
             try database.invalidate(message: String(describing: error))
             throw error
         }
-        let report = try await indexer.update(adding: scope, fingerprint: evaluator.fingerprint,
+        let report = try await indexer.updateMany(adding: scope, fingerprint: evaluator.fingerprint,
             rebuild: rebuild, verifyHashes: verifyHashes, evaluate: evaluator.evaluate)
         if !quiet {
             print("Index: \(report.evaluated) evaluated, \(report.cached) cached, \(report.hashed) hashed; \(try database.selectedPaths().count) current documents.")
@@ -338,12 +417,31 @@ struct IndexProjectEvaluator {
         if scope.kind == .rule, rules?.rule(named: scope.name) == nil { throw ValidationError("Unknown rule: \(scope.name)") }
     }
 
-    /// Extracts one record and preserves membership, validation, and branch evidence separately.
-    func evaluate(scope: IndexScope, path: String, content: String, modified: Date) async throws -> IndexEvaluation {
+    /// Extracts one record and applies every requested scope without reparsing it.
+    func evaluate(scopes: [IndexScope], path: String, content: String, modified: Date) async throws
+        -> [String: IndexEvaluation] {
         let record = MarkdownRecord(content: content,
             context: MarkdownRecordContext(path: try MarkdownRecordPath(path), modificationDate: modified))
         let analyzed = await MarkdownRecordAnalyzer.analyze(record,
             contentKind: .rulesKind(forFileName: URL(fileURLWithPath: path).lastPathComponent))
+        var evaluations: [String: IndexEvaluation] = [:]
+        for scope in scopes {
+            evaluations[scope.id] = try evaluation(scope: scope, path: path, analyzed: analyzed)
+        }
+        return evaluations
+    }
+
+    /// Evaluates one scope for callers that do not need cross-scope extraction reuse.
+    func evaluate(scope: IndexScope, path: String, content: String, modified: Date) async throws -> IndexEvaluation {
+        let evaluations = try await evaluate(scopes: [scope], path: path, content: content, modified: modified)
+        guard let evaluation = evaluations[scope.id] else {
+            throw ValidationError("Evaluator returned no result for scope \(scope.id).")
+        }
+        return evaluation
+    }
+
+    /// Preserves membership, validation, and branch evidence as separate persisted facts.
+    private func evaluation(scope: IndexScope, path: String, analyzed: AnalyzedMarkdownRecord) throws -> IndexEvaluation {
         var assessment: IndexAssessment
         switch scope.kind {
         case .directory:

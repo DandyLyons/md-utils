@@ -12,7 +12,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 ## Project Brief
 
 - **Language**: Swift 6.2+
-- **Native indexing**: `MarkdownUtilitiesIndex` uses upstream GRDB with system SQLite and Swift Crypto SHA-256. The CLI's `index update/type/rule` commands cache persisted scopes in `.md-utils/index.sqlite`; see `docs/collection-index.md`. JSON, expression indexes, and FTS5 are probed before opening index files. Core, WASM, and server have no GRDB/SQLite dependency. See `docs/sqlite-index-packaging.md` for runtime requirements. Xcode-based database integration is rejected.
+- **Native indexing**: `MarkdownUtilitiesIndex` uses upstream GRDB with system SQLite and Swift Crypto SHA-256. The CLI's `index update/type/rule` commands cache persisted scopes in `.md-utils/index.sqlite`; see `docs/collection-index.md`. JSON and expression indexes are baseline probes; FTS5 is probed only for opt-in FTS caches. New caches choose and record JSONB or JSON text from the linked runtime. Refresh and SQL output use bounded streaming/staging. Core, WASM, and server have no GRDB/SQLite dependency. See `docs/sqlite-index-packaging.md` for runtime requirements. Xcode-based database integration is rejected.
 - **Frameworks/Libraries**: Foundation, MarkdownSyntax, PathKit, Yams, swift-toml, JMESPath, DynamicJSON, JSONSchema.swift, swift-argument-parser, Noora (interactive CLI authoring), Rainbow, Hummingbird 2, Swift Logging
   - **parsing**: Any code that involves parsing text must use the `Parsing` library like the rest of the codebase.
 - **Package Manager / Build Tool**: Swift Package Manager

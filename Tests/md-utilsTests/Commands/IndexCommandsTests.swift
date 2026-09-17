@@ -50,7 +50,10 @@ struct IndexCommandsTests {
         try await refresh.run()
         #expect(try fixture.database().selectedPaths() == ["notes/book.md"])
         #expect(try fixture.database().scopes() == [IndexScope(path: "notes/")])
-        #expect(try fixture.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM documents_fts") } == 1)
+        #expect(try fixture.database().storagePolicy().bodyMode == .metadataOnly)
+        #expect(try fixture.read {
+            try Int.fetchOne($0, sql: "SELECT count(*) FROM sqlite_master WHERE name='documents_fts'")
+        } == 0)
     }
 
     @Test func `type index equals types find and overlapping conformance stays independent`() async throws {
@@ -216,6 +219,10 @@ struct IndexCommandsTests {
         try await update.run()
         try fixture.write("notes/book.md", "---\ntitle: Updated\nstatus: published\n---\nnew body")
 
+        let enable = try CLIProcessTestHelper.run(["index", "search", "enable",
+            "--project-root", fixture.root.string], workingDirectory: URL(fileURLWithPath: fixture.root.string))
+        #expect(enable.status == 0)
+
         let query = try CLIProcessTestHelper.run(["index", "query",
             "SELECT json_extract(metadata, '$.title') AS title, body FROM current_documents",
             "--project-root", fixture.root.string], workingDirectory: URL(fileURLWithPath: fixture.root.string))
@@ -242,15 +249,40 @@ struct IndexCommandsTests {
         #expect(status.standardOutput.contains("current: yes"))
     }
 
-    @Test func `query renderers preserve machine readable shapes`() throws {
-        let result = IndexQueryResult(columns: ["name", "count"],
-            rows: [[.text("a,b"), .integer(2)], [.text("quoted \"value\""), .null]], truncated: false)
-        let jsonl = try IndexQueryRenderer.render(result, format: .jsonl)
+    @Test func `nul query output preserves unusual paths without line ambiguity`() async throws {
+        let fixture = try IndexCommandFixture()
+        defer { fixture.remove() }
+        let unusual = "notes/line\nbreak name.md"
+        try fixture.write(unusual, "---\ntitle: Unusual\n---\n")
+        var update = try #require(CLIEntry.parseAsRoot(["index", "update", (fixture.root + "notes/").string,
+            "--project-root", fixture.root.string]) as? CLIEntry.Index.Update)
+        try await update.run()
+        let query = try CLIProcessTestHelper.run(["index", "query", "SELECT path FROM current_documents ORDER BY path",
+            "--format", "nul", "--project-root", fixture.root.string],
+            workingDirectory: URL(fileURLWithPath: fixture.root.string))
+        #expect(query.status == 0)
+        #expect(query.standardOutput == unusual + "\0")
+    }
+
+    @Test func `streaming query renderers preserve machine readable shapes`() throws {
+        let fixture = try IndexCommandFixture()
+        defer { fixture.remove() }
+        let database = try fixture.database()
+        _ = try CollectionIndexer(database: database, root: URL(fileURLWithPath: fixture.root.string))
+        func render(_ sql: String, format: IndexQueryFormat) throws -> String {
+            let pipe = Pipe()
+            try IndexStreamingQueryRenderer.render(database: database, sql: sql, format: format,
+                limits: IndexQueryLimits(), shouldCancel: { false }, output: pipe.fileHandleForWriting)
+            try pipe.fileHandleForWriting.close()
+            return String(decoding: try pipe.fileHandleForReading.readToEnd() ?? Data(), as: UTF8.self)
+        }
+        let sql = "SELECT 'a,b' AS name,2 AS count UNION ALL SELECT 'quoted \"value\"',NULL"
+        let jsonl = try render(sql, format: .jsonl)
         #expect(jsonl.contains("{\"count\":2,\"name\":\"a,b\"}"))
-        let csv = try IndexQueryRenderer.render(result, format: .csv)
+        let csv = try render(sql, format: .csv)
         #expect(csv == "name,count\n\"a,b\",2\n\"quoted \"\"value\"\"\",\n")
         #expect(throws: (any Error).self) {
-            try IndexQueryRenderer.render(IndexQueryResult(columns: ["value", "value"], rows: [], truncated: false), format: .jsonl)
+            try render("SELECT 1 AS value,2 AS value", format: .jsonl)
         }
     }
 }

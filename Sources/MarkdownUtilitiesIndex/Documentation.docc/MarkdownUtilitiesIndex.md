@@ -5,9 +5,11 @@ Maintain a rebuildable SQLite cache of file collections and selection assessment
 ## Overview
 
 Files remain authoritative. The native index tracks root-relative file paths,
-parsed metadata, source bodies, and independent scope memberships. GRDB uses the
-operating system's SQLite runtime, with mandatory JSON and FTS5 capability probes.
-The host supplies its existing content extractor and type or rule evaluator.
+parsed metadata and independent scope memberships. Optional FTS mode also retains
+one source body per selected document. GRDB uses the operating system's SQLite
+runtime, with mandatory JSON/expression-index probes and an FTS5 probe only for
+FTS-mode caches. The host supplies its existing content extractor and type or rule
+evaluator.
 
 ## Topics
 
@@ -17,6 +19,7 @@ The host supplies its existing content extractor and type or rule evaluator.
 - ``CollectionIndexer``
 - ``IndexScope``
 - ``IndexUpdateReport``
+- ``IndexRefreshLimits``
 
 ### Supplying Evaluations
 
@@ -29,3 +32,8 @@ The host supplies its existing content extractor and type or rule evaluator.
 
 - ``SQLiteIndexDatabase``
 - ``SQLiteIndexError``
+- ``IndexStoragePolicy``
+- ``IndexBodyMode``
+- ``IndexMetadataEncoding``
+- ``IndexQueryLimits``
+- ``IndexQuerySummary``

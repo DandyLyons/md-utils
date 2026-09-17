@@ -13,6 +13,9 @@ md-utils index update --rebuild
 md-utils index query "SELECT path FROM current_documents ORDER BY path"
 md-utils index explain "SELECT path FROM documents WHERE json_extract(metadata, '$.status') = 'draft'"
 md-utils index field add '$.status'
+md-utils index search enable
+md-utils index search status
+md-utils index search disable --vacuum
 md-utils index status
 ```
 
@@ -63,8 +66,15 @@ are recorded explicitly and retried on the next refresh. Config-loading failures
 invalidate existing scopes. The CLI exits unsuccessfully for incomplete scans or
 parse/evaluation failures; ordinary nonconformance remains an assessment result.
 
-Document, assessment, diagnostic, deletion, and FTS updates commit in one SQLite
-transaction. Cancellation or transaction failure leaves old rows marked
+Discovery paths and changed results are staged in SQLite in bounded batches; a
+refresh does not retain the corpus in memory. A file shared by overlapping scopes
+is read, hashed, and parsed once before each scope evaluates the shared extraction.
+The defaults fetch 256 staged candidates, batch at most 1,024 discovered paths or
+256 KiB of their UTF-8 bytes, and reject an individual source larger than 64 MiB.
+Library hosts can change these independent `IndexRefreshLimits`.
+
+Document, assessment, diagnostic, deletion, and optional FTS updates publish in
+one SQLite transaction. Cancellation or transaction failure leaves old rows marked
 unavailable. Concurrent updates use a generation check: a superseded scan cannot
 overwrite newer results. Stat checks around reading and evaluation detect common
 concurrent file edits, but filesystem enumeration is **not an atomic snapshot**.
@@ -81,11 +91,16 @@ every saved scope before opening a serialized read snapshot. Any incomplete scan
 parse failure, or evaluation failure exits unsuccessfully without running the SQL;
 there is intentionally no `--no-update` option. Exactly one SQLite read-only
 statement is accepted. SQLite's statement classifier plus `PRAGMA query_only`
-reject mutations. Results default to JSON with `columns`, typed `rows`, and a
-`truncated` flag; `--format jsonl` and `--format csv` are also available. The
-default limit is 1,000 rows and the accepted range is 1 through 10,000. BLOBs are
+reject mutations. Rows are pulled from one consistent snapshot and written only
+as the consumer accepts them; the query layer retains at most one row. Results
+default to JSON with `columns`, typed `rows`, and a `truncated` flag; `--format
+jsonl`, `--format csv`, and one-text-column `--format nul` are also available. NUL
+output safely represents paths containing whitespace or newlines. `--limit`,
+`--max-bytes`, and `--max-value-bytes` independently bound rows, aggregate SQLite
+value bytes, and one text/BLOB value. Defaults are 1,000 rows, 64 MiB, and 16 MiB.
+Cancellation and a slow output consumer stop SQLite from advancing. BLOBs are
 base64 objects in JSON and base64 text in CSV. Use column aliases for unique JSONL
-keys.
+keys. A later-row error can leave a valid prefix already written.
 
 All index commands use `<project-root>/.md-utils/index.sqlite` by default.
 `--database <file>` selects another cache, which must be bound to the same project
@@ -97,13 +112,14 @@ refresh times, and every saved scope's state and error.
 | Object | Contents |
 | --- | --- |
 | `files` | Root-relative path, mtime, byte size, SHA-256, parse/read state |
-| `documents` | JSON metadata and source text body for selected records |
+| `documents` | JSON/JSONB metadata and, only in FTS mode, one body per selected record |
 | `scopes` | Selection JSON, combined fingerprint, scan state/error |
 | `assessments` | Per-scope candidate selection, validation status, detailed evidence |
 | `diagnostics` | Separate parse, selection, validation, evaluation, and advisory records |
-| `documents_fts` | Transactionally maintained FTS5 source bodies |
-| `current_documents` | Selected documents with successful parsing and a complete selecting scope |
+| `documents_fts` | Optional external-content FTS5 index over `documents.body` |
+| `current_documents` | Current selected `path` and ordinary JSON `metadata`, plus `body` only in FTS mode |
 | `index_metadata` | Root, config path, update generation, extraction/evaluator version |
+| `refresh_*` | Bounded disk-backed staging for an in-progress generation |
 
 Raw tables may contain unavailable records after failures. Use
 `current_documents` for current parsed content. For a particular scope, also
@@ -112,12 +128,28 @@ Rule-selected malformed documents retain selection and diagnostics in raw tables
 but are excluded from `current_documents`. Negative type assessments never imply
 membership. Selected invalid but successfully parsed rule documents remain current.
 
+New caches are metadata-only: they do not retain bodies, create FTS tables, or
+expose `body` through current/type views. `index search enable` switches to FTS
+mode and rebuilds current files. FTS mode stores exactly one body in `documents`;
+`documents_fts` uses it as external content, and its update triggers do nothing
+when only metadata changes. Body and FTS queries in metadata-only mode fail with
+an actionable error. `index search disable` drops FTS and clears bodies; add
+`--vacuum` to reclaim free pages.
+
 ```sql
 SELECT d.path, d.metadata
 FROM current_documents AS d
-JOIN documents_fts AS f ON f.path = d.path
+JOIN documents AS raw USING(path)
+JOIN documents_fts AS f ON f.rowid = raw.rowid
 WHERE documents_fts MATCH 'search terms';
 ```
+
+Metadata representation is selected per cache from the linked SQLite connection:
+new caches use JSONB when `jsonb()` is available and JSON text otherwise. The
+choice is recorded. A runtime that cannot read a recorded JSONB cache fails before
+mutation. Public views always return ordinary JSON text. External tools therefore
+do not need custom functions, but their SQLite runtime must support JSONB to open
+a JSONB-backed cache.
 
 Field indexes are ordinary SQLite acceleration structures, distinct from
 collection membership. `index field add '$.status'` creates a managed expression
@@ -130,13 +162,13 @@ does **not** accelerate individual membership through `json_each`; model and que
 array membership explicitly.
 
 Each registered type gets a deterministic `type_<normalized-name>` view (for
-example, `Book` becomes `type_book`). It includes `path`, JSON `metadata`, `body`,
-and one `json_extract` projection for every managed field. Views use only
+example, `Book` becomes `type_book`). It includes `path`, ordinary JSON `metadata`,
+an FTS-mode `body`, and one `json_extract` projection for every managed field. Views use only
 successful `conforms` memberships from complete scopes, and one document may
 appear in several overlapping type views. `type_views` records the exact mapping
-when normalized type names collide. These views, tables, indexes, and FTS use only
-JSON text and standard SQLite facilities, so compatible external SQLite tools can
-query the same file without md-utils custom functions. Unmanaged SQL indexes and
+when normalized type names collide. These views, tables, indexes, and optional FTS
+use standard SQLite facilities, so compatible external SQLite tools can query the
+same file without md-utils custom functions. Unmanaged SQL indexes and
 views also survive refresh and rebuild. There is no JMESPath-to-SQL translation,
 schema-validation extension, definition catalog, or bidirectional file writing.
 

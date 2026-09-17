@@ -14,4 +14,4 @@ guard sqlite3_exec(connection, "CREATE TABLE consumer(value TEXT)", nil, nil, ni
     throw SmokeError.systemConnectionFailed
 }
 try SQLiteIndexDatabase.checkCapabilities()
-print("System SQLite \(SQLiteIndexDatabase.sqliteVersion): GRDB JSON, expression indexes, FTS5, and C consumer passed")
+print("System SQLite \(SQLiteIndexDatabase.sqliteVersion): GRDB JSON, expression indexes, and C consumer passed")

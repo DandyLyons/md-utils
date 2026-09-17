@@ -13,6 +13,8 @@ md-utils index update --verify-hashes
 md-utils index update --rebuild
 md-utils index query "SELECT path FROM current_documents"
 md-utils index field add '$.status'
+md-utils index search enable
+md-utils index search disable --vacuum
 md-utils index explain "SELECT path FROM documents WHERE json_extract(metadata, '$.status')='draft'"
 md-utils index status
 ```
@@ -52,9 +54,19 @@ filesystem snapshot, and no index command writes changes back to source files.
 
 `index query` and `index explain` refresh every saved scope before executing one
 read-only statement. Refresh failures prevent the query; mutations are rejected.
-JSON output is the default, with JSONL and CSV available through `--format`.
-Queries return at most 1,000 rows by default; `--limit` accepts 1 through 10,000.
+JSON output is the default, with JSONL, CSV, and one-text-column NUL output
+available through `--format`. NUL output safely preserves whitespace and newlines
+in paths. Rows stream from a consistent snapshot with callback/output backpressure.
+`--limit`, `--max-bytes`, and `--max-value-bytes` independently cap rows,
+aggregate value bytes, and one text/BLOB value.
 Use `--database <file>` to select a cache other than the project default.
+
+New caches are metadata-only and do not retain bodies or create FTS tables. Use
+`index search enable` to select FTS mode and rebuild every scope. It stores one
+body in `documents` and uses an external-content `documents_fts` index. `index
+search disable` clears bodies and drops FTS; `--vacuum` also reclaims free pages.
+Body and FTS SQL fail explicitly in metadata-only mode. `index search status`
+reports both the body mode and persisted metadata encoding.
 
 `index field add <json-path>` creates an explicit expression index. Use the exact
 expression printed by `index field list` in predicates. Managed fields also become
@@ -63,5 +75,7 @@ successful type memberships. Arrays are indexed as whole JSON values; use
 `json_each` for element membership, which is not accelerated by that index.
 
 `index status` reports generation, refresh timestamps, and saved scope states.
-The public schema uses standard SQLite JSON, FTS5, views, and expression indexes
-without md-utils-only SQL functions.
+Public views always expose ordinary JSON text. Raw metadata is JSONB when the
+linked SQLite runtime supports it and JSON text otherwise; the cache records the
+choice. Views, optional FTS5, and expression indexes use no md-utils-only SQL
+functions.

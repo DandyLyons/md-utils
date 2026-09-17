@@ -40,11 +40,15 @@ Incomplete scans retain unavailable rows and report errors. Query
 `current_documents` for current parsed members, and inspect `assessments` and
 `diagnostics` for nonconformance, parsing/evaluation errors, and advisories.
 Use `index query '<sql>'` for bounded read-only SQL that refreshes every scope
-first, `index explain '<sql>'` for query plans, `index field add '$.field'` for an
-explicit JSON expression index and type-view projection, and `index status` for
-freshness. Type views are named `type_<normalized-name>`. Arrays require explicit
-`json_each` membership queries; indexing the whole JSON array does not accelerate
-individual elements.
+first and streams rows with independent `--limit`, `--max-bytes`, and
+`--max-value-bytes` bounds. Use one-column `--format nul` for unambiguous paths.
+New caches are metadata-only. Run `index search enable` to retain one body per
+document and build external-content FTS; `index search disable --vacuum` removes
+bodies and search storage. Use `index explain '<sql>'` for query plans, `index field
+add '$.field'` for an explicit JSON expression index and type-view projection, and
+`index status` for freshness. Type views are named `type_<normalized-name>`.
+Arrays require explicit `json_each` membership queries; indexing the whole JSON
+array does not accelerate individual elements.
 
 ## Batch Operations
 
