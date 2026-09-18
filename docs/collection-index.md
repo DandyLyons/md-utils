@@ -73,11 +73,52 @@ The defaults fetch 256 staged candidates, batch at most 1,024 discovered paths o
 256 KiB of their UTF-8 bytes, and reject an individual source larger than 64 MiB.
 Library hosts can change these independent `IndexRefreshLimits`.
 
+Changed records flush after 128 files or 4 MiB of UTF-8 payload (including
+metadata, assessments, and diagnostics). A record exceeding that batch budget
+flushes the preceding batch and stages alone. The 64 MiB input-file limit still
+applies; oversized input is persisted as a visible failure without being read.
+Peak ingestion payload is one batch plus one file's input/extraction/evaluator
+output, rather than all changed bodies. Custom evaluators must budget their own
+working memory and output expansion. Metadata-only batches discard bodies before
+queueing them. A file's content is staged once with all independent assessments,
+then written/indexed once at publication. Directory traversal is incremental;
+SQLite provides candidate ordering without an in-memory directory sort.
+
+The index encodes typed assessment payloads and existing `JSONValue` metadata
+with `JSONEncoder`; it does not round-trip through Foundation `Any` objects.
+Native reads and file metadata use Swift System. A Swift traversal adapter uses
+Foundation's incremental directory enumerator, preserving hidden-file and symlink
+exclusions and propagating traversal errors, including failures at end of iteration.
+These paths require no explicit autorelease pools. Reads use at most a 64 KiB
+scratch buffer, honor short reads, and check cancellation between chunks.
+
+Reports retain the first 100 failure messages, truncated to 4,096 characters,
+and count omitted messages. Full per-file findings remain in `diagnostics`.
+
 Document, assessment, diagnostic, deletion, and optional FTS updates publish in
 one SQLite transaction. Cancellation or transaction failure leaves old rows marked
 unavailable. Concurrent updates use a generation check: a superseded scan cannot
 overwrite newer results. Stat checks around reading and evaluation detect common
 concurrent file edits, but filesystem enumeration is **not an atomic snapshot**.
+
+Staging uses the `refresh_*` tables in the existing cache, with no separate
+temporary source files. Success and normal thrown exits clear that generation's
+staging; if cleanup itself fails or the process crashes, the next refresh discards
+abandoned staging before scanning. Stale writers cannot append staging or remove
+a newer generation's work. Freed SQLite pages remain reusable (the cache does
+not shrink on each refresh). This cleanup never touches pending edits or source
+files. Keep the cache and its journals under hidden `.md-utils/`, excluded by
+discovery and by any filesystem watch consumer; custom cache locations and their
+journals are excluded from discovery by exact path and must likewise be excluded
+by the host watcher.
+
+Readers using a SQLite read transaction see a consistent committed snapshot.
+Before publication, raw tables retain the preceding content while scope state is
+`updating`, so current/type views with those scopes are unavailable. Publication
+switches content, memberships, diagnostics, and FTS together. Separate statements
+without a read transaction can see different committed generations; use
+`streamQuery` for a single consistent query. A failed or cancelled refresh never
+marks partially staged content complete.
 
 `--rebuild` ignores cached results and regenerates all registered scopes. It
 retains the database schema, saved scopes/config path, SQL field indexes, and
@@ -173,8 +214,13 @@ views also survive refresh and rebuild. There is no JMESPath-to-SQL translation,
 schema-validation extension, definition catalog, or bidirectional file writing.
 
 See [native SQLite packaging](sqlite-index-packaging.md) for runtime requirements.
-`swift test --filter 'MarkdownUtilitiesIndexTests|IndexCommandsTests'` covers
+`swift test --filter 'MarkdownUtilitiesIndexTests|IndexCommandsTests|IndexPayloadTests'` covers
 refresh/rebuild, migration rollback, interruption, scope overlap, unreadable
 directories, stat-preserving edits, evaluator parity, schema invalidation,
 non-Markdown extraction, and a 1,000-document collection. Native SQLite CI runs
 these suites on macOS and Linux.
+
+See [refresh resource measurements](index-refresh-benchmarks.md) for the
+reproducible 100,000-document benchmark, byte/record budgets, hardware, and
+measured limitations. Million-document validation and optimization are deferred
+to future improvement and are not part of #147's acceptance criteria.

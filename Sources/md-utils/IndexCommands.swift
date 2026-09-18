@@ -199,16 +199,6 @@ enum IndexQueryFormat: String, ExpressibleByArgument {
 }
 
 enum IndexQueryValueRenderer {
-    static func jsonValue(_ value: IndexQueryValue) -> Any {
-        switch value {
-        case .null: NSNull()
-        case .integer(let value): value
-        case .real(let value): value
-        case .text(let value): value
-        case .blob(let data): ["base64": data.base64EncodedString()]
-        }
-    }
-
     static func textValue(_ value: IndexQueryValue) -> String {
         switch value {
         case .null: ""
@@ -231,11 +221,13 @@ enum IndexStreamingQueryRenderer {
         output: FileHandle = .standardOutput) throws {
         var columnNames: [String] = []
         var firstJSONRow = true
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let summary = try database.streamQuery(sql, limits: limits, shouldCancel: shouldCancel, columns: { columns in
             columnNames = columns
             switch format {
             case .json:
-                let encoded = try JSONSerialization.data(withJSONObject: columns)
+                let encoded = try encoder.encode(columns)
                 write(Data("{\"columns\":".utf8), to: output)
                 write(encoded, to: output)
                 write(Data(",\"rows\":[".utf8), to: output)
@@ -252,11 +244,11 @@ enum IndexStreamingQueryRenderer {
             switch format {
             case .json:
                 if !firstJSONRow { write(Data(",".utf8), to: output) }
-                write(try JSONSerialization.data(withJSONObject: row.map(IndexQueryValueRenderer.jsonValue)), to: output)
+                write(try encoder.encode(row.map { IndexQueryJSONValue(value: $0) }), to: output)
                 firstJSONRow = false
             case .jsonl:
-                let object = Dictionary(uniqueKeysWithValues: zip(columnNames, row.map(IndexQueryValueRenderer.jsonValue)))
-                write(try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), to: output)
+                let object = Dictionary(uniqueKeysWithValues: zip(columnNames, row.map { IndexQueryJSONValue(value: $0) }))
+                write(try encoder.encode(object), to: output)
                 write(Data("\n".utf8), to: output)
             case .csv:
                 let line = row.map(IndexQueryValueRenderer.textValue).map(IndexQueryValueRenderer.csv).joined(separator: ",") + "\n"
@@ -327,9 +319,12 @@ struct IndexOptions: ParsableArguments {
         let report = try await indexer.updateMany(adding: scope, fingerprint: evaluator.fingerprint,
             rebuild: rebuild, verifyHashes: verifyHashes, evaluate: evaluator.evaluate)
         if !quiet {
-            print("Index: \(report.evaluated) evaluated, \(report.cached) cached, \(report.hashed) hashed; \(try database.selectedPaths().count) current documents.")
+            print("Index: \(report.evaluated) evaluated, \(report.cached) cached, \(report.hashed) hashed; \(try database.selectedCount()) current documents.")
         }
         for error in report.errors { FileHandle.standardError.write(Data("\(error)\n".utf8)) }
+        if report.omittedErrorCount > 0 {
+            FileHandle.standardError.write(Data("\(report.omittedErrorCount) additional failures; inspect persisted index diagnostics.\n".utf8))
+        }
         if !report.errors.isEmpty { throw ExitCode.failure }
         return database
     }
@@ -393,7 +388,7 @@ struct IndexProjectEvaluator {
         // Resolved schemas include transitive resources, including resources outside .md-utils/.
         for registry in [types, rules?.typeRegistry].compactMap({ $0 }) {
             for definition in registry.definitions {
-                components.append(try Self.json(TypesRenderer.definitionObject(definition)))
+                components.append(try Self.json(IndexDefinitionPayload(definition: definition)))
                 if let resolved = registry.resolvedFrontmatterSchema(for: definition.name) {
                     let encoder = JSONEncoder()
                     encoder.outputFormatting = [.sortedKeys]
@@ -404,7 +399,7 @@ struct IndexProjectEvaluator {
         if let rules {
             for definition in rules.definitions {
                 if let rule = rules.rule(named: definition.name) {
-                    components.append(try Self.json(rule.resolvedSchemas.mapValues(\.foundationValue)))
+                    components.append(try Self.json(rule.resolvedSchemas))
                 }
             }
         }
@@ -451,7 +446,7 @@ struct IndexProjectEvaluator {
             let failedEvaluation = !analyzed.parseDiagnostics.isEmpty || result.diagnostics.contains(where: Self.isEvaluationError)
             assessment = IndexAssessment(selected: result.conforms,
                 status: failedEvaluation ? "evaluation-error" : (result.conforms ? "conforms" : "nonconforming"),
-                detail: try Self.json(TypesRenderer.assessmentObject(result, path: path)),
+                detail: try Self.json(IndexTypePayload(result, path: path)),
                 diagnostics: result.diagnostics.map { Self.diagnostic($0, category: "validation") })
         case .rule:
             guard let rules, let rule = rules.rule(named: scope.name) else { throw ValidationError("Unknown rule: \(scope.name)") }
@@ -461,25 +456,13 @@ struct IndexProjectEvaluator {
                 || result.diagnostics.contains { Self.isEvaluationError($0) }
             assessment = IndexAssessment(selected: result.applicable && result.applicabilityDiagnostics.isEmpty,
                 status: evaluationError ? "evaluation-error" : result.status.rawValue,
-                detail: try Self.json([
-                    "status": result.status.rawValue,
-                    "evidence": try JSONSerialization.jsonObject(with: JSONEncoder().encode(result.evidence)),
-                    "typeAssessments": result.typeAssessments.mapValues { TypesRenderer.assessmentObject($0, path: nil) },
-                    "typeExpression": result.typeExpressionAssessment.map(Self.expressionObject) ?? [:],
-                ]), diagnostics: result.applicabilityDiagnostics.map { Self.diagnostic($0, category: "selection") }
+                detail: try Self.json(IndexRulePayload(result: result)),
+                diagnostics: result.applicabilityDiagnostics.map { Self.diagnostic($0, category: "selection") }
                     + result.diagnostics.map { Self.diagnostic($0, category: "validation") })
         }
         assessment.diagnostics.append(contentsOf: analyzed.parseDiagnostics.map { Self.diagnostic($0, category: "parse") })
-        return IndexEvaluation(metadata: try Self.json((analyzed.userFrontmatter ?? [:]).mapValues(\.foundationValue)),
+        return IndexEvaluation(metadata: try Self.json(analyzed.userFrontmatter ?? [:]),
             body: analyzed.body, parseState: analyzed.parseDiagnostics.isEmpty ? "ok" : "error", assessment: assessment)
-    }
-
-    private static func expressionObject(_ expression: MarkdownRuleTypeExpressionAssessment) -> [String: Any] {
-        var object: [String: Any] = ["location": expression.location, "status": expression.status.rawValue,
-            "children": expression.children.map(expressionObject)]
-        if let reference = expression.reference { object["reference"] = reference }
-        if let assessment = expression.assessment { object["assessment"] = TypesRenderer.assessmentObject(assessment, path: nil) }
-        return object
     }
 
     private static func isEvaluationError(_ diagnostic: MarkdownDiagnostic) -> Bool {
@@ -493,7 +476,9 @@ struct IndexProjectEvaluator {
             severity: diagnostic.severity.rawValue, code: diagnostic.code, location: diagnostic.location, message: diagnostic.message)
     }
 
-    private static func json(_ object: Any) throws -> String {
-        String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .fragmentsAllowed]), as: UTF8.self)
+    private static func json<Value: Encodable>(_ value: Value) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return String(decoding: try encoder.encode(value), as: UTF8.self)
     }
 }

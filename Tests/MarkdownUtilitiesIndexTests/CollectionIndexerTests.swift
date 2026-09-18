@@ -36,6 +36,191 @@ private func selectAll(_ scope: IndexScope, _ path: String, _ content: String, _
 
 @Suite("Incremental collection indexing")
 struct CollectionIndexerTests {
+    @Test func `independent readers see published content rather than staged batches`() async throws {
+        let fixture = try IndexFixture(bodyMode: .fts)
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "original")
+        let scope = IndexScope(path: "notes/")
+        _ = try await fixture.indexer.update(adding: scope, fingerprint: "v1", evaluate: selectAll)
+        let reader = try DatabaseQueue(path: fixture.database.databaseQueue.path)
+        let generation = try fixture.database.beginStagedRefresh(scopes: [scope], fingerprint: "v2")
+        try fixture.database.stageSeen(generation: generation, scopeID: scope.id, paths: ["notes/one.md"])
+        let evaluation = IndexEvaluation(metadata: "{}", body: "replacement",
+            assessment: IndexAssessment(selected: true, status: "selected"))
+        try fixture.database.stageChanges(generation: generation, changes: [StagedIndexChange(
+            file: IndexFileChange(path: "notes/one.md", mtime: 1, size: 11, hash: "new", evaluation: evaluation),
+            assessments: [scope.id: evaluation.assessment])])
+        try await reader.read { database throws -> Void in
+            #expect(try String.fetchOne(database, sql: "SELECT body FROM documents") == "original")
+            #expect(try Int.fetchOne(database, sql: "SELECT count(*) FROM current_documents") == 0)
+            #expect(try Int.fetchOne(database, sql: "SELECT count(*) FROM documents_fts WHERE documents_fts MATCH 'replacement'") == 0)
+        }
+        try fixture.database.commitStagedRefresh(scopes: [scope], errors: [:], fingerprint: "v2", generation: generation)
+        try await reader.read { database throws -> Void in
+            #expect(try String.fetchOne(database, sql: "SELECT body FROM documents") == "replacement")
+            #expect(try Int.fetchOne(database, sql: "SELECT count(*) FROM current_documents") == 1)
+            #expect(try Int.fetchOne(database, sql: "SELECT count(*) FROM documents_fts WHERE documents_fts MATCH 'replacement'") == 1)
+            #expect(try Int.fetchOne(database, sql: "SELECT count(*) FROM documents_fts WHERE documents_fts MATCH 'original'") == 0)
+        }
+    }
+
+    @Test func `traversal skips hidden entries and directory and file symlinks`() throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/nested/visible.md", "visible")
+        try fixture.write("notes/.hidden/secret.md", "hidden")
+        try fixture.write("notes/nested/.secret.md", "hidden")
+        try fixture.write("outside/other.md", "outside")
+        let notes = fixture.root.appendingPathComponent("notes/")
+        try FileManager.default.createSymbolicLink(at: notes.appendingPathComponent("linked/"),
+            withDestinationURL: fixture.root.appendingPathComponent("outside/"))
+        try FileManager.default.createSymbolicLink(at: notes.appendingPathComponent("linked.md"),
+            withDestinationURL: fixture.root.appendingPathComponent("outside/other.md"))
+        var paths: [String] = []
+        try IndexDirectoryTraversal.visit(notes, excluding: [], includeNonMarkdown: false) {
+            paths.append($0.lastPathComponent)
+        }
+        #expect(paths == ["visible.md"])
+    }
+
+    @Test func `unreadable descendant fails traversal instead of completing an empty scan`() throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/blocked/one.md", "one")
+        let blocked = fixture.root.appendingPathComponent("notes/blocked/")
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: blocked.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: blocked.path) }
+        // A privileged Linux runner may read directories regardless of their mode.
+        guard !FileManager.default.isReadableFile(atPath: blocked.path) else { return }
+        #expect(throws: (any Error).self) {
+            try IndexDirectoryTraversal.visit(fixture.root.appendingPathComponent("notes/"),
+                excluding: [], includeNonMarkdown: false) { _ in }
+        }
+    }
+
+    @Test func `traversal immediately propagates visitor cancellation`() throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "one")
+        try fixture.write("notes/two.md", "two")
+        var visits = 0
+        #expect(throws: CancellationError.self) {
+            try IndexDirectoryTraversal.visit(fixture.root.appendingPathComponent("notes/"),
+                excluding: [], includeNonMarkdown: false) { _ in
+                visits += 1
+                throw CancellationError()
+            }
+        }
+        #expect(visits == 1)
+    }
+
+    @Test func `custom cache is excluded from non Markdown root discovery`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.txt", "one")
+        let report = try await fixture.indexer.update(adding: IndexScope(includeNonMarkdown: true),
+            fingerprint: "v1", evaluate: selectAll)
+        #expect(report.errors.isEmpty)
+        #expect(report.evaluated == 1)
+        #expect(try fixture.database.selectedPaths() == ["notes/one.txt"])
+    }
+
+    @Test func `byte batches flush before growing and oversized payloads stage alone`() async throws {
+        let fixture = try IndexFixture(bodyMode: .fts)
+        defer { fixture.remove() }
+        for index in 0..<6 { try fixture.write("notes/\(index).md", String(repeating: "x", count: 512)) }
+        var observed: [Int] = []
+        let report = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1",
+            limits: IndexRefreshLimits(candidateBatchCount: 2, discoveryBatchCount: 2,
+                discoveryBatchBytes: 16, fileBytes: 1_024, changeBatchCount: 128, changeBatchBytes: 900)) {
+                _, _, content, _ in
+                observed.append(try fixture.count("refresh_files"))
+                return IndexEvaluation(metadata: "{}", body: content,
+                    assessment: IndexAssessment(selected: true, status: "selected"))
+            }
+        #expect(report.evaluated == 6)
+        #expect(observed == [0, 0, 1, 2, 3, 4])
+        #expect(try fixture.count("documents") == 6)
+        #expect(try fixture.count("refresh_files") == 0)
+        observed = []
+        _ = try await fixture.indexer.update(fingerprint: "v1", rebuild: true,
+            limits: IndexRefreshLimits(changeBatchBytes: 100)) { _, _, content, _ in
+                observed.append(try fixture.count("refresh_files"))
+                return IndexEvaluation(metadata: "{}", body: content,
+                    assessment: IndexAssessment(selected: true, status: "selected"))
+            }
+        #expect(observed == [0, 1, 2, 3, 4, 5])
+    }
+
+    @Test func `cancelled staged batches are discarded without publishing partial content`() async throws {
+        let fixture = try IndexFixture(bodyMode: .fts)
+        defer { fixture.remove() }
+        try fixture.write("notes/1.md", "old one")
+        try fixture.write("notes/2.md", "old two")
+        _ = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1", evaluate: selectAll)
+        var calls = 0
+        do {
+            _ = try await fixture.indexer.update(fingerprint: "v2", limits: IndexRefreshLimits(changeBatchCount: 1)) {
+                _, _, _, _ in
+                calls += 1
+                if calls == 2 {
+                    #expect(try fixture.count("refresh_files") == 1)
+                    #expect(try fixture.database.query("SELECT body FROM documents ORDER BY path").rows
+                        == [[.text("old one")], [.text("old two")]])
+                    #expect(try fixture.database.selectedPaths().isEmpty)
+                    throw CancellationError()
+                }
+                return IndexEvaluation(metadata: "{}", body: "new content",
+                    assessment: IndexAssessment(selected: true, status: "selected"))
+            }
+            Issue.record("Expected cancellation")
+        } catch is CancellationError {}
+        for table in ["refresh_files", "refresh_seen", "refresh_scopes", "refresh_assessments", "refresh_diagnostics"] {
+            #expect(try fixture.count(table) == 0)
+        }
+        #expect(!(try fixture.database.freshness().isCurrent))
+        _ = try await fixture.indexer.update(fingerprint: "v2", evaluate: selectAll)
+        #expect(try fixture.database.freshness().isCurrent)
+    }
+
+    @Test func `obsolete writers cannot stage and cleanup preserves newer work`() throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        let scope = IndexScope(path: "notes/")
+        let old = try fixture.database.beginStagedRefresh(scopes: [scope], fingerprint: "old")
+        try fixture.database.stageSeen(generation: old, scopeID: scope.id, paths: ["notes/old.md"])
+        let new = try fixture.database.beginStagedRefresh(scopes: [scope], fingerprint: "new")
+        #expect(try fixture.count("refresh_seen") == 0)
+        try fixture.database.stageSeen(generation: new, scopeID: scope.id, paths: ["notes/new.md"])
+        #expect(throws: SQLiteIndexError.self) {
+            try fixture.database.stageSeen(generation: old, scopeID: scope.id, paths: ["notes/stale.md"])
+        }
+        let evaluation = IndexEvaluation(metadata: "{}", body: "stale",
+            assessment: IndexAssessment(selected: true, status: "selected"))
+        #expect(throws: SQLiteIndexError.self) {
+            try fixture.database.stageChanges(generation: old, changes: [StagedIndexChange(
+                file: IndexFileChange(path: "notes/stale.md", mtime: 0, size: 5, hash: "stale", evaluation: evaluation),
+                assessments: [scope.id: evaluation.assessment])])
+        }
+        #expect(try fixture.count("refresh_files") == 0)
+        try fixture.database.discardStagedRefresh(generation: old)
+        #expect(try fixture.database.stagedCandidatePaths(generation: new, after: nil, limit: 10) == ["notes/new.md"])
+    }
+
+    @Test func `failure reports remain bounded and hidden staging is excluded`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        for index in 0..<105 { try fixture.write("notes/\(index).md", "oversized") }
+        try fixture.write("notes/.md-utils/abandoned.md", "hidden")
+        let report = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1",
+            limits: IndexRefreshLimits(fileBytes: 1), evaluate: selectAll)
+        #expect(report.errors.count == 100)
+        #expect(report.omittedErrorCount == 5)
+        #expect(try fixture.count("diagnostics") == 105)
+        #expect(try fixture.count("files") == 105)
+        #expect(report.hashed == 0)
+    }
+
     @Test func `new caches are metadata only and expose ordinary JSON without body surfaces`() async throws {
         let fixture = try IndexFixture()
         defer { fixture.remove() }
@@ -152,25 +337,49 @@ struct CollectionIndexerTests {
         #expect(try fixture.count("diagnostics") == 1)
     }
 
-    @Test func `overlapping scopes share one extraction call`() async throws {
-        let fixture = try IndexFixture()
+    @Test(arguments: [IndexBodyMode.metadataOnly, .fts])
+    func `overlapping scopes share one extraction call`(bodyMode: IndexBodyMode) async throws {
+        let fixture = try IndexFixture(bodyMode: bodyMode)
         defer { fixture.remove() }
         try fixture.write("notes/one.md", "one")
         let first = IndexScope(kind: .type, path: "notes/", name: "First")
         let second = IndexScope(kind: .type, path: "notes/", name: "Second")
         _ = try await fixture.indexer.update(adding: first, fingerprint: "v1", evaluate: selectAll)
+        try await fixture.database.databaseQueue.write { database in
+            try database.execute(sql: """
+                CREATE TABLE content_writes(kind TEXT);
+                CREATE TRIGGER staged_insert AFTER INSERT ON refresh_files BEGIN
+                  INSERT INTO content_writes VALUES('staged'); END;
+                CREATE TRIGGER staged_update AFTER UPDATE ON refresh_files BEGIN
+                  INSERT INTO content_writes VALUES('staged'); END;
+                CREATE TRIGGER published_update AFTER UPDATE ON documents BEGIN
+                  INSERT INTO content_writes VALUES('published'); END;
+                """)
+        }
         var calls = 0
         let report = try await fixture.indexer.updateMany(adding: second, fingerprint: "v2", rebuild: true) {
             scopes, _, content, _ in
             calls += 1
             return Dictionary(uniqueKeysWithValues: scopes.map { scope in
                 (scope.id, IndexEvaluation(metadata: "{}", body: content,
-                    assessment: IndexAssessment(selected: true, status: "conforms")))
+                    assessment: IndexAssessment(selected: scope.id == first.id,
+                        status: scope.id == first.id ? "conforms" : "nonconforming")))
             })
         }
         #expect(calls == 1)
         #expect(report.evaluated == 2)
+        #expect(report.hashed == 1)
         #expect(try fixture.count("assessments") == 2)
+        #expect(try fixture.database.selectedPaths(scope: first) == ["notes/one.md"])
+        #expect(try fixture.database.selectedPaths(scope: second).isEmpty)
+        #expect(try fixture.database.query("SELECT kind,count(*) FROM content_writes GROUP BY kind ORDER BY kind").rows
+            == [[.text("published"), .integer(1)], [.text("staged"), .integer(1)]])
+        let verified = try await fixture.indexer.updateMany(fingerprint: "v2", verifyHashes: true) { _, _, _, _ in
+            Issue.record("Unchanged assessments should not invoke extraction")
+            return [:]
+        }
+        #expect(verified.hashed == 1)
+        #expect(verified.cached == 2)
     }
 
     @Test func `creation refresh edits additions deletions and rebuild preserve declared SQL`() async throws {

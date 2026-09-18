@@ -174,11 +174,9 @@ extension CLIEntry.FrontMatterCommands {
 
       // Prompt for confirmation (unless --yes flag is used)
       if !yes {
-        print(
-          "\(CLIStyle.warning("⚠️"))  This will REPLACE the entire frontmatter in '\(CLIStyle.path(path.string))'. Continue? (y/n): ",
-          terminator: ""
-        )
-        fflush(stdout)
+        FileHandle.standardOutput.write(Data(
+          "\(CLIStyle.warning("⚠️"))  This will REPLACE the entire frontmatter in '\(CLIStyle.path(path.string))'. Continue? (y/n): ".utf8
+        ))
 
         guard let response = readLine()?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else {
           print(CLIStyle.muted("Cancelled (no input)."))

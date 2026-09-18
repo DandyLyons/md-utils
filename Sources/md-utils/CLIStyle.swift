@@ -109,7 +109,7 @@ enum CLIStyle {
 
   /// Writes a human-facing line to stderr.
   static func writeStderr(_ text: String) {
-    fputs("\(text)\n", stderr)
+    FileHandle.standardError.write(Data("\(text)\n".utf8))
   }
 
   /// Writes a styled error line to stderr.

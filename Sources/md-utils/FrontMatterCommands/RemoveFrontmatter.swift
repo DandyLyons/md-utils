@@ -69,11 +69,9 @@ extension CLIEntry.FrontMatterCommands {
       guard parsed.hasFrontMatterBlock else { return }
 
       if yes == false {
-        print(
-          "Are you sure you want to remove all frontmatter from '\(CLIStyle.path(path.string))'? (y/N): ",
-          terminator: ""
-        )
-        fflush(stdout)
+        FileHandle.standardOutput.write(Data(
+          "Are you sure you want to remove all frontmatter from '\(CLIStyle.path(path.string))'? (y/N): ".utf8
+        ))
 
         let response = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard response == "y" else {

@@ -1,6 +1,7 @@
 import Crypto
 import Foundation
 import GRDB
+import SystemPackage
 
 /// Stable SHA-256 fingerprints for content and evaluator cache provenance.
 public enum IndexFingerprint {
@@ -9,7 +10,10 @@ public enum IndexFingerprint {
 
     /// Returns the lowercase hexadecimal SHA-256 digest of the exact supplied bytes.
     public static func hash(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        let digits = Array("0123456789abcdef".utf8)
+        return String(decoding: SHA256.hash(data: data).flatMap {
+            [digits[Int($0 >> 4)], digits[Int($0 & 15)]]
+        }, as: UTF8.self)
     }
 
     /// Combines ordered configuration and schema components with ``runtimeVersion``.
@@ -24,8 +28,8 @@ public enum IndexFingerprint {
 
 /// Work counts and recoverable failures from a committed collection refresh.
 ///
-/// Counts are per scope-candidate pair, so overlapping scopes can count one file
-/// multiple times. A successful return does not imply an error-free scan.
+/// Evaluation and cache counts are per scope-candidate pair; hashes count unique
+/// files. A successful return does not imply an error-free scan.
 public struct IndexUpdateReport: Sendable {
     /// Number of completed evaluator calls, including returned parse or validation failures.
     public var evaluated = 0
@@ -33,11 +37,19 @@ public struct IndexUpdateReport: Sendable {
     public var cached = 0
     /// Number of successful file reads hashed during this refresh.
     public var hashed = 0
-    /// Incomplete scopes and read, parse, or evaluation failures requiring attention.
+    /// First 100 incomplete scopes and read, parse, or evaluation failures, each
+    /// truncated to 4,096 characters. Full file diagnostics remain persisted.
     public var errors: [String] = []
+    /// Additional failures persisted in SQLite after the report's 100-message limit.
+    public var omittedErrorCount = 0
+
+    mutating func recordError(_ message: String) {
+        if errors.count < 100 { errors.append(String(message.prefix(4_096))) }
+        else { omittedErrorCount += 1 }
+    }
 }
 
-/// Memory bounds for filesystem discovery and individual source reads.
+/// Memory bounds for filesystem discovery, changed payloads, and source reads.
 public struct IndexRefreshLimits: Equatable, Sendable {
     /// Number of staged candidate paths fetched from SQLite at once.
     public var candidateBatchCount: Int
@@ -47,14 +59,21 @@ public struct IndexRefreshLimits: Equatable, Sendable {
     public var discoveryBatchBytes: Int
     /// Maximum bytes read for one source file.
     public var fileBytes: Int64
+    /// Maximum changed files retained before a staging transaction.
+    public var changeBatchCount: Int
+    /// Maximum UTF-8 payload bytes in a staging batch. A larger file stages alone.
+    public var changeBatchBytes: Int
 
     public init(candidateBatchCount: Int = 256, discoveryBatchCount: Int = 1_024,
         discoveryBatchBytes: Int = 256 * 1_024,
-        fileBytes: Int64 = 64 * 1_024 * 1_024) {
+        fileBytes: Int64 = 64 * 1_024 * 1_024,
+        changeBatchCount: Int = 128, changeBatchBytes: Int = 4 * 1_024 * 1_024) {
         self.candidateBatchCount = candidateBatchCount
         self.discoveryBatchCount = discoveryBatchCount
         self.discoveryBatchBytes = discoveryBatchBytes
         self.fileBytes = fileBytes
+        self.changeBatchCount = changeBatchCount
+        self.changeBatchBytes = changeBatchBytes
     }
 }
 
@@ -118,6 +137,10 @@ public struct CollectionIndexer {
     /// The evaluator receives every scope needing a fresh assessment for the file.
     /// Returning results keyed by ``IndexScope/id`` lets a host parse or otherwise
     /// extract the source once and apply multiple selection policies to that result.
+    /// All results for a file must share metadata, body, and parse state; only their
+    /// assessments are scope-dependent. Payloads larger than the change batch byte
+    /// limit are staged individually, after flushing the previous batch. Evaluator
+    /// working memory and one file's output are additional to the batch budget.
     public func updateMany(
         adding scope: IndexScope? = nil,
         fingerprint: String,
@@ -128,6 +151,7 @@ public struct CollectionIndexer {
     ) async throws -> IndexUpdateReport {
         guard limits.candidateBatchCount > 0, limits.discoveryBatchCount > 0,
             limits.discoveryBatchBytes > 0, limits.fileBytes > 0,
+            limits.changeBatchCount > 0, limits.changeBatchBytes > 0,
             let maximumRead = Int(exactly: limits.fileBytes), maximumRead < Int.max else {
             throw SQLiteIndexError(message: "Refresh limits must be positive.")
         }
@@ -136,6 +160,9 @@ public struct CollectionIndexer {
         guard !scopes.isEmpty else { throw SQLiteIndexError(message: "No index scopes registered. Supply a directory to index update.") }
         for scope in scopes { try validate(scope) }
         let generation = try database.beginStagedRefresh(scopes: scopes, fingerprint: fingerprint)
+        // Generation-specific cleanup cannot discard a newer writer's work. After a
+        // crash, beginStagedRefresh reclaims abandoned staging on the next refresh.
+        defer { try? database.discardStagedRefresh(generation: generation) }
         var report = IndexUpdateReport()
         var scopeErrors: [String: String] = [:]
         let scopesByID = Dictionary(uniqueKeysWithValues: scopes.map { ($0.id, $0) })
@@ -151,6 +178,9 @@ public struct CollectionIndexer {
             do {
                 try enumerate(scope) { file in
                     let path = String(file.path.dropFirst(root.path.count + 1))
+                    if !paths.isEmpty && path.utf8.count > limits.discoveryBatchBytes - pathBytes {
+                        try flush()
+                    }
                     paths.append(path)
                     pathBytes += path.utf8.count
                     if paths.count >= limits.discoveryBatchCount || pathBytes >= limits.discoveryBatchBytes {
@@ -158,13 +188,36 @@ public struct CollectionIndexer {
                     }
                 }
                 try flush()
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as DatabaseError {
+                throw error
             } catch {
                 let message = "\(scope.path): \(error)"
                 scopeErrors[scope.id] = message
-                report.errors.append(message)
+                report.recordError(message)
             }
         }
         var after: String?
+        var changes: [StagedIndexChange] = []
+        var changeBytes = 0
+        let retainsBodies = try database.storagePolicy().bodyMode == .fts
+        func flushChanges() throws {
+            try database.stageChanges(generation: generation, changes: changes)
+            changes.removeAll(keepingCapacity: true)
+            changeBytes = 0
+        }
+        func enqueue(_ file: IndexFileChange, assessments: [String: IndexAssessment]) throws {
+            var change = StagedIndexChange(file: file, assessments: assessments)
+            if !retainsBodies { change.file.evaluation.body = "" }
+            let bytes = change.payloadBytes
+            if bytes > limits.changeBatchBytes - changeBytes { try flushChanges() }
+            changes.append(change)
+            changeBytes += bytes
+            if changes.count >= limits.changeBatchCount || changeBytes >= limits.changeBatchBytes {
+                try flushChanges()
+            }
+        }
         while true {
             let paths = try database.stagedCandidatePaths(generation: generation, after: after,
                 limit: limits.candidateBatchCount)
@@ -196,9 +249,7 @@ public struct CollectionIndexer {
                         report.cached += scopeIDs.count
                         continue
                     }
-                    let handle = try FileHandle(forReadingFrom: file)
-                    defer { try? handle.close() }
-                    let data = try handle.read(upToCount: maximumRead + 1) ?? Data()
+                    let data = try read(file, expected: Int(size), maximum: maximumRead + 1)
                     guard data.count <= maximumRead else {
                         throw SQLiteIndexError(message: "File exceeds the \(limits.fileBytes)-byte refresh limit: \(path)")
                     }
@@ -222,21 +273,26 @@ public struct CollectionIndexer {
                         }
                         scopesToEvaluate.append(scope)
                     }
+                    if scopesToEvaluate.isEmpty { continue }
                     let evaluations = try await evaluate(scopesToEvaluate, path, content,
                         Date(timeIntervalSince1970: mtime))
+                    guard try stat(file) == before else {
+                        throw SQLiteIndexError(message: "File changed during evaluation; retry update: \(path)")
+                    }
+                    var assessments: [String: IndexAssessment] = [:]
                     for scope in scopesToEvaluate {
                         guard let evaluation = evaluations[scope.id] else {
                             throw SQLiteIndexError(message: "Evaluator returned no result for scope \(scope.id) and path \(path).")
                         }
-                        let change = IndexFileChange(path: path, mtime: mtime, size: size, hash: hash, evaluation: evaluation)
-                        try database.stageChange(generation: generation, scopeID: scope.id, file: change)
+                        assessments[scope.id] = evaluation.assessment
                         report.evaluated += 1
                         if evaluation.parseState != "ok" || evaluation.assessment.status == "evaluation-error" {
-                            report.errors.append("\(path): \(evaluation.assessment.status) (\(evaluation.parseState))")
+                            report.recordError("\(path): \(evaluation.assessment.status) (\(evaluation.parseState))")
                         }
                     }
-                    guard try stat(file) == before else {
-                        throw SQLiteIndexError(message: "File changed during evaluation; retry update: \(path)")
+                    if let scope = scopesToEvaluate.first, let evaluation = evaluations[scope.id] {
+                        try enqueue(IndexFileChange(path: path, mtime: mtime, size: size, hash: hash, evaluation: evaluation),
+                            assessments: assessments)
                     }
                 } catch is CancellationError {
                     throw CancellationError()
@@ -244,19 +300,19 @@ public struct CollectionIndexer {
                     // Staging/schema failures are atomic database failures, not source diagnostics.
                     throw error
                 } catch {
-                    report.errors.append("\(path): \(error)")
+                    report.recordError("\(path): \(error)")
                     let diagnostic = IndexDiagnostic(category: "evaluation", severity: "error", code: "index.read-or-evaluate",
                         location: path, message: String(describing: error))
                     let evaluation = IndexEvaluation(metadata: "{}", body: "", parseState: "error",
                         assessment: IndexAssessment(selected: false, status: "evaluation-error", diagnostics: [diagnostic]))
-                    for scopeID in scopeIDs {
-                        try database.stageChange(generation: generation, scopeID: scopeID,
-                            file: IndexFileChange(path: path, mtime: mtime, size: size, hash: hash, evaluation: evaluation))
-                    }
+                    try enqueue(IndexFileChange(path: path, mtime: mtime, size: size, hash: hash, evaluation: evaluation),
+                        assessments: Dictionary(uniqueKeysWithValues: scopeIDs.map { ($0, evaluation.assessment) }))
                 }
             }
             after = paths.last
         }
+        try Task.checkCancellation()
+        try flushChanges()
         try Task.checkCancellation()
         try database.commitStagedRefresh(scopes: scopes, errors: scopeErrors,
             fingerprint: fingerprint, generation: generation)
@@ -272,13 +328,29 @@ public struct CollectionIndexer {
     }
 
     private func stat(_ file: URL) throws -> (Double, Int64) {
-        let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
-        guard attributes[.type] as? FileAttributeType == .typeRegular,
-            let modified = attributes[.modificationDate] as? Date,
-            let size = attributes[.size] as? NSNumber else {
+        let attributes = try Stat(FilePath(file.path), followTargetSymlink: false)
+        guard attributes.type == .regular else {
             throw SQLiteIndexError(message: "Not a regular file or metadata unavailable: \(file.path)")
         }
-        return (modified.timeIntervalSince1970, size.int64Value)
+        let modified = attributes.st_mtim
+        return (Double(modified.tv_sec) + Double(modified.tv_nsec) / 1_000_000_000, attributes.size)
+    }
+
+    private func read(_ file: URL, expected: Int, maximum: Int) throws -> Data {
+        let handle = try FileDescriptor.open(FilePath(file.path), .readOnly, options: .noFollow)
+        defer { try? handle.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: min(expected + 1, 64 * 1_024))
+        while data.count < maximum {
+            try Task.checkCancellation()
+            let remaining = maximum - data.count
+            let count = try buffer.withUnsafeMutableBytes {
+                try handle.read(into: UnsafeMutableRawBufferPointer(rebasing: $0.prefix(remaining)))
+            }
+            if count == 0 { break }
+            data.append(contentsOf: buffer.prefix(count))
+        }
+        return data
     }
 
     private func enumerate(_ scope: IndexScope, visitFile: (URL) throws -> Void) throws {
@@ -287,22 +359,9 @@ public struct CollectionIndexer {
         guard canonical.path == root.path || canonical.path.hasPrefix(root.path + "/") else {
             throw SQLiteIndexError(message: "Scope escapes project root: \(scope.path)")
         }
-        // Throwing traversal is deliberate: Foundation's default enumerator can silently skip errors.
-        func visit(_ directory: URL) throws {
-            let entries = try FileManager.default.contentsOfDirectory(at: directory,
-                includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
-                .sorted { $0.path < $1.path }
-            for file in entries {
-                let values = try file.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey])
-                // Do not follow symlinks into other scopes or cycles.
-                if values.isSymbolicLink == true { continue }
-                if values.isDirectory == true { try visit(file) }
-                else if values.isRegularFile == true,
-                    scope.includeNonMarkdown || ["md", "markdown"].contains(file.pathExtension.lowercased()) {
-                    try visitFile(file)
-                }
-            }
-        }
-        try visit(directory)
+        let cachePath = URL(fileURLWithPath: database.databaseQueue.path).standardizedFileURL.path
+        let cacheFiles = Set([cachePath, cachePath + "-journal", cachePath + "-wal", cachePath + "-shm"])
+        try IndexDirectoryTraversal.visit(directory, excluding: cacheFiles,
+            includeNonMarkdown: scope.includeNonMarkdown, visitFile: visitFile)
     }
 }

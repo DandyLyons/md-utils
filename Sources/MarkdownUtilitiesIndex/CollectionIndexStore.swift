@@ -342,4 +342,11 @@ extension SQLiteIndexDatabase {
             return try String.fetchAll(db, sql: "SELECT path FROM current_documents ORDER BY path")
         }
     }
+
+    /// Counts current documents without materializing their paths.
+    public func selectedCount() throws -> Int {
+        try databaseQueue.read {
+            try Int.fetchOne($0, sql: "SELECT count(*) FROM current_documents") ?? 0
+        }
+    }
 }
