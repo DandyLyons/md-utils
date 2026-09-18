@@ -186,11 +186,40 @@ WHERE documents_fts MATCH 'search terms';
 ```
 
 Metadata representation is selected per cache from the linked SQLite connection:
-new caches use JSONB when `jsonb()` is available and JSON text otherwise. The
+new caches use JSONB when creation, extraction, and strict validation succeed on
+the linked SQLite connection, and JSON text otherwise. The
 choice is recorded. A runtime that cannot read a recorded JSONB cache fails before
 mutation. Public views always return ordinary JSON text. External tools therefore
 do not need custom functions, but their SQLite runtime must support JSONB to open
 a JSONB-backed cache.
+
+Existing text caches remain text, including after ordinary `--rebuild`; upgrading
+the OS never silently changes their encoding. Raw `documents.metadata` has BLOB
+affinity and contains only the persisted representation. Validation triggers reject
+mixed storage and validate JSONB with `json_valid(metadata,8)`. Use public views or
+`json(metadata)` for JSON exports; raw blobs are SQLite's internal format.
+
+To recover a JSONB cache on an older runtime, run:
+
+```sh
+md-utils index update --rebuild --metadata-encoding text
+```
+
+This explicit recovery copies the database into `.md-utils/rebuild/`, discards
+cached metadata there without decoding JSONB, and reevaluates every saved scope
+from authoritative files. It retains field declarations, views, body mode, and
+separate pending-edit tables. Pending edits must remain independent of disposable
+document rows; this does not implement `index apply` (#142). Publication uses
+SQLite backup only after a complete refresh. Cancellation, scan/evaluation errors,
+or failed publication leave the original cache intact. Scratch copies are removed
+on normal exit; abandoned copies after a crash can be deleted.
+
+Recovery acquires an exclusive SQLite lock for the copy, refresh, and publication.
+Stop watchers, servers, editors, and external connections if lock acquisition fails.
+Generation and SQLite data-version checks also reject intervening writes through
+the same connection. Recovery
+requires enough disk space for a full copy plus staged refresh data. An incompatible
+ordinary open reports this recovery command without migrating the cache.
 
 Field indexes are ordinary SQLite acceleration structures, distinct from
 collection membership. `index field add '$.status'` creates a managed expression

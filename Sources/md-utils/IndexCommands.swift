@@ -26,9 +26,23 @@ extension CLIEntry {
             @OptionGroup var options: IndexOptions
             /// Forces reevaluation while retaining saved declarations and SQL schema objects.
             @Flag(help: "Regenerate all saved scopes while preserving field indexes and views") var rebuild = false
+            /// Explicit compatibility recovery from authoritative files.
+            @Option(help: "Use text with --rebuild to recover a JSONB cache on older SQLite") var metadataEncoding: String?
             /// Resolves the project and commits a refresh, reporting partial failures.
             mutating func run() async throws {
-                try await options.run(kind: .directory, directory: directory, name: "", rebuild: rebuild)
+                if let metadataEncoding {
+                    guard rebuild, metadataEncoding == "text" else {
+                        throw ValidationError("--metadata-encoding accepts text and requires --rebuild.")
+                    }
+                    let context = try options.context(prepare: false)
+                    try await context.database.rebuildAsText(root: context.canonicalRoot.path,
+                        scratchDirectory: context.canonicalRoot.appendingPathComponent(".md-utils/rebuild/")) { copy in
+                        try await options.run(kind: .directory, directory: directory, name: "", rebuild: true,
+                            databaseOverride: copy)
+                    }
+                } else {
+                    try await options.run(kind: .directory, directory: directory, name: "", rebuild: rebuild)
+                }
             }
         }
 
@@ -288,12 +302,12 @@ struct IndexOptions: ParsableArguments {
     /// commit explicit diagnostics and then produce a failing process exit status.
     @discardableResult
     func run(kind: IndexScope.Kind, directory: String?, name: String, rebuild: Bool = false,
-        quiet: Bool = false) async throws -> SQLiteIndexDatabase {
-        let context = try context()
+        quiet: Bool = false, databaseOverride: SQLiteIndexDatabase? = nil) async throws -> SQLiteIndexDatabase {
+        let context = try context(prepare: false, databaseOverride: databaseOverride)
         let root = context.root
         let canonicalRoot = context.canonicalRoot
         let database = context.database
-        let indexer = context.indexer
+        let indexer = try CollectionIndexer(database: database, root: canonicalRoot)
         let configPath = context.configPath
         let persistedConfig = try database.configurationPath(context.explicitConfig?.string)
         let resolvedConfigPath = Path(persistedConfig ?? configPath.string)
@@ -329,7 +343,7 @@ struct IndexOptions: ParsableArguments {
         return database
     }
 
-    func context() throws -> IndexCommandContext {
+    func context(prepare: Bool = true, databaseOverride: SQLiteIndexDatabase? = nil) throws -> IndexCommandContext {
         let explicitConfig = config.map { Path($0).absolute().normalize() }
         let root: Path
         if let projectRoot { root = Path(projectRoot).absolute().normalize() }
@@ -348,10 +362,10 @@ struct IndexOptions: ParsableArguments {
         try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
         let databasePath = database.map { Path($0).absolute().normalize().string }
             ?? cacheDirectory.appendingPathComponent("index.sqlite").path
-        let indexDatabase = try SQLiteIndexDatabase(path: databasePath)
-        let indexer = try CollectionIndexer(database: indexDatabase, root: canonicalRoot)
+        let indexDatabase = try databaseOverride ?? SQLiteIndexDatabase(path: databasePath)
+        if prepare { try indexDatabase.prepareCollection(root: canonicalRoot.path) }
         return IndexCommandContext(root: Path(canonicalRoot.path), canonicalRoot: canonicalRoot,
-            database: indexDatabase, indexer: indexer,
+            database: indexDatabase,
             configPath: Path(cacheDirectory.appendingPathComponent("md-utils.json").path), explicitConfig: explicitConfig)
     }
 }
@@ -360,7 +374,6 @@ struct IndexCommandContext {
     let root: Path
     let canonicalRoot: URL
     let database: SQLiteIndexDatabase
-    let indexer: CollectionIndexer
     let configPath: Path
     let explicitConfig: Path?
 }

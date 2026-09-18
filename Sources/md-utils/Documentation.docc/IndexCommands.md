@@ -79,3 +79,10 @@ Public views always expose ordinary JSON text. Raw metadata is JSONB when the
 linked SQLite runtime supports it and JSON text otherwise; the cache records the
 choice. Views, optional FTS5, and expression indexes use no md-utils-only SQL
 functions.
+
+Recover an incompatible cache from files with
+`index update --rebuild --metadata-encoding text`. This works on older SQLite
+runtimes without decoding the old JSONB. A private disk copy preserves scopes,
+field/view declarations, and separate pending edits; incomplete refreshes leave
+the original untouched. Stop other index writers during recovery. Existing text
+caches stay text on later updates and ordinary rebuilds.

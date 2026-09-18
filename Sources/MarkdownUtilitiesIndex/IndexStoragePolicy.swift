@@ -76,7 +76,27 @@ extension SQLiteIndexDatabase {
     }
 
     func supportsJSONB(_ database: Database) -> Bool {
-        (try? Data.fetchOne(database, sql: "SELECT jsonb('{}')")) != nil
+        (try? Bool.fetchOne(database, sql: """
+            SELECT typeof(jsonb('{"value":42}'))='blob'
+              AND json_extract(jsonb('{"value":42}'),'$.value')=42
+              AND json_valid(jsonb('{"value":42}'),8)=1
+            """)) == true
+    }
+
+    static func createMetadataValidation(_ database: Database) throws {
+        let encoding = try String.fetchOne(database, sql: "SELECT value FROM index_metadata WHERE key='metadata_encoding'")
+        let validation = encoding == "jsonb" ? "json_valid(new.metadata,8)" : "json_valid(new.metadata)"
+        for operation in ["INSERT", "UPDATE OF metadata"] {
+            let suffix = operation == "INSERT" ? "insert" : "update"
+            try database.execute(sql: """
+                CREATE TRIGGER metadata_encoding_\(suffix) BEFORE \(operation) ON documents
+                WHEN typeof(new.metadata) != CASE
+                  (SELECT value FROM index_metadata WHERE key='metadata_encoding')
+                  WHEN 'jsonb' THEN 'blob' ELSE 'text' END
+                  OR NOT \(validation)
+                BEGIN SELECT RAISE(ABORT,'Metadata does not match recorded encoding'); END;
+                """)
+        }
     }
 
     static func checkFTSCapability(_ database: Database) throws {

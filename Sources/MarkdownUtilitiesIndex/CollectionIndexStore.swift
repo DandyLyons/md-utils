@@ -140,7 +140,8 @@ extension SQLiteIndexDatabase {
         try prepareCollection(root: root, checkFTSCapability: Self.checkFTSCapability)
     }
 
-    func prepareCollection(root: String, checkFTSCapability: (Database) throws -> Void) throws {
+    func prepareCollection(root: String, checkFTSCapability: (Database) throws -> Void,
+        jsonbProbe: ((Database) -> Bool)? = nil) throws {
         let existingCollection = try databaseQueue.read { database in
             try Bool.fetchOne(database,
                 sql: "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='index_metadata')") ?? false
@@ -160,11 +161,24 @@ extension SQLiteIndexDatabase {
             }
             return (encoding, bodyMode)
         }
-        let jsonbAvailable = try databaseQueue.read { supportsJSONB($0) }
+        let jsonbAvailable = try databaseQueue.read { jsonbProbe?($0) ?? supportsJSONB($0) }
         if recordedPolicy.encoding == .jsonb && !jsonbAvailable {
-            throw SQLiteIndexError(message: "This cache stores SQLite JSONB, but linked SQLite \(Self.sqliteVersion) cannot read JSONB. Rebuild the cache explicitly as JSON text with a JSONB-capable md-utils runtime.")
+            throw SQLiteIndexError(message: "This cache stores SQLite JSONB, but linked SQLite \(Self.sqliteVersion) cannot read JSONB. Run index update --rebuild --metadata-encoding text to rebuild from authoritative files on this runtime.")
         }
         let selectedEncoding = recordedPolicy.encoding ?? (existingCollection ? .text : (jsonbAvailable ? .jsonb : .text))
+        if existingCollection {
+            try databaseQueue.read { database in
+                let savedRoot = try String.fetchOne(database, sql: "SELECT value FROM index_metadata WHERE key='root'")
+                guard savedRoot == nil || savedRoot == root else {
+                    throw SQLiteIndexError(message: "Index belongs to a different project root: \(savedRoot ?? "").")
+                }
+                let expectedType = selectedEncoding == .jsonb ? "blob" : "text"
+                if try Bool.fetchOne(database, sql: "SELECT EXISTS(SELECT 1 FROM documents WHERE typeof(metadata)!=?)",
+                    arguments: [expectedType]) == true {
+                    throw SQLiteIndexError(message: "Metadata storage does not match the recorded encoding. Run index update --rebuild --metadata-encoding text.")
+                }
+            }
+        }
         // A collection without a recorded mode predates the storage-policy
         // migration and retained searchable bodies. Migrated collections must
         // honor their persisted policy so metadata-only reopen never needs FTS5.
@@ -270,6 +284,9 @@ extension SQLiteIndexDatabase {
                   category TEXT NOT NULL, severity TEXT NOT NULL, code TEXT NOT NULL,
                   location TEXT NOT NULL, message TEXT NOT NULL);
                 """)
+        }
+        migrator.registerMigration("collection-v5-metadata-validation") { database in
+            try Self.createMetadataValidation(database)
         }
         guard try databaseQueue.read({ try migrator.hasBeenSuperseded($0) }) == false else {
             throw SQLiteIndexError(message: "Index schema was created by a newer md-utils version. Upgrade md-utils before updating this index.")

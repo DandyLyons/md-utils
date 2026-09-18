@@ -76,6 +76,23 @@ FTS5. JSONB is also probed on the actual connection: new caches record JSONB whe
 available and JSON text otherwise. A cache recorded as JSONB fails before mutation
 when opened by an incompatible runtime.
 
+The probe verifies JSONB creation, extraction, and strict `json_valid(...,8)` on
+the actual connection. Existing text caches keep their encoding. Explicit
+`index update --rebuild --metadata-encoding text` recovery works on older linked
+runtimes by replacing cached metadata from files in a private database copy;
+see [recovery semantics](collection-index.md).
+
+[SQLite introduced JSONB in 3.45.0](https://sqlite.org/json1.html#jsonb).
+The [macOSdb library history](https://macosdb.com/macos/component/libsqlite3/)
+and [executable history](https://macosdb.com/macos/component/sqlite/) record
+3.48.0 in macOS 26 beta 1, 3.51.0 in beta 2, and 3.54.0 in macOS 27 beta 1.
+These catalog observations are not support guarantees: the linked-runtime probe,
+not the OS version or a separate `sqlite3` executable, determines storage.
+External tools need their own JSONB-capable runtime for JSONB caches, even when
+querying views that export JSON text. Text recovery restores compatibility with
+tools that pass the baseline JSON/expression-index probes. No private GRDB SQL
+functions or bundled SQLite runtime are required.
+
 On failure, `SQLiteIndexError` identifies the system runtime version, failed
 capability, SQLite error, and OS/distribution remediation. Updating GRDB alone
 does not update SQLite. There is no silent reduced-functionality mode or bundled

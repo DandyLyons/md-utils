@@ -38,6 +38,24 @@ private struct IndexCommandFixture {
 
 @Suite("Index commands")
 struct IndexCommandsTests {
+    @Test func `CLI explicit text recovery preserves type views and exports JSON`() async throws {
+        let fixture = try IndexCommandFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/book.md", "---\ntitle: Book\n---\n# Book")
+        var create = try #require(CLIEntry.parseAsRoot(["index", "type", "Book", (fixture.root + "notes/").string,
+            "--project-root", fixture.root.string]) as? CLIEntry.Index.SelectType)
+        try await create.run()
+        var rebuild = try #require(CLIEntry.parseAsRoot(["index", "update", "--project-root", fixture.root.string,
+            "--rebuild", "--metadata-encoding", "text"]) as? CLIEntry.Index.Update)
+        try await rebuild.run()
+        #expect(try fixture.database().storagePolicy().metadataEncoding == .text)
+        #expect(try fixture.database().selectedPaths() == ["notes/book.md"])
+        #expect(try fixture.read { try String.fetchOne($0, sql: "SELECT json_extract(metadata,'$.title') FROM current_documents") } == "Book")
+        #expect(try fixture.read { try Int.fetchOne($0, sql: "SELECT count(*) FROM type_views") } == 1)
+        rebuild.rebuild = false
+        await #expect(throws: ValidationError.self) { try await rebuild.run() }
+    }
+
     @Test func `CLI registers scopes refreshes and rebuilds in place`() async throws {
         let fixture = try IndexCommandFixture()
         defer { fixture.remove() }
