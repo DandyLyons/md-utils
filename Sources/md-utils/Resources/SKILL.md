@@ -28,6 +28,13 @@ The `md-utils` CLI provides structured operations on Markdown files. Add `--help
 
 ## Collection Indexing
 
+On macOS, `md-utils index watch ./notes/` registers a scope and completes an
+initial refresh before watching native changes. Omit the directory to watch
+saved scopes. It reloads configuration, debounces changes, and periodically
+reconciles missed events while retaining the persisted metadata-only/FTS mode.
+Ctrl-C/SIGTERM cancels pending work. Other platforms require `index update`.
+Use `--debounce <seconds>` and `--reconcile-interval <seconds>` to tune latency.
+
 `md-utils index update ./notes/` registers a directory scope and refreshes all
 saved scopes in `.md-utils/index.sqlite`. `index type Book ./notes/` selects only
 conforming documents; `index rule books` preserves rule-selected invalid members.

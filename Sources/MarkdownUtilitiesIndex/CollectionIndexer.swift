@@ -360,7 +360,7 @@ public struct CollectionIndexer {
             throw SQLiteIndexError(message: "Scope escapes project root: \(scope.path)")
         }
         let cachePath = URL(fileURLWithPath: database.databaseQueue.path).standardizedFileURL.path
-        let cacheFiles = Set([cachePath, cachePath + "-journal", cachePath + "-wal", cachePath + "-shm"])
+        let cacheFiles = IndexCacheExclusions(root: root, databasePath: cachePath)
         try IndexDirectoryTraversal.visit(directory, excluding: cacheFiles,
             includeNonMarkdown: scope.includeNonMarkdown, visitFile: visitFile)
     }

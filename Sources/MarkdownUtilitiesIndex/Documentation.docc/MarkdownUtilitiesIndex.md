@@ -20,6 +20,8 @@ evaluator.
 - ``IndexScope``
 - ``IndexUpdateReport``
 - ``IndexRefreshLimits``
+- ``IndexWatcher``
+- ``IndexCacheExclusions``
 
 ### Supplying Evaluations
 

@@ -6,6 +6,9 @@ import GRDBSQLite
 public final class SQLiteIndexDatabase {
     let databaseQueue: DatabaseQueue
 
+    /// Filesystem path used to exclude the cache and sidecars from native watching.
+    public var path: String { databaseQueue.path }
+
     /// The system SQLite runtime used by GRDB, not a bundled version.
     public static var sqliteVersion: String { String(cString: sqlite3_libversion()) }
 

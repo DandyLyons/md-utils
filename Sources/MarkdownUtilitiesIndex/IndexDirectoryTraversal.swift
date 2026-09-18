@@ -4,7 +4,17 @@ import SystemPackage
 /// Incremental traversal with explicit error propagation. The caller stages paths
 /// in count- and byte-limited batches rather than retaining the complete listing.
 enum IndexDirectoryTraversal {
+    static func visit(_ directory: URL, excluding cacheFiles: IndexCacheExclusions,
+        includeNonMarkdown: Bool, visitFile: (URL) throws -> Void) throws {
+        try visit(directory, isExcluded: cacheFiles.contains, includeNonMarkdown: includeNonMarkdown, visitFile: visitFile)
+    }
+
     static func visit(_ directory: URL, excluding cacheFiles: Set<String>,
+        includeNonMarkdown: Bool, visitFile: (URL) throws -> Void) throws {
+        try visit(directory, isExcluded: cacheFiles.contains, includeNonMarkdown: includeNonMarkdown, visitFile: visitFile)
+    }
+
+    static func visit(_ directory: URL, isExcluded: (String) -> Bool,
         includeNonMarkdown: Bool, visitFile: (URL) throws -> Void) throws {
         try Task.checkCancellation()
         let rootMetadata = try Stat(FilePath(directory.path), followTargetSymlink: false)
@@ -30,7 +40,14 @@ enum IndexDirectoryTraversal {
             guard let file = next as? URL else {
                 throw SQLiteIndexError(message: "Unexpected directory entry in \(directory.path)/")
             }
-            if cacheFiles.contains(file.path) { continue }
+            if isExcluded(file.path) {
+                // SQLite may remove a sidecar between enumeration and metadata
+                // lookup. An excluded entry's disappearance cannot fail a scope.
+                if (try? Stat(FilePath(file.path), followTargetSymlink: false).type) == .directory {
+                    entries.skipDescendants()
+                }
+                continue
+            }
             let metadata = try Stat(FilePath(file.path), followTargetSymlink: false)
             if metadata.type == .symbolicLink {
                 // Foundation does not descend into symbolic links. Calling

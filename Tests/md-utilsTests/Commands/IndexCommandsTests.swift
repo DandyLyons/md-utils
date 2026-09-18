@@ -38,6 +38,23 @@ private struct IndexCommandFixture {
 
 @Suite("Index commands")
 struct IndexCommandsTests {
+    @Test func `watch parses optional scope and rejects invalid timing options`() throws {
+        let watch = try #require(CLIEntry.parseAsRoot(["index", "watch", "./notes/",
+            "--debounce", "0.5", "--reconcile-interval", "10"]) as? CLIEntry.Index.Watch)
+        #expect(watch.directory == "./notes/")
+        #expect(watch.debounce == 0.5)
+        #expect(watch.reconcileInterval == 10)
+        let saved = try #require(CLIEntry.parseAsRoot(["index", "watch"]) as? CLIEntry.Index.Watch)
+        #expect(saved.directory == nil)
+        for option in ["--debounce", "--reconcile-interval"] {
+            for value in ["0", "-1", "nan", "inf", "1e300"] {
+                #expect(throws: (any Error).self) {
+                    try CLIEntry.parseAsRoot(["index", "watch", option, value])
+                }
+            }
+        }
+    }
+
     @Test func `CLI explicit text recovery preserves type views and exports JSON`() async throws {
         let fixture = try IndexCommandFixture()
         defer { fixture.remove() }

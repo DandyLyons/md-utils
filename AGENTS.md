@@ -18,6 +18,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 - **Package Manager / Build Tool**: Swift Package Manager
 - **Index compatibility recovery**: `index update --rebuild --metadata-encoding text` rebuilds authoritative files in a private disk copy, retaining declarations and independent pending-edit tables before publication. Recovery requires exclusive writer access. Existing text caches retain their encoding.
 - **Executable Targets**: `md-utils`, `md-utils-server`
+- **Index watching**: `index watch` uses a bounded `AsyncStream`, actor-isolated debounce state, `ContinuousClock`/`Duration`, and structured concurrency with Swift Service Lifecycle's `UnixSignalsSequence`. The isolated macOS FSEvents adapter is a justified C API exception: recursive hierarchy notifications and event-loss reporting avoid per-file open descriptors. Refresh reuses the staged update service and persisted storage mode. Other platforms explicitly require `index update`; see `docs/collection-index.md`.
 - **Library Targets**: `MarkdownUtilitiesCore`, `MarkdownUtilities`, `MarkdownUtilitiesServer`, `MarkdownUtilitiesIndex`
 - **Test Framework**: Swift Testing, not XCTest
 - **Build Command**: `swift build`
@@ -56,6 +57,10 @@ swift run md-utils <command>
 > If no `.build/` directory exists, run `swift build` first to create. Do not use the `.build/` directory from another worktree or branch. 
 
 ## Critical Rules
+
+**Modern Swift APIs**: Prefer modern Swift APIs. Do not introduce Objective-C or
+C APIs when a suitable Swift API exists. Any necessary exception must have a
+documented technical reason and stay behind an isolated adapter.
 
 **STRICTLY FORBIDDEN: Force Unwrapping with `!`**
 

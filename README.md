@@ -227,6 +227,11 @@ only. Run `md-utils index search enable` to opt into one retained body per docum
 and an external-content FTS5 index; `index search disable --vacuum` removes them.
 Files remain authoritative.
 
+On macOS, `md-utils index watch ./notes/` performs an initial refresh, then keeps
+saved scopes current with native notifications and periodic reconciliation.
+Omit the directory to watch existing scopes; Ctrl-C stops the watcher. Other
+platforms should use `index update`.
+
 The cache is stored in `.md-utils/index.sqlite`. See
 [collection indexing](docs/collection-index.md) for project/config resolution,
 non-Markdown support, diagnostics, and freshness guarantees.

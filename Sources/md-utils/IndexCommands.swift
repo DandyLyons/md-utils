@@ -13,7 +13,7 @@ extension CLIEntry {
         /// Registers directory, type, and rule selection entry points.
         static let configuration = CommandConfiguration(commandName: "index",
             abstract: "Maintain a rebuildable SQLite collection cache",
-            subcommands: [Update.self, SelectType.self, SelectRule.self, Query.self, Explain.self,
+            subcommands: [Update.self, Watch.self, SelectType.self, SelectRule.self, Query.self, Explain.self,
                 Field.self, Search.self, Status.self])
 
         /// Refreshes every saved scope and optionally registers a directory collection.

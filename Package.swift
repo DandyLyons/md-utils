@@ -48,6 +48,7 @@ let package = Package(
     .package(url: "https://github.com/onevcat/Rainbow", from: "4.2.1"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.26.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.15.0"),
+    .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.11.0"),
     .package(
       url: "https://github.com/mattpolzin/OpenAPIKit.git",
       from: "6.0.0",
@@ -198,6 +199,7 @@ let package = Package(
         "MarkdownUtilitiesIndex",
         "MarkdownUtilitiesCore",
         "MarkdownUtilities",
+        .product(name: "UnixSignals", package: "swift-service-lifecycle"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "JSONSchema", package: "JSONSchema.swift"),
         .product(name: "PathKit", package: "PathKit"),

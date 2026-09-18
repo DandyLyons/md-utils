@@ -10,6 +10,7 @@ md-utils index rule books
 md-utils index update
 md-utils index update --verify-hashes
 md-utils index update --rebuild
+md-utils index watch ./notes/
 md-utils index query "SELECT path FROM current_documents ORDER BY path"
 md-utils index explain "SELECT path FROM documents WHERE json_extract(metadata, '$.status') = 'draft'"
 md-utils index field add '$.status'
@@ -42,6 +43,62 @@ a scope to include other UTF-8 text files. This option is saved per scope.
 Extraction uses existing YAML/TOML, wrapped-frontmatter, and hash-comment parsers.
 Unmapped host files retain raw text; predicates needing unavailable syntax report
 the existing evaluator diagnostics. Binary/non-UTF-8 files report read failures.
+
+## Native watching
+
+On macOS, `md-utils index watch ./notes/` registers a directory scope, completes
+an initial reconciliation, then maintains **all saved scopes** until Ctrl-C or
+SIGTERM. Omit the directory to watch existing declarations without adding an
+unrestricted collection. Initial failure exits unsuccessfully; subsequent failures
+are reported to stderr and retried on the next change or recovery interval.
+
+The native FSEvents subscription starts before the initial scan. It covers the
+whole project, including hidden configuration/type/schema inputs, and the saved
+config's parent directory for nonstandard config locations. File reads do not
+trigger refreshes. Create, edit, delete, rename, and atomic replacement events
+are debounced (default `--debounce 0.3` seconds); continuous changes trigger a
+refresh after at most four debounce intervals, with a one-second minimum.
+Changes during refresh remain pending for another pass.
+
+The watch service uses Swift actors, a one-element-buffered `AsyncStream`,
+`ContinuousClock`/`Duration`, and structured child tasks. CLI shutdown consumes
+`UnixSignalsSequence` from Swift Service Lifecycle (already part of the server's
+dependency graph), rather than installing POSIX handlers in command code.
+The only direct C interop is isolated in `IndexNativeWatch.swift`: FSEvents
+provides recursive hierarchy notifications and event-loss flags. Dispatch's
+Swift file-system source watches an individual open descriptor; using one per
+file would add corpus-sized watch resources and registration races for this
+large-collection index. This is the documented exception to the Swift API rule.
+
+Every event batch conservatively reconciles all saved scopes through the same
+bounded staging/publication service as `index update`. This is incremental
+extraction and assessment reuse, not a path-only scan: discovery and hash
+verification still visit all candidates. The persisted metadata-only/FTS mode is
+preserved. Configurations are reloaded and fingerprinted on each refresh, so
+transitive schema or definition changes invalidate assessments without editing
+documents. Moves remain deletion plus addition; identity preservation is deferred.
+
+Dropped, coalesced, and root-change notifications trigger reconciliation, never
+direct deletion. `--reconcile-interval 30` also reconciles after 30 idle seconds,
+covering lost events and temporarily unavailable roots. Missing or unreadable
+scopes retain prior rows as incomplete; successful enumeration is required to
+prune missing files. Invalid configuration invalidates the old assessments and
+the watcher retries after repair. The database, its WAL/SHM/journal sidecars,
+and `.md-utils/rebuild/` recovery copies are excluded from discovery and event
+feedback. Refresh staging is inside the excluded database.
+
+Concurrent CLI refreshes use the existing SQLite transactions and optimistic
+generation checks. A superseded watch refresh cannot overwrite the newer
+generation; it reports the failure and retries. Ctrl-C/SIGTERM cancels pending
+work and discards unpublished staging; an already committed publication remains
+valid. Stop watchers before exclusive `--metadata-encoding text` recovery. A
+crashed process's staging is reclaimed by the next update.
+
+Native watching currently supports macOS only. Linux and other platforms return
+an explicit unsupported-platform error; run `index update` manually or from an
+external scheduler there. There is no silent polling-only watch fallback. The
+periodic reconciliation on macOS supplements native notifications and can cost
+a full corpus read, so choose its interval accordingly for large collections.
 
 ## Freshness and failure semantics
 

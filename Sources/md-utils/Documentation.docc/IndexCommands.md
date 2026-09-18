@@ -2,6 +2,20 @@
 
 Cache parsed text and type or rule assessments in a rebuildable SQLite database.
 
+## Watching selections
+
+On macOS, `index watch ./notes/` registers a scope, completes initial reconciliation,
+then uses native FSEvents to refresh all saved scopes. Omit the directory to watch
+existing selections. `--debounce` defaults to 0.3 seconds and
+`--reconcile-interval` defaults to 30 seconds. Recovery reconciliations cover
+dropped events; every refresh hashes candidates and reloads configuration,
+types, and schemas through the bounded update service. Storage mode is retained.
+Cache sidecars and recovery files cannot cause feedback loops. Unavailable scopes
+remain incomplete without pruning their old rows. Later refresh failures are
+reported and retried; an initial failure exits. Ctrl-C/SIGTERM cancels staged work.
+Concurrent writers use generation checks. Other platforms explicitly require
+`index update`; there is no silent polling-only fallback.
+
 ## Register and refresh selections
 
 ```sh
@@ -11,6 +25,7 @@ md-utils index rule books
 md-utils index update
 md-utils index update --verify-hashes
 md-utils index update --rebuild
+md-utils index watch ./notes/
 md-utils index query "SELECT path FROM current_documents"
 md-utils index field add '$.status'
 md-utils index search enable
