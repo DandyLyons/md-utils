@@ -82,7 +82,7 @@ public struct IndexRefreshLimits: Equatable, Sendable {
 /// Scans are best-effort filesystem observations, not atomic filesystem snapshots.
 /// Evaluation occurs outside SQLite; committing uses an optimistic generation check.
 /// See <doc:RefreshingCollections> for scope retention and recovery semantics.
-public struct CollectionIndexer {
+public struct CollectionIndexer: Sendable {
     /// Checked SQLite connection receiving transactional collection updates.
     public let database: SQLiteIndexDatabase
     /// Canonical project directory used to resolve all saved relative scope paths.

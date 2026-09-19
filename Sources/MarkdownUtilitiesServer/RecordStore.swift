@@ -118,6 +118,8 @@ public enum RecordStoreError: Error, Equatable, Sendable, LocalizedError {
 
   /// The backend could not currently perform the requested operation.
   case unavailable
+  /// This adapter exposes authoritative files for reads only.
+  case unsupportedOperation
 
   /// Human-readable description of the semantic storage failure.
   public var errorDescription: String? {
@@ -140,6 +142,8 @@ public enum RecordStoreError: Error, Equatable, Sendable, LocalizedError {
       return "The record-store continuation token belongs to a different query"
     case .unavailable:
       return "The record store is unavailable"
+    case .unsupportedOperation:
+      return "This record store does not support mutations"
     }
   }
 }

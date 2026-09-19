@@ -8,6 +8,10 @@ on:
       - Sources/MarkdownUtilitiesCore/**
       - Sources/MarkdownUtilities/**
       - Sources/MarkdownUtilitiesServer/**
+      - Sources/MarkdownUtilitiesIndex/**
+      - Sources/MarkdownUtilitiesIndexNative/**
+      - Sources/MarkdownUtilitiesServerNative/**
+      - Tests/MarkdownUtilitiesServerNativeTests/**
       - Sources/md-utils-server/**
       - Tests/MarkdownUtilitiesServerTests/**
       - Dockerfile.server-linux
@@ -21,6 +25,10 @@ on:
       - Sources/MarkdownUtilitiesCore/**
       - Sources/MarkdownUtilities/**
       - Sources/MarkdownUtilitiesServer/**
+      - Sources/MarkdownUtilitiesIndex/**
+      - Sources/MarkdownUtilitiesIndexNative/**
+      - Sources/MarkdownUtilitiesServerNative/**
+      - Tests/MarkdownUtilitiesServerNativeTests/**
       - Sources/md-utils-server/**
       - Tests/MarkdownUtilitiesServerTests/**
       - Dockerfile.server-linux
@@ -39,7 +47,10 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Build native server
-        run: swift build --product md-utils-server
+        run: apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev && swift build --product md-utils-server
+
+      - name: Test indexed native server
+        run: swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests'
 
       - name: Run native server route smoke test
         run: swift run MarkdownUtilitiesServerLinuxSmoke

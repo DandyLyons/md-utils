@@ -71,7 +71,9 @@ public final class IndexWatcher {
     /// Initial failures propagate; later failures are reported and retried at the
     /// reconciliation interval or next change. Cancellation releases the native stream
     /// when the caller drops this watcher and prevents staged publication.
+    /// Set `initialRefresh` to false only when the host already completed startup refresh.
     public func run(debounce: Duration = .milliseconds(300), reconcileInterval: Duration = .seconds(30),
+        initialRefresh: Bool = true,
         refresh: () async throws -> Void, ready: () -> Void = {},
         reportError: (any Error) -> Void = { _ in }) async throws {
         guard debounce > .zero, reconcileInterval > .zero else {
@@ -84,7 +86,7 @@ public final class IndexWatcher {
         async let _: Void = Self.observe(events, state: state)
         let clock = ContinuousClock()
         try Task.checkCancellation()
-        try await refresh()
+        if initialRefresh { try await refresh() }
         ready()
         var lastRefresh = clock.now
         while true {

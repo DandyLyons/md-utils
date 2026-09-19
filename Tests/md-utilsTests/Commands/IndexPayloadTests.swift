@@ -3,6 +3,7 @@ import MarkdownUtilitiesCore
 import MarkdownUtilitiesIndex
 import Testing
 @testable import md_utils
+@testable import MarkdownUtilitiesIndexNative
 
 @Suite("Index JSON compatibility")
 struct IndexPayloadTests {

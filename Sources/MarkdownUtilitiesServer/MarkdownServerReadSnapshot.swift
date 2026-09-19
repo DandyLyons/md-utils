@@ -197,12 +197,15 @@ public struct GenericMarkdownRecord: Codable, Equatable, Sendable {
 
 /// Every candidate associated with an ambiguous read-snapshot lookup.
 public struct MarkdownServerReadConflict: Codable, Equatable, Sendable {
+  public let totalCandidates: Int
+  public var truncated: Bool { candidates.count < totalCandidates }
   /// Records sharing the requested primary identity or logical path.
   public let candidates: [GenericMarkdownRecord]
 
   /// Creates a conflict that retains every ambiguous record.
-  public init(candidates: [GenericMarkdownRecord]) {
+  public init(candidates: [GenericMarkdownRecord], totalCandidates: Int? = nil) {
     self.candidates = candidates
+    self.totalCandidates = totalCandidates ?? candidates.count
   }
 }
 

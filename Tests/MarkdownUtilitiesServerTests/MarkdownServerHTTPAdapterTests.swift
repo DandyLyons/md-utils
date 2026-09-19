@@ -25,7 +25,7 @@ struct MarkdownServerHTTPAdapterTests {
       try await client.execute(uri: "/books", method: .get) { response in
         #expect(response.status == .ok)
         #expect(response.headers[.contentType] == "application/json; charset=utf-8")
-        let records = try decode([GenericMarkdownRecord].self, from: response.body)
+        let records = try decode(MarkdownServerReadPage.self, from: response.body).records
         #expect(records.count == 5)
 
         let invalid = try #require(records.first {

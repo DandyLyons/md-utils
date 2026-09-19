@@ -4,6 +4,8 @@ import MarkdownUtilitiesCore
 
 /// Stable machine-readable details for an HTTP failure.
 public struct MarkdownServerHTTPError: Codable, Equatable, Sendable {
+  public let totalCandidates: Int?
+  public let truncated: Bool?
   /// Stable error code suitable for client branching.
   public let code: String
   /// Human-readable explanation of the failure.
@@ -15,11 +17,15 @@ public struct MarkdownServerHTTPError: Codable, Equatable, Sendable {
   public init(
     code: String,
     message: String,
-    candidates: [GenericMarkdownRecord]? = nil
+    candidates: [GenericMarkdownRecord]? = nil,
+    totalCandidates: Int? = nil,
+    truncated: Bool? = nil
   ) {
     self.code = code
     self.message = message
     self.candidates = candidates
+    self.totalCandidates = totalCandidates
+    self.truncated = truncated
   }
 }
 
@@ -76,8 +82,18 @@ public enum MarkdownServerHTTPAdapter {
     snapshot: MarkdownServerReadSnapshot,
     on router: Router<BasicRequestContext>
   ) throws -> [EndpointRouteDescription] {
+    try register(plan: plan, repository: MarkdownSnapshotReadRepository(snapshot: snapshot), on: router)
+  }
+
+  /// Registers the same contract against a generation-aware, bounded read repository.
+  @discardableResult
+  public static func register(
+    plan: EndpointPlan,
+    repository: any MarkdownServerReadRepository,
+    on router: Router<BasicRequestContext>
+  ) throws -> [EndpointRouteDescription] {
     let plannedNames = plan.resources.map(\.name).sorted()
-    let snapshotNames = snapshot.resources.map(\.name).sorted()
+    let snapshotNames = repository.resourceNames.sorted()
     guard plannedNames == snapshotNames else {
       throw MarkdownServerHTTPAdapterError.resourceSnapshotMismatch(
         planned: plannedNames,
@@ -87,7 +103,7 @@ public enum MarkdownServerHTTPAdapter {
 
     let openAPIDocument = try MarkdownServerOpenAPIGenerator.generate(from: plan)
     let openAPIJSON = try openAPIDocument.serialized(format: .json)
-    let resources = Dictionary(uniqueKeysWithValues: snapshot.resources.map { ($0.name, $0) })
+    let resources = Dictionary(uniqueKeysWithValues: plan.resources.map { ($0.name, $0) })
     var installedRoutes: [EndpointRouteDescription] = []
     for route in plan.routes {
       guard route.method == .get else {
@@ -100,8 +116,13 @@ public enum MarkdownServerHTTPAdapter {
       switch route.kind {
       case .collection:
         let resource = try routeResource(route, resources: resources)
-        router.get(RouterPath(route.path.rawValue)) { _, _ in
-          try jsonResponse(resource.records, status: .ok)
+        router.get(RouterPath(route.path.rawValue)) { request, _ in
+          do {
+            let query = try readQuery(request.uri.string)
+            guard query.search == nil || resource.searchEnabled else { throw MarkdownServerReadError.searchUnavailable }
+            let page = try await repository.page(resource: resource.name, query: query)
+            return await readHeaders(try jsonResponse(page, status: .ok), repository: repository, generation: page.generation)
+          } catch { return try readErrorResponse(error) }
         }
 
       case .item:
@@ -116,12 +137,12 @@ public enum MarkdownServerHTTPAdapter {
               message: "The item identity is missing or has invalid percent encoding"
             )
           }
-          return try lookupResponse(
-            resource.lookup(primary: MarkdownRecordIdentity(rawValue: identity)),
+          do { return await readHeaders(try lookupResponse(
+            try await repository.lookup(resource: resource.name, identity: MarkdownRecordIdentity(rawValue: identity)),
             notFoundMessage: "No record exists with primary identity \"\(identity)\"",
             conflictCode: "record.identity-conflict",
             conflictMessage: "Several records share the requested primary identity"
-          )
+          ), repository: repository) } catch { return try readErrorResponse(error) }
         }
 
       case .logicalPath:
@@ -136,12 +157,12 @@ public enum MarkdownServerHTTPAdapter {
               message: "The logical path must be a valid collection-relative record path"
             )
           }
-          return try lookupResponse(
-            snapshot.lookup(logicalPath: path),
+          do { return await readHeaders(try lookupResponse(
+            try await repository.lookup(path: path),
             notFoundMessage: "No record exists at logical path \"\(path.rawValue)\"",
             conflictCode: "record.logical-path-conflict",
             conflictMessage: "Several records share the requested logical path"
-          )
+          ), repository: repository) } catch { return try readErrorResponse(error) }
         }
 
       case .openAPI:
@@ -160,8 +181,8 @@ public enum MarkdownServerHTTPAdapter {
 
   private static func routeResource(
     _ route: EndpointRouteDescription,
-    resources: [String: MarkdownResourceReadSnapshot]
-  ) throws -> MarkdownResourceReadSnapshot {
+    resources: [String: PlannedMarkdownResource]
+  ) throws -> PlannedMarkdownResource {
     guard let name = route.resourceName, let resource = resources[name] else {
       throw MarkdownServerHTTPAdapterError.missingRouteResource(
         operationID: route.operationID,
@@ -188,6 +209,7 @@ public enum MarkdownServerHTTPAdapter {
   ) throws -> Response {
     switch result {
     case .record(let record):
+      _ = try markdownServerEncodedRecordSize(record)
       return try jsonResponse(record, status: .ok)
     case .notFound:
       return try errorResponse(
@@ -196,11 +218,23 @@ public enum MarkdownServerHTTPAdapter {
         message: notFoundMessage
       )
     case .conflict(let conflict):
+      var candidates: [GenericMarkdownRecord] = []
+      var bytes = 32_768
+      for record in conflict.candidates.prefix(1_000) {
+        let size: Int
+        do { size = try markdownServerEncodedRecordSize(record) }
+        catch MarkdownServerReadError.responseTooLarge { break }
+        guard bytes + size <= 64 * 1_024 * 1_024 else { break }
+        candidates.append(record)
+        bytes += size + 1
+      }
       return try errorResponse(
         status: .conflict,
         code: conflictCode,
         message: conflictMessage,
-        candidates: conflict.candidates
+        candidates: candidates,
+        totalCandidates: conflict.totalCandidates,
+        truncated: candidates.count < conflict.totalCandidates
       )
     }
   }
@@ -209,13 +243,17 @@ public enum MarkdownServerHTTPAdapter {
     status: HTTPResponse.Status,
     code: String,
     message: String,
-    candidates: [GenericMarkdownRecord]? = nil
+    candidates: [GenericMarkdownRecord]? = nil,
+    totalCandidates: Int? = nil,
+    truncated: Bool? = nil
   ) throws -> Response {
     try jsonResponse(
       MarkdownServerHTTPErrorEnvelope(error: MarkdownServerHTTPError(
         code: code,
         message: message,
-        candidates: candidates
+        candidates: candidates,
+        totalCandidates: totalCandidates,
+        truncated: truncated
       )),
       status: status
     )
@@ -228,10 +266,79 @@ public enum MarkdownServerHTTPAdapter {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let data = try encoder.encode(value)
+    guard data.count <= 64 * 1_024 * 1_024 else { throw MarkdownServerReadError.responseTooLarge }
     return Response(
       status: status,
       headers: [.contentType: "application/json; charset=utf-8"],
       body: .init(byteBuffer: ByteBuffer(bytes: data))
     )
+  }
+
+  private static func readQuery(_ uri: String) throws -> MarkdownServerReadQuery {
+    guard uri.utf8.count <= 32_768, let components = URLComponents(string: uri) else {
+      throw MarkdownServerReadError.invalidQuery("Invalid request URI")
+    }
+    var values: [String: String] = [:]
+    for item in components.queryItems ?? [] {
+      guard ["limit", "cursor", "pathPrefix", "valid", "filter", "q"].contains(item.name),
+        values[item.name] == nil, let value = item.value else {
+        throw MarkdownServerReadError.invalidQuery("Unknown, repeated, or empty query parameter")
+      }
+      values[item.name] = value
+    }
+    let limit: Int
+    if let raw = values["limit"] {
+      guard let parsed = Int(raw) else { throw MarkdownServerReadError.invalidQuery("Invalid limit") }
+      limit = parsed
+    } else { limit = 100 }
+    var valid: Bool?
+    if let raw = values["valid"] {
+      guard raw == "true" || raw == "false" else { throw MarkdownServerReadError.invalidQuery("Invalid valid flag") }
+      valid = raw == "true"
+    }
+    var filter: [String: JSONValue] = [:]
+    if let raw = values["filter"] {
+      guard let decoded = try? JSONDecoder().decode([String: JSONValue].self, from: Data(raw.utf8)) else {
+        throw MarkdownServerReadError.invalidQuery("filter must be a JSON object")
+      }
+      filter = decoded
+    }
+    return try MarkdownServerReadQuery(limit: limit, cursor: values["cursor"], pathPrefix: values["pathPrefix"],
+      valid: valid, filter: filter, search: values["q"])
+  }
+
+  private static func readErrorResponse(_ error: any Error) throws -> Response {
+    let status: HTTPResponse.Status
+    let code: String
+    let message: String
+    switch error {
+    case MarkdownServerReadError.invalidQuery(let detail):
+      status = .badRequest; code = "request.invalid-query"; message = detail
+    case MarkdownServerReadError.generationChanged:
+      status = .conflict; code = "request.generation-changed"; message = "Restart pagination against the current generation"
+    case MarkdownServerReadError.searchUnavailable:
+      status = .badRequest; code = "request.search-unavailable"; message = "Search is not enabled for this resource"
+    case MarkdownServerReadError.sourceChanged:
+      status = .serviceUnavailable; code = "record.source-changed"; message = "Authoritative files changed; refresh the index and retry"
+    case MarkdownServerReadError.restartRequired:
+      status = .serviceUnavailable; code = "server.restart-required"; message = "Server definitions changed; restart to load the new contract"
+    case MarkdownServerReadError.responseTooLarge:
+      status = .contentTooLarge; code = "record.response-too-large"; message = "The record exceeds the response byte limit"
+    default:
+      status = .serviceUnavailable; code = "server.unavailable"; message = "The read repository is unavailable"
+    }
+    return try errorResponse(status: status, code: code, message: message)
+  }
+
+  private static func readHeaders(_ response: Response, repository: any MarkdownServerReadRepository,
+    generation: String? = nil) async -> Response {
+    var response = response
+    if let name = HTTPFields.Element.Name("X-Md-Utils-Stale") {
+      response.headers[name] = await repository.isStale() ? "true" : "false"
+    }
+    if let generation, let name = HTTPFields.Element.Name("X-Md-Utils-Generation") {
+      response.headers[name] = generation
+    }
+    return response
   }
 }

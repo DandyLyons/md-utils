@@ -3,6 +3,7 @@ import Foundation
 import Hummingbird
 import Logging
 import MarkdownUtilitiesServer
+import MarkdownUtilitiesServerNative
 import PathKit
 
 extension ServerEntry {
@@ -56,12 +57,13 @@ extension ServerEntry {
         projectRoot: root,
         configurationFile: config.map { Path($0) }
       )
-      let runtime = try await loader.load()
+      let repository = try IndexedMarkdownRepository(projectRoot: root.string, configurationFile: config)
+      try await repository.refresh()
 
       let router = Router()
       try MarkdownServerHTTPAdapter.register(
-        plan: runtime.plan,
-        snapshot: runtime.snapshot,
+        plan: repository.plan,
+        repository: repository,
         on: router
       )
 
@@ -74,9 +76,8 @@ extension ServerEntry {
       logger.info("Loaded md-utils server project", metadata: [
         "project_root": "\(loader.projectRoot.string)",
         "configuration": "\(loader.configurationFile.string)",
-        "records": "\(runtime.importedRecordCount)",
-        "resources": "\(runtime.plan.resources.count)",
-        "routes": "\(runtime.plan.routes.count)",
+        "resources": "\(repository.plan.resources.count)",
+        "routes": "\(repository.plan.routes.count)",
       ])
       let applicationLogger = logger
 
@@ -96,7 +97,16 @@ extension ServerEntry {
         },
         logger: applicationLogger
       )
-      try await app.runService()
+      try await withThrowingTaskGroup(of: Void.self) { group in
+        group.addTask { try await app.runService() }
+        group.addTask {
+          try await repository.watch { message in
+            applicationLogger.error("Index refresh failed", metadata: ["error": "\(message)"])
+          }
+        }
+        defer { group.cancelAll() }
+        try await group.next()
+      }
     }
   }
 }

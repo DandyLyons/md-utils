@@ -3,8 +3,19 @@ import GRDBSQLite
 
 /// A native SQLite connection reserved for the rebuildable file index.
 /// GRDB serializes access and commits collection changes transactionally.
-public final class SQLiteIndexDatabase {
+/// Its only stored state is GRDB's thread-safe serialized queue.
+public final class SQLiteIndexDatabase: Sendable {
     let databaseQueue: DatabaseQueue
+
+    /// Synchronous native adapter access. The closure cannot suspend a read transaction.
+    package func serverRead<T>(_ body: (Database) throws -> T) throws -> T {
+        try databaseQueue.read(body)
+    }
+
+    /// Publishes one bounded native adapter staging batch transactionally.
+    package func serverWrite<T>(_ body: (Database) throws -> T) throws -> T {
+        try databaseQueue.write(body)
+    }
 
     /// Filesystem path used to exclude the cache and sidecars from native watching.
     public var path: String { databaseQueue.path }

@@ -204,7 +204,8 @@ public struct EndpointPlanCompiler: Sendable {
         operations: operations,
         selection: selection,
         identityPolicy: resource.identityPolicy,
-        projectionPolicy: resource.projectionPolicy
+        projectionPolicy: resource.projectionPolicy,
+        searchEnabled: resource.searchEnabled
       )
       plannedResources.append(planned)
 

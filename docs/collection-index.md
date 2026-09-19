@@ -3,6 +3,11 @@
 Files remain authoritative. The SQLite database is a disposable cache of parsed
 text and selection assessments, not a backup or a way to restore a folder.
 
+The native server reuses this cache and evaluation library. Its bounded read
+projections and explicit resource configuration are described in
+[indexed server reads](indexed-server-reads.md). Indexing a rule/type never exposes
+an HTTP resource automatically.
+
 ```sh
 md-utils index update ./notes/
 md-utils index type Book ./notes/

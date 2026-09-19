@@ -48,6 +48,7 @@
           ]
         },
         "identityPolicy": { "$ref": "#/$defs/identityPolicy" },
+        "searchEnabled": { "type": "boolean", "default": false },
         "projectionPolicy": {
           "const": "genericRecord",
           "default": "genericRecord",

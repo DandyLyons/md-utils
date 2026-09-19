@@ -1,6 +1,6 @@
 # Native Read-Only Server
 
-Compose a project snapshot once and expose it through generic Hummingbird 2 routes.
+Compile an immutable resource plan and expose bounded indexed reads through generic Hummingbird 2 routes.
 
 ## Startup
 
@@ -26,7 +26,10 @@ recursively imports `.md` and `.markdown` files outside `.md-utils/` into
 ``MarkdownServerReadSnapshot``. Any decoding, reference, route, or snapshot failure
 stops startup before Hummingbird accepts requests.
 
-The snapshot is immutable. Restart the process to observe filesystem changes.
+The native executable instead composes `IndexedMarkdownRepository` from the separate
+`MarkdownUtilitiesServerNative` target. It shares the CLI cache, publishes body-free
+projections, and watches source files on macOS. Other platforms adopt explicit CLI
+index updates. Resource configuration and definition changes require restart.
 Hummingbird's `runService()` performs graceful lifecycle shutdown for `SIGINT` and
 `SIGTERM`.
 
@@ -35,14 +38,14 @@ Hummingbird's `runService()` performs graceful lifecycle shutdown for `SIGINT` a
 ``MarkdownServerHTTPAdapter`` registers each route in the plan without generated or
 resource-specific Swift code:
 
-- Collection routes return `[GenericMarkdownRecord]`.
+- Collection routes return `{records, generation, nextCursor}` with bounded pagination.
 - Item routes return one record by the resource's primary identity.
 - `/_md-utils/path/**` returns one record by exact nested logical path when fallback
   is enabled.
 - `/openapi.json` returns the active deterministic OpenAPI 3.1.1 document.
 
 Not-found results map to `404`. Invalid logical paths map to `400`. Identity and
-logical-path collisions map to `409` with every candidate in a stable
+logical-path collisions map to `409` with bounded candidates and explicit totals in a stable
 ``MarkdownServerHTTPErrorEnvelope``. A handler never chooses an arbitrary colliding
 record.
 
@@ -56,8 +59,13 @@ contract without importing records or starting Hummingbird. See <doc:GeneratedOp
 
 ## Performance Boundary
 
-Recursive discovery, Markdown parsing, rule checks, type assessment, and index
-construction occur once during startup. Requests read immutable precomputed arrays
-and lookup indexes. The first release returns unpaginated collections and stores the
-startup import in memory, so it targets bounded project trees rather than an
-unbounded or live-updating repository.
+The executable uses disk-backed projection staging and generation-consistent read
+transactions. Source bodies are read only for requested records, checked against
+indexed content hashes, and never cached across the corpus in a snapshot. Pages
+are limited to 1,000 records and 64 MiB; single source reads are limited to 64 MiB.
+Changed sources return `503 record.source-changed`. Failed operational refreshes
+retain the last publication and expose `X-Md-Utils-Stale`.
+
+Collection parameters are `limit`, `cursor`, `pathPrefix`, `valid`, and scalar JSON
+`filter`. Resources with `searchEnabled: true` additionally offer `q` and require an
+FTS-enabled cache. All parameters and errors are generated from the endpoint plan.

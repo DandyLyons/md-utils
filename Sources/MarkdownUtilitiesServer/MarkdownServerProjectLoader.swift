@@ -148,6 +148,12 @@ public struct MarkdownServerProjectLoader: @unchecked Sendable {
     )
   }
 
+  /// Loads only explicit resource declarations for composition with shared native registries.
+  public func loadConfiguration() throws -> MarkdownServerConfiguration {
+    try validatePaths()
+    return try loadServerConfiguration()
+  }
+
   private func loadPlanDependencies() throws -> PlanDependencies {
     try validatePaths()
     let configuration = try loadServerConfiguration()
@@ -305,6 +311,7 @@ private struct NativeMarkdownServerConfigurationFile: Decodable {
 }
 
 private struct NativeMarkdownResourceConfiguration: Decodable {
+  let searchEnabled: Bool
   let name: String
   let route: String
   let operations: [MarkdownResourceOperation]
@@ -314,6 +321,7 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
   let operationIDOverrides: [MarkdownOperationIDOverride]
 
   private enum CodingKeys: String, CodingKey {
+    case searchEnabled
     case name
     case route
     case operations
@@ -325,6 +333,7 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
 
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    searchEnabled = try container.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false
     name = try container.decode(String.self, forKey: .name)
     route = try container.decode(String.self, forKey: .route)
     operations = try container.decode([MarkdownResourceOperation].self, forKey: .operations)
@@ -348,7 +357,8 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
       selection: selection,
       identityPolicy: identityPolicy.policy,
       projectionPolicy: projectionPolicy,
-      operationIDOverrides: operationIDOverrides
+      operationIDOverrides: operationIDOverrides,
+      searchEnabled: searchEnabled
     )
   }
 }

@@ -274,6 +274,18 @@ public enum MarkdownServerOpenAPIGenerator {
     switch route.kind {
     case .collection:
       value["summary"] = string("List \(resource?.name ?? "Markdown records")")
+      var parameters = [
+        queryParameter("limit", "Maximum records (1–1000; default 100)", object(["type": string("integer"), "minimum": .integer(1), "maximum": .integer(1000), "default": .integer(100)])),
+        queryParameter("cursor", "Opaque continuation for the same query and generation", object(["type": string("string")])),
+        queryParameter("pathPrefix", "Collection-relative directory ending in /", object(["type": string("string")])),
+        queryParameter("valid", "Filter aggregate record validity", object(["type": string("boolean")])),
+        queryParameter("filter", "JSON object of top-level frontmatter scalar equality filters, combined with AND", object(["type": string("string")]))
+      ]
+      if resource?.searchEnabled == true {
+        parameters.append(queryParameter("q", "FTS5 search expression; results ordered by logical path", object(["type": string("string")])))
+      }
+      value["parameters"] = array(parameters)
+      value["x-md-utils-search-enabled"] = .boolean(resource?.searchEnabled == true)
     case .item:
       value["summary"] = string("Get one \(resource?.name ?? "Markdown record") record")
       value["parameters"] = array([pathParameter(
@@ -300,6 +312,11 @@ public enum MarkdownServerOpenAPIGenerator {
     return .object(value)
   }
 
+  private static func queryParameter(_ name: String, _ description: String, _ schema: JSONValue) -> JSONValue {
+    object(["name": string(name), "in": string("query"), "required": .boolean(false),
+      "description": string(description), "schema": schema])
+  }
+
   private static func responses(
     for route: EndpointRouteDescription,
     resource: PlannedMarkdownResource?,
@@ -311,10 +328,19 @@ public enum MarkdownServerOpenAPIGenerator {
         "200": response(
           description: "Selected Markdown records, including invalid rule-selected items",
           schema: object([
-            "type": string("array"),
-            "items": recordSchema(for: resource, typeSchemas: typeSchemas),
+            "type": string("object"),
+            "required": array([string("records"), string("generation"), string("nextCursor")]),
+            "properties": object([
+              "records": object(["type": string("array"), "items": recordSchema(for: resource, typeSchemas: typeSchemas)]),
+              "generation": object(["type": string("string")]),
+              "nextCursor": object(["type": array([string("string"), string("null")])]),
+            ]),
           ])
         ),
+        "400": errorResponse("Invalid query or unavailable search"),
+        "409": errorResponse("Generation changed; restart pagination"),
+        "413": errorResponse("A record exceeds the response byte limit"),
+        "503": errorResponse("Source changed, restart required, or repository unavailable"),
       ])
     case .item:
       return object([
@@ -325,6 +351,8 @@ public enum MarkdownServerOpenAPIGenerator {
         "400": errorResponse("The identity is missing or invalid"),
         "404": errorResponse("No selected record has the requested identity"),
         "409": errorResponse("Several selected records share the requested identity"),
+        "413": errorResponse("A record exceeds the response byte limit"),
+        "503": errorResponse("Source changed, restart required, or repository unavailable"),
       ])
     case .logicalPath:
       return object([
@@ -335,6 +363,8 @@ public enum MarkdownServerOpenAPIGenerator {
         "400": errorResponse("The logical path is invalid"),
         "404": errorResponse("No canonical record has the requested logical path"),
         "409": errorResponse("Several canonical records share the requested logical path"),
+        "413": errorResponse("A record exceeds the response byte limit"),
+        "503": errorResponse("Source changed, restart required, or repository unavailable"),
       ])
     case .openAPI:
       return object([
@@ -500,6 +530,8 @@ public enum MarkdownServerOpenAPIGenerator {
             "type": array([string("array"), string("null")]),
             "items": reference("GenericMarkdownRecord"),
           ]),
+          "totalCandidates": object(["type": string("integer"), "minimum": .integer(0)]),
+          "truncated": object(["type": string("boolean")]),
         ]),
         "additionalProperties": .boolean(false),
       ]),

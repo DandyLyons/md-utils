@@ -197,6 +197,8 @@ extension SQLiteIndexDatabase {
                     arguments: [String(Date().timeIntervalSince1970)])
             }
             try refreshTypeViews(database)
+            try database.execute(sql: "INSERT INTO index_metadata VALUES('published_generation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                arguments: [String(generation)])
             try database.execute(sql: "DELETE FROM refresh_diagnostics; DELETE FROM refresh_assessments; DELETE FROM refresh_files; DELETE FROM refresh_seen; DELETE FROM refresh_scopes")
         }
     }

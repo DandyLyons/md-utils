@@ -607,14 +607,13 @@ swift run md-utils-server openapi \
 The default bind address is `127.0.0.1:8080`. `LOG_LEVEL` controls Swift Logging.
 Hummingbird handles `SIGINT` and `SIGTERM` through graceful service shutdown.
 
-- `GET /books` returns the complete configured resource as a JSON array.
+- `GET /books` returns `{records, generation, nextCursor}` with a default page of 100 records.
 - `GET /books/{id}` returns one unambiguous primary-ID record.
 - `GET /_md-utils/path/**` returns an exact nested logical path when at least one
   `get` resource enables fallback.
 - `GET /openapi.json` returns the active generated OpenAPI 3.1.1 document.
 - Missing records return `404`; invalid lookup paths return `400`; identity or path
-  collisions return `409` with every candidate in
-  `{"error":{"code","message","candidates"}}`.
+  collisions return `409` with bounded candidates, their total count, and a truncation flag.
 
 Rule-selected records remain present when checks or an expected mdtype fail; their
 generic envelopes report `valid: false` and structured diagnostics. Missing primary
@@ -622,12 +621,13 @@ IDs remain visible in collections but cannot be fetched by item ID. A canonical
 record may appear through several resources with the same canonical identity and
 revision.
 
-Startup performs one deterministic recursive import into `InMemoryRecordStore`,
-then builds one immutable snapshot. Requests do not rescan files or reparse Markdown.
-Filesystem changes require a process restart, and collection responses are currently
-unpaginated, so this initial distribution is intended for bounded project trees. It
-does not provide hot reload, writes, authentication, or a persistent production
-store.
+Startup refreshes the shared `.md-utils/index.sqlite` cache and publishes body-free
+read projections. macOS uses filesystem watching; other platforms consume explicit
+CLI index updates. Requests read bounded, revision-checked authoritative files.
+Resource and definition changes require restart. Pagination, typed equality filters,
+and optional FTS search are described by the generated OpenAPI contract. See
+[indexed server reads](docs/indexed-server-reads.md) for query parameters, the
+breaking collection-response change, consistency guarantees, and memory limits.
 
 Verify the native server on Linux with:
 
@@ -641,6 +641,8 @@ docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 - **MarkdownUtilitiesCore** for portable content operations on Apple platforms, Linux, and WebAssembly
 - **MarkdownUtilities** for native filesystem and metadata integrations
 - **MarkdownUtilitiesServer** for immutable server planning, snapshots, and Hummingbird 2 routes
+- **MarkdownUtilitiesIndexNative** for shared CLI/server indexing evaluation
+- **MarkdownUtilitiesServerNative** for persistent indexed filesystem reads and refresh
 - All testing uses the native Swift Testing framework
 
 ### Dependencies

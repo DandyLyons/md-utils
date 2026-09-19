@@ -4,6 +4,7 @@ import GRDB
 import MarkdownUtilities
 import MarkdownUtilitiesCore
 import MarkdownUtilitiesIndex
+import MarkdownUtilitiesIndexNative
 import PathKit
 import Testing
 @testable import md_utils

@@ -198,6 +198,9 @@ struct MarkdownServerOpenAPITests {
     let content = try #require(success["content"]?.objectValue)
     let json = try #require(content["application/json"]?.objectValue)
     let schema = try #require(json["schema"])
+    if let records = schema.objectValue?["properties"]?.objectValue?["records"]?.objectValue?["items"] {
+      return records
+    }
     if schema.objectValue?["type"]?.stringValue == "array" {
       return try #require(schema.objectValue?["items"])
     }

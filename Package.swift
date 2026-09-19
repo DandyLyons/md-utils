@@ -9,6 +9,8 @@ let package = Package(
     .macOS(.v13), .iOS(.v16), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16),
   ],
   products: [
+    .library(name: "MarkdownUtilitiesServerNative", targets: ["MarkdownUtilitiesServerNative"]),
+    .library(name: "MarkdownUtilitiesIndexNative", targets: ["MarkdownUtilitiesIndexNative"]),
     .library(name: "MarkdownUtilitiesIndex", targets: ["MarkdownUtilitiesIndex"]),
     .library(
       name: "MarkdownUtilitiesCore",
@@ -57,7 +59,26 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
-    // SQLite remains outside Core, WASM, and the server.
+    .testTarget(name: "MarkdownUtilitiesServerNativeTests", dependencies: [
+      .product(name: "GRDB", package: "GRDB.swift"),
+      "MarkdownUtilitiesServerNative", "MarkdownUtilitiesServer", "MarkdownUtilitiesIndexNative",
+      "MarkdownUtilitiesIndex", "MarkdownUtilitiesCore",
+      .product(name: "PathKit", package: "PathKit"),
+      .product(name: "Hummingbird", package: "hummingbird"),
+      .product(name: "HummingbirdTesting", package: "hummingbird"),
+    ]),
+    .target(name: "MarkdownUtilitiesIndexNative", dependencies: [
+      "MarkdownUtilitiesIndex", "MarkdownUtilities", "MarkdownUtilitiesCore",
+      .product(name: "JMESPath", package: "jmespath.swift"),
+      .product(name: "PathKit", package: "PathKit"),
+    ]),
+    .target(name: "MarkdownUtilitiesServerNative", dependencies: [
+      .product(name: "SystemPackage", package: "swift-system"),
+      "MarkdownUtilitiesServer", "MarkdownUtilitiesIndexNative", "MarkdownUtilitiesIndex",
+      .product(name: "GRDB", package: "GRDB.swift"),
+      .product(name: "PathKit", package: "PathKit"),
+    ]),
+    // SQLite remains outside Core, WASM, and MarkdownUtilitiesServer.
     .target(
       name: "MarkdownUtilitiesIndex",
       dependencies: [
@@ -175,6 +196,7 @@ let package = Package(
     .executableTarget(
       name: "md-utils-server",
       dependencies: [
+        "MarkdownUtilitiesServerNative",
         "MarkdownUtilitiesServer",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Hummingbird", package: "hummingbird"),
@@ -196,6 +218,7 @@ let package = Package(
     .executableTarget(
       name: "md-utils",
       dependencies: [
+        "MarkdownUtilitiesIndexNative",
         "MarkdownUtilitiesIndex",
         "MarkdownUtilitiesCore",
         "MarkdownUtilities",
@@ -221,6 +244,7 @@ let package = Package(
     .testTarget(
       name: "md-utilsTests",
       dependencies: [
+        "MarkdownUtilitiesIndexNative",
         "MarkdownUtilitiesCore",
         .target(name: "md-utils"),
       ],

@@ -35,6 +35,12 @@ Components describe the generic record envelope, resource memberships, validity,
 canonical identity, logical path, revision, diagnostics, collisions, and HTTP errors.
 Every resource alias references the same canonical record components.
 
+Collection operations return a bounded page with `records`, `generation`, and
+nullable `nextCursor`. They declare `limit`, `cursor`, `pathPrefix`, `valid`, and
+JSON-encoded scalar `filter` query parameters. `q` is declared only when the
+resource enables search. Invalid queries return `400`, changed generations `409`,
+oversized records `413`, and unavailable or changed sources `503`.
+
 Type-selected resources constrain `frontmatter` with the selected type's resolved
 Draft 2020-12 schemas. Rule selection with an expected type deliberately retains the
 generic envelope because nonconforming records remain successful responses; its

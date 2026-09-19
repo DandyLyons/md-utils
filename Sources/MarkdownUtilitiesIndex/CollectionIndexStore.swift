@@ -319,7 +319,12 @@ extension SQLiteIndexDatabase {
     /// - Returns: The persisted path, or `nil` when the host should use its default.
     /// - Throws: SQLite read or write errors. This method does not load the config file.
     public func configurationPath(_ supplied: String? = nil) throws -> String? {
-        try databaseQueue.write { db in
+        if supplied == nil {
+            return try databaseQueue.read { db in
+                try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='config'")
+            }
+        }
+        return try databaseQueue.write { db in
             if let supplied {
                 try db.execute(sql: "INSERT INTO index_metadata VALUES('config',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                     arguments: [supplied])

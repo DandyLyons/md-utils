@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import MarkdownUtilitiesServer
+import MarkdownUtilitiesServerNative
 import PathKit
 
 extension ServerEntry {
@@ -43,11 +44,7 @@ extension ServerEntry {
     var output: String
 
     mutating func run() throws {
-      let loader = MarkdownServerProjectLoader(
-        projectRoot: Path(projectRoot),
-        configurationFile: config.map { Path($0) }
-      )
-      let runtime = try loader.loadPlan()
+      let runtime = try IndexedMarkdownRepository.loadPlan(projectRoot: projectRoot, configurationFile: config)
       let document = try MarkdownServerOpenAPIGenerator.generate(from: runtime.plan)
       let data = try document.serialized(format: format.libraryValue)
       try data.write(to: URL(fileURLWithPath: Path(output).absolute().string), options: .atomic)

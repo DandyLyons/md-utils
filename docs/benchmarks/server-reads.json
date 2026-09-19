@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-18",
+  "platform": "macOS arm64",
+  "toolchain": "Swift 6.3.1",
+  "configuration": "debug",
+  "notes": "100000-document measurement overlapped Linux build validation on the same host.",
+  "measurements": [
+    {
+      "count": 1000,
+      "body_bytes": 4096,
+      "corpus_body_bytes": 4096000,
+      "startup_and_first_page_seconds": 2.932,
+      "warm_page_seconds": 0.335,
+      "page_bytes": 4576973,
+      "peak_rss_bytes": 66338816
+    },
+    {
+      "count": 100000,
+      "body_bytes": 4096,
+      "corpus_body_bytes": 409600000,
+      "startup_and_first_page_seconds": 214.205,
+      "warm_page_seconds": 0.342,
+      "page_bytes": 4577159,
+      "peak_rss_bytes": 106561536
+    }
+  ]
+}

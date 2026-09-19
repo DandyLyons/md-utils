@@ -1,7 +1,7 @@
 # MarkdownUtilities Server Architecture
 
-- Status: native read-only Hummingbird 2 vertical slice implemented
-- Last updated: 2026-08-09
+- Status: native indexed reads, pagination, optional FTS, and generated OpenAPI implemented
+- Last updated: 2026-09-18
 
 This document records the architectural direction for exposing Markdown-backed data through conventional HTTP APIs. It distinguishes implemented foundations, decisions already made, the next recommended milestone, and questions that still require explicit design.
 
@@ -32,7 +32,7 @@ The original type-system prerequisite has been met. The project now has enough p
 - `MarkdownUtilitiesServer` defines the asynchronous, storage-neutral `RecordStore` contract and actor-backed `InMemoryRecordStore` reference implementation.
 - `MarkdownServerReadSnapshotBuilder` performs one bounded scan, reuses one analysis per candidate, and builds immutable generic record, membership, validity, identity, and lookup indexes.
 - `MarkdownServerHTTPAdapter` registers generic Hummingbird 2 collection, item, and reserved logical-path handlers directly from the immutable plan.
-- `md-utils-server` loads `.md-utils/server/server.yaml`, imports project Markdown recursively, builds one immutable snapshot, logs startup state, and runs with signal-aware lifecycle handling.
+- `md-utils-server` compiles an immutable endpoint plan and uses the shared native index with bounded, revision-checked reads. See [indexed server reads](indexed-server-reads.md) for publication, filtering, search, and refresh semantics.
 
 The normative type design is documented in [RFC 0001: mdtype](rfcs/0001-mdtype.md). The portable dependency and runtime status is documented in [WebAssembly Support](webassembly.md).
 
@@ -42,7 +42,6 @@ The following pieces do not yet exist:
 
 - a domain-resource projection and encoding contract;
 - a public schema-introspection API suitable for generators outside `MarkdownUtilitiesCore`;
-- OpenAPI generation from exposed resources;
 - resource pagination, filtering, and query behavior;
 - the Cloudflare Workers distribution; and
 - persistent type indexes or a production storage backend.
@@ -354,7 +353,7 @@ The first vertical slice proves endpoint derivation with the smallest useful rea
 
 1. Define one explicit exposed resource backed by a `Book` mdtype.
 2. Define a minimal response projection for that resource.
-3. Import recursively discovered Markdown into `InMemoryRecordStore` and build the generic immutable read snapshot.
+3. Refresh the shared native index and publish bounded body-free projections. The in-memory snapshot remains available for custom stores and contract fixtures.
 4. Compile the resource into an immutable `EndpointPlan` containing `GET /books` and `GET /books/{id}`.
 5. Register generic Hummingbird 2 handlers from that plan.
 6. For type selection, return records that conform to `Book`; separately test rule selection with an expected type, where invalid candidates remain visible with `valid: false` and diagnostics.
@@ -386,11 +385,11 @@ rules + mdtype definitions + resource configuration
 
 `MarkdownUtilitiesServer` owns plan construction and generic handlers. The `md-utils-server` executable performs startup composition and serves the registered plan through Hummingbird 2. No resource-specific Swift source is generated. The process accepts `--project-root`, `--config`, `--hostname`, and `--port`; it defaults to `.md-utils/server/server.yaml` and `127.0.0.1:8080`.
 
-At startup, the executable loads rule and mdtype definitions, recursively imports project Markdown while excluding `.md-utils/`, compiles the plan, and publishes one immutable snapshot. A filesystem change becomes visible only after restart. `runService()` handles `SIGINT` and `SIGTERM` through graceful lifecycle shutdown.
+At startup, the executable loads definitions, compiles the plan, refreshes the shared index, and publishes body-free projections. macOS watching and explicit CLI updates publish subsequent generations. Definition and resource configuration changes require restart. `runService()` handles `SIGINT` and `SIGTERM` through graceful lifecycle shutdown.
 
 Collection handlers return the complete selected resource. Item and logical-path handlers switch exhaustively over record, not-found, and conflict lookup results. All HTTP failures use a stable JSON error envelope; `409 Conflict` includes every candidate and never selects one arbitrarily. Invalid rule-selected candidates remain normal `200` representations with `valid: false` and diagnostics. Missing primary identities remain visible in collections but have no item lookup key.
 
-The startup scan and parsing cost is paid once. Concurrent handlers only read immutable arrays and indexes. The initial server deliberately has no response pagination or production persistence, so operators should treat it as a bounded-project distribution and restart it after content changes.
+Native reads use bounded pages and generation-consistent SQLite transactions. Body-free projections are staged on disk; requested bodies come from revision-checked authoritative files. Resource definitions require restart, while source changes refresh through watching or explicit index updates. See [indexed server reads](indexed-server-reads.md) for query contracts and measured memory bounds.
 
 Storage must remain replaceable so a maintainer can use an ordinary folder hierarchy, SQLite, or a future adapter appropriate to the deployment.
 
@@ -455,7 +454,7 @@ The following questions remain intentionally unresolved:
 - List pagination, filtering, sorting, full-text search, and query limits.
 - Which rules run at each read or write lifecycle point.
 - The OpenAPI generation and routing toolchain for Workers.
-- Whether SQLite, filesystem storage, or another backend is the default for the native server.
+- Canonical SQLite storage remains separate future work; the native server currently uses an indexed filesystem adapter.
 - The JavaScript/WebAssembly ABI and release packaging for Core.
 - Whether canonical Markdown on Workers lives in Durable Object SQLite, R2, or another store.
 - Durable Object sharding and cross-shard query design.

@@ -135,6 +135,8 @@ public struct MarkdownOperationIDOverride: Codable, Equatable, Sendable {
 
 /// One explicitly exposed Markdown-backed server resource.
 public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
+  /// Explicit opt-in to native FTS queries. The cache must already enable FTS.
+  public let searchEnabled: Bool
   /// Stable, case-sensitive name used to identify this resource in a plan.
   public let name: String
 
@@ -173,14 +175,28 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
     selection: MarkdownResourceSelection,
     identityPolicy: MarkdownRecordIdentityPolicy,
     projectionPolicy: MarkdownResourceProjectionPolicy = .genericRecord,
-    operationIDOverrides: [MarkdownOperationIDOverride] = []
+    operationIDOverrides: [MarkdownOperationIDOverride] = [],
+    searchEnabled: Bool = false
   ) {
     self.name = name
+    self.searchEnabled = searchEnabled
     self.route = route
     self.operations = operations
     self.selection = selection
     self.identityPolicy = identityPolicy
     self.projectionPolicy = projectionPolicy
     self.operationIDOverrides = operationIDOverrides
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(name: try values.decode(String.self, forKey: .name),
+      route: try values.decode(String.self, forKey: .route),
+      operations: try values.decode([MarkdownResourceOperation].self, forKey: .operations),
+      selection: try values.decode(MarkdownResourceSelection.self, forKey: .selection),
+      identityPolicy: try values.decode(MarkdownRecordIdentityPolicy.self, forKey: .identityPolicy),
+      projectionPolicy: try values.decodeIfPresent(MarkdownResourceProjectionPolicy.self, forKey: .projectionPolicy) ?? .genericRecord,
+      operationIDOverrides: try values.decodeIfPresent([MarkdownOperationIDOverride].self, forKey: .operationIDOverrides) ?? [],
+      searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false)
   }
 }

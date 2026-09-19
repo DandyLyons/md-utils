@@ -120,6 +120,8 @@ public enum PlannedResourceSelection: Codable, Equatable, Sendable {
 
 /// One immutable resource in a compiled endpoint plan.
 public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
+  /// Whether this resource's contract offers FTS search.
+  public let searchEnabled: Bool
   /// Stable configured resource name.
   public let name: String
 
@@ -155,14 +157,27 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
     operations: [MarkdownResourceOperation],
     selection: PlannedResourceSelection,
     identityPolicy: MarkdownRecordIdentityPolicy,
-    projectionPolicy: MarkdownResourceProjectionPolicy
+    projectionPolicy: MarkdownResourceProjectionPolicy,
+    searchEnabled: Bool = false
   ) {
     self.name = name
+    self.searchEnabled = searchEnabled
     self.route = route
     self.operations = operations
     self.selection = selection
     self.identityPolicy = identityPolicy
     self.projectionPolicy = projectionPolicy
+  }
+
+  public init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(name: try values.decode(String.self, forKey: .name),
+      route: try values.decode(EndpointRoutePath.self, forKey: .route),
+      operations: try values.decode([MarkdownResourceOperation].self, forKey: .operations),
+      selection: try values.decode(PlannedResourceSelection.self, forKey: .selection),
+      identityPolicy: try values.decode(MarkdownRecordIdentityPolicy.self, forKey: .identityPolicy),
+      projectionPolicy: try values.decode(MarkdownResourceProjectionPolicy.self, forKey: .projectionPolicy),
+      searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false)
   }
 }
 
