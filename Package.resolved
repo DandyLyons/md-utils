@@ -1,5 +1,5 @@
 {
-  "originHash" : "112f08ab25a7178f8f34efd04a8f0ce2293183ee18e7f00c62814783f95abf36",
+  "originHash" : "0ee34f5546e307bd847b1fbdd4a0da3965f6be3799814fb36b912602990ce18d",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -107,6 +107,15 @@
       "state" : {
         "revision" : "26cc5e9ae0947092c7139ef7ba612e34646086c7",
         "version" : "0.10.1"
+      }
+    },
+    {
+      "identity" : "stencil",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/stencilproject/Stencil.git",
+      "state" : {
+        "revision" : "4f222ac85d673f35df29962fc4c36ccfdaf9da5b",
+        "version" : "0.15.1"
       }
     },
     {

@@ -110,6 +110,7 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 
 ### Implemented
 
+- **Template Rendering Prototype** — Render a Stencil body with explicit YAML frontmatter from JSON; see the [Stencil user guide](Sources/MarkdownUtilitiesTemplates/Documentation.docc/RenderingMarkdownWithStencil.md) and [implementation notes](docs/template-rendering.md).
 - **Table of Contents** — Generate TOC with multiple output formats (Markdown, JSON, plain text, HTML)
 - **Heading Manipulation** — Promote/demote headings while maintaining nested structure
 - **Section Operations** — Extract sections by name or index; reorder sections (move up/down/to position)

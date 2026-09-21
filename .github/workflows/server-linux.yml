@@ -8,6 +8,10 @@ on:
       - Sources/MarkdownUtilitiesCore/**
       - Sources/MarkdownUtilities/**
       - Sources/MarkdownUtilitiesServer/**
+      - Sources/MarkdownUtilitiesTemplates/**
+      - Tests/MarkdownUtilitiesTemplatesTests/**
+      - Sources/md-utils/TemplateCommands.swift
+      - Tests/md-utilsTests/Commands/TemplateTests.swift
       - Sources/MarkdownUtilitiesIndex/**
       - Sources/MarkdownUtilitiesIndexNative/**
       - Sources/MarkdownUtilitiesServerNative/**
@@ -25,6 +29,10 @@ on:
       - Sources/MarkdownUtilitiesCore/**
       - Sources/MarkdownUtilities/**
       - Sources/MarkdownUtilitiesServer/**
+      - Sources/MarkdownUtilitiesTemplates/**
+      - Tests/MarkdownUtilitiesTemplatesTests/**
+      - Sources/md-utils/TemplateCommands.swift
+      - Tests/md-utilsTests/Commands/TemplateTests.swift
       - Sources/MarkdownUtilitiesIndex/**
       - Sources/MarkdownUtilitiesIndexNative/**
       - Sources/MarkdownUtilitiesServerNative/**
@@ -50,7 +58,7 @@ jobs:
         run: apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev && swift build --product md-utils-server
 
       - name: Test indexed native server
-        run: swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests'
+        run: swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownTemplateRendererTests|TemplateTests'
 
       - name: Run native server route smoke test
         run: swift run MarkdownUtilitiesServerLinuxSmoke
