@@ -9,6 +9,7 @@ let package = Package(
     .macOS(.v13), .iOS(.v16), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16),
   ],
   products: [
+    .library(name: "MarkdownUtilitiesTemplates", targets: ["MarkdownUtilitiesTemplates"]),
     .library(name: "MarkdownUtilitiesServerNative", targets: ["MarkdownUtilitiesServerNative"]),
     .library(name: "MarkdownUtilitiesIndexNative", targets: ["MarkdownUtilitiesIndexNative"]),
     .library(name: "MarkdownUtilitiesIndex", targets: ["MarkdownUtilitiesIndex"]),
@@ -34,6 +35,7 @@ let package = Package(
     ),
   ],
   dependencies: [
+    .package(url: "https://github.com/stencilproject/Stencil.git", from: "0.15.1"),
     .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "4.5.1"),
     .package(url: "https://github.com/apple/swift-system", from: "1.8.1"),
@@ -59,6 +61,16 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
+    // Stencil stays outside Core and its WebAssembly dependency graph.
+    .target(name: "MarkdownUtilitiesTemplates", dependencies: [
+      "MarkdownUtilitiesCore", "Yams",
+      .product(name: "Stencil", package: "Stencil"),
+      .product(name: "JSONSchema", package: "JSONSchema.swift"),
+      .product(name: "Parsing", package: "swift-parsing"),
+    ]),
+    .testTarget(name: "MarkdownUtilitiesTemplatesTests", dependencies: [
+      "MarkdownUtilitiesTemplates", "MarkdownUtilitiesCore", "Yams",
+    ]),
     .testTarget(name: "MarkdownUtilitiesServerNativeTests", dependencies: [
       .product(name: "GRDB", package: "GRDB.swift"),
       "MarkdownUtilitiesServerNative", "MarkdownUtilitiesServer", "MarkdownUtilitiesIndexNative",
@@ -218,6 +230,7 @@ let package = Package(
     .executableTarget(
       name: "md-utils",
       dependencies: [
+        "MarkdownUtilitiesTemplates",
         "MarkdownUtilitiesIndexNative",
         "MarkdownUtilitiesIndex",
         "MarkdownUtilitiesCore",

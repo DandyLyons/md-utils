@@ -11,4 +11,4 @@ COPY . .
 
 RUN swift build --product md-utils-server
 RUN swift run MarkdownUtilitiesServerLinuxSmoke
-RUN swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests'
+RUN swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownTemplateRendererTests|TemplateTests'

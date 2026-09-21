@@ -1,0 +1,14 @@
+{
+  "frontmatter": {
+    "title": "Sales: September",
+    "tags": ["sales", "monthly"],
+    "published": false
+  },
+  "data": {
+    "summary": "Revenue increased.",
+    "regions": [
+      {"name": "North", "revenue": 24000},
+      {"name": "South", "revenue": 18000}
+    ]
+  }
+}
