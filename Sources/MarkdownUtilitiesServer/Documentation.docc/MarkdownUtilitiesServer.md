@@ -22,6 +22,11 @@ state for concurrent request handling. See <doc:ReadSnapshots>.
 Server resources are opt-in. A loaded rule or mdtype is never exposed unless a
 ``MarkdownResourceConfiguration`` references it explicitly.
 
+``ResourceMutationPlanner`` uses an explicit writable codec declaration to propose
+and validate complete records without persistence. Destination rules/types must pass;
+by default all other currently passing loaded contracts are preserved as well. An
+explicit endpoint-only override reports permitted losses. HTTP routes remain read-only.
+
 ```swift
 import MarkdownUtilitiesCore
 import MarkdownUtilitiesServer

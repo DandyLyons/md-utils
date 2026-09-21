@@ -170,6 +170,7 @@ let package = Package(
       name: "MarkdownUtilitiesServer",
       dependencies: [
         "MarkdownUtilitiesCore",
+        "MarkdownUtilitiesTemplates",
         "MarkdownUtilities",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "JMESPath", package: "jmespath.swift"),

@@ -311,6 +311,7 @@ private struct NativeMarkdownServerConfigurationFile: Decodable {
 }
 
 private struct NativeMarkdownResourceConfiguration: Decodable {
+  let writable: WritableResourceConfiguration?
   let searchEnabled: Bool
   let name: String
   let route: String
@@ -321,6 +322,7 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
   let operationIDOverrides: [MarkdownOperationIDOverride]
 
   private enum CodingKeys: String, CodingKey {
+    case writable
     case searchEnabled
     case name
     case route
@@ -333,6 +335,7 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
 
   init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    writable = try container.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable)
     searchEnabled = try container.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false
     name = try container.decode(String.self, forKey: .name)
     route = try container.decode(String.self, forKey: .route)
@@ -358,7 +361,8 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
       identityPolicy: identityPolicy.policy,
       projectionPolicy: projectionPolicy,
       operationIDOverrides: operationIDOverrides,
-      searchEnabled: searchEnabled
+      searchEnabled: searchEnabled,
+      writable: writable
     )
   }
 }

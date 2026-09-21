@@ -15,6 +15,7 @@ enum WasmCoreSmokeError: Error {
   case fmVarYAMLProjectionMismatch
   case fmVarScalarCoercionMismatch
   case fmVarScalarEvaluationMismatch
+  case resourceMutationMismatch
 }
 
 @main
@@ -113,6 +114,20 @@ struct WasmCoreSmoke {
     )
     guard assessment.conforms else {
       throw WasmCoreSmokeError.typeAssessmentFailed
+    }
+
+    let mutationSource = try ResourceMutationSource(
+      record: MarkdownRecord(identity: .init(rawValue: "wasm"), content: content,
+        revision: .init(rawValue: "baseline")), expectedRevision: .init(rawValue: "baseline"))
+    let codec = try MarkdownResourceCodec(configuration: .init(frontmatterFields: ["title"], bodyWritable: true))
+    let proposal = try codec.plan(.patch(frontmatter: ["title": .set(.string("Updated"))], body: nil),
+      source: mutationSource)
+    let mutation = try await ResourceMutationValidator(types: typeRegistry, rules: rules.registry)
+      .validate(proposal, destination: .init(type: definition.name))
+    guard mutation.isValid, mutation.proposal.record.revision == nil,
+          try MarkdownDocument(content: proposal.record.content).frontMatter["title"] == .string("Updated"),
+          try MarkdownDocument(content: proposal.record.content).body == document.body else {
+      throw WasmCoreSmokeError.resourceMutationMismatch
     }
 
     let fmVarSourceMap = FMVarSourceMap(source: "é\r\n<fm-var query=\"$.title\">old</fm-var>")

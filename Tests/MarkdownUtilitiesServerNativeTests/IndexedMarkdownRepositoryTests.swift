@@ -12,6 +12,32 @@ import Testing
 
 @Suite("Indexed native server")
 struct IndexedMarkdownRepositoryTests {
+  @Test func `codec proposals use authoritative source identically with metadata and FTS caches`() async throws {
+    let root = try fixture()
+    defer { try? root.delete() }
+    let metadataRepository = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await metadataRepository.refresh()
+    let identity = MarkdownRecordIdentity(rawValue: "books/a.md")
+    let metadataRecord = try await metadataRepository.record(for: identity)
+    let codec = try MarkdownResourceCodec(configuration: .init(frontmatterFields: ["flag"], bodyWritable: true))
+    let edit = ResourceEdit.patch(frontmatter: ["flag": .set(.boolean(false))], body: nil)
+    let first = try codec.plan(edit, source: ResourceMutationSource(record: metadataRecord,
+      expectedRevision: #require(metadataRecord.revision)))
+    let database = try SQLiteIndexDatabase(path: (root + ".md-utils/index.sqlite").string)
+    try database.setBodyMode(.fts)
+    let ftsRepository = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await ftsRepository.refresh()
+    let ftsRecord = try await ftsRepository.record(for: identity)
+    let second = try codec.plan(edit, source: ResourceMutationSource(record: ftsRecord,
+      expectedRevision: #require(ftsRecord.revision)))
+    #expect(first.record.content == second.record.content)
+    #expect(first.baselineRevision == second.baselineRevision)
+    #expect(try (root + "books/a.md").read(.utf8) == metadataRecord.content)
+    try (root + "books/a.md").write("# Concurrent change")
+    await #expect(throws: MarkdownServerReadError.self) {
+      try await ftsRepository.record(for: identity)
+    }
+  }
   private func fixture(search: Bool = false) throws -> Path {
     let root = Path("tmp/indexed-server-tests/\(UUID().uuidString)/").absolute()
     try (root + ".md-utils/server/").mkpath()

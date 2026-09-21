@@ -1,7 +1,7 @@
 # MarkdownUtilities Server Architecture
 
-- Status: native indexed reads, pagination, optional FTS, and generated OpenAPI implemented
-- Last updated: 2026-09-18
+- Status: native indexed reads, generated OpenAPI, and shared mutation planning implemented; HTTP mutations remain deferred
+- Last updated: 2026-09-21
 
 This document records the architectural direction for exposing Markdown-backed data through conventional HTTP APIs. It distinguishes implemented foundations, decisions already made, the next recommended milestone, and questions that still require explicit design.
 
@@ -145,7 +145,11 @@ The type and rule prerequisites are now implemented as library concepts:
 
 Types should drive resource discovery, read validation, write conformance, and derived type membership. Rules should drive explicitly configured policy checks at defined lifecycle points. A matching rule is not a type, and rule applicability is not conformance.
 
-The server must not automatically enforce every loaded rule on every endpoint. Resource exposure configuration must state which rule sets, if any, participate in reads, writes, or administrative diagnostics. This avoids turning local lint policy into an undocumented HTTP contract.
+The configured resource selection defines its required mutation validation. The default
+mutation policy additionally preserves every currently satisfied type and applicable,
+passing rule loaded for the collection, including unexposed definitions. Previously
+failing checks are not additional blockers. An explicit endpoint-only override permits
+loss of other conformance while reporting the changes. See [mutation planning](resource-mutations.md).
 
 ### Use Whole-Markdown Structural Conformance
 
@@ -448,11 +452,11 @@ The following questions remain intentionally unresolved:
 - Whether OpenAPI is generated as a complete document or composed with maintainer-authored operations.
 - The public resource representation and section-to-field projection model.
 - Whether the first general representation is domain-specific, generic JSON, or both.
-- Create templates and reversible Markdown encoding semantics.
+- HTTP mutation request formats and persistence coordination; template creation and top-level metadata/body codec semantics are defined in #90.
 - Stable identity generation and its relationship to logical paths.
 - Revision generation and HTTP precondition mapping, including ETags and conditional writes.
 - List pagination, filtering, sorting, full-text search, and query limits.
-- Which rules run at each read or write lifecycle point.
+- HTTP mechanisms for selecting the explicit endpoint-only mutation override.
 - The OpenAPI generation and routing toolchain for Workers.
 - Canonical SQLite storage remains separate future work; the native server currently uses an indexed filesystem adapter.
 - The JavaScript/WebAssembly ABI and release packaging for Core.
@@ -496,3 +500,9 @@ This document does not select a final database, Durable Object topology, authent
 Swift OpenAPI Generator, generated server protocols, build plugins, and resource-specific generated Swift code are not part of the server design.
 
 This document records the agreed direction and recommends the smallest next experiment that can invalidate or confirm the endpoint-derivation design before the project commits to production infrastructure.
+
+## Writable resource planning
+
+See [resource mutation planning](resource-mutations.md) for explicit codec configuration,
+template creation, replacement/patch semantics, revision preconditions, and conformance
+preservation. These library APIs do not enable HTTP mutations; routes remain read-only.

@@ -135,6 +135,8 @@ public struct MarkdownOperationIDOverride: Codable, Equatable, Sendable {
 
 /// One explicitly exposed Markdown-backed server resource.
 public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
+  /// Optional explicit writable contract; does not enable HTTP mutation routes.
+  public let writable: WritableResourceConfiguration?
   /// Explicit opt-in to native FTS queries. The cache must already enable FTS.
   public let searchEnabled: Bool
   /// Stable, case-sensitive name used to identify this resource in a plan.
@@ -176,9 +178,11 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
     identityPolicy: MarkdownRecordIdentityPolicy,
     projectionPolicy: MarkdownResourceProjectionPolicy = .genericRecord,
     operationIDOverrides: [MarkdownOperationIDOverride] = [],
-    searchEnabled: Bool = false
+    searchEnabled: Bool = false,
+    writable: WritableResourceConfiguration? = nil
   ) {
     self.name = name
+    self.writable = writable
     self.searchEnabled = searchEnabled
     self.route = route
     self.operations = operations
@@ -197,6 +201,7 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
       identityPolicy: try values.decode(MarkdownRecordIdentityPolicy.self, forKey: .identityPolicy),
       projectionPolicy: try values.decodeIfPresent(MarkdownResourceProjectionPolicy.self, forKey: .projectionPolicy) ?? .genericRecord,
       operationIDOverrides: try values.decodeIfPresent([MarkdownOperationIDOverride].self, forKey: .operationIDOverrides) ?? [],
-      searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false)
+      searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false,
+      writable: try values.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable))
   }
 }

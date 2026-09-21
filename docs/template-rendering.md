@@ -1,5 +1,9 @@
 # Template rendering prototype (#31)
 
+The [writable resource planning contract](resource-mutations.md) consumes this renderer
+for creation through `TemplateResourceCreationCodec`. Replacement and patching use
+separate codecs and never rerender creation templates.
+
 For a task-oriented introduction, read the [Stencil user guide](../Sources/MarkdownUtilitiesTemplates/Documentation.docc/RenderingMarkdownWithStencil.md).
 It is also the User guide topic in the `MarkdownUtilitiesTemplates` DocC catalog.
 

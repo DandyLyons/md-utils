@@ -3,6 +3,7 @@ import MarkdownUtilitiesCore
 
 /// Stable categories produced while compiling endpoint configuration.
 public enum EndpointPlanDiagnosticCode: String, Codable, Equatable, Sendable {
+  case invalidCodec = "endpoint.codec.invalid"
   /// Configuration declares a schema version unsupported by this package release.
   case unsupportedConfigurationVersion = "endpoint.configuration.unsupported-version"
   /// Resource name is empty or contains ambiguous surrounding whitespace.
@@ -184,6 +185,19 @@ public struct EndpointPlanCompiler: Sendable {
       }
 
       let route = validatedResourceRoute(resource.route, location: location, diagnostics: &diagnostics)
+      if let writable = resource.writable {
+        do {
+          try writable.codec.validate()
+          if case .frontmatter(let path, _) = resource.identityPolicy.source,
+             let field = path.first, writable.codec.frontmatterFields.contains(field) {
+            throw ResourceCodecError("identity", "Identity field \(field) cannot be writable.")
+          }
+        } catch {
+          diagnostics.append(EndpointPlanDiagnostic(code: .invalidCodec,
+            location: "\(location).writable", message: error.localizedDescription))
+          resourceIsValid = false
+        }
+      }
       let selection = validatedSelection(resource.selection, location: location, diagnostics: &diagnostics)
       let overrides = validatedOverrides(
         resource.operationIDOverrides,
@@ -205,7 +219,8 @@ public struct EndpointPlanCompiler: Sendable {
         selection: selection,
         identityPolicy: resource.identityPolicy,
         projectionPolicy: resource.projectionPolicy,
-        searchEnabled: resource.searchEnabled
+        searchEnabled: resource.searchEnabled,
+        writable: resource.writable
       )
       plannedResources.append(planned)
 

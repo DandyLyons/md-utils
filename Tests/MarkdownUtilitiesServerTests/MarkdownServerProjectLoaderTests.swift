@@ -6,6 +6,37 @@ import Testing
 @Suite("Native server project loading")
 struct MarkdownServerProjectLoaderTests {
   @Test
+  func `native YAML loader retains explicit codec and template declarations`() async throws {
+    let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
+    defer { try? root.delete() }
+    try (root + ".md-utils/server/").mkpath()
+    try (root + ".md-utils/types/").mkpath()
+    try (root + ".md-utils/md-utils.json").write("{\"configVersion\":\"0.3.0\"}")
+    try (root + ".md-utils/types/book.mdtype.json").write("""
+      {"md-utils-type-schema":"1","name":"Book","version":"1","frontmatter":{},"body":{"requirements":[],"recommendations":[]},"context":{"requirements":[],"recommendations":[]}}
+      """)
+    try (root + ".md-utils/server/server.yaml").write("""
+      serverConfigVersion: "1"
+      resources:
+        - name: books
+          route: /books
+          operations: [get]
+          selection: {mode: type, type: Book, searchRoot: .}
+          identityPolicy: {source: logicalPath}
+          writable:
+            codec:
+              frontmatterFields: [title]
+              bodyWritable: true
+            creation:
+              template: '# Book'
+      """)
+    let runtime = try await MarkdownServerProjectLoader(projectRoot: root).load()
+    let writable = try #require(runtime.configuration.resources.first?.writable)
+    #expect(writable.codec.frontmatterFields == ["title"])
+    #expect(writable.codec.protectedFields.isEmpty)
+    #expect(writable.creation?.template == "# Book")
+  }
+  @Test
   func `Server initialization creates valid configuration and preserves existing YAML`() async throws {
     let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
     defer { try? root.delete() }

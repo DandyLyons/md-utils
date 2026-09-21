@@ -120,6 +120,8 @@ public enum PlannedResourceSelection: Codable, Equatable, Sendable {
 
 /// One immutable resource in a compiled endpoint plan.
 public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
+  /// Explicit codec declaration, independent of read projection and routing.
+  public let writable: WritableResourceConfiguration?
   /// Whether this resource's contract offers FTS search.
   public let searchEnabled: Bool
   /// Stable configured resource name.
@@ -158,9 +160,11 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
     selection: PlannedResourceSelection,
     identityPolicy: MarkdownRecordIdentityPolicy,
     projectionPolicy: MarkdownResourceProjectionPolicy,
-    searchEnabled: Bool = false
+    searchEnabled: Bool = false,
+    writable: WritableResourceConfiguration? = nil
   ) {
     self.name = name
+    self.writable = writable
     self.searchEnabled = searchEnabled
     self.route = route
     self.operations = operations
@@ -177,7 +181,8 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
       selection: try values.decode(PlannedResourceSelection.self, forKey: .selection),
       identityPolicy: try values.decode(MarkdownRecordIdentityPolicy.self, forKey: .identityPolicy),
       projectionPolicy: try values.decode(MarkdownResourceProjectionPolicy.self, forKey: .projectionPolicy),
-      searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false)
+      searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false,
+      writable: try values.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable))
   }
 }
 

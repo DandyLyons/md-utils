@@ -48,6 +48,7 @@
           ]
         },
         "identityPolicy": { "$ref": "#/$defs/identityPolicy" },
+        "writable": { "$ref": "#/$defs/writable" },
         "searchEnabled": { "type": "boolean", "default": false },
         "projectionPolicy": {
           "const": "genericRecord",
@@ -61,6 +62,37 @@
         }
       },
       "additionalProperties": false
+    },
+    "writable": {
+      "type": "object",
+      "required": ["codec"],
+      "additionalProperties": false,
+      "description": "Explicit mutation planning contract; does not register write routes.",
+      "properties": {
+        "codec": {
+          "type": "object",
+          "required": ["frontmatterFields", "bodyWritable"],
+          "additionalProperties": false,
+          "properties": {
+            "frontmatterFields": {
+              "type": "array", "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1, "not": { "const": "$md-utils" } }
+            },
+            "bodyWritable": { "type": "boolean" },
+            "protectedFields": {
+              "type": "array", "default": [], "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "creation": {
+          "type": "object", "required": ["template"], "additionalProperties": false,
+          "properties": {
+            "template": { "type": "string" },
+            "inputSchema": { "type": ["object", "boolean"] }
+          }
+        }
+      }
     },
     "ruleSelection": {
       "type": "object",
