@@ -430,7 +430,7 @@ public struct MarkdownRecordIdentityIndex: Equatable, Sendable {
       guard case .string(let value) = value else {
         return unsupportedAssessment(record: record, fallback: fallback, location: location, value: value)
       }
-      guard isValidSlug(value, policy: policy) else {
+      guard policy.isValid(value) else {
         return invalidAssessment(
           record: record,
           fallback: fallback,
@@ -463,50 +463,7 @@ public struct MarkdownRecordIdentityIndex: Equatable, Sendable {
     return current
   }
 
-  private static func isValidSlug(_ value: String, policy: MarkdownSlugPolicy) -> Bool {
-    guard value.isEmpty == false else { return false }
-    switch policy {
-    case .strictASCII:
-      return validSeparatedASCII(value, permitsUppercase: false)
-    case .preserve:
-      return validSeparatedASCII(value, permitsUppercase: true)
-    case .unicode:
-      guard value == value.lowercased() else { return false }
-      var previousWasSeparator = false
-      var foundAlphanumeric = false
-      for character in value {
-        let isSeparator = character == "-" || character == "_"
-        if isSeparator {
-          if previousWasSeparator || foundAlphanumeric == false { return false }
-          previousWasSeparator = true
-        } else {
-          guard character.isLetter || character.isNumber else { return false }
-          foundAlphanumeric = true
-          previousWasSeparator = false
-        }
-      }
-      return foundAlphanumeric && previousWasSeparator == false
-    }
-  }
 
-  private static func validSeparatedASCII(_ value: String, permitsUppercase: Bool) -> Bool {
-    var previousWasHyphen = false
-    var foundAlphanumeric = false
-    for scalar in value.unicodeScalars {
-      let isLowercase = (97...122).contains(scalar.value)
-      let isUppercase = permitsUppercase && (65...90).contains(scalar.value)
-      let isDigit = (48...57).contains(scalar.value)
-      if scalar == "-" {
-        if previousWasHyphen || foundAlphanumeric == false { return false }
-        previousWasHyphen = true
-      } else {
-        guard isLowercase || isUppercase || isDigit else { return false }
-        foundAlphanumeric = true
-        previousWasHyphen = false
-      }
-    }
-    return foundAlphanumeric && previousWasHyphen == false
-  }
 
   private static func unsupportedAssessment(
     record: MarkdownRecord,

@@ -36,6 +36,7 @@ public struct CLIEntry: AsyncParsableCommand {
       OKFCommands.self,
       RulesCommands.self,
       SectionCommands.self,
+      Slug.self,
       TemplateCommands.self,
       TypesCommands.self,
     ],

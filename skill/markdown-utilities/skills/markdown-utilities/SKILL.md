@@ -15,6 +15,7 @@ The `md-utils` CLI provides structured operations on Markdown files. Add `--help
 | `md-utils fm` | YAML/TOML frontmatter: get, set, remove blocks, uniqueness checks, array ops, dump; YAML-only search |
 | `md-utils explore` | Progressively inspect large Markdown files by tree, heading, and line |
 | `md-utils toc` | Generate table of contents |
+| `md-utils slug 'My Title'` | Print a slug candidate without changing files or checking uniqueness; `--policy unicode`, `strictASCII`, or `preserve` |
 | `md-utils headings` | Promote or demote heading levels |
 | `md-utils section` | Get, replace, or reorder sections |
 | `md-utils extract` | Extract a section by name or index |

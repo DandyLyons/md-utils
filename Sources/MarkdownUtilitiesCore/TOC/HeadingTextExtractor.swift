@@ -84,33 +84,6 @@ public enum HeadingTextExtractor {
     from text: String,
     existingSlugs: Set<String> = []
   ) -> String {
-    // Step 1: Convert to lowercase
-    var slug = text.lowercased()
-
-    // Step 2: Replace spaces with hyphens
-    slug = slug.replacingOccurrences(of: " ", with: "-")
-
-    // Step 3: Remove all characters except alphanumerics, hyphens, and underscores
-    slug = slug.filter { char in
-      char.isLetter || char.isNumber || char == "-" || char == "_"
-    }
-
-    // Remove leading/trailing hyphens
-    slug = slug.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-
-    // If slug is empty after processing, use a default
-    if slug.isEmpty {
-      slug = "section"
-    }
-
-    // Step 4: Handle duplicates with numeric suffixes
-    var uniqueSlug = slug
-    var counter = 1
-    while existingSlugs.contains(uniqueSlug) {
-      uniqueSlug = "\(slug)-\(counter)"
-      counter += 1
-    }
-
-    return uniqueSlug
+    MarkdownSlugGenerator.headingAnchor(from: text, existingSlugs: existingSlugs)
   }
 }

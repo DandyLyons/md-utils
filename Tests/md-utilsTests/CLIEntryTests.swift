@@ -15,7 +15,7 @@ struct CLIEntryTests {
 
     #expect(config.commandName == "md-utils")
     #expect(config.version == "0.1.0-alpha")
-    #expect(config.subcommands.count == 19)
+    #expect(config.subcommands.count == 20)
 
     // Verify the subcommands are registered (in order as listed in CLIEntry)
     #expect(config.subcommands[0] is CLIEntry.AgentCommands.Type)
@@ -35,7 +35,8 @@ struct CLIEntryTests {
     #expect(config.subcommands[14] is CLIEntry.OKFCommands.Type)
     #expect(config.subcommands[15] is CLIEntry.RulesCommands.Type)
     #expect(config.subcommands[16] is CLIEntry.SectionCommands.Type)
-    #expect(config.subcommands[17] is CLIEntry.TemplateCommands.Type)
-    #expect(config.subcommands[18] is CLIEntry.TypesCommands.Type)
+    #expect(config.subcommands[17] is Slug.Type)
+    #expect(config.subcommands[18] is CLIEntry.TemplateCommands.Type)
+    #expect(config.subcommands[19] is CLIEntry.TypesCommands.Type)
   }
 }
