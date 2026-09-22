@@ -7,7 +7,8 @@ Derive stable primary identities and collision-safe logical-path fallbacks for c
 `MarkdownRecordIdentityPolicy` selects one primary identity source:
 
 - `existingIdentity` uses the identity supplied by the record store;
-- `logicalPath` uses the complete normalized collection-relative path; and
+- `logicalPath` uses the complete normalized collection-relative path;
+- `filename` uses its final component, preserving case, Unicode, spaces, and extension; and
 - `frontmatter(path:format:)` reads a nested value from schema-visible user frontmatter.
 
 Logical-path fallback is enabled by default. It provides an unambiguous recovery route for a record whose configured primary identity is missing, invalid, or duplicated. A host may explicitly disable fallback, but doing so does not disable primary collision detection. Reserved `$md-utils` metadata is not available to frontmatter identity paths.
@@ -45,6 +46,14 @@ Existing and frontmatter-derived primary identities survive a record move. A log
 The immutable index assesses the collection once and retains every candidate. Duplicate primary identities produce a diagnostic containing every available conflicting logical path. `lookup(primary:)` and `lookup(logicalPath:)` return `notFound`, one record candidate, or a conflict containing all candidates; lookup never selects the first collision.
 
 Primary and logical-path lookup use separate namespaces. This matches server routing, where a primary item route and the reserved logical-path fallback route identify the same canonical record without creating an identity collision.
+
+## Filename Lookup
+
+The portable `filename` source supports expressive names without slugification.
+Two documents named `Reading Notes.md` in different directories produce a filename
+conflict, while enabled exact logical-path fallback still distinguishes them.
+A missing path produces a missing-identity diagnostic. This Core capability does
+not by itself enable named HTTP routes or change the version 1 server configuration.
 
 ## Relationship to `fm unique`
 

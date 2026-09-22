@@ -22,6 +22,9 @@ public enum MarkdownRecordIdentityFormat: Codable, Equatable, Sendable {
 public enum MarkdownRecordIdentitySource: Codable, Equatable, Sendable {
   case existingIdentity
   case logicalPath
+  /// The complete final path component, preserving case, Unicode, spaces, and extension.
+  /// Different directories may contain the same filename; normal collision handling applies.
+  case filename
   case frontmatter(path: [String], format: MarkdownRecordIdentityFormat)
 }
 
@@ -314,7 +317,7 @@ public struct MarkdownRecordIdentityIndex: Equatable, Sendable {
       }
       return availableAssessment(record: record, identity: identity, fallback: fallback)
 
-    case .logicalPath:
+    case .logicalPath, .filename:
       guard let path = record.context.path else {
         return missingAssessment(
           record: record,
@@ -324,9 +327,15 @@ public struct MarkdownRecordIdentityIndex: Equatable, Sendable {
           message: "The record has no logical path"
         )
       }
+      let value: String
+      if case .filename = policy.source {
+        value = path.rawValue.components(separatedBy: "/").last ?? path.rawValue
+      } else {
+        value = path.rawValue
+      }
       return availableAssessment(
         record: record,
-        identity: MarkdownRecordIdentity(rawValue: path.rawValue),
+        identity: MarkdownRecordIdentity(rawValue: value),
         fallback: fallback
       )
 

@@ -5,6 +5,47 @@ import Testing
 @Suite("Markdown record identity index")
 struct MarkdownRecordIdentityIndexTests {
   @Test
+  func `Filename lookup preserves expressive names and reports cross-directory collisions`() async throws {
+    let filename = "Café — Reading Notes.md"
+    let first = try makeRecord(path: "books/\(filename)")
+    let second = try makeRecord(path: "stories/\(filename)")
+    let policy = MarkdownRecordIdentityPolicy(source: .filename)
+    let index = await MarkdownRecordIdentityIndex.build(
+      records: [first, second],
+      policy: policy,
+    )
+
+    #expect(index.assessments.allSatisfy { $0.status == .duplicate })
+    guard case .conflict(let conflict) = index.lookup(
+      primary: MarkdownRecordIdentity(rawValue: filename),
+    ) else {
+      Issue.record("Expected an ambiguous filename lookup")
+      return
+    }
+    #expect(conflict.candidates.count == 2)
+    guard case .record(let exact) = index.lookup(
+      logicalPath: try MarkdownRecordPath("books/\(filename)"),
+    ) else {
+      Issue.record("Exact path must remain available despite filename ambiguity")
+      return
+    }
+    #expect(exact.record == first)
+    #expect(index.lookup(primary: MarkdownRecordIdentity(rawValue: "cafe-reading-notes")) == .notFound)
+  }
+
+  @Test
+  func `Filename source without path reports missing identity`() async throws {
+    let record = MarkdownRecord(content: "# No path")
+    let index = await MarkdownRecordIdentityIndex.build(
+      records: [record],
+      policy: MarkdownRecordIdentityPolicy(source: .filename),
+    )
+    let assessment = try #require(index.assessments.first)
+    #expect(assessment.status == .missing)
+    #expect(assessment.diagnostics.map(\.code) == [.missingLogicalPath])
+  }
+
+  @Test
   func `Existing identity uses logical path fallback by default`() async throws {
     let record = try makeRecord(path: "books/dune.md", identity: "record-1")
 
