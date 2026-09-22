@@ -11,15 +11,17 @@ import SystemPackage
 public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStore {
   public nonisolated let resourceNames: [String]
   public nonisolated let plan: EndpointPlan
-  private let root: URL
+  let root: URL
   private let configurationFile: String?
   private let database: SQLiteIndexDatabase
-  private let evaluator: IndexProjectEvaluator
+  let evaluator: IndexProjectEvaluator
   private let configurationSignature: Data
   private let projectionKey: String
   private var projecting = false
   private var restartRequired = false
   private var refreshFailure = false
+  var mutationCheckpoint: (@Sendable (MutationBoundary) throws -> Void)?
+  func setMutationCheckpoint(_ checkpoint: (@Sendable (MutationBoundary) throws -> Void)?) { mutationCheckpoint = checkpoint }
 
   /// Offline contract composition reads a saved custom project-config path without
   /// creating, migrating, refreshing, or probing the index's body/metadata policy.
@@ -107,10 +109,15 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
 
   /// Startup and watcher refresh reuse exactly the CLI's staged index service.
   public func refresh() async throws {
+    let lease = try await CollectionWriterLease.acquire(root: root)
+    try await refresh(lease: lease)
+  }
+
+  func refresh(lease: CollectionWriterLease) async throws {
     try checkConfiguration()
     do {
       let indexer = try CollectionIndexer(database: database, root: root)
-      let report = try await indexer.updateMany(adding: IndexScope(), fingerprint: evaluator.fingerprint,
+      let report = try await indexer.updateMany(adding: IndexScope(), writerLease: lease, fingerprint: evaluator.fingerprint,
         verifyHashes: true, evaluate: evaluator.evaluate)
       if try hasOperationalFailure() {
         let detail = report.errors.isEmpty ? "Index refresh is incomplete; inspect md-utils index status." : report.errors.joined(separator: "; ")
@@ -141,7 +148,7 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
     #endif
   }
 
-  private func checkConfiguration() throws {
+  func checkConfiguration() throws {
     guard !restartRequired else { throw MarkdownServerReadError.restartRequired }
     // Database contention is an operational failure, not evidence that definitions changed.
     let config = try database.configurationPath(nil) ?? root.appendingPathComponent(".md-utils/md-utils.json").path
@@ -483,13 +490,15 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
   private func lookupEvidence(resource: String, path: String, db: Database, generation: String) throws -> [MarkdownLookupEvidence] {
     let rows = try Row.fetchAll(db, sql: "SELECT evidence FROM server_lookups WHERE plan=? AND generation=? AND resource=? AND path=? AND selected=1 ORDER BY lookup",
       arguments: [projectionKey, generation, resource, path])
-    return try rows.map { row in
+    var evidence: [MarkdownLookupEvidence] = []
+    for row in rows {
       let item = try JSONDecoder().decode(MarkdownLookupEvidence.self, from: row["evidence"])
       let scope = item.uniqueWithin == .server ? "" : " AND selected=1"
       let count = try Int.fetchOne(db, sql: "SELECT count(*) FROM server_lookups WHERE plan=? AND generation=? AND resource=? AND lookup=? AND value=?\(scope)",
         arguments: [projectionKey, generation, resource, item.lookup, item.value]) ?? 0
-      return item.checking(count: count)
+      evidence.append(item.checking(count: count))
     }
+    return evidence
   }
 
   public func lookup(path: MarkdownRecordPath) async throws -> MarkdownServerReadLookupResult {
@@ -679,7 +688,7 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
 }
 
 /// A single candidate preserves the existing semantic projector without a corpus cache.
-private struct SingleRecordStore: RecordStore {
+struct SingleRecordStore: RecordStore {
   let record: MarkdownRecord
   func record(for identity: MarkdownRecordIdentity) async throws -> MarkdownRecord {
     guard record.identity == identity else { throw RecordStoreError.notFound(identity) }

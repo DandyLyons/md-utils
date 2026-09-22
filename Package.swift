@@ -181,6 +181,7 @@ let package = Package(
       resources: [
         .process("Resources/1_server.schema.json"),
         .process("Resources/2_server.schema.json"),
+        .process("Resources/3_server.schema.json"),
       ]
     ),
     .testTarget(

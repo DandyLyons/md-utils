@@ -11,7 +11,7 @@ extension ServerEntry {
   struct Serve: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "serve",
-      abstract: "Start the configured read-only HTTP server"
+      abstract: "Start the configured HTTP server (writes require explicit opt-in)"
     )
 
     @Option(
@@ -59,11 +59,13 @@ extension ServerEntry {
       )
       let repository = try IndexedMarkdownRepository(projectRoot: root.string, configurationFile: config)
       try await repository.refresh()
+      try await repository.recoverMutations()
 
       let router = Router()
       try MarkdownServerHTTPAdapter.register(
         plan: repository.plan,
         repository: repository,
+        mutations: repository,
         on: router
       )
 

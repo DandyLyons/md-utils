@@ -11,15 +11,17 @@ extension SQLiteIndexDatabase {
     /// connections from modifying pending edits or declarations during the copy.
     public func rebuildAsText(
         root: String, scratchDirectory: URL,
-        refresh: (SQLiteIndexDatabase) async throws -> Void
+        refresh: (SQLiteIndexDatabase, CollectionWriterLease) async throws -> Void
     ) async throws {
+        let lease = try await CollectionWriterLease.acquire(root: URL(fileURLWithPath: root))
+        defer { withExtendedLifetime(lease) {} }
         let previousLockingMode = try acquireRecoveryLock()
         defer { releaseRecoveryLock(previousLockingMode) }
         let directory = scratchDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let (copy, version, generation) = try prepareTextCopy(root: root, directory: directory)
-        try await refresh(copy)
+        try await refresh(copy, lease)
         try Task.checkCancellation()
         try publishTextCopy(copy, version: version, generation: generation)
     }

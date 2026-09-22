@@ -100,9 +100,10 @@ public struct ResourceMutationProposal: Equatable, Sendable {
     baselineRevision = nil
   }
 
-  public init(content: String, source: ResourceMutationSource) {
+  public init(content: String, source: ResourceMutationSource, proposedContext: MarkdownRecordContext? = nil) {
     var proposed = source.record
     proposed.content = content
+    if let proposedContext { proposed.context = proposedContext }
     proposed.revision = nil
     record = proposed
     original = source.record

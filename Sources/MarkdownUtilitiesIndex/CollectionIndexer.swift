@@ -116,13 +116,14 @@ public struct CollectionIndexer: Sendable {
     ///   update generation. Other evaluator errors become persisted diagnostics.
     public func update(
         adding scope: IndexScope? = nil,
+        writerLease: CollectionWriterLease? = nil,
         fingerprint: String,
         rebuild: Bool = false,
         verifyHashes: Bool = false,
         limits: IndexRefreshLimits = IndexRefreshLimits(),
         evaluate: (IndexScope, String, String, Date) async throws -> IndexEvaluation
     ) async throws -> IndexUpdateReport {
-        try await updateMany(adding: scope, fingerprint: fingerprint, rebuild: rebuild,
+        try await updateMany(adding: scope, writerLease: writerLease, fingerprint: fingerprint, rebuild: rebuild,
             verifyHashes: verifyHashes, limits: limits) { scopes, path, content, modified in
             var evaluations: [String: IndexEvaluation] = [:]
             for scope in scopes {
@@ -143,12 +144,17 @@ public struct CollectionIndexer: Sendable {
     /// working memory and one file's output are additional to the batch budget.
     public func updateMany(
         adding scope: IndexScope? = nil,
+        writerLease: CollectionWriterLease? = nil,
         fingerprint: String,
         rebuild: Bool = false,
         verifyHashes: Bool = false,
         limits: IndexRefreshLimits = IndexRefreshLimits(),
         evaluate: ([IndexScope], String, String, Date) async throws -> [String: IndexEvaluation]
     ) async throws -> IndexUpdateReport {
+        let lease: CollectionWriterLease
+        if let writerLease { lease = writerLease } else { lease = try await CollectionWriterLease.acquire(root: root) }
+        guard lease.root == root.resolvingSymlinksInPath() else { throw SQLiteIndexError(message: "Writer lease belongs to another collection.") }
+        defer { withExtendedLifetime(lease) {} }
         guard limits.candidateBatchCount > 0, limits.discoveryBatchCount > 0,
             limits.discoveryBatchBytes > 0, limits.fileBytes > 0,
             limits.changeBatchCount > 0, limits.changeBatchBytes > 0,

@@ -90,6 +90,7 @@ public enum MarkdownServerHTTPAdapter {
   public static func register(
     plan: EndpointPlan,
     repository: any MarkdownServerReadRepository,
+    mutations: (any MarkdownMutationService)? = nil,
     on router: Router<BasicRequestContext>
   ) throws -> [EndpointRouteDescription] {
     let plannedNames = plan.resources.map(\.name).sorted()
@@ -106,6 +107,13 @@ public enum MarkdownServerHTTPAdapter {
     let resources = Dictionary(uniqueKeysWithValues: plan.resources.map { ($0.name, $0) })
     var installedRoutes: [EndpointRouteDescription] = []
     for route in plan.routes {
+      if route.kind == .mutation || route.kind == .mutationStatus || route.kind == .mutationRecovery {
+        guard let mutations else { throw MarkdownServerHTTPAdapterError.unsupportedMethod(operationID: route.operationID, method: route.method) }
+        let resource = try routeResource(route, resources: resources)
+        try MarkdownMutationHTTP.register(route: route, collectionRoute: resource.route.rawValue, service: mutations, router: router)
+        installedRoutes.append(route)
+        continue
+      }
       guard route.method == .get else {
         throw MarkdownServerHTTPAdapterError.unsupportedMethod(
           operationID: route.operationID,
@@ -114,6 +122,7 @@ public enum MarkdownServerHTTPAdapter {
       }
 
       switch route.kind {
+      case .mutation, .mutationStatus, .mutationRecovery: break
       case .collection:
         let resource = try routeResource(route, resources: resources)
         router.get(RouterPath(route.path.rawValue)) { request, _ in
@@ -224,7 +233,7 @@ public enum MarkdownServerHTTPAdapter {
     switch route.kind {
     case .logicalPath:
       return "/_md-utils/path/**"
-    case .collection, .item, .namedLookup, .openAPI:
+    case .collection, .item, .namedLookup, .openAPI, .mutation, .mutationStatus, .mutationRecovery:
       return route.path.rawValue
     }
   }
@@ -238,7 +247,11 @@ public enum MarkdownServerHTTPAdapter {
     switch result {
     case .record(let record):
       _ = try markdownServerEncodedRecordSize(record)
-      return try jsonResponse(record, status: .ok)
+      var response = try jsonResponse(record, status: .ok)
+      if let revision = record.revision, let name = HTTPFields.Element.Name("MD-Utils-Revision") {
+        response.headers[name] = MarkdownRevisionHeader.encode(revision)
+      }
+      return response
     case .notFound:
       return try errorResponse(
         status: .notFound,

@@ -126,6 +126,7 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
   public let constraints: [MarkdownLookupConstraint]
   /// Explicit codec declaration, independent of read projection and routing.
   public let writable: WritableResourceConfiguration?
+  public let mutations: MarkdownMutationConfiguration?
   /// Whether this resource's contract offers FTS search.
   public let searchEnabled: Bool
   /// Stable configured resource name.
@@ -166,6 +167,7 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
     projectionPolicy: MarkdownResourceProjectionPolicy,
     searchEnabled: Bool = false,
     writable: WritableResourceConfiguration? = nil,
+    mutations: MarkdownMutationConfiguration? = nil,
     lookups: [MarkdownResourceLookup] = [],
     constraints: [MarkdownLookupConstraint] = [],
   ) {
@@ -173,6 +175,7 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
     self.constraints = constraints
     self.name = name
     self.writable = writable
+    self.mutations = mutations
     self.searchEnabled = searchEnabled
     self.route = route
     self.operations = operations
@@ -191,6 +194,7 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
       projectionPolicy: try values.decode(MarkdownResourceProjectionPolicy.self, forKey: .projectionPolicy),
       searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false,
       writable: try values.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable),
+      mutations: try values.decodeIfPresent(MarkdownMutationConfiguration.self, forKey: .mutations),
       lookups: try values.decodeIfPresent([MarkdownResourceLookup].self, forKey: .lookups) ?? [],
       constraints: try values.decodeIfPresent([MarkdownLookupConstraint].self, forKey: .constraints) ?? [],
     )
@@ -201,6 +205,10 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
 public enum EndpointHTTPMethod: String, Codable, Equatable, Sendable {
   /// Retrieves a collection or individual resource without mutation.
   case get = "GET"
+  case post = "POST"
+  case put = "PUT"
+  case patch = "PATCH"
+  case delete = "DELETE"
 }
 
 /// Semantic handler categories consumed by HTTP adapters and contract generators.
@@ -213,6 +221,9 @@ public enum EndpointRouteKind: String, Codable, Equatable, Sendable {
 
   /// Named resource lookup using a segment or exact query value.
   case namedLookup
+  case mutation
+  case mutationStatus
+  case mutationRecovery
 
   /// Retrieves a canonical record by its collection-relative logical path.
   case logicalPath
@@ -238,6 +249,7 @@ public struct EndpointRouteDescription: Codable, Equatable, Sendable {
   /// Globally unique stable identifier for the operation.
   public let operationID: String
   public let lookupName: String?
+  public let mutationOperation: MarkdownMutationOperation?
   public let lookupUsesQuery: Bool?
 
   /// Creates a transport-neutral route description.
@@ -255,6 +267,7 @@ public struct EndpointRouteDescription: Codable, Equatable, Sendable {
     resourceName: String?,
     operationID: String,
     lookupName: String? = nil,
+    mutationOperation: MarkdownMutationOperation? = nil,
     lookupUsesQuery: Bool? = nil,
   ) {
     self.method = method
@@ -263,6 +276,7 @@ public struct EndpointRouteDescription: Codable, Equatable, Sendable {
     self.resourceName = resourceName
     self.operationID = operationID
     self.lookupName = lookupName
+    self.mutationOperation = mutationOperation
     self.lookupUsesQuery = lookupUsesQuery
   }
 }
