@@ -77,7 +77,7 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
       typeRegistry: evaluator.types).compile(configuration)
     resourceNames = plan.resources.map(\.name)
     projectionKey = IndexFingerprint.combined(["server-projection-1", evaluator.fingerprint,
-      String(decoding: try encoder.encode(plan), as: UTF8.self)])
+      String(decoding: try encoder.encode(plan), as: UTF8.self), "named-lookups-1"])
     if plan.resources.contains(where: \.searchEnabled), try database.storagePolicy().bodyMode != .fts {
       throw MarkdownServerReadError.searchUnavailable
     }
@@ -93,6 +93,11 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
           path TEXT NOT NULL, identity TEXT,
           PRIMARY KEY(plan,generation,resource,path));
         CREATE INDEX IF NOT EXISTS server_identity ON server_memberships(plan,generation,resource,identity,path);
+        CREATE TABLE IF NOT EXISTS server_lookups(
+          plan TEXT NOT NULL, generation TEXT NOT NULL, resource TEXT NOT NULL, lookup TEXT NOT NULL,
+          path TEXT NOT NULL, value TEXT, selected INTEGER NOT NULL, evidence BLOB NOT NULL,
+          PRIMARY KEY(plan,generation,resource,lookup,path));
+        CREATE INDEX IF NOT EXISTS server_lookup_value ON server_lookups(plan,generation,resource,lookup,value,path);
         """)
       if try !db.columns(in: "server_records").contains(where: { $0.name == "mtime" }) {
         try db.execute(sql: "ALTER TABLE server_records ADD COLUMN mtime REAL NOT NULL DEFAULT 0")
@@ -187,6 +192,14 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
           WHERE m.plan=? AND m.generation=(SELECT generation FROM server_publications WHERE plan=?);
           """, arguments: [generation, projectionKey, projectionKey, generation, generation, projectionKey, projectionKey])
       }
+      try database.serverWrite { db in
+        try db.execute(sql: """
+          INSERT INTO server_lookups
+          SELECT l.plan,?,l.resource,l.lookup,l.path,l.value,l.selected,l.evidence
+          FROM server_lookups l JOIN server_records r ON r.plan=l.plan AND r.path=l.path AND r.generation=?
+          WHERE l.plan=? AND l.generation=(SELECT generation FROM server_publications WHERE plan=?)
+          """, arguments: [generation, generation, projectionKey, projectionKey])
+      }
       var after = ""
       while true {
         try Task.checkCancellation()
@@ -213,6 +226,20 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
             revision: .init(rawValue: hash))
           let snapshot = try await MarkdownServerReadSnapshotBuilder(store: SingleRecordStore(record: record),
             plan: plan, ruleRegistry: evaluator.rules ?? MarkdownRuleCompiler().compile([]), typeRegistry: evaluator.types).build()
+          if plan.persistentIdentity != nil || plan.resources.contains(where: { !$0.lookups.isEmpty }) {
+            let analyzed = await MarkdownRecordAnalyzer.analyze(record)
+            try database.serverWrite { db in
+              for resource in plan.resources {
+                let selected = snapshot.resource(named: resource.name)?.records.isEmpty == false
+                for item in resource.lookupEvidence(analyzed: analyzed, persistentIdentity: plan.persistentIdentity)
+                  where selected || item.uniqueWithin == .server {
+                  try db.execute(sql: "INSERT INTO server_lookups VALUES(?,?,?,?,?,?,?,?)",
+                    arguments: [projectionKey, generation, resource.name, item.lookup, path, item.value, selected,
+                      try JSONEncoder().encode(item)])
+                }
+              }
+            }
+          }
           guard let projected = snapshot.resources.lazy.compactMap({ $0.records.first }).first else { continue }
           guard data.suffix(projected.body.utf8.count).elementsEqual(projected.body.utf8) else { throw MarkdownServerReadError.unavailable }
           let empty = replacing(projected, body: "")
@@ -239,12 +266,14 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
         if let previous {
           try db.execute(sql: "DELETE FROM server_records WHERE plan=? AND generation=?", arguments: [projectionKey, previous])
           try db.execute(sql: "DELETE FROM server_memberships WHERE plan=? AND generation=?", arguments: [projectionKey, previous])
+          try db.execute(sql: "DELETE FROM server_lookups WHERE plan=? AND generation=?", arguments: [projectionKey, previous])
         }
       }
     } catch {
       try? database.serverWrite { db in
         try db.execute(sql: "DELETE FROM server_records WHERE plan=? AND generation=?", arguments: [projectionKey, generation])
         try db.execute(sql: "DELETE FROM server_memberships WHERE plan=? AND generation=?", arguments: [projectionKey, generation])
+        try db.execute(sql: "DELETE FROM server_lookups WHERE plan=? AND generation=?", arguments: [projectionKey, generation])
       }
       throw error
     }
@@ -365,6 +394,13 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
   }
 
   public func lookup(resource: String, identity: MarkdownRecordIdentity) async throws -> MarkdownServerReadLookupResult {
+    if let planned = plan.resources.first(where: { $0.name == resource }),
+      let alias = planned.assessmentLookups(persistentIdentity: plan.persistentIdentity).first(where: {
+        $0.policy(persistentIdentity: plan.persistentIdentity)?.source == planned.identityPolicy.source
+          && planned.constraint(for: $0).uniqueWithin == .server
+      }) {
+      return try await lookup(resource: resource, lookup: alias.name, value: identity.rawValue)
+    }
     try await prepareRead()
     return try database.serverRead { db in
       let generation = try publication(db)
@@ -393,6 +429,66 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
       if count == 0 { return .notFound }
       if count == 1, let record = records.first { return .record(record) }
       return .conflict(MarkdownServerReadConflict(candidates: records, totalCandidates: count))
+    }
+  }
+
+  public func lookup(resource: String, lookup: String, value: String) async throws -> MarkdownServerReadLookupResult {
+    try await prepareRead()
+    guard let planned = plan.resources.first(where: { $0.name == resource }),
+      let declaration = planned.assessmentLookups(persistentIdentity: plan.persistentIdentity).first(where: { $0.name == lookup }) else { return .notFound }
+    let serverScope = planned.constraint(for: declaration).uniqueWithin == .server
+    let value = declaration.queryValue(value)
+    return try database.serverRead { db in
+      let generation = try publication(db)
+      let base = "plan=? AND generation=? AND resource=? AND lookup=? AND value=?"
+      let arguments: StatementArguments = [projectionKey, generation, resource, lookup, value]
+      let visible = try Int.fetchOne(db, sql: "SELECT count(*) FROM server_lookups WHERE \(base) AND selected=1", arguments: arguments) ?? 0
+      guard visible > 0 else { return .notFound }
+      let count = serverScope
+        ? (try Int.fetchOne(db, sql: "SELECT count(*) FROM server_lookups WHERE \(base)", arguments: arguments) ?? visible)
+        : visible
+      let rows = try Row.fetchCursor(db, sql: """
+        SELECT r.path,r.hash,r.body_bytes,CASE WHEN length(r.projection)<=67076096 THEN r.projection ELSE NULL END AS projection
+        FROM server_records r JOIN server_lookups l ON l.plan=r.plan AND l.generation=r.generation AND l.path=r.path
+        WHERE l.plan=? AND l.generation=? AND l.resource=? AND l.lookup=? AND l.value=? AND l.selected=1
+        ORDER BY r.path LIMIT 1000
+        """, arguments: arguments)
+      var records: [GenericMarkdownRecord] = []
+      var bytes = 32_768
+      while let row = try rows.next() {
+        let record = try materialize(projection(row, db: db, generation: generation), row: row)
+        do { bytes += try markdownServerEncodedRecordSize(record) + 1 }
+        catch MarkdownServerReadError.responseTooLarge {
+          if count == 1 { throw MarkdownServerReadError.responseTooLarge }
+          break
+        }
+        if bytes > 64 * 1_024 * 1_024 {
+          if count == 1 { throw MarkdownServerReadError.responseTooLarge }
+          break
+        }
+        records.append(record)
+      }
+      if count == 1, let record = records.first { return .record(record) }
+      return .conflict(MarkdownServerReadConflict(candidates: records, totalCandidates: count))
+    }
+  }
+
+  public func lookupEvidence(resource: String, path: MarkdownRecordPath) async throws -> [MarkdownLookupEvidence] {
+    try await prepareRead()
+    return try database.serverRead { db in
+      try lookupEvidence(resource: resource, path: path.rawValue, db: db, generation: publication(db))
+    }
+  }
+
+  private func lookupEvidence(resource: String, path: String, db: Database, generation: String) throws -> [MarkdownLookupEvidence] {
+    let rows = try Row.fetchAll(db, sql: "SELECT evidence FROM server_lookups WHERE plan=? AND generation=? AND resource=? AND path=? AND selected=1 ORDER BY lookup",
+      arguments: [projectionKey, generation, resource, path])
+    return try rows.map { row in
+      let item = try JSONDecoder().decode(MarkdownLookupEvidence.self, from: row["evidence"])
+      let scope = item.uniqueWithin == .server ? "" : " AND selected=1"
+      let count = try Int.fetchOne(db, sql: "SELECT count(*) FROM server_lookups WHERE plan=? AND generation=? AND resource=? AND lookup=? AND value=?\(scope)",
+        arguments: [projectionKey, generation, resource, item.lookup, item.value]) ?? 0
+      return item.checking(count: count)
     }
   }
 
@@ -484,6 +580,16 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
     var memberships: [GenericMarkdownResourceMembership] = []
     var diagnostics = record.diagnostics
     for member in record.memberships {
+      for evidence in try lookupEvidence(resource: member.resourceName, path: row["path"], db: db, generation: generation)
+        where evidence.violatesConstraint {
+        for problem in evidence.diagnostics {
+          let diagnostic = MarkdownServerRecordDiagnostic(code: "identity.lookup.\(evidence.status.rawValue)",
+            severity: .error, source: .identity, location: "lookups.\(evidence.lookup)",
+            message: problem.message, identity: problem.identity,
+          )
+          if !diagnostics.contains(diagnostic) { diagnostics.append(diagnostic) }
+        }
+      }
       var duplicate = false
       if let identity = member.identity {
         let paths = try String.fetchAll(db, sql: """

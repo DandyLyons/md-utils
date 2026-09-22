@@ -3,6 +3,7 @@ import MarkdownUtilitiesCore
 
 /// Stable categories produced while compiling endpoint configuration.
 public enum EndpointPlanDiagnosticCode: String, Codable, Equatable, Sendable {
+  case invalidLookup = "endpoint.lookup.invalid"
   case invalidCodec = "endpoint.codec.invalid"
   /// Configuration declares a schema version unsupported by this package release.
   case unsupportedConfigurationVersion = "endpoint.configuration.unsupported-version"
@@ -124,14 +125,24 @@ public struct EndpointPlanCompiler: Sendable {
   public func compile(_ configuration: MarkdownServerConfiguration) throws -> EndpointPlan {
     // Validate the top-level version independently so resource diagnostics are still useful.
     var diagnostics: [EndpointPlanDiagnostic] = []
-    if configuration.serverConfigVersion != MarkdownServerConfigurationSchemaVersion.current {
+    if !["1", "2"].contains(configuration.serverConfigVersion) {
       diagnostics.append(EndpointPlanDiagnostic(
         code: .unsupportedConfigurationVersion,
         location: "serverConfigVersion",
-        message: "Unsupported server configuration version \"\(configuration.serverConfigVersion)\"; expected \"\(MarkdownServerConfigurationSchemaVersion.current)\""
+        message: "Unsupported server configuration version \"\(configuration.serverConfigVersion)\"; expected 1 or 2"
       ))
     }
 
+    if configuration.serverConfigVersion == "1",
+      configuration.persistentIdentity != nil || configuration.resources.contains(where: { !$0.lookups.isEmpty || !$0.constraints.isEmpty }) {
+      diagnostics.append(EndpointPlanDiagnostic(code: .invalidLookup, location: "serverConfigVersion",
+        message: "Named lookups and constraints require serverConfigVersion 2."))
+    }
+    if let persistent = configuration.persistentIdentity,
+      persistent.path.isEmpty || persistent.path.contains(where: { $0.isEmpty || $0 == "$md-utils" }) {
+      diagnostics.append(EndpointPlanDiagnostic(code: .invalidLookup, location: "persistentIdentity.path",
+        message: "Persistent identity requires a nonempty user frontmatter path."))
+    }
     let duplicateNames = duplicates(configuration.resources.map(\.name))
     var plannedResources: [PlannedMarkdownResource] = []
     var routeCandidates: [RouteCandidate] = []
@@ -184,6 +195,9 @@ public struct EndpointPlanCompiler: Sendable {
         resourceIsValid = false
       }
 
+      let lookupErrors = lookupDiagnostics(resource, persistentIdentity: configuration.persistentIdentity, location: location)
+      diagnostics.append(contentsOf: lookupErrors)
+      if !lookupErrors.isEmpty { resourceIsValid = false }
       let route = validatedResourceRoute(resource.route, location: location, diagnostics: &diagnostics)
       if let writable = resource.writable {
         do {
@@ -220,9 +234,26 @@ public struct EndpointPlanCompiler: Sendable {
         identityPolicy: resource.identityPolicy,
         projectionPolicy: resource.projectionPolicy,
         searchEnabled: resource.searchEnabled,
-        writable: resource.writable
+        writable: resource.writable,
+        lookups: resource.lookups.sorted { $0.name < $1.name },
+        constraints: resource.constraints.sorted { $0.lookup < $1.lookup },
       )
       plannedResources.append(planned)
+
+      if operations.contains(.get) {
+        for lookup in planned.lookups {
+          for query in [true, false] where query || lookup.source != .logicalPath {
+            let suffix = query ? "" : "/{id}"
+            let id = "\(resource.name).lookup.\(lookup.name).\(query ? "query" : "get")"
+            routeCandidates.append(RouteCandidate(description: EndpointRouteDescription(
+              method: .get, path: EndpointRoutePath(validated: resource.route + "/by/" + lookup.name + suffix),
+              kind: .namedLookup, resourceName: resource.name, operationID: id,
+              lookupName: lookup.name, lookupUsesQuery: query,
+            ), location: "\(location).lookups"))
+            operationIDCandidates.append(OperationIDCandidate(id: id, location: "\(location).lookups"))
+          }
+        }
+      }
 
       for operation in operations {
         let operationID = overrides.values[operation] ?? "\(resource.name).\(operation.rawValue)"
@@ -319,8 +350,45 @@ public struct EndpointPlanCompiler: Sendable {
       serverConfigVersion: configuration.serverConfigVersion,
       resources: plannedResources.sorted(by: resourceOrder),
       routes: routeCandidates.map(\.description).sorted(by: routeOrder),
-      typeSchemas: typeSchemas
+      typeSchemas: typeSchemas,
+      persistentIdentity: configuration.persistentIdentity,
     )
+  }
+
+  private func lookupDiagnostics(_ resource: MarkdownResourceConfiguration,
+    persistentIdentity: MarkdownPersistentIdentity?, location: String,
+  ) -> [EndpointPlanDiagnostic] {
+    var messages: [String] = []
+    if resource.lookups.count > 64 || resource.constraints.count > 64 { messages.append("At most 64 lookups and constraints are supported per resource.") }
+    if Set(resource.lookups.map(\.name)).count != resource.lookups.count { messages.append("Duplicate lookup names.") }
+    if Set(resource.constraints.map(\.lookup)).count != resource.constraints.count { messages.append("Duplicate lookup constraints.") }
+    for lookup in resource.lookups {
+      if lookup.name.isEmpty || !lookup.name.utf8.allSatisfy({ (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }) {
+        messages.append("Lookup names must contain lowercase ASCII letters, digits, or hyphens.")
+      }
+      if lookup.source == .frontmatter {
+        if lookup.path?.isEmpty != false || lookup.path?.contains(where: { $0.isEmpty || $0 == "$md-utils" }) == true
+          || lookup.format == nil || (lookup.format == .slug) != (lookup.slugPolicy != nil) {
+          messages.append("Frontmatter lookup \(lookup.name) requires a valid path/format and slugPolicy only for slug format.")
+        }
+      } else if lookup.path != nil || lookup.format != nil || lookup.slugPolicy != nil {
+        messages.append("Only frontmatter lookups accept path, format, or slugPolicy.")
+      }
+      if lookup.policy(persistentIdentity: persistentIdentity) == nil { messages.append("Lookup \(lookup.name) has no valid identity source.") }
+      if lookup.protectedIdentifier && lookup.source != .frontmatter && lookup.source != .persistentIdentity {
+        messages.append("Only metadata identifiers can be designated protected.")
+      }
+    }
+    for constraint in resource.constraints {
+      guard let lookup = resource.lookups.first(where: { $0.name == constraint.lookup }) else {
+        messages.append("Constraint references undeclared lookup \(constraint.lookup).")
+        continue
+      }
+      if lookup.source == .persistentIdentity && (constraint.uniqueWithin != .server || constraint.requireValue) {
+        messages.append("Persistent UUIDs are optional and always unique server-wide.")
+      }
+    }
+    return messages.map { EndpointPlanDiagnostic(code: .invalidLookup, location: location + ".lookups", message: $0) }
   }
 
   /// Validates public route values decoded independently from an ``EndpointPlan``.

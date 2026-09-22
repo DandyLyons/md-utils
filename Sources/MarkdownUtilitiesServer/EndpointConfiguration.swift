@@ -3,8 +3,10 @@ import MarkdownUtilitiesCore
 
 /// The supported version of the md-utils server resource-configuration schema.
 public enum MarkdownServerConfigurationSchemaVersion {
-  /// The newest server configuration schema understood by this package version.
+  /// The default schema used for backward-compatible empty configurations.
   public static let current = "1"
+  /// Named lookups require explicit version 2 configuration.
+  public static let latest = "2"
 }
 
 /// Explicit, opt-in server resource configuration.
@@ -14,6 +16,7 @@ public struct MarkdownServerConfiguration: Codable, Equatable, Sendable {
 
   /// Resources explicitly exposed by the server; loaded rules and types are not exposed implicitly.
   public let resources: [MarkdownResourceConfiguration]
+  public let persistentIdentity: MarkdownPersistentIdentity?
 
   /// Creates a transport-neutral server configuration.
   ///
@@ -22,10 +25,12 @@ public struct MarkdownServerConfiguration: Codable, Equatable, Sendable {
   ///   - resources: Explicit resource declarations to compile into an ``EndpointPlan``.
   public init(
     serverConfigVersion: String = MarkdownServerConfigurationSchemaVersion.current,
-    resources: [MarkdownResourceConfiguration] = []
+    resources: [MarkdownResourceConfiguration] = [],
+    persistentIdentity: MarkdownPersistentIdentity? = nil,
   ) {
     self.serverConfigVersion = serverConfigVersion
     self.resources = resources
+    self.persistentIdentity = persistentIdentity
   }
 }
 
@@ -135,6 +140,10 @@ public struct MarkdownOperationIDOverride: Codable, Equatable, Sendable {
 
 /// One explicitly exposed Markdown-backed server resource.
 public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
+  /// Named read aliases; declarations alone do not require uniqueness.
+  public let lookups: [MarkdownResourceLookup]
+  /// Explicit scoped identity invariants assessed independently of type conformance.
+  public let constraints: [MarkdownLookupConstraint]
   /// Optional explicit writable contract; does not enable HTTP mutation routes.
   public let writable: WritableResourceConfiguration?
   /// Explicit opt-in to native FTS queries. The cache must already enable FTS.
@@ -179,8 +188,12 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
     projectionPolicy: MarkdownResourceProjectionPolicy = .genericRecord,
     operationIDOverrides: [MarkdownOperationIDOverride] = [],
     searchEnabled: Bool = false,
-    writable: WritableResourceConfiguration? = nil
+    writable: WritableResourceConfiguration? = nil,
+    lookups: [MarkdownResourceLookup] = [],
+    constraints: [MarkdownLookupConstraint] = [],
   ) {
+    self.lookups = lookups
+    self.constraints = constraints
     self.name = name
     self.writable = writable
     self.searchEnabled = searchEnabled
@@ -202,6 +215,9 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
       projectionPolicy: try values.decodeIfPresent(MarkdownResourceProjectionPolicy.self, forKey: .projectionPolicy) ?? .genericRecord,
       operationIDOverrides: try values.decodeIfPresent([MarkdownOperationIDOverride].self, forKey: .operationIDOverrides) ?? [],
       searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false,
-      writable: try values.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable))
+      writable: try values.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable),
+      lookups: try values.decodeIfPresent([MarkdownResourceLookup].self, forKey: .lookups) ?? [],
+      constraints: try values.decodeIfPresent([MarkdownLookupConstraint].self, forKey: .constraints) ?? [],
+    )
   }
 }

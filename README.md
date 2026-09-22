@@ -501,9 +501,15 @@ swift run md-utils-server schema
 The bundled schema source is
 [`Sources/MarkdownUtilitiesServer/Resources/1_server.schema.json`](Sources/MarkdownUtilitiesServer/Resources/1_server.schema.json).
 
+For named UUID, slug, filename, and exact-path lookups, use server configuration
+version 2. `md-utils-server init --schema-version 2` initializes it, and
+`md-utils-server schema --schema-version 2` exports its schema. Lookup availability,
+scoped uniqueness, and identity protection are independent settings. See
+[named resource lookups](docs/resource-lookups.md) for examples and collision behavior.
+
 ### `server.yaml` schema
 
-The top-level `serverConfigVersion` is required and must be `"1"`. It is versioned
+The top-level `serverConfigVersion` is required and supports `"1"` or `"2"`. It is versioned
 independently from `.md-utils/md-utils.json`. `resources` is a required array; every
 resource has these fields:
 

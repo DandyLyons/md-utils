@@ -301,16 +301,29 @@ private struct PlanDependencies {
 private struct NativeMarkdownServerConfigurationFile: Decodable {
   let serverConfigVersion: String
   let resources: [NativeMarkdownResourceConfiguration]
+  let persistentIdentity: MarkdownPersistentIdentity?
+
+  private enum CodingKeys: String, CodingKey { case serverConfigVersion, resources, persistentIdentity }
+  init(from decoder: Decoder) throws {
+    try rejectUnknownLookupKeys(decoder, allowed: ["serverConfigVersion", "resources", "persistentIdentity"])
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    serverConfigVersion = try c.decode(String.self, forKey: .serverConfigVersion)
+    resources = try c.decode([NativeMarkdownResourceConfiguration].self, forKey: .resources)
+    persistentIdentity = try c.decodeIfPresent(MarkdownPersistentIdentity.self, forKey: .persistentIdentity)
+  }
 
   var configuration: MarkdownServerConfiguration {
     MarkdownServerConfiguration(
       serverConfigVersion: serverConfigVersion,
-      resources: resources.map(\.configuration)
+      resources: resources.map(\.configuration),
+      persistentIdentity: persistentIdentity,
     )
   }
 }
 
 private struct NativeMarkdownResourceConfiguration: Decodable {
+  let lookups: [MarkdownResourceLookup]
+  let constraints: [MarkdownLookupConstraint]
   let writable: WritableResourceConfiguration?
   let searchEnabled: Bool
   let name: String
@@ -322,6 +335,7 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
   let operationIDOverrides: [MarkdownOperationIDOverride]
 
   private enum CodingKeys: String, CodingKey {
+    case lookups, constraints
     case writable
     case searchEnabled
     case name
@@ -334,7 +348,11 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
   }
 
   init(from decoder: Decoder) throws {
+    try rejectUnknownLookupKeys(decoder, allowed: ["name", "route", "operations", "selection", "identityPolicy",
+      "projectionPolicy", "operationIDOverrides", "searchEnabled", "writable", "lookups", "constraints"])
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    lookups = try container.decodeIfPresent([MarkdownResourceLookup].self, forKey: .lookups) ?? []
+    constraints = try container.decodeIfPresent([MarkdownLookupConstraint].self, forKey: .constraints) ?? []
     writable = try container.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable)
     searchEnabled = try container.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false
     name = try container.decode(String.self, forKey: .name)
@@ -362,7 +380,9 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
       projectionPolicy: projectionPolicy,
       operationIDOverrides: operationIDOverrides,
       searchEnabled: searchEnabled,
-      writable: writable
+      writable: writable,
+      lookups: lookups,
+      constraints: constraints,
     )
   }
 }

@@ -24,9 +24,10 @@ public enum MarkdownServerConfigurationSchema {
   public static let projectFileName = "server.schema.json"
 
   /// Returns the complete bundled JSON Schema.
-  public static func content() throws -> String {
+  public static func content(version: String = "1") throws -> String {
+    guard ["1", "2"].contains(version) else { throw CocoaError(.fileReadUnsupportedScheme) }
     guard let url = Bundle.module.url(
-      forResource: "1_server.schema",
+      forResource: "\(version)_server.schema",
       withExtension: "json"
     ) else {
       throw CocoaError(.fileNoSuchFile)
@@ -41,7 +42,8 @@ public enum MarkdownServerConfigurationBootstrapper {
   ///
   /// Existing server configuration is never overwritten.
   public static func initialize(
-    projectRoot: Path = .current
+    projectRoot: Path = .current,
+    schemaVersion: String = "1",
   ) throws -> MarkdownServerConfigurationInitializationResult {
     let root = projectRoot.absolute().normalize()
     let configurationDirectory = root + ".md-utils/server/"
@@ -49,14 +51,14 @@ public enum MarkdownServerConfigurationBootstrapper {
     let schemaFile = configurationDirectory + MarkdownServerConfigurationSchema.projectFileName
 
     try configurationDirectory.mkpath()
-    try schemaFile.write(try MarkdownServerConfigurationSchema.content())
+    try schemaFile.write(try MarkdownServerConfigurationSchema.content(version: schemaVersion))
 
     let configurationCreated = configurationFile.exists == false
     if configurationCreated {
       try configurationFile.write(
         """
         # yaml-language-server: $schema=server.schema.json
-        serverConfigVersion: "1"
+        serverConfigVersion: "\(schemaVersion)"
         resources: []
 
         """

@@ -12,6 +12,87 @@ import Testing
 
 @Suite("Indexed native server")
 struct IndexedMarkdownRepositoryTests {
+  @Test(arguments: [false, true])
+  func `named lookups enforce global UUID scope without exposing hidden records`(fts: Bool) async throws {
+    let root = try fixture()
+    defer { try? root.delete() }
+    try (root + ".md-utils/server/server.yaml").write("""
+      serverConfigVersion: "2"
+      persistentIdentity:
+        path: [uuid]
+      resources:
+        - name: books
+          route: /books
+          operations: [list, get]
+          selection: {mode: rule, rule: books}
+          identityPolicy: {source: frontmatter, path: [slug], format: string}
+          lookups:
+            - {name: uuid, source: persistentIdentity}
+            - {name: slug, source: frontmatter, path: [slug], format: string}
+            - {name: filename, source: filename}
+            - {name: path, source: logicalPath}
+          constraints:
+            - {lookup: slug, uniqueWithin: resource}
+      """)
+    let uuid = "550e8400-e29b-41d4-a716-446655440000"
+    try (root + "books/a.md").write("---\nuuid: \(uuid)\nslug: duplicate\n---\n# Book\nAlpha")
+    try (root + "hidden/").mkpath()
+    try (root + "hidden/a.md").write("---\nuuid: \(uuid)\nslug: unique\n---\nSecret content")
+    if fts {
+      let db = try SQLiteIndexDatabase(path: (root + ".md-utils/index.sqlite").string)
+      try db.prepareCollection(root: root.string)
+      try db.setBodyMode(.fts)
+    }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await repository.refresh()
+    guard case .conflict(let conflict) = try await repository.lookup(resource: "books", lookup: "uuid", value: uuid) else {
+      Issue.record("Unexposed UUID holder must participate in global conflict"); return
+    }
+    #expect(conflict.totalCandidates == 2)
+    #expect(conflict.candidates.count == 1)
+    #expect(conflict.candidates.first?.body == "# Book\nAlpha")
+    #expect(try await repository.lookup(resource: "books", lookup: "path", value: "hidden/a.md") == .notFound)
+    guard case .record = try await repository.lookup(resource: "books", lookup: "filename", value: "a.md") else {
+      Issue.record("Filename lookup must be scoped to resource"); return
+    }
+    let evidence = try await repository.lookupEvidence(resource: "books", path: MarkdownRecordPath("books/a.md"))
+    #expect(evidence.first(where: { $0.lookup == "uuid" })?.violatesConstraint == true)
+    let page = try await repository.page(resource: "books", query: .init())
+    #expect(page.records.first?.diagnostics.contains(where: { $0.code == "identity.lookup.duplicate" }) == true)
+
+    // Unchanged projected files must still acquire new collision counts when only
+    // an unexposed holder changes; reused alias rows cannot retain stale counts.
+    try (root + "hidden/a.md").delete()
+    try await repository.refresh()
+    guard case .record = try await repository.lookup(resource: "books", lookup: "uuid", value: uuid) else {
+      Issue.record("Collision should clear after refresh"); return
+    }
+    try (root + "books/a.md").move(root + "books/Reading Notes.md")
+    try await repository.refresh()
+    guard case .record(let moved) = try await repository.lookup(resource: "books", lookup: "uuid", value: uuid) else {
+      Issue.record("UUID must resolve after move reconciliation"); return
+    }
+    #expect(moved.logicalPath?.rawValue == "books/Reading Notes.md")
+    #expect(try await repository.lookup(resource: "books", lookup: "filename", value: "a.md") == .notFound)
+
+    let router = Router()
+    try MarkdownServerHTTPAdapter.register(plan: repository.plan, repository: repository, on: router)
+    try await Application(router: router).test(.router) { client in
+      try await client.execute(uri: "/books/by/filename/Reading%20Notes.md", method: .get) { response in
+        #expect(response.status == .ok)
+      }
+      try await client.execute(uri: "/books/by/path?value=books%2FReading%20Notes.md", method: .get) { response in
+        #expect(response.status == .ok)
+      }
+      try await client.execute(uri: "/books/by/path?value=hidden%2Fa.md", method: .get) { response in
+        #expect(response.status == .notFound)
+      }
+      try await client.execute(uri: "/books/by/path?value=a&value=b", method: .get) { response in
+        #expect(response.status == .badRequest)
+      }
+    }
+  }
+
   @Test func `codec proposals use authoritative source identically with metadata and FTS caches`() async throws {
     let root = try fixture()
     defer { try? root.delete() }
@@ -349,6 +430,10 @@ struct IndexedMarkdownRepositoryTests {
   @Test func `collision candidate lists declare their truncation`() async throws {
     let root = try fixture()
     defer { try? root.delete() }
+    let config = root + ".md-utils/server/server.yaml"
+    try config.write(try config.read(.utf8)
+      .replacingOccurrences(of: "serverConfigVersion: \"1\"", with: "serverConfigVersion: \"2\"")
+      .replacingOccurrences(of: "    searchEnabled:", with: "    lookups: [{name: slug, source: frontmatter, path: [slug], format: string}]\n    searchEnabled:"))
     for index in 0..<1_001 {
       try (root + "books/collision-\(index).md").write("---\nslug: crowded\n---\n# Book")
     }
@@ -360,6 +445,12 @@ struct IndexedMarkdownRepositoryTests {
     #expect(conflict.truncated)
     #expect(conflict.candidates.count <= 1_000)
     #expect(try JSONEncoder().encode(conflict).count <= 64 * 1_024 * 1_024)
+    guard case .conflict(let named) = try await repository.lookup(resource: "books", lookup: "slug", value: "crowded") else {
+      Issue.record("Expected named conflict"); return
+    }
+    #expect(named.totalCandidates == 1_001)
+    #expect(named.truncated)
+    #expect(named.candidates.count <= 1_000)
   }
 
   @Test func `atomic source replacements never return a different body under the indexed revision`() async throws {

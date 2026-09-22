@@ -120,6 +120,10 @@ public enum PlannedResourceSelection: Codable, Equatable, Sendable {
 
 /// One immutable resource in a compiled endpoint plan.
 public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
+  /// Named read aliases in deterministic name order.
+  public let lookups: [MarkdownResourceLookup]
+  /// Explicit constraints in deterministic lookup-name order.
+  public let constraints: [MarkdownLookupConstraint]
   /// Explicit codec declaration, independent of read projection and routing.
   public let writable: WritableResourceConfiguration?
   /// Whether this resource's contract offers FTS search.
@@ -161,8 +165,12 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
     identityPolicy: MarkdownRecordIdentityPolicy,
     projectionPolicy: MarkdownResourceProjectionPolicy,
     searchEnabled: Bool = false,
-    writable: WritableResourceConfiguration? = nil
+    writable: WritableResourceConfiguration? = nil,
+    lookups: [MarkdownResourceLookup] = [],
+    constraints: [MarkdownLookupConstraint] = [],
   ) {
+    self.lookups = lookups
+    self.constraints = constraints
     self.name = name
     self.writable = writable
     self.searchEnabled = searchEnabled
@@ -182,7 +190,10 @@ public struct PlannedMarkdownResource: Codable, Equatable, Sendable {
       identityPolicy: try values.decode(MarkdownRecordIdentityPolicy.self, forKey: .identityPolicy),
       projectionPolicy: try values.decode(MarkdownResourceProjectionPolicy.self, forKey: .projectionPolicy),
       searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false,
-      writable: try values.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable))
+      writable: try values.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable),
+      lookups: try values.decodeIfPresent([MarkdownResourceLookup].self, forKey: .lookups) ?? [],
+      constraints: try values.decodeIfPresent([MarkdownLookupConstraint].self, forKey: .constraints) ?? [],
+    )
   }
 }
 
@@ -199,6 +210,9 @@ public enum EndpointRouteKind: String, Codable, Equatable, Sendable {
 
   /// Retrieves one selected record by primary identity.
   case item
+
+  /// Named resource lookup using a segment or exact query value.
+  case namedLookup
 
   /// Retrieves a canonical record by its collection-relative logical path.
   case logicalPath
@@ -223,6 +237,8 @@ public struct EndpointRouteDescription: Codable, Equatable, Sendable {
 
   /// Globally unique stable identifier for the operation.
   public let operationID: String
+  public let lookupName: String?
+  public let lookupUsesQuery: Bool?
 
   /// Creates a transport-neutral route description.
   ///
@@ -237,13 +253,17 @@ public struct EndpointRouteDescription: Codable, Equatable, Sendable {
     path: EndpointRoutePath,
     kind: EndpointRouteKind,
     resourceName: String?,
-    operationID: String
+    operationID: String,
+    lookupName: String? = nil,
+    lookupUsesQuery: Bool? = nil,
   ) {
     self.method = method
     self.path = path
     self.kind = kind
     self.resourceName = resourceName
     self.operationID = operationID
+    self.lookupName = lookupName
+    self.lookupUsesQuery = lookupUsesQuery
   }
 }
 
@@ -260,6 +280,7 @@ public struct EndpointPlan: Codable, Equatable, Sendable {
 
   /// Resolved contracts for the Markdown types explicitly referenced by resources.
   public let typeSchemas: [ResolvedMarkdownTypeFrontmatterSchema]
+  public let persistentIdentity: MarkdownPersistentIdentity?
 
   /// Creates an immutable endpoint plan from already compiled values.
   ///
@@ -274,11 +295,13 @@ public struct EndpointPlan: Codable, Equatable, Sendable {
     serverConfigVersion: String,
     resources: [PlannedMarkdownResource],
     routes: [EndpointRouteDescription],
-    typeSchemas: [ResolvedMarkdownTypeFrontmatterSchema] = []
+    typeSchemas: [ResolvedMarkdownTypeFrontmatterSchema] = [],
+    persistentIdentity: MarkdownPersistentIdentity? = nil,
   ) {
     self.serverConfigVersion = serverConfigVersion
     self.resources = resources
     self.routes = routes
     self.typeSchemas = typeSchemas
+    self.persistentIdentity = persistentIdentity
   }
 }

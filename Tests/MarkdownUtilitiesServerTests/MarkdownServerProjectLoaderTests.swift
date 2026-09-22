@@ -5,6 +5,29 @@ import Testing
 
 @Suite("Native server project loading")
 struct MarkdownServerProjectLoaderTests {
+  @Test func `version two bootstrap exports matching schema and rejects unknown lookup fields`() throws {
+    let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()
+    defer { try? root.delete() }
+    let result = try MarkdownServerConfigurationBootstrapper.initialize(projectRoot: root, schemaVersion: "2")
+    #expect(try result.configurationFile.read(.utf8).contains("serverConfigVersion: \"2\""))
+    #expect(try result.schemaFile.read(.utf8) == MarkdownServerConfigurationSchema.content(version: "2"))
+    #expect(try MarkdownServerProjectLoader(projectRoot: root).loadConfiguration().serverConfigVersion == "2")
+    try result.configurationFile.write("""
+      serverConfigVersion: "2"
+      resources:
+        - name: books
+          route: /books
+          operations: [get]
+          selection: {mode: type, type: Book, searchRoot: .}
+          identityPolicy: {source: logicalPath}
+          lookups:
+            - {name: slug, source: filename, unique: true}
+      """)
+    #expect(throws: MarkdownServerProjectLoaderError.self) {
+      try MarkdownServerProjectLoader(projectRoot: root).loadConfiguration()
+    }
+  }
+
   @Test
   func `native YAML loader retains explicit codec and template declarations`() async throws {
     let root = Path("tmp/server-loader-tests/\(UUID().uuidString)/").absolute()

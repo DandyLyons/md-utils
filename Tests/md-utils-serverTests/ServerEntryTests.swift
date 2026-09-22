@@ -41,6 +41,8 @@ struct ServerEntryTests {
 
     let schema = try ServerEntry.parseAsRoot(["schema"])
     #expect(schema is ServerEntry.Schema)
+    let versionTwo = try #require(try ServerEntry.parseAsRoot(["schema", "--schema-version", "2"]) as? ServerEntry.Schema)
+    #expect(versionTwo.schemaVersion == "2")
   }
 
   @Test

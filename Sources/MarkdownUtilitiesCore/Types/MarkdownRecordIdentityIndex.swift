@@ -298,7 +298,7 @@ public struct MarkdownRecordIdentityIndex: Equatable, Sendable {
     )
   }
 
-  private static func assess(
+  package static func assess(
     _ analyzed: AnalyzedMarkdownRecord,
     policy: MarkdownRecordIdentityPolicy
   ) -> MarkdownRecordIdentityAssessment {

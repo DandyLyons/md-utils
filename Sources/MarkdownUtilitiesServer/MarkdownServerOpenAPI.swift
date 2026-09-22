@@ -189,7 +189,7 @@ public enum MarkdownServerOpenAPIGenerator {
         continue
       }
       let resource = route.resourceName.flatMap { resources[$0] }
-      let requiresResource = route.kind == .collection || route.kind == .item
+      let requiresResource = route.kind == .collection || route.kind == .item || route.kind == .namedLookup
       if requiresResource && resource == nil {
         diagnostics.append(.init(
           code: .invalidPlan,
@@ -292,6 +292,17 @@ public enum MarkdownServerOpenAPIGenerator {
         name: "id",
         description: "Primary resource identity"
       )])
+    case .namedLookup:
+      value["summary"] = string("Get a selected record by \(route.lookupName ?? "named lookup")")
+      if route.lookupUsesQuery == true {
+        value["parameters"] = array([object([
+          "name": string("value"), "in": string("query"), "required": .boolean(true),
+          "schema": object(["type": string("string"), "minLength": .integer(1), "maxLength": .integer(4096)]),
+          "description": string("Exact lookup value; percent encode paths and other URL-sensitive text"),
+        ])])
+      } else {
+        value["parameters"] = array([pathParameter(name: "id", description: "Exact named lookup value")])
+      }
     case .logicalPath:
       value["summary"] = string("Get one canonical record by logical path")
       value["parameters"] = array([pathParameter(
@@ -342,7 +353,7 @@ public enum MarkdownServerOpenAPIGenerator {
         "413": errorResponse("A record exceeds the response byte limit"),
         "503": errorResponse("Source changed, restart required, or repository unavailable"),
       ])
-    case .item:
+    case .item, .namedLookup:
       return object([
         "200": response(
           description: "The unambiguous selected Markdown record",

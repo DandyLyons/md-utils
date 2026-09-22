@@ -1,5 +1,8 @@
 # Indexed native server reads
 
+Version 2 server configuration supports [named lookups and scoped constraints](resource-lookups.md)
+using the same bounded publication model; version 1 remains supported.
+
 The native executable shares `.md-utils/index.sqlite` with `md-utils index`.
 Files remain authoritative. `MarkdownUtilitiesIndexNative` owns native evaluation
 and fingerprints; `MarkdownUtilitiesServerNative` provides `IndexedMarkdownRepository`

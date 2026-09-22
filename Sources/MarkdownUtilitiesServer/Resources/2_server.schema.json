@@ -1,0 +1,513 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dandylyons.github.io/md-utils/schemas/server/2/server.schema.json",
+  "title": "md-utils server configuration",
+  "description": "Configuration for the native read-only md-utils-server.",
+  "type": "object",
+  "required": [
+    "serverConfigVersion",
+    "resources"
+  ],
+  "properties": {
+    "serverConfigVersion": {
+      "const": "2",
+      "description": "Server configuration schema version. This is independent of the md-utils.json configVersion."
+    },
+    "resources": {
+      "type": "array",
+      "description": "Explicitly exposed Markdown-backed HTTP resources.",
+      "items": {
+        "$ref": "#/$defs/resource"
+      }
+    },
+    "persistentIdentity": {
+      "type": "object",
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "required": [
+        "name",
+        "route",
+        "operations",
+        "selection",
+        "identityPolicy"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S(?:.*\\S)?$",
+          "description": "Stable, case-sensitive resource name."
+        },
+        "route": {
+          "type": "string",
+          "pattern": "^/(?!_md-utils(?:/|$))(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^\\\\?#*{}:%\\s]+$",
+          "description": "Absolute literal collection route without a trailing slash. The /_md-utils namespace is reserved."
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "list",
+              "get"
+            ]
+          },
+          "description": "Read operations exposed for the resource."
+        },
+        "selection": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ruleSelection"
+            },
+            {
+              "$ref": "#/$defs/typeSelection"
+            },
+            {
+              "$ref": "#/$defs/ruleWithExpectedTypeSelection"
+            }
+          ]
+        },
+        "identityPolicy": {
+          "$ref": "#/$defs/identityPolicy"
+        },
+        "writable": {
+          "$ref": "#/$defs/writable"
+        },
+        "searchEnabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "projectionPolicy": {
+          "const": "genericRecord",
+          "default": "genericRecord",
+          "description": "Response representation. genericRecord is the only supported policy in version 1."
+        },
+        "operationIDOverrides": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/operationIDOverride"
+          }
+        },
+        "lookups": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/lookup"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "lookup"
+            ],
+            "properties": {
+              "lookup": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueWithin": {
+                "enum": [
+                  "resource",
+                  "server"
+                ]
+              },
+              "requireValue": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "writable": {
+      "type": "object",
+      "required": [
+        "codec"
+      ],
+      "additionalProperties": false,
+      "description": "Explicit mutation planning contract; does not register write routes.",
+      "properties": {
+        "codec": {
+          "type": "object",
+          "required": [
+            "frontmatterFields",
+            "bodyWritable"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "frontmatterFields": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "not": {
+                  "const": "$md-utils"
+                }
+              }
+            },
+            "bodyWritable": {
+              "type": "boolean"
+            },
+            "protectedFields": {
+              "type": "array",
+              "default": [],
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "creation": {
+          "type": "object",
+          "required": [
+            "template"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "template": {
+              "type": "string"
+            },
+            "inputSchema": {
+              "type": [
+                "object",
+                "boolean"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "ruleSelection": {
+      "type": "object",
+      "required": [
+        "mode",
+        "rule"
+      ],
+      "properties": {
+        "mode": {
+          "const": "rule"
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "typeSelection": {
+      "type": "object",
+      "required": [
+        "mode",
+        "type",
+        "searchRoot"
+      ],
+      "properties": {
+        "mode": {
+          "const": "type"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "searchRoot": {
+          "type": "string",
+          "pattern": "^(?:\\.|(?!/)(?!.*(?:^|/)\\.{1,2}/)(?!.*//)[^\\\\]+/)$",
+          "description": "Collection-relative directory ending in /, or . for the project root."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ruleWithExpectedTypeSelection": {
+      "type": "object",
+      "required": [
+        "mode",
+        "rule",
+        "type"
+      ],
+      "properties": {
+        "mode": {
+          "const": "ruleWithExpectedType"
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "identityPolicy": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/intrinsicIdentityPolicy"
+        },
+        {
+          "$ref": "#/$defs/frontmatterIdentityPolicy"
+        }
+      ]
+    },
+    "intrinsicIdentityPolicy": {
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "existingIdentity",
+            "logicalPath"
+          ]
+        },
+        "logicalPathFallbackEnabled": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "frontmatterIdentityPolicy": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/nonSlugFrontmatterIdentityPolicy"
+        },
+        {
+          "$ref": "#/$defs/slugFrontmatterIdentityPolicy"
+        }
+      ]
+    },
+    "nonSlugFrontmatterIdentityPolicy": {
+      "type": "object",
+      "required": [
+        "source",
+        "path",
+        "format"
+      ],
+      "properties": {
+        "source": {
+          "const": "frontmatter"
+        },
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "format": {
+          "enum": [
+            "string",
+            "integer",
+            "uuid"
+          ]
+        },
+        "logicalPathFallbackEnabled": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "slugFrontmatterIdentityPolicy": {
+      "type": "object",
+      "required": [
+        "source",
+        "path",
+        "format",
+        "slugPolicy"
+      ],
+      "properties": {
+        "source": {
+          "const": "frontmatter"
+        },
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "format": {
+          "const": "slug"
+        },
+        "slugPolicy": {
+          "enum": [
+            "strictASCII",
+            "unicode",
+            "preserve"
+          ]
+        },
+        "logicalPathFallbackEnabled": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "operationIDOverride": {
+      "type": "object",
+      "required": [
+        "operation",
+        "operationID"
+      ],
+      "properties": {
+        "operation": {
+          "enum": [
+            "list",
+            "get"
+          ]
+        },
+        "operationID": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": ".*\\S.*"
+        }
+      },
+      "additionalProperties": false
+    },
+    "lookup": {
+      "type": "object",
+      "required": [
+        "name",
+        "source"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "source": {
+          "enum": [
+            "frontmatter",
+            "filename",
+            "logicalPath",
+            "persistentIdentity"
+          ]
+        },
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "format": {
+          "enum": [
+            "string",
+            "integer",
+            "uuid",
+            "slug"
+          ]
+        },
+        "slugPolicy": {
+          "enum": [
+            "strictASCII",
+            "unicode",
+            "preserve"
+          ]
+        },
+        "protectedIdentifier": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "frontmatter"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "path",
+              "format"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "path"
+                  ]
+                },
+                {
+                  "required": [
+                    "format"
+                  ]
+                },
+                {
+                  "required": [
+                    "slugPolicy"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "format"
+            ],
+            "properties": {
+              "format": {
+                "const": "slug"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "slugPolicy"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "slugPolicy"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

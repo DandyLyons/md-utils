@@ -193,7 +193,7 @@ struct EndpointPlanCompilerTests {
     let duplicateTwo = makeResource(name: "same", route: "/same-two")
 
     let diagnostics = try compilationDiagnostics(configuration: MarkdownServerConfiguration(
-      serverConfigVersion: "2",
+      serverConfigVersion: "unsupported",
       resources: [invalid, empty, duplicateOne, duplicateTwo]
     ))
     let codes = Set(diagnostics.map(\.code))

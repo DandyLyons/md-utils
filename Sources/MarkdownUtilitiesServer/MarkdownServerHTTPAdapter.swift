@@ -145,6 +145,34 @@ public enum MarkdownServerHTTPAdapter {
           ), repository: repository) } catch { return try readErrorResponse(error) }
         }
 
+      case .namedLookup:
+        let resource = try routeResource(route, resources: resources)
+        router.get(RouterPath(route.path.rawValue)) { request, context in
+          do {
+            guard let name = route.lookupName else { throw MarkdownServerReadError.unavailable }
+            let value: String
+            if route.lookupUsesQuery == true {
+              guard request.uri.string.utf8.count <= 32_768,
+                let components = URLComponents(string: request.uri.string),
+                let items = components.queryItems, items.count == 1,
+                items[0].name == "value", let supplied = items[0].value, !supplied.isEmpty else {
+                throw MarkdownServerReadError.invalidQuery("Named lookup requires exactly one nonempty value query parameter")
+              }
+              value = supplied
+            } else {
+              guard let encoded = context.parameters.get("id"), let decoded = encoded.removingPercentEncoding,
+                !decoded.isEmpty else { throw MarkdownServerReadError.invalidQuery("Invalid lookup value") }
+              value = decoded
+            }
+            guard value.utf8.count <= 4_096 else { throw MarkdownServerReadError.invalidQuery("Lookup value exceeds 4096 bytes") }
+            return await readHeaders(try lookupResponse(
+              try await repository.lookup(resource: resource.name, lookup: name, value: value),
+              notFoundMessage: "No selected document has this lookup value",
+              conflictCode: "record.lookup-conflict", conflictMessage: "Lookup value is ambiguous",
+            ), repository: repository)
+          } catch { return try readErrorResponse(error) }
+        }
+
       case .logicalPath:
         router.get(RouterPath(hummingbirdPath(for: route))) { _, context in
           let encodedPath = context.parameters.getCatchAll().joined(separator: "/")
@@ -196,7 +224,7 @@ public enum MarkdownServerHTTPAdapter {
     switch route.kind {
     case .logicalPath:
       return "/_md-utils/path/**"
-    case .collection, .item, .openAPI:
+    case .collection, .item, .namedLookup, .openAPI:
       return route.path.rawValue
     }
   }

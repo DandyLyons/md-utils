@@ -224,13 +224,36 @@ public struct MarkdownResourceReadSnapshot: Equatable, Sendable {
   /// Stable resource name from the endpoint plan.
   public let name: String
   /// Selected records in deterministic store order.
-  public let records: [GenericMarkdownRecord]
+  private let sourceRecords: [GenericMarkdownRecord]
+  public var records: [GenericMarkdownRecord] {
+    sourceRecords.map { $0.addingLookupEvidence(lookupEvidence[$0.logicalPath?.rawValue ?? ""] ?? []) }
+  }
 
   private let primaryLookup: [MarkdownRecordIdentity: [Int]]
+  package var namedLookups: [String: [String: MarkdownServerReadLookupResult]] = [:]
+  package var primaryAlias: String?
+  package var lookupDeclarations: [MarkdownResourceLookup] = []
+  public internal(set) var lookupEvidence: [String: [MarkdownLookupEvidence]] = [:]
+
+  public func lookup(named name: String, value: String) -> MarkdownServerReadLookupResult {
+    let value = lookupDeclarations.first(where: { $0.name == name })?.queryValue(value) ?? value
+    return addingEvidence(namedLookups[name]?[value] ?? .notFound)
+  }
+
+  private func addingEvidence(_ result: MarkdownServerReadLookupResult) -> MarkdownServerReadLookupResult {
+    switch result {
+    case .notFound: return .notFound
+    case .record(let record): return .record(record.addingLookupEvidence(lookupEvidence[record.logicalPath?.rawValue ?? ""] ?? []))
+    case .conflict(let conflict): return .conflict(MarkdownServerReadConflict(candidates: conflict.candidates.map {
+      $0.addingLookupEvidence(lookupEvidence[$0.logicalPath?.rawValue ?? ""] ?? [])
+    }, totalCandidates: conflict.totalCandidates))
+    }
+  }
 
   /// Looks up one resource member without selecting an arbitrary collision candidate.
   public func lookup(primary identity: MarkdownRecordIdentity) -> MarkdownServerReadLookupResult {
-    lookupResult(indexes: primaryLookup[identity] ?? [], records: records)
+    if let primaryAlias { return lookup(named: primaryAlias, value: identity.rawValue) }
+    return addingEvidence(lookupResult(indexes: primaryLookup[identity] ?? [], records: sourceRecords))
   }
 
   /// Creates a resource view after the builder has completed identity assessment.
@@ -240,7 +263,7 @@ public struct MarkdownResourceReadSnapshot: Equatable, Sendable {
     primaryLookup: [MarkdownRecordIdentity: [Int]]
   ) {
     self.name = name
-    self.records = records
+    self.sourceRecords = records
     self.primaryLookup = primaryLookup
   }
 }
@@ -369,7 +392,7 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
     // Path-only selection is deliberately separated from analysis so large stores do not
     // parse records that cannot participate in any planned resource.
     let candidates = records.filter { record in
-      plan.resources.contains { resource in
+      plan.persistentIdentity != nil || plan.resources.contains(where: { !$0.lookups.isEmpty }) || plan.resources.contains { resource in
         isPathCandidate(record, for: resource, dependencies: dependencies)
       }
     }
@@ -449,6 +472,42 @@ public struct MarkdownServerReadSnapshotBuilder: Sendable {
         records: records,
         primaryLookup: resourcePrimaryLookups[resourceIndex]
       ))
+    }
+
+    for resourceIndex in plan.resources.indices {
+      let resource = plan.resources[resourceIndex]
+      resourceSnapshots[resourceIndex].lookupDeclarations = resource.assessmentLookups(persistentIdentity: plan.persistentIdentity)
+      resourceSnapshots[resourceIndex].primaryAlias = resource.assessmentLookups(persistentIdentity: plan.persistentIdentity).first {
+        $0.policy(persistentIdentity: plan.persistentIdentity)?.source == resource.identityPolicy.source
+          && resource.constraint(for: $0).uniqueWithin == .server
+      }?.name
+      guard !resource.lookups.isEmpty || plan.persistentIdentity != nil else { continue }
+      let selected = Set(resourceMembers[resourceIndex])
+      let evidence = analyzedRecords.map { resource.lookupEvidence(analyzed: $0, persistentIdentity: plan.persistentIdentity) }
+      for lookup in resource.assessmentLookups(persistentIdentity: plan.persistentIdentity) {
+        var groups: [String: [Int]] = [:]
+        let serverScope = resource.constraint(for: lookup).uniqueWithin == .server
+        for index in evidence.indices where serverScope || selected.contains(index) {
+          if let value = evidence[index].first(where: { $0.lookup == lookup.name })?.value {
+            groups[value, default: []].append(index)
+          }
+        }
+        for (value, indexes) in groups {
+          let visible = indexes.filter { selected.contains($0) }.compactMap { canonicalIndexes[$0] }.map { canonicalRecords[$0] }
+          guard !visible.isEmpty else { continue }
+          let result: MarkdownServerReadLookupResult
+          if indexes.count == 1, let record = visible.first { result = .record(record) }
+          else { result = .conflict(MarkdownServerReadConflict(candidates: Array(visible.prefix(1_000)), totalCandidates: indexes.count)) }
+          resourceSnapshots[resourceIndex].namedLookups[lookup.name, default: [:]][value] = result
+        }
+        for index in selected {
+          guard let path = analyzedRecords[index].record.context.path?.rawValue,
+            let item = evidence[index].first(where: { $0.lookup == lookup.name }) else { continue }
+          resourceSnapshots[resourceIndex].lookupEvidence[path, default: []].append(
+            item.checking(count: item.value.flatMap { groups[$0]?.count } ?? 0)
+          )
+        }
+      }
     }
 
     var logicalPathLookup: [MarkdownRecordPath: [Int]] = [:]

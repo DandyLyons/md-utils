@@ -18,9 +18,14 @@ extension ServerEntry {
     )
     var projectRoot: Path = .current
 
+    @Option(name: .long, help: "Server configuration schema version: 1 or 2.")
+    var schemaVersion = "1"
+
     mutating func run() async throws {
+      guard ["1", "2"].contains(schemaVersion) else { throw ValidationError("schema-version must be 1 or 2") }
       let result = try MarkdownServerConfigurationBootstrapper.initialize(
-        projectRoot: projectRoot
+        projectRoot: projectRoot,
+        schemaVersion: schemaVersion,
       )
       let action = result.configurationCreated
         ? "Initialized server configuration"

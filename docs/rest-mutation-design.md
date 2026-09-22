@@ -4,6 +4,11 @@ Status: design discussion consolidated on 2026-09-21; updated 2026-09-22. This d
 approved behavior and separates remaining proposals. It does not describe shipped
 HTTP mutations or mark issue acceptance criteria complete.
 
+Implementation update: #153's named read lookups and scoped constraint assessment
+use server configuration v2; see [the current read contract](resource-lookups.md).
+Broader mutation examples below remain design material for #82. Current read syntax
+takes precedence over earlier illustrative snippets.
+
 Tracking: [#82](https://github.com/DandyLyons/md-utils/issues/82), within
 [#93](https://github.com/DandyLyons/md-utils/issues/93). Existing contracts:
 [resource mutation planning](resource-mutations.md),

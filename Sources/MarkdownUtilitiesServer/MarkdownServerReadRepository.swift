@@ -89,12 +89,20 @@ public protocol MarkdownServerReadRepository: Sendable {
   func page(resource: String, query: MarkdownServerReadQuery) async throws -> MarkdownServerReadPage
   func lookup(resource: String, identity: MarkdownRecordIdentity) async throws -> MarkdownServerReadLookupResult
   func lookup(path: MarkdownRecordPath) async throws -> MarkdownServerReadLookupResult
+  func lookup(resource: String, lookup: String, value: String) async throws -> MarkdownServerReadLookupResult
+  func lookupEvidence(resource: String, path: MarkdownRecordPath) async throws -> [MarkdownLookupEvidence]
   /// Whether reads are using the last successful publication after a refresh failure.
   func isStale() async -> Bool
 }
 
 extension MarkdownServerReadRepository {
   public func isStale() async -> Bool { false }
+  public func lookup(resource: String, lookup: String, value: String) async throws -> MarkdownServerReadLookupResult {
+    throw MarkdownServerReadError.unavailable
+  }
+  public func lookupEvidence(resource: String, path: MarkdownRecordPath) async throws -> [MarkdownLookupEvidence] {
+    throw MarkdownServerReadError.unavailable
+  }
 }
 
 /// Cursor contents are opaque to clients and bind continuation to an exact query.
@@ -194,6 +202,14 @@ public struct MarkdownSnapshotReadRepository: MarkdownServerReadRepository {
 
   public func lookup(path: MarkdownRecordPath) async throws -> MarkdownServerReadLookupResult {
     snapshot.lookup(logicalPath: path)
+  }
+
+  public func lookup(resource: String, lookup: String, value: String) async throws -> MarkdownServerReadLookupResult {
+    snapshot.resource(named: resource)?.lookup(named: lookup, value: value) ?? .notFound
+  }
+
+  public func lookupEvidence(resource: String, path: MarkdownRecordPath) async throws -> [MarkdownLookupEvidence] {
+    snapshot.resource(named: resource)?.lookupEvidence[path.rawValue] ?? []
   }
 }
 
