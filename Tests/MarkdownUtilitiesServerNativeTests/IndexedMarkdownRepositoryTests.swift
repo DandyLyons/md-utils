@@ -14,6 +14,7 @@ import Testing
 struct IndexedMarkdownRepositoryTests {
   @Test(arguments: [false, true])
   func `named lookups enforce global UUID scope without exposing hidden records`(fts: Bool) async throws {
+    guard #available(macOS 14.0, *) else { return }
     let root = try fixture()
     defer { try? root.delete() }
     try (root + ".md-utils/server/server.yaml").write("""

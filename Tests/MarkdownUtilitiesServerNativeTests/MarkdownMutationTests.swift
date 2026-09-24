@@ -10,7 +10,7 @@ import Testing
 
 @Suite("Native resource mutations")
 struct MarkdownMutationTests {
-  private func fixture() throws -> Path {
+  private func fixture(template: String = "{{ 'Book' | h1 }}\n{{ data.text | bold }}") throws -> Path {
     let root = Path("tmp/mutations/\(UUID().uuidString)/").absolute()
     try (root + ".md-utils/server/").mkpath()
     try (root + "books/").mkpath()
@@ -31,7 +31,7 @@ struct MarkdownMutationTests {
             - {name: uuid, source: persistentIdentity}
           writable:
             codec: {frontmatterFields: [title, subtitle], bodyWritable: true}
-            creation: {template: "# Book\\n{{ data.text }}"}
+            creation: {template: \(String(decoding: try JSONEncoder().encode(template), as: UTF8.self))}
           mutations:
             operations: [create, replace, patch, delete, identity, repairUUID]
             identityFields: [slug]
@@ -44,6 +44,45 @@ struct MarkdownMutationTests {
   }
   private func request(_ operation: MarkdownMutationOperation, _ json: String = "{}") throws -> MarkdownMutationRequest {
     try MarkdownMutationRequest(operation: operation, data: Data(json.utf8))
+  }
+
+  @Test
+  func `template warnings survive durable receipt replay`() async throws {
+    let root = try fixture(template: "# Book\n{{ data.text | date:'YYYY' }}")
+    defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let receipt = try await create(repository)
+    #expect(receipt.state == .completed)
+    #expect(receipt.diagnostics.contains { $0.code == "template.knap.INVALID_FILTER_INPUT" })
+    let restarted = try IndexedMarkdownRepository(projectRoot: root.string)
+    let replay = try await create(restarted)
+    #expect(replay.id == receipt.id)
+    #expect(replay.diagnostics == receipt.diagnostics)
+  }
+
+  @Test
+  func `template errors return structured diagnostics without writing a record`() async throws {
+    guard #available(macOS 14.0, *) else { return }
+    let root = try fixture(template: "# Book\n{{ data.text | nonexistent_filter }}")
+    defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await repository.refresh()
+    let router = Router()
+    try MarkdownServerHTTPAdapter.register(plan: repository.plan, repository: repository, mutations: repository, on: router)
+    let idempotency = try #require(HTTPFields.Element.Name("Idempotency-Key"))
+    try await Application(router: router).test(.router) { client in
+      try await client.execute(uri: "/books", method: .post,
+        headers: [.contentType: "application/json", idempotency: "bad-template"],
+        body: ByteBuffer(string: #"{"frontmatter":{"title":"Dune"},"data":{"text":"Story"}}"#)) { response in
+        #expect(response.status.code == 422)
+        let payload = try JSONDecoder().decode([String: JSONValue].self, from: Data(response.body.readableBytesView))
+        guard case .object(let error) = payload["error"] else { Issue.record("Missing error"); return }
+        #expect(error["code"] == .string("template.template"))
+        guard case .array(let diagnostics) = error["diagnostics"] else { Issue.record("Missing diagnostics"); return }
+        #expect(!diagnostics.isEmpty)
+      }
+    }
+    #expect(try (root + "books/").children().isEmpty)
   }
   private func create(_ repository: IndexedMarkdownRepository, title: String = "Dune", key: String = "one") async throws -> MarkdownMutationReceipt {
     let payload: [String: JSONValue] = ["frontmatter": .object(["title": .string(title)]), "data": .object(["text": .string("Story")])]
@@ -61,6 +100,7 @@ struct MarkdownMutationTests {
     let repository = try IndexedMarkdownRepository(projectRoot: root.string)
     let created = try await create(repository, title: "Dune — Notes")
     #expect(created.state == .completed)
+    #expect(try (root + created.path.rawValue).read(.utf8).contains("# Book\n**Story**"))
     #expect(created.path.rawValue == "books/Dune — Notes.md")
     #expect(created.record?.frontmatter?["slug"] == .string("dune-notes"))
     let uuid = try #require(created.record?.frontmatter?["uuid"])
@@ -130,6 +170,7 @@ struct MarkdownMutationTests {
   }
 
   @Test func httpContracts() async throws {
+    guard #available(macOS 14.0, *) else { return }
     let root = try fixture(); defer { try? root.delete() }
     let repository = try IndexedMarkdownRepository(projectRoot: root.string)
     let created = try await create(repository)
@@ -262,6 +303,7 @@ struct MarkdownMutationTests {
   }
 
   @Test func httpWriteAndNamedLookup() async throws {
+    guard #available(macOS 14.0, *) else { return }
     let root = try fixture(); defer { try? root.delete() }
     let repository = try IndexedMarkdownRepository(projectRoot: root.string)
     try await repository.refresh()

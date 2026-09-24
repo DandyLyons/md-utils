@@ -40,7 +40,7 @@ FTS5 must be enabled in the runtime build when search is used. [SQLite JSON](htt
 | Platform or product | Policy |
 | --- | --- |
 | Native index, macOS 13+ | Use system SQLite with mandatory capability probes. Local validation uses macOS 27 arm64, not every older OS. |
-| Native index, Linux | Use distribution SQLite. Ubuntu Noble with Swift 6.2 is the reference container; CI covers x86_64 and local Docker validation covers arm64. Other distributions require validation. |
+| Native index, Linux | Use distribution SQLite. Ubuntu Noble with Swift 6.3 is the reference container; CI covers x86_64 and local Docker validation covers arm64. Other distributions require validation. |
 | iOS 16+, tvOS 16+, watchOS 9+, Mac Catalyst 16+ | Package minimums are unchanged. The prototype has not validated these SDKs/runtimes; do not infer index support from the manifest alone. |
 | Windows, Android | Not supported by this prototype. |
 | `MarkdownUtilitiesCore` and Core WASM smoke | No dependency path to GRDB or SQLite. |

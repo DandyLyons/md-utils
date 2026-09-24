@@ -49,16 +49,16 @@ permissions:
 jobs:
   native-server:
     runs-on: ubuntu-latest
-    container: swift:6.2-noble
+    container: swift:6.3.1-noble
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
       - name: Build native server
-        run: apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev && swift build --product md-utils-server
+        run: apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev libjavascriptcoregtk-4.1-dev pkg-config && swift build --product md-utils-server
 
       - name: Test indexed native server
-        run: swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownTemplateRendererTests|TemplateTests'
+        run: swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownUtilitiesTemplatesTests|TemplateTests'
 
       - name: Run native server route smoke test
         run: swift run MarkdownUtilitiesServerLinuxSmoke

@@ -42,7 +42,7 @@ Directory paths in the table are relative to `Sources/MarkdownUtilitiesCore/`, `
 
 Rule modification dates are explicit `MarkdownRecordContext` input. Native adapters may acquire them from a filesystem, but Core never reads host metadata. A server or WebAssembly host must supply the capability and per-record timestamp or rule compilation/assessment fails explicitly.
 
-Linux verification uses Swift 6.2 in `Dockerfile.core-linux`. A successful image build runs `swift build --target MarkdownUtilitiesCore`, then runs the isolated `IntegrationTests/LinuxCoreSmoke/` executable against Core. The full focused `MarkdownUtilitiesCoreTests` target remains part of `swift test`; SwiftPM test filtering cannot avoid compiling unrelated package test targets.
+Linux verification uses Swift 6.3 in `Dockerfile.core-linux`. A successful image build runs `swift build --target MarkdownUtilitiesCore`, then runs the isolated `IntegrationTests/LinuxCoreSmoke/` executable against Core. The full focused `MarkdownUtilitiesCoreTests` target remains part of `swift test`; SwiftPM test filtering cannot avoid compiling unrelated package test targets.
 
 The Core schema adapter performs no implicit retrieval. A caller supplies `MarkdownSchemaResourceProvider`; registry construction resolves and caches the immutable graph, rewrites external references to canonical resource identifiers, and rejects missing resources, cycles, and conflicting `$id` values before assessment. The current JSONSchema dependency passes the package's draft 2020-12 `const`, `contains`, `allOf`, required-property, and nested-reference coverage on macOS, compiles in the Linux Core container, and performs representative draft 2020-12 assessment in the WASI smoke target.
 

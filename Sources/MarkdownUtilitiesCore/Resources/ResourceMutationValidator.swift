@@ -86,7 +86,7 @@ public struct ResourceMutationValidator: Sendable {
     if let original = proposal.original {
       before = await MarkdownRecordAnalyzer.analyze(original)
     } else { before = nil }
-    var diagnostics = after.parseDiagnostics
+    var diagnostics = proposal.diagnostics + after.parseDiagnostics
     // Failure to establish the baseline must not silently weaken preservation.
     diagnostics.append(contentsOf: before?.parseDiagnostics ?? [])
     var changes: [ResourceConformanceChange] = []

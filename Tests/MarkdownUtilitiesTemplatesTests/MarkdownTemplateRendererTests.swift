@@ -3,7 +3,7 @@ import MarkdownUtilitiesCore
 import MarkdownUtilitiesTemplates
 import Testing
 
-@Suite("Single-document Stencil prototype")
+@Suite("Single-document Knap rendering")
 struct MarkdownTemplateRendererTests {
   @Test
   func `Yams preserves explicit JSON values and strings requiring quoting`() async throws {
@@ -50,12 +50,12 @@ struct MarkdownTemplateRendererTests {
   }
 
   @Test
-  func `loops conditions empty states and scalar roots use Stencil syntax`() async throws {
+  func `loops conditions empty states and scalar roots use Knap syntax`() async throws {
     let renderer = MarkdownTemplateRenderer()
-    let template = "{% for item in data %}- {{ item }}\n{% empty %}No items.{% endfor %}"
+    let template = "{% if data %}{% for item in data %}- {{ item }}\n{% endfor %}{% else %}No items.{% endif %}"
     let populated = try await renderer.render(template: template,
       input: .init(data: .array([.string("A"), .string("B")])))
-    #expect(populated.source == "- A\n- B\n")
+    #expect(populated.source == "- A\n- B")
     let empty = try await renderer.render(template: template, input: .init(data: .array([])))
     #expect(empty.source == "No items.")
     let scalar = try await renderer.render(template: "{% if data %}{{ data }}{% endif %}",
@@ -91,8 +91,8 @@ struct MarkdownTemplateRendererTests {
     }
   }
 
-  @Test(arguments: ["{% include \"secret.stencil\" %}", "{% extends \"base.stencil\" %}", "{% unknown %}"])
-  func `external templates and invalid syntax fail`(template: String) async throws {
+  @Test(arguments: ["{% unknown %}", "{% if data %}", "{{ data | nonexistent_filter }}"])
+  func `invalid syntax and unknown filters fail`(template: String) async throws {
     do {
       _ = try await MarkdownTemplateRenderer().render(template: template, input: .init(data: .null))
       Issue.record("Expected template failure")
@@ -117,23 +117,23 @@ struct MarkdownTemplateRendererTests {
   }
 
   @Test
-  func `missing null and empty values retain the documented prototype semantics`() async throws {
+  func `missing null and empty values use Knap fallbacks`() async throws {
     let result = try await MarkdownTemplateRenderer().render(
-      template: "{{ data.missing|default:'fallback' }}|{{ data.null }}|{{ data.empty }}|{% if data.null %}present{% endif %}",
+      template: "{{ data.missing ?? 'fallback' }}|{{ data.null }}|{{ data.empty }}|{% if data.null %}present{% endif %}",
       input: .init(data: .object(["null": .null, "empty": .string("")])))
     #expect(result.source == "fallback|||")
   }
 
   @Test
-  func `null normalization preserves nested array positions schema values and YAML`() async throws {
+  func `typed null preserves nested array positions schema values and YAML`() async throws {
     let schema = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"type":"object","properties":{"frontmatter":{"type":"object","required":["value"],"properties":{"value":{"type":"null"}}}}}"#.utf8))
     let result = try await MarkdownTemplateRenderer().render(
-      template: "{{ frontmatter.value }}{% if frontmatter.value %}wrong{% endif %}|{% for item in data %}[{{ item.value }}]{% endfor %}|{{ data.count }}",
+      template: "{{ frontmatter.value }}{% if frontmatter.value %}wrong{% endif %}|{% for item in data %}[{{ item.value }}]{% endfor %}|{{ data | length }}",
       input: .init(frontmatter: ["value": .null], data: .array([
         .object(["value": .string("A")]), .null, .object(["value": .null]),
-        .object(["value": .string("B")])
+        .object(["value": .string("B")]),
       ])), schema: schema)
-    #expect(result.source.hasSuffix("|[A][][][B]|4"))
+    #expect(result.source.hasSuffix("|[A]\n[]\n[]\n[B]|4"))
     #expect(result.document.frontMatter["value"] == .null)
     let root = try await MarkdownTemplateRenderer().render(
       template: "{{ data }}{% if data %}wrong{% endif %}", input: .init(data: .null))

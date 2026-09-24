@@ -25,7 +25,7 @@ tree:
     types:
       _doc: Project Markdown type definitions using the mdtype compound extensions.
   AGENTS.md: Agent-facing project instructions, architecture notes, and workflow rules.
-  Dockerfile.core-linux: Swift 6.2 Linux build and smoke-test definition for MarkdownUtilitiesCore.
+  Dockerfile.core-linux: Swift 6.3 Linux build and smoke-test definition for MarkdownUtilitiesCore.
   IntegrationTests:
     _doc: Standalone packages that validate md-utils products as external consumers.
     LinuxCoreSmoke:

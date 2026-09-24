@@ -1,6 +1,7 @@
 import Foundation
 import Hummingbird
 import MarkdownUtilitiesCore
+import MarkdownUtilitiesTemplates
 
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, *)
 enum MarkdownMutationHTTP {
@@ -88,6 +89,8 @@ enum MarkdownMutationHTTP {
     switch error {
     case let value as MarkdownMutationError: problem = value
     case let value as ResourceCodecError: problem = .init(422, value.diagnostic.code, value.localizedDescription, diagnostics: [value.diagnostic])
+    case let value as MarkdownTemplateError:
+      problem = .init(422, "template.\(value.stage.rawValue)", value.localizedDescription, diagnostics: value.diagnostics)
     case let value as MarkdownSlugGenerator.Failure: problem = .init(422, "slug.invalid", value.localizedDescription)
     case is DecodingError: problem = .init(400, "request.invalid", "Malformed request envelope.")
     case let value as any HTTPResponseError: problem = .init(value.status.code, "request.body", "Request body exceeds the limit or cannot be read.")

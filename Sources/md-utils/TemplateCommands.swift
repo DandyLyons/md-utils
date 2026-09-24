@@ -7,16 +7,16 @@ extension CLIEntry {
   struct TemplateCommands: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "template",
-      abstract: "Render a Stencil body with explicit YAML frontmatter (prototype).",
-      subcommands: [Render.self]
+      abstract: "Render a Knap body with explicit YAML frontmatter.",
+      subcommands: [Render.self],
     )
 
     struct Render: AsyncParsableCommand {
       static let configuration = CommandConfiguration(
-        abstract: "Render and validate one document before writing it."
+        abstract: "Render and validate one document before writing it.",
       )
 
-      @Option(help: "Self-contained Stencil body template file.")
+      @Option(help: "Knap body template file (.knap or .knap.md recommended).")
       var template: String
 
       @Option(help: "JSON envelope containing data and an optional frontmatter object.")
@@ -47,6 +47,10 @@ extension CLIEntry {
         }
         let result = try await MarkdownTemplateRenderer(limits: limits)
           .render(template: source, input: input, schema: inputSchema)
+        for warning in result.warnings {
+          try FileHandle.standardError.write(contentsOf:
+            Data("Warning \(warning.location) [\(warning.code)]: \(warning.message)\n".utf8))
+        }
         if let output {
           try result.source.write(toFile: output, atomically: true, encoding: .utf8)
         } else {

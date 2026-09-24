@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.3
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -35,7 +35,7 @@ let package = Package(
     ),
   ],
   dependencies: [
-    .package(url: "https://github.com/stencilproject/Stencil.git", from: "0.15.1"),
+    .package(url: "https://github.com/DandyLyons/SwiftKnap.git", revision: "5972f60343683b3d5d7dd3ab0edf2b35085c542f"),
     .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.11.1"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "4.5.1"),
     .package(url: "https://github.com/apple/swift-system", from: "1.8.1"),
@@ -61,10 +61,10 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.0"),
   ],
   targets: [
-    // Stencil stays outside Core and its WebAssembly dependency graph.
+    // SwiftKnap stays outside Core and its WebAssembly dependency graph.
     .target(name: "MarkdownUtilitiesTemplates", dependencies: [
       "MarkdownUtilitiesCore", "Yams",
-      .product(name: "Stencil", package: "Stencil"),
+      .product(name: "SwiftKnap", package: "SwiftKnap"),
       .product(name: "JSONSchema", package: "JSONSchema.swift"),
       .product(name: "Parsing", package: "swift-parsing"),
     ]),
@@ -86,7 +86,7 @@ let package = Package(
     ]),
     .target(name: "MarkdownUtilitiesServerNative", dependencies: [
       .product(name: "SystemPackage", package: "swift-system"),
-      "MarkdownUtilitiesServer", "MarkdownUtilitiesIndexNative", "MarkdownUtilitiesIndex",
+      "MarkdownUtilitiesServer", "MarkdownUtilitiesIndexNative", "MarkdownUtilitiesIndex", "MarkdownUtilitiesTemplates",
       .product(name: "GRDB", package: "GRDB.swift"),
       .product(name: "PathKit", package: "PathKit"),
     ]),
