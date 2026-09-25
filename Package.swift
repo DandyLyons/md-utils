@@ -187,6 +187,7 @@ let package = Package(
     .testTarget(
       name: "MarkdownUtilitiesServerTests",
       dependencies: [
+        .product(name: "JSONSchema", package: "JSONSchema.swift"),
         "MarkdownUtilitiesCore",
         "MarkdownUtilitiesServer",
         .product(name: "Hummingbird", package: "hummingbird"),

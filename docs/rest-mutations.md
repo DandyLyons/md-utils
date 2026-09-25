@@ -39,8 +39,9 @@ resources:
 `operations` declares reads; `mutations.operations` independently enables writes.
 Declaring a writable codec alone does not install write routes. All writes use the
 existing bounded native index and authoritative files; no second corpus cache is
-created. The existing generated OpenAPI explicitly labels itself **read-only**;
-mutation OpenAPI remains #108.
+created. Generated OpenAPI includes every configured mutation, named/path alias,
+operation-status route, and recovery route from the same endpoint plan. Read-only
+resources advertise no mutation operations.
 
 ## Requests and revisions
 
