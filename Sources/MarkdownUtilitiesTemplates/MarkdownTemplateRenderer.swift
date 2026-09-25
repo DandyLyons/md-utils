@@ -2,6 +2,7 @@ import Foundation
 import JSONSchema
 import MarkdownUtilitiesCore
 import Parsing
+import SwiftKnap
 import Yams
 
 /// Explicit frontmatter and body data for a single generated document.
@@ -43,7 +44,7 @@ public struct MarkdownTemplateLimits: Sendable {
   public init(
     templateBytes: Int = 16 * 1_024 * 1_024,
     inputBytes: Int = 64 * 1_024 * 1_024,
-    outputBytes: Int = 64 * 1_024 * 1_024
+    outputBytes: Int = 64 * 1_024 * 1_024,
   ) {
     self.templateBytes = templateBytes
     self.inputBytes = inputBytes
@@ -58,11 +59,14 @@ public struct MarkdownTemplateError: Error, LocalizedError, Sendable {
   }
   public let stage: Stage
   public let message: String
+  /// Knap codes and template positions, when the failure came from rendering.
+  public let diagnostics: [MarkdownDiagnostic]
   public var errorDescription: String? { "Template \(stage.rawValue): \(message)" }
 
-  public init(stage: Stage, message: String) {
+  public init(stage: Stage, message: String, diagnostics: [MarkdownDiagnostic] = []) {
     self.stage = stage
     self.message = message
+    self.diagnostics = diagnostics
   }
 }
 
@@ -70,24 +74,29 @@ public struct MarkdownTemplateError: Error, LocalizedError, Sendable {
 public struct RenderedMarkdownTemplate: Sendable {
   public let source: String
   public let document: MarkdownDocument
+  /// Nonfatal Knap diagnostics; callers should surface them alongside the output.
+  public let warnings: [MarkdownDiagnostic]
 }
 
-/// Renders a self-contained Stencil body and serializes explicit YAML frontmatter.
+/// Renders a Knap body and serializes explicit YAML frontmatter.
 ///
 /// This service performs no filesystem access or persistence. Server callers must supply
 /// administrator-configured templates. Resource codecs remain responsible for record
 /// identity, type/rule reassessment, and persistence.
 public struct MarkdownTemplateRenderer: Sendable {
   public let limits: MarkdownTemplateLimits
+  /// Per-call execution limits; unspecified values use SwiftKnap's finite defaults.
+  public let renderLimits: RenderLimits
 
-  public init(limits: MarkdownTemplateLimits = .init()) {
+  public init(limits: MarkdownTemplateLimits = .init(), renderLimits: RenderLimits = .init()) {
     self.limits = limits
+    self.renderLimits = renderLimits
   }
 
   public func render(
     template: String,
     input: MarkdownTemplateInput,
-    schema: JSONValue? = nil
+    schema: JSONValue? = nil,
   ) async throws -> RenderedMarkdownTemplate {
     guard limits.templateBytes > 0, limits.inputBytes > 0, limits.outputBytes > 0 else {
       throw MarkdownTemplateError(stage: .input, message: "Byte limits must be positive.")
@@ -122,7 +131,16 @@ public struct MarkdownTemplateRenderer: Sendable {
     }
 
     try rejectFrontmatter(in: template)
-    let body = try StencilRenderingAdapter.render(template, context: input.context)
+    // Cancellation and SwiftKnap runtime failures propagate; they are not invalid
+    // template input and must not be reported as HTTP validation failures.
+    let rendered = try await KnapRendering.shared.render(template, input: input, limits: renderLimits)
+    let diagnostics = rendered.errors.map { KnapRendering.diagnostic($0, severity: .error) }
+    guard diagnostics.isEmpty else {
+      throw MarkdownTemplateError(stage: .template,
+        message: diagnostics.map { "\($0.location) [\($0.code)]: \($0.message)" }.joined(separator: "\n"),
+        diagnostics: diagnostics)
+    }
+    let body = rendered.output
     try checkSize(body.utf8.count, limit: limits.outputBytes, stage: .output)
     // Values and conditionals can introduce a block even when the source had none.
     try rejectFrontmatter(in: body)
@@ -145,7 +163,8 @@ public struct MarkdownTemplateRenderer: Sendable {
         throw MarkdownTemplateError(stage: .output, message: "Generated document boundaries changed during parsing.")
       }
       _ = try await document.parseAST()
-      return RenderedMarkdownTemplate(source: source, document: document)
+      return RenderedMarkdownTemplate(source: source, document: document,
+        warnings: rendered.warnings.map { KnapRendering.diagnostic($0, severity: .advisory) })
     } catch let error as MarkdownTemplateError { throw error }
     catch { throw MarkdownTemplateError(stage: .output, message: String(describing: error)) }
   }

@@ -34,7 +34,7 @@ for source, destination in [
 (work / "Sources/Baseline/main.swift").write_text(
     'import GRDBSQLite\nprint("System SQLite \\(String(cString: sqlite3_libversion()))")\n'
 )
-(work / "Package.swift").write_text('''// swift-tools-version: 6.2
+(work / "Package.swift").write_text('''// swift-tools-version: 6.3
 import PackageDescription
 let package = Package(
     name: "SQLiteMeasurement",

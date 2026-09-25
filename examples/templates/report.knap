@@ -1,0 +1,5 @@
+{{ frontmatter.title | h1 }}
+
+{{ data.summary }}
+
+{% if data.regions %}{{ data.regions | table }}{% else %}No regions.{% endif %}

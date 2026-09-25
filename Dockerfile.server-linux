@@ -1,6 +1,6 @@
-FROM swift:6.2-noble
+FROM swift:6.3.1-noble AS build
 
-RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev libjavascriptcoregtk-4.1-dev pkg-config && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/
 
@@ -11,4 +11,17 @@ COPY . .
 
 RUN swift build --product md-utils-server
 RUN swift run MarkdownUtilitiesServerLinuxSmoke
-RUN swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownTemplateRendererTests|TemplateTests'
+RUN swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownUtilitiesTemplatesTests|TemplateTests'
+
+# Verify installed release executables can locate their SwiftPM resource bundles.
+RUN swift build -c release --product md-utils && swift build -c release --product md-utils-server
+RUN mkdir -p /opt/md-utils/ && cp .build/release/md-utils .build/release/md-utils-server /opt/md-utils/ && cp -R .build/release/*.resources /opt/md-utils/
+
+# A fresh runtime image prevents resource lookup falling back to the build tree.
+FROM swift:6.3.1-noble
+RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-0 libjavascriptcoregtk-4.1-0 && rm -rf /var/lib/apt/lists/*
+COPY --from=build /opt/md-utils/ /opt/md-utils/
+COPY examples/templates/ /opt/md-utils/examples/
+WORKDIR /opt/md-utils/
+RUN ./md-utils template render --template ./examples/report.knap --data ./examples/report.json --output ./report.md && test -s ./report.md
+RUN ./md-utils-server --help

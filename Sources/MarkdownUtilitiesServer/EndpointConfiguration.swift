@@ -5,8 +5,8 @@ import MarkdownUtilitiesCore
 public enum MarkdownServerConfigurationSchemaVersion {
   /// The default schema used for backward-compatible empty configurations.
   public static let current = "1"
-  /// Named lookups require explicit version 2 configuration.
-  public static let latest = "2"
+  /// Mutations require version 3; named read lookups are also supported by version 2.
+  public static let latest = "3"
 }
 
 /// Explicit, opt-in server resource configuration.
@@ -146,6 +146,7 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
   public let constraints: [MarkdownLookupConstraint]
   /// Optional explicit writable contract; does not enable HTTP mutation routes.
   public let writable: WritableResourceConfiguration?
+  public let mutations: MarkdownMutationConfiguration?
   /// Explicit opt-in to native FTS queries. The cache must already enable FTS.
   public let searchEnabled: Bool
   /// Stable, case-sensitive name used to identify this resource in a plan.
@@ -189,6 +190,7 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
     operationIDOverrides: [MarkdownOperationIDOverride] = [],
     searchEnabled: Bool = false,
     writable: WritableResourceConfiguration? = nil,
+    mutations: MarkdownMutationConfiguration? = nil,
     lookups: [MarkdownResourceLookup] = [],
     constraints: [MarkdownLookupConstraint] = [],
   ) {
@@ -196,6 +198,7 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
     self.constraints = constraints
     self.name = name
     self.writable = writable
+    self.mutations = mutations
     self.searchEnabled = searchEnabled
     self.route = route
     self.operations = operations
@@ -216,6 +219,7 @@ public struct MarkdownResourceConfiguration: Codable, Equatable, Sendable {
       operationIDOverrides: try values.decodeIfPresent([MarkdownOperationIDOverride].self, forKey: .operationIDOverrides) ?? [],
       searchEnabled: try values.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false,
       writable: try values.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable),
+      mutations: try values.decodeIfPresent(MarkdownMutationConfiguration.self, forKey: .mutations),
       lookups: try values.decodeIfPresent([MarkdownResourceLookup].self, forKey: .lookups) ?? [],
       constraints: try values.decodeIfPresent([MarkdownLookupConstraint].self, forKey: .constraints) ?? [],
     )

@@ -71,9 +71,9 @@ private func selectAll(_ scope: IndexScope, _ path: String, _ content: String, _
                 """)
         }
         try await fixture.database.rebuildAsText(root: fixture.root.path,
-            scratchDirectory: fixture.root.appendingPathComponent("scratch/")) { copy in
+            scratchDirectory: fixture.root.appendingPathComponent("scratch/")) { copy, lease in
             let indexer = try CollectionIndexer(database: copy, root: fixture.root)
-            _ = try await indexer.update(fingerprint: "v1", rebuild: true, evaluate: selectAll)
+            _ = try await indexer.update(writerLease: lease, fingerprint: "v1", rebuild: true, evaluate: selectAll)
         }
         #expect(try fixture.database.storagePolicy().metadataEncoding == .text)
         #expect(try fixture.database.scopes() == [IndexScope(path: "notes/")])
@@ -109,7 +109,7 @@ private func selectAll(_ scope: IndexScope, _ path: String, _ content: String, _
         let policy = try fixture.database.storagePolicy()
         await #expect(throws: CancellationError.self) {
             try await fixture.database.rebuildAsText(root: fixture.root.path,
-                scratchDirectory: fixture.root.appendingPathComponent("scratch/")) { _ in
+                scratchDirectory: fixture.root.appendingPathComponent("scratch/")) { _, _ in
                 throw CancellationError()
             }
         }
@@ -125,7 +125,7 @@ private func selectAll(_ scope: IndexScope, _ path: String, _ content: String, _
         let other = try DatabaseQueue(path: fixture.root.appendingPathComponent("index.sqlite").path)
         await #expect(throws: SQLiteIndexError.self) {
             try await fixture.database.rebuildAsText(root: fixture.root.path,
-                scratchDirectory: fixture.root.appendingPathComponent("scratch/")) { _ in
+                scratchDirectory: fixture.root.appendingPathComponent("scratch/")) { _, _ in
                 do {
                     try await other.write { try $0.execute(sql: "UPDATE index_metadata SET value='100' WHERE key='generation'") }
                     Issue.record("Other connection unexpectedly wrote during recovery")

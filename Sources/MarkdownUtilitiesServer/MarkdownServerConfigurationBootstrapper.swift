@@ -25,7 +25,7 @@ public enum MarkdownServerConfigurationSchema {
 
   /// Returns the complete bundled JSON Schema.
   public static func content(version: String = "1") throws -> String {
-    guard ["1", "2"].contains(version) else { throw CocoaError(.fileReadUnsupportedScheme) }
+    guard ["1", "2", "3"].contains(version) else { throw CocoaError(.fileReadUnsupportedScheme) }
     guard let url = Bundle.module.url(
       forResource: "\(version)_server.schema",
       withExtension: "json"

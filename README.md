@@ -94,7 +94,7 @@ import MarkdownUtilities
 
 ### Linux Validation
 
-Core is tested with Swift 6.2 on Linux in Docker:
+Core is tested with Swift 6.3 on Linux in Docker:
 
 ```bash
 docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
@@ -110,9 +110,10 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 
 ### Implemented
 
-- **Template Rendering Prototype** — Render a Stencil body with explicit YAML frontmatter from JSON; see the [Stencil user guide](Sources/MarkdownUtilitiesTemplates/Documentation.docc/RenderingMarkdownWithStencil.md) and [implementation notes](docs/template-rendering.md).
+- **Knap Templates** — Render Markdown using SwiftKnap with explicit YAML frontmatter from JSON; see the [Knap user guide](Sources/MarkdownUtilitiesTemplates/Documentation.docc/RenderingMarkdownWithKnap.md) and [implementation notes](docs/template-rendering.md).
 - **Table of Contents** — Generate TOC with multiple output formats (Markdown, JSON, plain text, HTML)
 - **Slug generation** — `md-utils slug 'My Title'` generates a candidate without changing files or guaranteeing uniqueness; see [slug policies and API](docs/slug-generation.md).
+- **REST mutations** — Opt-in server config v3 provides revision-checked CRUD, explicit identity edits, UUID repair, and durable retry/recovery. See [requests and configuration](docs/rest-mutations.md).
 - **Heading Manipulation** — Promote/demote headings while maintaining nested structure
 - **Section Operations** — Extract sections by name or index; reorder sections (move up/down/to position)
 - **Content Selection** — Extract body without frontmatter, select by line range, extract by section
@@ -645,7 +646,7 @@ docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 
 ## Architecture
 
-- **Swift 6.2** or later
+- **Swift 6.3** or later
 - **MarkdownUtilitiesCore** for portable content operations on Apple platforms, Linux, and WebAssembly
 - **MarkdownUtilities** for native filesystem and metadata integrations
 - **MarkdownUtilitiesServer** for immutable server planning, snapshots, and Hummingbird 2 routes
@@ -665,12 +666,18 @@ docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 - [swift-toml](https://github.com/mattt/swift-toml) — TOML parsing and serialization
 - [jmespath.swift](https://github.com/nicktmro/jmespath.swift) — JMESPath query language for JSON
 - [Hummingbird 2](https://github.com/hummingbird-project/hummingbird) — Native HTTP routing and lifecycle
+- [SwiftKnap](https://github.com/DandyLyons/SwiftKnap) — Knap template rendering on macOS and Linux
 - [OpenAPIKit](https://github.com/mattpolzin/OpenAPIKit) — OpenAPI 3.1 decoding and strict contract validation
 
 ## Platform Compatibility
 **macOS** is the primary development and testing platform. Core, native integrations, and the CLI are covered by the full Swift test suite.
 
-**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.2 using `Dockerfile.core-linux`. The native read-only server is separately built and tested with `Dockerfile.server-linux`. The complete `MarkdownUtilities` and `md-utils` CLI layers are not covered by the Core guarantee.
+**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.3 using `Dockerfile.core-linux`. The native read-only server is separately built and tested with `Dockerfile.server-linux`. The complete `MarkdownUtilities` and `md-utils` CLI layers are not covered by the Core guarantee.
+
+Template rendering uses SwiftKnap on macOS and Linux. Ubuntu 24.04 builds of the CLI
+and server require `libjavascriptcoregtk-4.1-dev` and `pkg-config`; deployment requires
+`libjavascriptcoregtk-4.1-0` and the SwiftPM resource bundles. See
+[template rendering and distribution requirements](docs/template-rendering.md).
 
 **WebAssembly**: `MarkdownUtilitiesCore` is supported with the official Swift 6.3.1 WASI SDK. Run `scripts/build-wasm.sh` to compile Core and execute the root-package smoke target under WasmKit. See [WebAssembly Support](docs/webassembly.md) for SDK installation, dependency compatibility patches, artifact location, and current scope.
 

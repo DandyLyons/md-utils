@@ -17,7 +17,7 @@ struct ResourceMutationPlannerTests {
       selection: .ruleWithExpectedType(rule: "books", expectedType: .init(rawValue: "Book")),
       identityPolicy: .init(source: .frontmatter(path: ["id"], format: .string)),
       writable: writable ? .init(codec: .init(frontmatterFields: fields, bodyWritable: true),
-        creation: .init(template: "# Book\n{{ data.description }}")) : nil)
+        creation: .init(template: "{{ 'Book' | h1 }}\n{{ data.description }}")) : nil)
   }
 
   private func compiler() throws -> EndpointPlanCompiler {

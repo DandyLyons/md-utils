@@ -18,7 +18,7 @@ public struct TemplateResourceCreationCodec: Sendable {
     input: MarkdownTemplateInput,
     identity: MarkdownRecordIdentity,
     context: MarkdownRecordContext = .init(),
-    protectedFrontmatter: [String: JSONValue] = [:]
+    protectedFrontmatter: [String: JSONValue] = [:],
   ) async throws -> ResourceMutationProposal {
     try MarkdownResourceCodec.validatePath(context.path)
     try codec.validateFields((input.frontmatter ?? [:]).keys)
@@ -33,6 +33,6 @@ public struct TemplateResourceCreationCodec: Sendable {
       input: MarkdownTemplateInput(frontmatter: input.frontmatter == nil && values.isEmpty ? nil : values,
         data: input.data), schema: template.inputSchema)
     return try ResourceMutationProposal(created: MarkdownRecord(identity: identity,
-      content: rendered.source, context: context))
+      content: rendered.source, context: context), diagnostics: rendered.warnings)
   }
 }

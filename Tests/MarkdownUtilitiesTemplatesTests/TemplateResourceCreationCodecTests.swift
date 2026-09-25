@@ -4,10 +4,26 @@ import MarkdownUtilitiesCore
 
 @Suite("Template resource creation")
 struct TemplateResourceCreationCodecTests {
+  @Test
+  func `creation warnings survive conformance validation`() async throws {
+    let codec = TemplateResourceCreationCodec(
+      codec: try MarkdownResourceCodec(configuration: .init(frontmatterFields: [], bodyWritable: true)),
+      template: .init(template: "# Book\n{{ data | date:\"YYYY\" }}"),
+    )
+    let proposal = try await codec.plan(input: .init(data: .string("not-a-date")), identity: .init(rawValue: "17"))
+    let rules = try MarkdownRuleCompiler().compile([
+      .init(name: "book"),
+    ])
+    let validation = try await ResourceMutationValidator(types: .init(definitions: []), rules: rules)
+      .validate(proposal, destination: .init(rule: "book"))
+    #expect(validation.isValid)
+    #expect(validation.diagnostics.contains { $0.code == "template.knap.INVALID_FILTER_INPUT" && $0.severity == .advisory })
+  }
+
   private func creator(schema: JSONValue? = nil) throws -> TemplateResourceCreationCodec {
     TemplateResourceCreationCodec(codec: try MarkdownResourceCodec(configuration: .init(
       frontmatterFields: ["title"], bodyWritable: true, protectedFields: ["id"])),
-      template: .init(template: "# Book\n\n{{ data.description }}\n", inputSchema: schema))
+      template: .init(template: "{{ \"Book\" | h1 }}\n\n{{ data.description }}\n", inputSchema: schema))
   }
 
   @Test

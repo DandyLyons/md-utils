@@ -1,96 +1,90 @@
-# Template rendering prototype (#31)
+# Knap template rendering
 
-The [writable resource planning contract](resource-mutations.md) consumes this renderer
-for creation through `TemplateResourceCreationCodec`. Replacement and patching use
-separate codecs and never rerender creation templates.
-
-For a task-oriented introduction, read the [Stencil user guide](../Sources/MarkdownUtilitiesTemplates/Documentation.docc/RenderingMarkdownWithStencil.md).
-It is also the User guide topic in the `MarkdownUtilitiesTemplates` DocC catalog.
-
-`MarkdownUtilitiesTemplates` supplies single-document rendering for the CLI and
-future #90 resource codecs. Stencil renders the body; Yams serializes an explicit
-frontmatter object. No template is responsible for YAML quoting or delimiters.
+`MarkdownUtilitiesTemplates` uses [SwiftKnap](https://github.com/DandyLyons/SwiftKnap)
+for single-document Markdown generation. The CLI and server creation codec share
+this implementation. SwiftKnap owns execution and platform support; md-utils uses
+only its Swift API. Core/WASM does not depend on SwiftKnap.
 
 ```console
-swift run md-utils template render --template ./examples/templates/report.stencil --data ./examples/templates/report.json
-swift run md-utils template render --template ./examples/templates/report.stencil --data ./examples/templates/report.json --output ./tmp/report.md
+swift run md-utils template render --template ./examples/templates/report.knap --data ./examples/templates/report.json
+swift run md-utils template render --template ./examples/templates/report.knap --data ./examples/templates/report.json --output ./tmp/report.md
 ```
 
+See the [Knap guide](../Sources/MarkdownUtilitiesTemplates/Documentation.docc/RenderingMarkdownWithKnap.md).
+
+## Document contract
+
 Input is a JSON envelope with required `data` (any JSON value) and optional
-`frontmatter` (an object). Omission produces no block, `{}` produces an empty YAML
-block, and explicit `null` for the frontmatter object is rejected. Null values
-inside the object are supported. Both variables are available in the body template.
-An optional `--schema` JSON Schema validates the entire envelope before rendering.
-Schemas validate supplied values; they do not populate defaults or map fields.
+`frontmatter` (an object). Both are template variables. Omission produces no
+frontmatter block; `{}` produces an empty YAML block; explicit null frontmatter
+is rejected. Nested null values are preserved. Optional `--schema` validates the
+complete envelope before rendering and never supplies defaults.
 
-The library accepts `MarkdownTemplateInput` containing existing Core `JSONValue`
-values. `MarkdownTemplateRenderer.render(template:input:schema:)` returns exact
-assembled source and a parsed `MarkdownDocument`; it also parses the body AST.
-The library has no filesystem, HTTP, or SQLite operations. A private adapter is
-the only place that imports Stencil. Stencil is outside Core and its WASM graph;
-WebAssembly support is deferred, not assumed. Native platform validation remains
-necessary before treating this prototype as the completed #31 foundation.
+Knap renders the body; Yams serializes frontmatter with sorted keys and typed
+values. Templates and rendered bodies cannot start with YAML/TOML frontmatter
+delimiters, including CRLF/BOM forms. Use `***` for a leading horizontal rule.
+The assembled document is parsed and verified before output or persistence.
 
-CLI callers choose their own templates. Server administrators must choose templates;
-request data must never select template source or host paths. No template loader
-is installed: executed includes or inheritance requiring another template fail.
+CLI output supports stdout or an explicit `.md`/`.markdown` file. Existing files
+are replaced atomically only after successful validation; parent directories must
+exist. Non-Markdown output remains unsupported (future host support is #134).
 
-## Rendering behavior and limits
+Server templates are administrator-owned; requests supply data, never template
+source or host paths. Creation protects host metadata and the mutation service
+validates the complete proposal before committing. Replace/patch never rerender
+templates. See [resource mutations](resource-mutations.md).
 
-- Frontmatter keys are serialized in sorted order with Yams' Codable encoder.
-  Values retain their structured types; callers do not pre-escape frontmatter strings.
-- Stencil receives literal body text with its default whitespace behavior. Callers
-  prepare body values for Markdown tables, links, or other special contexts. There
-  are no md-utils formatting filters.
-- Body source and rendered output must not begin with `---` or `+++` delimiter
-  lines, including CRLF forms. This deliberately also reserves a leading Markdown
-  horizontal rule written as `---`; use `***` instead. Unterminated opening
-  delimiters are rejected rather than interpreted as a second frontmatter source.
-- Missing and null values interpolate as empty text; null is false in conditions.
-  Only the Stencil presentation copy recursively maps null to empty strings,
-  retaining dictionary keys and array positions. Schema validation and YAML
-  serialization retain actual null values. Empty strings/arrays are false in
-  conditions. Use a schema with required fields when missing data must fail;
-  strict mode is deferred. Stencil's existing filters operate on the presentation
-  values, so null behaves like an empty string in filters as well.
-- For repeatable reports, iterate ordered arrays and avoid time-dependent features
-  such as Stencil's `now` tag. General byte determinism across all Stencil features
-  is not yet promised.
-- Defaults: 16 MiB template source, 64 MiB JSON input, 64 MiB assembled output.
-  CLI file reads are bounded. Library input size is measured by encoding the envelope
-  as JSON. Body/output checks happen after rendering and serialization. These checks
-  do not bound peak memory, iterations, recursion, or execution time; users are
-  responsible for their workloads. No execution sandbox is claimed.
-- Output is validated before stdout emission or atomic file replacement. An explicit
-  existing output file is replaced on success. Parent directories must already exist.
-  Explicit output filenames must end in `.md` or `.markdown` (case-insensitive).
-  Other extensions and extensionless paths fail before input reads or writes.
-  Stdout always contains Markdown. Non-Markdown generation is explicitly unsupported;
-  future host detection, wrapping, and placement depend on issue #134.
-- Failures carry an input/schema/template/frontmatter/output stage. Stencil's own
-  diagnostic detail is retained as text without leaking engine types into the API.
+## Knap behavior
 
-TOML, includes tooling, formatting helpers, frontmatter mappings, batch rendering,
-additional input formats, and REST persistence are outside this prototype.
+- Knap is the only language. Rewrite old templates; no legacy engine, translation,
+  or compatibility mode exists. Server `creation.template` strings use Knap in all
+  supported server configuration versions.
+- Standard SwiftKnap filters are available, including Markdown helpers. No custom
+  filters, resolvers, DOM, filesystem, or network integrations are installed.
+- Missing and null remain distinct in the SwiftKnap input. Knap controls all
+  presentation semantics. Empty arrays are false; empty objects are true; `??`
+  uses truthiness, including for zero/false. Null is never normalized to a string.
+- Integer inputs outside ±9,007,199,254,740,991 are rejected; supply them as strings.
+  Fractional numbers use JSONValue's Double representation; non-finite values fail.
+- Arrays retain order. Objects use SwiftKnap's sorted dictionary conversion and
+  upstream enumeration rules. Use arrays when order matters.
+- Surrounding whitespace is preserved (`trimOutput: false`); internal whitespace
+  follows Knap. Date/time/locale-dependent filters are not promised byte-deterministic.
+- A shared lazy engine is reused. SwiftKnap handles concurrent execution; variables
+  and limits are supplied per call.
+- Errors preserve upstream codes/locations. Nonfatal warnings are returned by the
+  library, printed to CLI stderr, and retained in creation validation and receipts.
+
+## Limits
+
+Default byte guardrails: 16 MiB template, 64 MiB JSON input, 64 MiB assembled output.
+File reads are bounded; output checks happen after rendering/serialization and do
+not bound peak allocation. SwiftKnap also applies finite default template/output/
+value-length, operation, and nesting limits, which may reject input below byte
+limits. Library callers can supply SwiftKnap `RenderLimits` through the renderer.
+Cancellation does not interrupt running engine work. No wall-clock deadline or
+execution sandbox is claimed.
+
+## Build and deployment
+
+Swift 6.3 is required. SwiftKnap is pinned to
+`5972f60343683b3d5d7dd3ab0edf2b35085c542f`. Ubuntu 24.04 builds require
+`libjavascriptcoregtk-4.1-dev` and `pkg-config`; deployments require
+`libjavascriptcoregtk-4.1-0`. Preserve SwiftPM resource bundles beside installed
+executables. The server Docker build verifies installed release rendering.
+
+SwiftKnap and bundled Knap/Day.js are MIT; its JXKit dependency is LGPL-3.0. Follow
+the upstream [distribution notices](https://github.com/DandyLyons/SwiftKnap/blob/main/ThirdParty/README.md).
+SwiftPM does not bundle the Linux system runtime; this is not a standalone static
+Linux executable. Upstream verified macOS and Ubuntu 24.04 arm64. Validate other
+distributed architectures. Linux support does not imply WASM support; Workers
+template creation remains separate work.
 
 ## Verification
 
 ```console
-swift test --filter MarkdownTemplateRendererTests
-swift test --filter TemplateTests
+swift test --filter 'MarkdownUtilitiesTemplatesTests|TemplateTests|ResourceMutationPlannerTests|MarkdownMutationTests'
 docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
+docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
+scripts/build-wasm.sh
 ```
-
-Fixtures cover typed YAML values, loops/empty states, schema rejection before
-rendering, reserved delimiters, missing includes, size checks, and preservation
-of an existing output on failure. See #93 for the later resource-creation boundary.
-
-Prototype verification: native macOS build, sample CLI rendering to stdout/file,
-and all 1,444 tests passed. Linux Docker verification with Swift 6.2 on Ubuntu Noble
-also passed: the rendering target built and all 14 focused template/CLI tests
-passed. Earlier dependency-fetch DNS failures were resolved on retry. This was
-focused Linux verification, not a run of the entire Linux test suite. SwiftPM
-generated the Stencil 0.15.1 lockfile entry.
-
-The Native Server Linux workflow and `Dockerfile.server-linux` include the focused
-template tests, so future renderer changes retain Linux coverage.

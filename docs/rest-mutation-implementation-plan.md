@@ -1,7 +1,8 @@
 # REST mutation implementation sequence
 
-Status: implementation plan, 2026-09-22. No implementation acceptance criteria are
-claimed complete. Product contract: [REST mutation design](rest-mutation-design.md).
+Status: original implementation sequence, 2026-09-22. The implemented native
+contract and recovery routes are documented in [REST mutations](rest-mutations.md).
+Product contract: [REST mutation design](rest-mutation-design.md).
 Internal policy: [FileEditPolicy](document-edit-policies-design.md).
 
 ## Scope and sequencing

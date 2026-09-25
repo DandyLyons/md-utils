@@ -90,23 +90,28 @@ public struct ResourceMutationProposal: Equatable, Sendable {
   public let record: MarkdownRecord
   public let original: MarkdownRecord?
   public let baselineRevision: MarkdownRecordRevision?
+  /// Diagnostics produced while constructing the document, before reassessment.
+  public let diagnostics: [MarkdownDiagnostic]
 
-  public init(created record: MarkdownRecord) throws {
+  public init(created record: MarkdownRecord, diagnostics: [MarkdownDiagnostic] = []) throws {
     guard record.identity != nil, record.revision == nil else {
       throw ResourceCodecError("identity", "Creation requires a host identity and no caller-assigned revision.")
     }
     self.record = record
     original = nil
     baselineRevision = nil
+    self.diagnostics = diagnostics
   }
 
-  public init(content: String, source: ResourceMutationSource) {
+  public init(content: String, source: ResourceMutationSource, proposedContext: MarkdownRecordContext? = nil) {
     var proposed = source.record
     proposed.content = content
+    if let proposedContext { proposed.context = proposedContext }
     proposed.revision = nil
     record = proposed
     original = source.record
     baselineRevision = source.expectedRevision
+    diagnostics = []
   }
 }
 

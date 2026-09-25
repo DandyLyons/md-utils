@@ -1,4 +1,4 @@
-FROM swift:6.2-noble
+FROM swift:6.3.1-noble
 
 WORKDIR /workspace/
 

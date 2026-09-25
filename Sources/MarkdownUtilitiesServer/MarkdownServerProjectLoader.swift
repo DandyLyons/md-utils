@@ -325,6 +325,7 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
   let lookups: [MarkdownResourceLookup]
   let constraints: [MarkdownLookupConstraint]
   let writable: WritableResourceConfiguration?
+  let mutations: MarkdownMutationConfiguration?
   let searchEnabled: Bool
   let name: String
   let route: String
@@ -336,7 +337,7 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
 
   private enum CodingKeys: String, CodingKey {
     case lookups, constraints
-    case writable
+    case writable, mutations
     case searchEnabled
     case name
     case route
@@ -349,11 +350,12 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
 
   init(from decoder: Decoder) throws {
     try rejectUnknownLookupKeys(decoder, allowed: ["name", "route", "operations", "selection", "identityPolicy",
-      "projectionPolicy", "operationIDOverrides", "searchEnabled", "writable", "lookups", "constraints"])
+      "projectionPolicy", "operationIDOverrides", "searchEnabled", "writable", "lookups", "constraints", "mutations"])
     let container = try decoder.container(keyedBy: CodingKeys.self)
     lookups = try container.decodeIfPresent([MarkdownResourceLookup].self, forKey: .lookups) ?? []
     constraints = try container.decodeIfPresent([MarkdownLookupConstraint].self, forKey: .constraints) ?? []
     writable = try container.decodeIfPresent(WritableResourceConfiguration.self, forKey: .writable)
+    mutations = try container.decodeIfPresent(MarkdownMutationConfiguration.self, forKey: .mutations)
     searchEnabled = try container.decodeIfPresent(Bool.self, forKey: .searchEnabled) ?? false
     name = try container.decode(String.self, forKey: .name)
     route = try container.decode(String.self, forKey: .route)
@@ -381,6 +383,7 @@ private struct NativeMarkdownResourceConfiguration: Decodable {
       operationIDOverrides: operationIDOverrides,
       searchEnabled: searchEnabled,
       writable: writable,
+      mutations: mutations,
       lookups: lookups,
       constraints: constraints,
     )

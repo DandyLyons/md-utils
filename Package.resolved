@@ -1,5 +1,5 @@
 {
-  "originHash" : "0ee34f5546e307bd847b1fbdd4a0da3965f6be3799814fb36b912602990ce18d",
+  "originHash" : "fd9de9894ade22bbad1c83ef928be202d1887acca12f223fe49e265d2827f3fa",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "d14de4b2d9205068c9db89c00d097ca43c897000",
         "version" : "0.6.0"
+      }
+    },
+    {
+      "identity" : "jxkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jectivex/JXKit.git",
+      "state" : {
+        "revision" : "a4c1872d36036fe4ade4b1cadb268603e89e25f0",
+        "version" : "3.6.0"
       }
     },
     {
@@ -107,15 +116,6 @@
       "state" : {
         "revision" : "26cc5e9ae0947092c7139ef7ba612e34646086c7",
         "version" : "0.10.1"
-      }
-    },
-    {
-      "identity" : "stencil",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/stencilproject/Stencil.git",
-      "state" : {
-        "revision" : "4f222ac85d673f35df29962fc4c36ccfdaf9da5b",
-        "version" : "0.15.1"
       }
     },
     {
@@ -395,6 +395,14 @@
       "state" : {
         "revision" : "827506c90475e82d5a7f191f950fb3025cbdc0d6",
         "version" : "2.0.0"
+      }
+    },
+    {
+      "identity" : "swiftknap",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/DandyLyons/SwiftKnap.git",
+      "state" : {
+        "revision" : "5972f60343683b3d5d7dd3ab0edf2b35085c542f"
       }
     },
     {

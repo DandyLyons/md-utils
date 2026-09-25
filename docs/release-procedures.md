@@ -4,6 +4,14 @@
 
 md-utils is distributed via [Mint](https://github.com/yonaskolb/Mint). Releasing a new version requires tagging a commit on `main` with a semantic version tag and creating a GitHub release.
 
+Builds require Swift 6.3. Template consumers use SwiftKnap; follow its
+[third-party distribution notices](https://github.com/DandyLyons/SwiftKnap/blob/main/ThirdParty/README.md)
+when distributing binaries. Include the dependency license notices, preserve SwiftPM
+resource bundles, and meet the applicable JXKit source/relinking requirements.
+Dynamic system runtime linkage alone does not cover JXKit's separate license.
+Ubuntu 24.04 installations need `libjavascriptcoregtk-4.1-0`; building also needs
+`libjavascriptcoregtk-4.1-dev` and `pkg-config`. See [template rendering](template-rendering.md).
+
 ## Pre-Release Checklist
 
 Before releasing, complete every item:

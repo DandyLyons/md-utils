@@ -1,9 +1,0 @@
-# {{ frontmatter.title }}
-
-{{ data.summary }}
-
-| Region | Revenue |
-| --- | ---: |
-{% for region in data.regions %}| {{ region.name }} | {{ region.revenue }} |
-{% empty %}| No regions | 0 |
-{% endfor %}

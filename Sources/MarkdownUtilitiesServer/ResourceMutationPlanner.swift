@@ -14,10 +14,13 @@ public struct ResourceMutationPlanner: Sendable {
     _ edit: ResourceEdit,
     source: ResourceMutationSource,
     resource: PlannedMarkdownResource,
-    policy: ResourceMutationValidationPolicy = .preserveExistingConformance
+    policy: ResourceMutationValidationPolicy = .preserveExistingConformance,
+    proposedContext: MarkdownRecordContext? = nil,
   ) async throws -> ResourceMutationValidation {
     let codec = try codec(for: resource)
-    let proposal = try codec.plan(edit, source: source)
+    let encoded = try codec.plan(edit, source: source)
+    let proposal = ResourceMutationProposal(content: encoded.record.content, source: source,
+      proposedContext: encoded.record.content == source.record.content ? nil : proposedContext)
     return try await validator.validate(proposal, destination: requirements(for: resource), policy: policy)
   }
 
@@ -51,7 +54,7 @@ public struct ResourceMutationPlanner: Sendable {
       bodyWritable: writable.codec.bodyWritable, protectedFields: protected))
   }
 
-  private func requirements(for resource: PlannedMarkdownResource) -> ResourceMutationRequirements {
+  package func requirements(for resource: PlannedMarkdownResource) -> ResourceMutationRequirements {
     switch resource.selection {
     case .rule(let name): return .init(rule: name)
     case .type(let name, let root): return .init(type: name, searchRoot: root.rawValue)

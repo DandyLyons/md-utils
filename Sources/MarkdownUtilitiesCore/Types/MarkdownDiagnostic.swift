@@ -23,7 +23,7 @@ public enum MarkdownFixItSafety: String, Codable, Equatable, Sendable {
 }
 
 /// A portable edit to canonical Markdown record content.
-public enum MarkdownRecordEdit: Equatable, Sendable {
+public enum MarkdownRecordEdit: Codable, Equatable, Sendable {
   case ensureFrontmatter
   case setFrontmatterValue(path: [String], value: JSONValue)
   case requestFrontmatterValue(path: [String])
@@ -31,7 +31,7 @@ public enum MarkdownRecordEdit: Equatable, Sendable {
 }
 
 /// A structured remediation proposed by a Markdown diagnostic.
-public struct MarkdownFixIt: Equatable, Sendable {
+public struct MarkdownFixIt: Codable, Equatable, Sendable {
   public var id: String
   public var title: String
   public var safety: MarkdownFixItSafety
@@ -51,7 +51,7 @@ public struct MarkdownFixIt: Equatable, Sendable {
 }
 
 /// A stable, structured type-assessment diagnostic.
-public struct MarkdownDiagnostic: Equatable, Sendable {
+public struct MarkdownDiagnostic: Codable, Equatable, Sendable {
   public var code: String
   public var severity: MarkdownDiagnosticSeverity
   public var domain: MarkdownDiagnosticDomain

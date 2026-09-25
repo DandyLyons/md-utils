@@ -1,5 +1,5 @@
-FROM swift:6.2-noble
-RUN apt-get update && apt-get install -y --no-install-recommends python3 libsqlite3-dev binutils && rm -rf /var/lib/apt/lists/*
+FROM swift:6.3.1-noble
+RUN apt-get update && apt-get install -y --no-install-recommends python3 libsqlite3-dev libjavascriptcoregtk-4.1-dev pkg-config binutils && rm -rf /var/lib/apt/lists/*
 WORKDIR /workspace/
 COPY Package.swift Package.resolved ./
 RUN swift package resolve

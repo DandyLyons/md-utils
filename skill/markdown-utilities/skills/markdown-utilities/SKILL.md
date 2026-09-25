@@ -130,6 +130,16 @@ manifest, or multi-file atomicity guarantee. On interruption restore the backup 
 inspect reported generated files before retrying. Default init and legacy configs
 remain 0.2.0 and retain their existing syntax and behavior.
 
+## Knap Templates
+
+Use `md-utils template render --template ./templates/report.knap --data ./data/report.json --output ./reports/report.md`.
+Input is JSON with required `data` and optional `frontmatter` object. Templates use
+Knap for the body; md-utils serializes frontmatter as YAML. Use Knap's standard
+Markdown filters (`h1`, `list`, `table`, `bold`) and `??` fallback. Optional `--schema`
+validates the envelope without supplying defaults. Omit `--output` for stdout;
+warnings go to stderr. Existing output is unchanged on failure. No old template
+language or translation is supported. Keep YAML/TOML delimiters out of templates.
+
 ## Reading Long Markdown Files
 
 Prefer `md-utils explore` before reading especially lengthy Markdown files, such as files around 400+ lines or 1000+ words. Start with a whole-document structure view, then expand only the relevant sections by heading line number.

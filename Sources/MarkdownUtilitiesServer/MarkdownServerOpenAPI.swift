@@ -179,7 +179,7 @@ public enum MarkdownServerOpenAPIGenerator {
     }
     var paths: [String: JSONValue] = [:]
 
-    for route in plan.routes {
+    for route in plan.routes where route.kind != .mutation && route.kind != .mutationStatus && route.kind != .mutationRecovery {
       guard route.method == .get else {
         diagnostics.append(.init(
           code: .invalidPlan,
@@ -235,6 +235,7 @@ public enum MarkdownServerOpenAPIGenerator {
         "schemas": .object(componentSchemas(typeSchemas: plan.typeSchemas)),
       ]),
       "x-md-utils-server-config-version": string(plan.serverConfigVersion),
+      "x-md-utils-contract-scope": string("read-only; mutation OpenAPI tracked by #108"),
     ])
     let document = MarkdownServerOpenAPIDocument(value: value)
     try validate(document)
@@ -272,6 +273,7 @@ public enum MarkdownServerOpenAPIGenerator {
       value["tags"] = array([string(resource.name)])
     }
     switch route.kind {
+    case .mutation, .mutationStatus, .mutationRecovery: break // Write contract is tracked separately by #108.
     case .collection:
       value["summary"] = string("List \(resource?.name ?? "Markdown records")")
       var parameters = [
@@ -334,6 +336,7 @@ public enum MarkdownServerOpenAPIGenerator {
     typeSchemas: [MarkdownTypeName: ResolvedMarkdownTypeFrontmatterSchema]
   ) -> JSONValue {
     switch route.kind {
+    case .mutation, .mutationStatus, .mutationRecovery: return .object([:])
     case .collection:
       return object([
         "200": response(

@@ -106,9 +106,19 @@ enum CLIProcessTestHelper {
 
   /// Locates the executable built beside the test bundle.
   private static func executableURL() throws -> URL {
-    let candidate = Bundle.module.bundleURL
-      .deletingLastPathComponent()
-      .appending(path: "md-utils")
+    let resources = Bundle.module.bundleURL
+    var products = resources.deletingLastPathComponent()
+    // Swift Build nests resources inside the test bundle on macOS, whereas
+    // the SwiftPM native build system places resource bundles beside products.
+    var ancestor = resources
+    while ancestor.path != "/" {
+      if ancestor.pathExtension == "xctest" {
+        products = ancestor.deletingLastPathComponent()
+        break
+      }
+      ancestor.deleteLastPathComponent()
+    }
+    let candidate = products.appending(path: "md-utils")
     guard FileManager.default.isExecutableFile(atPath: candidate.path) else {
       throw CLIProcessTestHelperError.executableNotFound(candidate)
     }

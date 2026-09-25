@@ -49,8 +49,8 @@ resources:
 ```
 
 The creation template is administrator-owned source, never a request-selected file
-or template. `MarkdownUtilitiesTemplates` implements creation using #31's renderer;
-Stencil stays outside Core/WASM. Omit `creation` to disable creation planning.
+or template. `MarkdownUtilitiesTemplates` implements creation using the shared SwiftKnap renderer;
+SwiftKnap stays outside Core/WASM. Omit `creation` to disable creation planning.
 `protectedFields` defaults to an empty list. The server planner additionally protects
 the entire top-level field containing its configured identity path. `$md-utils` is
 always reserved. Unknown/read-only metadata fields fail even when their values equal
@@ -117,8 +117,8 @@ HTTP PATCH media type or wire format.
   interpreting requested body text as new frontmatter.
 
 Serialization is deterministic for supported values. Creation inherits the shared
-renderer's size limits and semantics; time-dependent Stencil features such as `now`
-are not byte-deterministic. Existing-record hosts must enforce bounded source/request
+renderer's byte limits and Knap execution limits/semantics. Date-dependent filters
+can depend on time or locale; arbitrary templates are not promised byte-deterministic. Existing-record hosts must enforce bounded source/request
 sizes before invoking the in-memory codec.
 
 ## Validation and concurrency

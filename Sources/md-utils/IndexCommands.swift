@@ -37,9 +37,9 @@ extension CLIEntry {
                     }
                     let context = try options.context(prepare: false)
                     try await context.database.rebuildAsText(root: context.canonicalRoot.path,
-                        scratchDirectory: context.canonicalRoot.appendingPathComponent(".md-utils/rebuild/")) { copy in
+                        scratchDirectory: context.canonicalRoot.appendingPathComponent(".md-utils/rebuild/")) { copy, lease in
                         try await options.run(kind: .directory, directory: directory, name: "", rebuild: true,
-                            databaseOverride: copy)
+                            databaseOverride: copy, writerLease: lease)
                     }
                 } else {
                     try await options.run(kind: .directory, directory: directory, name: "", rebuild: rebuild)
@@ -303,7 +303,7 @@ struct IndexOptions: ParsableArguments {
     /// commit explicit diagnostics and then produce a failing process exit status.
     @discardableResult
     func run(kind: IndexScope.Kind, directory: String?, name: String, rebuild: Bool = false,
-        quiet: Bool = false, databaseOverride: SQLiteIndexDatabase? = nil) async throws -> SQLiteIndexDatabase {
+        quiet: Bool = false, databaseOverride: SQLiteIndexDatabase? = nil, writerLease: CollectionWriterLease? = nil) async throws -> SQLiteIndexDatabase {
         let context = try context(prepare: false, databaseOverride: databaseOverride)
         let root = context.root
         let canonicalRoot = context.canonicalRoot
@@ -333,7 +333,7 @@ struct IndexOptions: ParsableArguments {
             try database.invalidate(message: String(describing: error))
             throw error
         }
-        let report = try await indexer.updateMany(adding: scope, fingerprint: evaluator.fingerprint,
+        let report = try await indexer.updateMany(adding: scope, writerLease: writerLease, fingerprint: evaluator.fingerprint,
             rebuild: rebuild, verifyHashes: verifyHashes, evaluate: evaluator.evaluate)
         if !quiet {
             print("Index: \(report.evaluated) evaluated, \(report.cached) cached, \(report.hashed) hashed; \(try database.selectedCount()) current documents.")

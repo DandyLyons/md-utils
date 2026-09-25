@@ -20,8 +20,8 @@ public struct ResourceMutationRequirements: Sendable {
 }
 
 /// One loaded contract's before/after evidence, including unexposed definitions.
-public struct ResourceConformanceChange: Equatable, Sendable {
-  public enum Kind: String, Sendable { case type, rule }
+public struct ResourceConformanceChange: Codable, Equatable, Sendable {
+  public enum Kind: String, Codable, Sendable { case type, rule }
   public let kind: Kind
   public let name: String
   public let previouslyPassed: Bool
@@ -86,7 +86,7 @@ public struct ResourceMutationValidator: Sendable {
     if let original = proposal.original {
       before = await MarkdownRecordAnalyzer.analyze(original)
     } else { before = nil }
-    var diagnostics = after.parseDiagnostics
+    var diagnostics = proposal.diagnostics + after.parseDiagnostics
     // Failure to establish the baseline must not silently weaken preservation.
     diagnostics.append(contentsOf: before?.parseDiagnostics ?? [])
     var changes: [ResourceConformanceChange] = []
