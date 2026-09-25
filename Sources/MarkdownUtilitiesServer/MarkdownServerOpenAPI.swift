@@ -179,8 +179,11 @@ public enum MarkdownServerOpenAPIGenerator {
     }
     var paths: [String: JSONValue] = [:]
 
-    for route in plan.routes where route.kind != .mutation && route.kind != .mutationStatus && route.kind != .mutationRecovery {
-      guard route.method == .get else {
+    for route in plan.routes {
+      let isMutation = [.mutation, .mutationStatus, .mutationRecovery].contains(route.kind)
+      let expectedMethod: EndpointHTTPMethod = route.kind == .mutationRecovery ? .post
+        : route.kind == .mutation ? (route.mutationOperation?.method ?? .get) : .get
+      guard route.method == expectedMethod, route.kind != .mutation || route.mutationOperation != nil else {
         diagnostics.append(.init(
           code: .invalidPlan,
           location: "routes.\(route.operationID).method",
@@ -189,7 +192,7 @@ public enum MarkdownServerOpenAPIGenerator {
         continue
       }
       let resource = route.resourceName.flatMap { resources[$0] }
-      let requiresResource = route.kind == .collection || route.kind == .item || route.kind == .namedLookup
+      let requiresResource = isMutation || route.kind == .collection || route.kind == .item || route.kind == .namedLookup
       if requiresResource && resource == nil {
         diagnostics.append(.init(
           code: .invalidPlan,
@@ -206,17 +209,28 @@ public enum MarkdownServerOpenAPIGenerator {
         ))
         continue
       }
-      if paths[route.path.rawValue] != nil {
+      if isMutation && (resource?.mutations == nil || (route.kind == .mutation &&
+        resource?.mutations?.operations.contains(where: { $0 == route.mutationOperation }) != true)) {
+        diagnostics.append(.init(code: .invalidPlan, location: "routes.\(route.operationID).resourceName",
+          message: "Mutation route is not enabled by its resource"))
+        continue
+      }
+      let method = route.method.rawValue.lowercased()
+      var pathItem = paths[route.path.rawValue]?.objectValue ?? [:]
+      if pathItem[method] != nil {
         diagnostics.append(.init(
           code: .invalidPlan,
           location: "routes.\(route.operationID).path",
-          message: "Endpoint plan contains more than one GET operation for \"\(route.path.rawValue)\""
+          message: "Endpoint plan contains more than one \(route.method.rawValue) operation for \"\(route.path.rawValue)\""
         ))
         continue
       }
-      paths[route.path.rawValue] = object([
-        "get": operation(for: route, resource: resource, typeSchemas: typeSchemas),
-      ])
+      if isMutation, let resource {
+        pathItem[method] = MarkdownMutationOpenAPI.operation(route, resource: resource)
+      } else {
+        pathItem[method] = operation(for: route, resource: resource, typeSchemas: typeSchemas)
+      }
+      paths[route.path.rawValue] = .object(pathItem)
     }
 
     if diagnostics.isEmpty == false {
@@ -235,7 +249,7 @@ public enum MarkdownServerOpenAPIGenerator {
         "schemas": .object(componentSchemas(typeSchemas: plan.typeSchemas)),
       ]),
       "x-md-utils-server-config-version": string(plan.serverConfigVersion),
-      "x-md-utils-contract-scope": string("read-only; mutation OpenAPI tracked by #108"),
+      "x-md-utils-contract-scope": string("configured reads and mutations"),
     ])
     let document = MarkdownServerOpenAPIDocument(value: value)
     try validate(document)
@@ -269,11 +283,27 @@ public enum MarkdownServerOpenAPIGenerator {
       "operationId": string(route.operationID),
       "responses": responses(for: route, resource: resource, typeSchemas: typeSchemas),
     ]
+    if route.kind != .openAPI, var responses = value["responses"]?.objectValue {
+      for (status, responseValue) in responses {
+        guard var response = responseValue.objectValue else { continue }
+        var headers: [String: JSONValue] = [
+          "X-Md-Utils-Stale": object(["description": string("Whether the read repository is stale"), "schema": object(["type": string("boolean")])]),
+        ]
+        if status == "200", route.kind == .collection {
+          headers["X-Md-Utils-Generation"] = object(["description": string("Publication generation; distinct from canonical source revision"), "schema": object(["type": string("string")])])
+        } else if status == "200" {
+          headers["MD-Utils-Revision"] = MarkdownMutationOpenAPI.revisionHeader()
+        }
+        response["headers"] = .object(headers)
+        responses[status] = .object(response)
+      }
+      value["responses"] = .object(responses)
+    }
     if let resource {
       value["tags"] = array([string(resource.name)])
     }
     switch route.kind {
-    case .mutation, .mutationStatus, .mutationRecovery: break // Write contract is tracked separately by #108.
+    case .mutation, .mutationStatus, .mutationRecovery: break
     case .collection:
       value["summary"] = string("List \(resource?.name ?? "Markdown records")")
       var parameters = [
@@ -423,7 +453,7 @@ public enum MarkdownServerOpenAPIGenerator {
   private static func componentSchemas(
     typeSchemas: [ResolvedMarkdownTypeFrontmatterSchema]
   ) -> [String: JSONValue] {
-    var schemas = genericComponentSchemas()
+    var schemas = genericComponentSchemas().merging(MarkdownMutationOpenAPI.schemas) { _, new in new }
     for schema in typeSchemas {
       let combined: JSONValue
       if schema.schemas.isEmpty {

@@ -638,6 +638,15 @@ and optional FTS search are described by the generated OpenAPI contract. See
 [indexed server reads](docs/indexed-server-reads.md) for query parameters, the
 breaking collection-response change, consistency guarantees, and memory limits.
 
+Generated OpenAPI also describes explicitly enabled CRUD, identity edits, UUID
+repair, lookup aliases, and operation status/recovery. Creation requires an
+`Idempotency-Key`; other writes require the `MD-Utils-If-Revision` token returned
+by item reads. For a resource with writable `title`, a PATCH body can be
+`{"frontmatter":{"set":{"title":"Revised title"}}}`. Completed creates return
+`201`; other writes, including DELETE, return `200` with a durable receipt.
+Publication failures can report committed source with recovery still pending.
+See [REST mutations](docs/rest-mutations.md) for configuration and complete examples.
+
 Verify the native server on Linux with:
 
 ```bash
