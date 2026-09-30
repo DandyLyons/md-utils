@@ -1,9 +1,38 @@
 import MarkdownUtilitiesCore
 
 /// Wire contracts for the mutation routes already present in the immutable plan.
+///
+/// Builds OpenAPI description objects and JSON Schema objects, rather than actual
+/// request or response payloads. ``MarkdownServerOpenAPIGenerator`` installs the
+/// operation objects under `paths[path][method]` and merges ``schemas`` into
+/// `components.schemas`, then validates the complete document.
+///
+/// Helpers assume compiler-validated resource configuration. They describe the
+/// transport implemented by `MarkdownMutationHTTP`; they do not enable routes,
+/// validate incoming requests, or persist records. See <doc:GeneratedOpenAPI>.
 enum MarkdownMutationOpenAPI {
+  /// Shared prose for revision parameter/header descriptions and the token schema.
+  ///
+  /// This is a description string, not an encoded revision or a schema object.
   static let revisionDescription = "Versioned canonical revision: r1. followed by standard Base64 of the UTF-8 revision. Native revisions are source SHA-256 hashes. This is not an ETag or publication generation; If-Match is not a substitute."
 
+  /// Builds the OpenAPI Operation Object for a mutation, status, or recovery route.
+  ///
+  /// The returned object always contains `operationId: string`, `tags: [string]`,
+  /// `summary: string`, `parameters: [Parameter Object]`, and
+  /// `responses: {statusCode: Response Object}`. Mutation operations also include
+  /// `description`. Mutation and recovery routes include `requestBody`; status
+  /// reads omit it. The HTTP method and route path are supplied by the caller's
+  /// enclosing Path Item Object, not embedded in this value.
+  ///
+  /// Creation requires an idempotency header. Other mutations require a revision
+  /// header and either an identity path parameter or an exact lookup query value.
+  /// Status/recovery routes address a receipt by its `id` path parameter.
+  ///
+  /// - Parameters:
+  ///   - route: A planned mutation-family route with its operation and lookup metadata.
+  ///   - resource: The matching resource with explicit mutation configuration.
+  /// - Returns: An object-valued OpenAPI operation, not a complete path or document.
   static func operation(_ route: EndpointRouteDescription, resource: PlannedMarkdownResource) -> JSONValue {
     var parameters: [JSONValue] = []
     var result: [String: JSONValue] = [
@@ -40,6 +69,31 @@ enum MarkdownMutationOpenAPI {
     return .object(result)
   }
 
+  /// Describes the JSON request envelope accepted by one configured mutation.
+  ///
+  /// Returns a Schema Object with `type: "object"`, `properties: {field: schema}`,
+  /// `additionalProperties: false`, and `description`. A `required: [string]`
+  /// array is included only when at least one envelope field is mandatory:
+  ///
+  /// - Create permits optional `frontmatter`, `data`, `filename`, and `identifiers`.
+  /// - Replace requires `frontmatter` and, when writable, `body`.
+  /// - Patch permits `frontmatter: {set: object, remove: [string]}` and writable `body`.
+  /// - Identity editing requires a nonempty `identifiers` object.
+  /// - Delete and UUID repair permit only an empty object. DELETE's body may be
+  ///   omitted; that distinction is expressed by the enclosing Request Body Object.
+  ///
+  /// Replace, patch, and identity editing also permit `validationPolicy` via a
+  /// component reference. Metadata and identifier property names are restricted
+  /// to their configured fields, but their values use the unconstrained schema
+  /// `{}`: complete-record validation remains a separate runtime check. Patch
+  /// removal names are unique; when no fields are writable, `items: false`
+  /// permits only an empty removal array. Set/remove overlap is checked at runtime.
+  ///
+  /// A creation template's input schema is preserved in
+  /// `x-md-utils-template-input-schema`. It applies to assembled template input,
+  /// including host-owned values, rather than directly constraining this envelope.
+  ///
+  /// - Returns: The envelope's schema, without an `application/json` content wrapper.
   private static func request(_ operation: MarkdownMutationOperation, resource: PlannedMarkdownResource) -> JSONValue {
     let fields = Set(resource.writable?.codec.frontmatterFields ?? []).sorted()
     let frontmatter = object(Dictionary(uniqueKeysWithValues: fields.map { ($0, JSONValue.object([:])) }))
@@ -90,6 +144,21 @@ enum MarkdownMutationOpenAPI {
     return .object(schema)
   }
 
+  /// Maps the route's documented HTTP statuses to OpenAPI Response Objects.
+  ///
+  /// The shape is `{"200": {"description": ..., "content": ...}, ...}`;
+  /// keys are decimal status strings, not integers. Every response describes
+  /// `application/json`. Successful writes reference `MarkdownMutationReceipt`:
+  /// create uses `201`, and other mutations (including DELETE) use `200`.
+  /// Status reads use `200` even for unfinished receipts; recovery can use either
+  /// success code depending on the original operation.
+  ///
+  /// Ordinary errors reference `MarkdownMutationErrorEnvelope`. `409` and `503`
+  /// use `oneOf` with receipt and error-envelope references because abandoned,
+  /// uncertain, or committed-but-unpublished operations can return a receipt.
+  /// Selected responses describe the optional canonical revision header.
+  ///
+  /// - Returns: An object-valued Responses Object for a mutation-family route.
   private static func responses(_ route: EndpointRouteDescription) -> JSONValue {
     let receipt = ref("MarkdownMutationReceipt")
     let error = ref("MarkdownMutationErrorEnvelope")
@@ -122,6 +191,28 @@ enum MarkdownMutationOpenAPI {
     return .object(result)
   }
 
+  /// Named JSON Schema components merged directly into `components.schemas`.
+  ///
+  /// Each dictionary value is an object-valued schema, not an instance of the
+  /// corresponding Swift type. Keys define the names used by local `$ref` values:
+  ///
+  /// - `MarkdownRevisionToken`: a bounded string with the `r1.` Base64 token pattern.
+  /// - `ResourceMutationValidationPolicy`: a string enum with the preservation default.
+  /// - `MarkdownMutationReceipt`: the Codable receipt fields plus the HTTP adapter's
+  ///   `committed`, `operationStatus`, and optional `code` fields. `committed` can
+  ///   be null when the source outcome is uncertain. Optional Codable fields are
+  ///   omitted when absent; they are not generally represented by explicit null.
+  /// - `MarkdownMutationErrorEnvelope`: `{error: {code, message, diagnostics}}`.
+  /// - `MarkdownDiagnostic`: shared diagnostic fields, including `fixIts`.
+  /// - `MarkdownFixIt`: `{id, title, safety, edits}`. Each edit is a `oneOf` of
+  ///   Swift's synthesized enum objects, such as `{"ensureFrontmatter": {}}` or
+  ///   `{"appendHeading": {"text": "Book", "level": 1}}`.
+  /// - `ResourceConformanceChange`: before/after pass and selection flags with diagnostics.
+  ///
+  /// Receipt dates use numeric Foundation reference-date seconds. Receipt records
+  /// reference `GenericMarkdownRecord`, which the parent generator must also supply.
+  /// Object schemas reject unknown fields; individual `required` arrays preserve
+  /// the distinction between required, omitted, and nullable values.
   static var schemas: [String: JSONValue] {
     var receipt = [
       "state": enumeration(["prepared", "committed", "completed", "recoveryRequired", "abandoned"]),
@@ -170,29 +261,106 @@ enum MarkdownMutationOpenAPI {
     ]
   }
 
+  /// Describes `MD-Utils-Revision` for an OpenAPI response's `headers` map.
+  ///
+  /// - Returns: `{"description": string, "schema": {"$ref":
+  ///   "#/components/schemas/MarkdownRevisionToken"}}`. The caller supplies the
+  ///   header name as the map key. No `required` flag is emitted because a response
+  ///   includes this header only when a committed revision is available.
   static func revisionHeader() -> JSONValue {
     .object(["description": .string(revisionDescription + " Present when a committed revision is available."), "schema": ref("MarkdownRevisionToken")])
   }
 
+  /// Non-null string schema: `{"type": "string"}`; not a string instance.
   private static let text = JSONValue.object(["type": .string("string")])
+
+  /// Non-null Boolean schema: `{"type": "boolean"}`; not a Boolean instance.
   private static let boolean = JSONValue.object(["type": .string("boolean")])
+
+  /// Numeric date schema: `{"type": "number", "description": string}`.
+  ///
+  /// Matches the receipt encoder's seconds since 2001-01-01 UTC, including
+  /// fractional seconds. It does not advertise an ISO 8601 `date-time` string.
   private static let date = JSONValue.object(["type": .string("number"), "description": .string("Seconds since 2001-01-01T00:00:00Z (Foundation Codable date encoding).")])
+
+  /// Converts strings to a literal JSON array, preserving order and duplicates.
+  ///
+  /// - Returns: `["first", "second", ...]`, used for keyword values such as
+  ///   `required`, `enum`, or `type`; this is not an array schema.
   private static func strings(_ values: [String]) -> JSONValue { .array(values.map(JSONValue.string)) }
+
+  /// Builds `{"type": "string", "enum": [string, ...]}` from allowed values.
+  ///
+  /// Callers supply a nonempty set of allowed spellings; this helper neither
+  /// deduplicates nor validates them. It does not add a default or permit null.
   private static func enumeration(_ values: [String]) -> JSONValue { .object(["type": .string("string"), "enum": strings(values)]) }
+
+  /// Builds a local schema reference: `{"$ref": "#/components/schemas/<name>"}`.
+  ///
+  /// - Parameter name: An existing component key safe to embed as a JSON Pointer
+  ///   segment. No escaping or existence check is performed here; these callers
+  ///   use fixed component names, and the complete document is validated later.
   private static func ref(_ name: String) -> JSONValue { .object(["$ref": .string("#/components/schemas/\(name)")]) }
+
+  /// Builds `{"type": "array", "items": itemSchema}` without length constraints.
+  ///
+  /// - Parameter item: An object or Boolean JSON Schema describing each element,
+  ///   not a sample element. The value is embedded unchanged.
   private static func list(_ item: JSONValue) -> JSONValue { .object(["type": .string("array"), "items": item]) }
+
+  /// Builds a closed object schema from property schemas and required field names.
+  ///
+  /// - Parameters:
+  ///   - properties: Literal field names mapped to schemas, not instance values.
+  ///     An empty schema `{}` allows any JSON value for that field.
+  ///   - required: Names that must be present; callers ensure they exist in
+  ///     `properties`. An empty list omits the `required` keyword entirely.
+  /// - Returns: `{"type": "object", "properties": {...},
+  ///   "additionalProperties": false}` with an optional `required: [string]`.
+  ///   Empty properties therefore describe an empty object, not an arbitrary map.
   private static func object(_ properties: [String: JSONValue], required: [String] = []) -> JSONValue {
     var value: [String: JSONValue] = ["type": .string("object"), "properties": .object(properties), "additionalProperties": .boolean(false)]
     if !required.isEmpty { value["required"] = strings(required) }
     return .object(value)
   }
+  /// Builds an inline, required OpenAPI Parameter Object.
+  ///
+  /// - Parameters:
+  ///   - name: The HTTP header, path placeholder, or query parameter name.
+  ///   - location: The OpenAPI `in` value; callers use `header`, `path`, or `query`.
+  ///   - description: Human-readable parameter semantics.
+  ///   - schema: A schema or schema reference; defaults to a non-null string schema.
+  /// - Returns: `{"name": string, "in": string, "required": true,
+  ///   "description": string, "schema": schema}`. This helper cannot describe
+  ///   an optional parameter and does not check location/name consistency.
   private static func parameter(_ name: String, location: String, description: String, schema: JSONValue = text) -> JSONValue {
     .object(["name": .string(name), "in": .string(location), "required": .boolean(true), "description": .string(description), "schema": schema])
   }
+  /// Wraps an envelope schema in an OpenAPI Request Body Object for JSON input.
+  ///
+  /// - Parameters:
+  ///   - schema: The schema of the complete JSON body, embedded unchanged.
+  ///   - required: Whether an HTTP body must be supplied. This does not control
+  ///     which properties inside that body are required.
+  ///   - limit: Transport byte limit to describe: 8 MiB for mutations or 1 KiB
+  ///     for recovery. It is documentation, not an enforced JSON Schema constraint.
+  /// - Returns: `{"required": boolean, "description": string,
+  ///   "content": {"application/json": {"schema": schema}}}`.
   private static func body(_ schema: JSONValue, required: Bool = true, limit: Int = 8 * 1024 * 1024) -> JSONValue {
     .object(["required": .boolean(required), "description": .string("Maximum \(limit) bytes. Unknown envelope fields are rejected."),
       "content": .object(["application/json": .object(["schema": schema])])])
   }
+  /// Wraps a response payload schema in an OpenAPI Response Object.
+  ///
+  /// - Parameters:
+  ///   - description: Meaning of the HTTP outcome, including any recovery semantics.
+  ///   - schema: Schema of the complete JSON payload, commonly a component reference
+  ///     or a `oneOf` of receipt and error-envelope references.
+  ///   - revision: Whether to describe the optional `MD-Utils-Revision` header.
+  ///     This does not assert that every response carries a revision.
+  /// - Returns: `{"description": string, "content": {"application/json":
+  ///   {"schema": schema}}}`. When requested, adds `headers: {"MD-Utils-Revision":
+  ///   Header Object}`. The caller supplies the HTTP status as the enclosing map key.
   private static func response(_ description: String, schema: JSONValue, revision: Bool = false) -> JSONValue {
     var value: [String: JSONValue] = ["description": .string(description), "content": .object(["application/json": .object(["schema": schema])])]
     if revision { value["headers"] = .object(["MD-Utils-Revision": revisionHeader()]) }

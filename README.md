@@ -94,11 +94,7 @@ import MarkdownUtilities
 
 ### Linux Validation
 
-Core is tested with Swift 6.3 on Linux in Docker:
-
-```bash
-docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
-```
+Core is tested with Swift 6.3 on Linux in Docker in CI.
 
 ---
 
@@ -647,11 +643,7 @@ by item reads. For a resource with writable `title`, a PATCH body can be
 Publication failures can report committed source with recovery still pending.
 See [REST mutations](docs/rest-mutations.md) for configuration and complete examples.
 
-Verify the native server on Linux with:
-
-```bash
-docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
-```
+The native server is built and tested on Linux in Docker in CI.
 
 ## Architecture
 
@@ -681,7 +673,7 @@ docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 ## Platform Compatibility
 **macOS** is the primary development and testing platform. Core, native integrations, and the CLI are covered by the full Swift test suite.
 
-**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.3 using `Dockerfile.core-linux`. The native read-only server is separately built and tested with `Dockerfile.server-linux`. The complete `MarkdownUtilities` and `md-utils` CLI layers are not covered by the Core guarantee.
+**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.3 using `Dockerfile.core-linux` in CI. The native read-only server is separately built and tested with `Dockerfile.server-linux` in CI. The complete `MarkdownUtilities` and `md-utils` CLI layers are not covered by the Core guarantee.
 
 Template rendering uses SwiftKnap on macOS and Linux. Ubuntu 24.04 builds of the CLI
 and server require `libjavascriptcoregtk-4.1-dev` and `pkg-config`; deployment requires

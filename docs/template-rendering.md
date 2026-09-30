@@ -84,7 +84,7 @@ template creation remains separate work.
 
 ```console
 swift test --filter 'MarkdownUtilitiesTemplatesTests|TemplateTests|ResourceMutationPlannerTests|MarkdownMutationTests'
-docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
-docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
 scripts/build-wasm.sh
 ```
+
+Linux Docker builds and validation run in CI only.

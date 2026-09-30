@@ -20,21 +20,19 @@ swift build
 # 2. All tests must pass
 swift test
 
-# 3. Verify Core on Linux when changing Core or its dependencies
-docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
-
-# 4. Verify Core on WebAssembly when changing Core or its dependencies
+# 3. Verify Core on WebAssembly when changing Core or its dependencies
 scripts/build-wasm.sh
 
-# 5. Verify CLI works
+# 4. Verify CLI works
 swift run md-utils --help
 ```
+
+Linux Docker builds and validation run in CI only.
 
 ## Checklist
 
 - [ ] `swift build` passes
 - [ ] `swift test` passes
-- [ ] Linux Core container passes when Core or its dependencies changed
 - [ ] WebAssembly Core build and smoke test pass when Core or its dependencies changed
 - [ ] CLI help displays correctly
 - [ ] Documentation updated if needed

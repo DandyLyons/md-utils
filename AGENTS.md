@@ -31,7 +31,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 - **Formatter/Linter**: No dedicated formatter or linter is configured in-package
 - **Documentation**: README.md, AGENTS.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
 - **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/TOML/JSON parsing failures as user-visible errors
-- **CI/Coverage**: Schema publication, Pages, WebAssembly, native Linux server, and native SQLite workflows are configured; local verification uses `Dockerfile.server-linux` and `Dockerfile.sqlite-index`; no coverage command is documented. Refresh scale measurements use `scripts/benchmark-index-refresh.py`; see `docs/index-refresh-benchmarks.md` for corpus characteristics and resource budgets.
+- **CI/Coverage**: Schema publication, Pages, WebAssembly, native Linux server, and native SQLite workflows are configured; Docker Linux builds run in CI only; no coverage command is documented. Refresh scale measurements use `scripts/benchmark-index-refresh.py`; see `docs/index-refresh-benchmarks.md` for corpus characteristics and resource budgets.
 
 ## Requirements
 
@@ -48,15 +48,11 @@ swift build
 # Test
 swift test
 
-# Build and test Core on Linux
-docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
-
-# Build and test the native server on Linux
-docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
-
 # Run CLI
 swift run md-utils <command>
 ```
+
+Linux Docker builds and validation run in CI only.
 
 > [!Note] 
 > If no `.build/` directory exists, run `swift build` first to create. Do not use the `.build/` directory from another worktree or branch. 
