@@ -131,63 +131,50 @@ struct IndexFileChange {
 }
 
 extension SQLiteIndexDatabase {
-    /// Upgrades an empty runtime-probe database without dropping user field indexes or views.
+    /// Creates the current cache format or rejects an incompatible disposable cache.
     ///
     /// ``CollectionIndexer/init(database:root:)`` calls this automatically.
     /// - Parameter root: Canonical absolute project directory, matching future opens.
-    /// - Throws: A root mismatch, a newer unsupported migration, or a SQLite migration error.
+    /// - Throws: A root mismatch, incompatible cache format, or SQLite error.
     public func prepareCollection(root: String) throws {
         try prepareCollection(root: root, checkFTSCapability: Self.checkFTSCapability)
     }
 
     func prepareCollection(root: String, checkFTSCapability: (Database) throws -> Void,
         jsonbProbe: ((Database) -> Bool)? = nil) throws {
-        let existingCollection = try databaseQueue.read { database in
-            try Bool.fetchOne(database,
-                sql: "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='index_metadata')") ?? false
+        let configuration = path == ":memory:" ? IndexConfiguration() : try IndexConfiguration.load(root: root)
+        let exists = try databaseQueue.read {
+            try Bool.fetchOne($0, sql: "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='index_metadata')") ?? false
         }
-        let recordedPolicy: (encoding: IndexMetadataEncoding?, bodyMode: IndexBodyMode?) = try databaseQueue.read { database in
-            guard existingCollection else { return (nil, nil) }
-            let rows = try Row.fetchAll(database,
-                sql: "SELECT key,value FROM index_metadata WHERE key IN ('metadata_encoding','body_mode')")
-            let values = Dictionary(uniqueKeysWithValues: rows.map { ($0["key"] as String, $0["value"] as String) })
-            let encoding = values["metadata_encoding"].flatMap(IndexMetadataEncoding.init(rawValue:))
-            let bodyMode = values["body_mode"].flatMap(IndexBodyMode.init(rawValue:))
-            if values["metadata_encoding"] != nil && encoding == nil {
-                throw SQLiteIndexError(message: "Index has an unsupported metadata encoding. Upgrade md-utils before opening it.")
-            }
-            if values["body_mode"] != nil && bodyMode == nil {
-                throw SQLiteIndexError(message: "Index has an unsupported body mode. Upgrade md-utils before opening it.")
-            }
-            return (encoding, bodyMode)
-        }
-        let jsonbAvailable = try databaseQueue.read { jsonbProbe?($0) ?? supportsJSONB($0) }
-        if recordedPolicy.encoding == .jsonb && !jsonbAvailable {
-            throw SQLiteIndexError(message: "This cache stores SQLite JSONB, but linked SQLite \(Self.sqliteVersion) cannot read JSONB. Run index update --rebuild --metadata-encoding text to rebuild from authoritative files on this runtime.")
-        }
-        let selectedEncoding = recordedPolicy.encoding ?? (existingCollection ? .text : (jsonbAvailable ? .jsonb : .text))
-        if existingCollection {
-            try databaseQueue.read { database in
-                let savedRoot = try String.fetchOne(database, sql: "SELECT value FROM index_metadata WHERE key='root'")
-                guard savedRoot == nil || savedRoot == root else {
-                    throw SQLiteIndexError(message: "Index belongs to a different project root: \(savedRoot ?? "").")
+        if exists {
+            try databaseQueue.write { db in
+                guard try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='root'") == root else {
+                    throw SQLiteIndexError(message: "Index belongs to a different project root.")
                 }
-                let expectedType = selectedEncoding == .jsonb ? "blob" : "text"
-                if try Bool.fetchOne(database, sql: "SELECT EXISTS(SELECT 1 FROM documents WHERE typeof(metadata)!=?)",
-                    arguments: [expectedType]) == true {
-                    throw SQLiteIndexError(message: "Metadata storage does not match the recorded encoding. Run index update --rebuild --metadata-encoding text.")
+                guard try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='format'") == Self.cacheFormat else {
+                    throw SQLiteIndexError(message: "Incompatible disposable index. Run index update --rebuild; legacy SQLite settings are not imported.")
+                }
+                let policy = try storagePolicy(db)
+                if policy.bodyMode == .fts { try checkFTSCapability(db) }
+                if policy.metadataEncoding == .jsonb && !(jsonbProbe?(db) ?? supportsJSONB(db)) {
+                    throw SQLiteIndexError(message: "SQLite cannot read this JSONB cache. Run index update --rebuild --metadata-encoding text.")
                 }
             }
+            return
         }
-        // A collection without a recorded mode predates the storage-policy
-        // migration and retained searchable bodies. Migrated collections must
-        // honor their persisted policy so metadata-only reopen never needs FTS5.
-        let selectedBodyMode = recordedPolicy.bodyMode ?? (existingCollection ? .fts : .metadataOnly)
-        if selectedBodyMode == .fts {
-            try databaseQueue.write { try checkFTSCapability($0) }
-        }
-        var migrator = DatabaseMigrator()
-        migrator.registerMigration("collection-v1") { db in
+        try createCollection(root: root, configuration: configuration, checkFTSCapability: checkFTSCapability, jsonbProbe: jsonbProbe)
+    }
+
+    static let cacheFormat = "6"
+
+    func createCollection(root: String, configuration: IndexConfiguration,
+        checkFTSCapability: (Database) throws -> Void = SQLiteIndexDatabase.checkFTSCapability,
+        jsonbProbe: ((Database) -> Bool)? = nil) throws {
+        try databaseQueue.write { db in
+            let available = jsonbProbe?(db) ?? supportsJSONB(db)
+            let encoding = configuration.metadataEncoding ?? (available ? .jsonb : .text)
+            guard encoding != .jsonb || available else { throw SQLiteIndexError(message: "JSONB unavailable; rebuild with text encoding.") }
+            if configuration.bodyMode == .fts { try checkFTSCapability(db) }
             try db.execute(sql: """
                 CREATE TABLE index_metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL);
                 INSERT INTO index_metadata VALUES ('generation', '0');
@@ -204,15 +191,13 @@ extension SQLiteIndexDatabase {
                   location TEXT NOT NULL, message TEXT NOT NULL,
                   FOREIGN KEY(scope_id, path) REFERENCES assessments(scope_id, path) ON DELETE CASCADE);
                 CREATE TABLE documents(path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
-                  metadata TEXT NOT NULL CHECK(json_valid(metadata)), body TEXT);
+                  metadata BLOB NOT NULL CHECK(json_valid(json(metadata))), body TEXT);
                 CREATE INDEX assessments_path ON assessments(path);
                 CREATE VIEW current_documents AS SELECT d.path,json(d.metadata) AS metadata,d.body
                   FROM documents d JOIN files f USING(path)
                   WHERE f.state='ok' AND EXISTS(SELECT 1 FROM assessments a JOIN scopes s ON s.id=a.scope_id
                     WHERE a.path=d.path AND a.selected=1 AND s.state='complete');
                 """)
-        }
-        migrator.registerMigration("collection-v2-query-schema") { db in
             try db.execute(sql: """
                 CREATE TABLE index_fields(
                   name TEXT PRIMARY KEY,
@@ -222,46 +207,7 @@ extension SQLiteIndexDatabase {
                   type_name TEXT PRIMARY KEY,
                   view_name TEXT NOT NULL UNIQUE);
                 """)
-        }
-        migrator.registerMigration("collection-v3-storage-policy") { database in
-            let preservedViews = try Row.fetchAll(database, sql: """
-                SELECT name,sql FROM sqlite_master
-                WHERE type='view' AND name!='current_documents' AND sql IS NOT NULL ORDER BY name
-                """).map { ($0["name"] as String, $0["sql"] as String) }
-            let preservedIndexes = try String.fetchAll(database, sql: """
-                SELECT sql FROM sqlite_master
-                WHERE type='index' AND tbl_name='documents' AND sql IS NOT NULL ORDER BY name
-                """)
-            for (name, _) in preservedViews {
-                try database.execute(sql: "DROP VIEW \(Self.identifier(name))")
-            }
-            try database.execute(sql: "DROP VIEW current_documents")
-            try Self.dropFTS(database)
-            try database.execute(sql: "ALTER TABLE documents RENAME TO documents_legacy")
-            try database.execute(sql: """
-                CREATE TABLE documents(
-                  path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
-                  metadata BLOB NOT NULL CHECK(json_valid(json(metadata))),
-                  body TEXT);
-                """)
-            let metadataExpression = selectedEncoding == .jsonb ? "jsonb(metadata)" : "json(metadata)"
-            let bodyExpression = selectedBodyMode == .fts ? "body" : "NULL"
-            try database.execute(sql: """
-                INSERT INTO documents(path,metadata,body)
-                SELECT path,\(metadataExpression),\(bodyExpression) FROM documents_legacy;
-                DROP TABLE documents_legacy;
-                """)
-            try database.execute(sql: "INSERT INTO index_metadata VALUES('body_mode',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                arguments: [selectedBodyMode.rawValue])
-            try database.execute(sql: "INSERT INTO index_metadata VALUES('metadata_encoding',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                arguments: [selectedEncoding.rawValue])
-            try Self.createCurrentDocumentsView(database, bodyMode: selectedBodyMode)
-            for sql in preservedIndexes { try database.execute(sql: sql) }
-            for (_, sql) in preservedViews { try database.execute(sql: sql) }
-            if selectedBodyMode == .fts { try Self.createFTS(database) }
-        }
-        migrator.registerMigration("collection-v4-refresh-staging") { database in
-            try database.execute(sql: """
+            try db.execute(sql: """
                 CREATE TABLE refresh_seen(
                   generation INTEGER NOT NULL, scope_id TEXT NOT NULL, path TEXT NOT NULL,
                   PRIMARY KEY(generation,scope_id,path));
@@ -284,22 +230,13 @@ extension SQLiteIndexDatabase {
                   category TEXT NOT NULL, severity TEXT NOT NULL, code TEXT NOT NULL,
                   location TEXT NOT NULL, message TEXT NOT NULL);
                 """)
+            try db.execute(sql: "INSERT INTO index_metadata VALUES('root',?),('format',?),('epoch',?),('body_mode',?),('metadata_encoding',?)",
+                arguments: [root, Self.cacheFormat, UUID().uuidString, configuration.bodyMode.rawValue, encoding.rawValue])
+            try Self.createCurrentDocumentsView(db, bodyMode: configuration.bodyMode)
+            if configuration.bodyMode == .fts { try Self.createFTS(db) }
+            try Self.createMetadataValidation(db)
         }
-        migrator.registerMigration("collection-v5-metadata-validation") { database in
-            try Self.createMetadataValidation(database)
-        }
-        guard try databaseQueue.read({ try migrator.hasBeenSuperseded($0) }) == false else {
-            throw SQLiteIndexError(message: "Index schema was created by a newer md-utils version. Upgrade md-utils before updating this index.")
-        }
-        try migrator.migrate(databaseQueue)
-        try databaseQueue.write { db in
-            let existing = try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='root'")
-            guard existing == nil || existing == root else {
-                throw SQLiteIndexError(message: "Index belongs to a different project root: \(existing ?? "").")
-            }
-            try db.execute(sql: "INSERT OR IGNORE INTO index_metadata VALUES ('root', ?)", arguments: [root])
-            try refreshTypeViews(db)
-        }
+        try installConfiguration(configuration)
     }
 
     /// Returns saved declarations, including incomplete scopes, in stable identifier order.

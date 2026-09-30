@@ -182,12 +182,25 @@ without a read transaction can see different committed generations; use
 `streamQuery` for a single consistent query. A failed or cancelled refresh never
 marks partially staged content complete.
 
-`--rebuild` ignores cached results and regenerates all registered scopes. It
-retains the database schema, saved scopes/config path, SQL field indexes, and
-views. An incomplete rebuild retains unavailable rows for recovery. Deleting the
-database also deletes these declarations; register scopes again after deletion.
-Migrations are transactional; databases from newer versions are rejected rather
-than reset automatically.
+`--rebuild` creates a fresh database from authoritative files and settings in
+`.md-utils/md-utils.indexconfig.json`. Registered scopes, config path, body mode,
+encoding, and managed field indexes survive; type views derive from type scopes.
+Cached results, provenance, and arbitrary SQL objects do not survive. Edit the
+JSON to replace settings; explicit directory/config/encoding overrides are saved
+after a successful rebuild. Deleting SQLite alone retains the JSON settings.
+
+Fresh databases are staged under `.md-utils/rebuild/` and published through SQLite
+backup under the collection writer lease and an exclusive database lock. Failed
+scans retain the old cache and settings. Readers can receive busy/unavailable
+errors during publication; server projections are recreated afterward. A new
+epoch prevents generation reuse. A config-save failure after publication is
+reported; retry with the same overrides (there is no cross-file transaction).
+
+Cache formats are versioned without historical schema migrations. Incompatible
+caches require `index update --rebuild`. Unreleased legacy SQLite settings are
+not imported; supply scopes again. Mutation receipts remain independent in
+`.md-utils/mutations/`. Pending user edits belong outside the disposable cache;
+rebuild refuses databases containing the legacy `pending_edits` table.
 
 `index query` and `index explain` always perform the same incremental refresh of
 every saved scope before opening a serialized read snapshot. Any incomplete scan,
@@ -267,14 +280,10 @@ To recover a JSONB cache on an older runtime, run:
 md-utils index update --rebuild --metadata-encoding text
 ```
 
-This explicit recovery copies the database into `.md-utils/rebuild/`, discards
-cached metadata there without decoding JSONB, and reevaluates every saved scope
-from authoritative files. It retains field declarations, views, body mode, and
-separate pending-edit tables. Pending edits must remain independent of disposable
-document rows; this does not implement `index apply` (#142). Publication uses
-SQLite backup only after a complete refresh. Cancellation, scan/evaluation errors,
-or failed publication leave the original cache intact. Scratch copies are removed
-on normal exit; abandoned copies after a crash can be deleted.
+This override uses the same fresh-cache rebuild with text metadata. It never
+decodes cached JSONB. Declarations come from JSON, not the old database. Failed
+refreshes retain the original cache. Scratch copies are removed on normal exit;
+abandoned copies after a crash can be deleted. This does not implement #142.
 
 Recovery acquires an exclusive SQLite lock for the copy, refresh, and publication.
 Stop watchers, servers, editors, and external connections if lock acquisition fails.

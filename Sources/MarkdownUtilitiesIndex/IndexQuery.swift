@@ -57,7 +57,7 @@ public struct IndexQuerySummary: Equatable, Sendable {
 }
 
 /// A managed expression index projected into generated type views.
-public struct IndexField: Equatable, Sendable {
+public struct IndexField: Codable, Equatable, Sendable {
     public var name: String
     public var jsonPath: String
     public var columnName: String

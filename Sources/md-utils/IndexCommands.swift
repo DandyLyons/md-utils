@@ -31,13 +31,14 @@ extension CLIEntry {
             @Option(help: "Use text with --rebuild to recover a JSONB cache on older SQLite") var metadataEncoding: String?
             /// Resolves the project and commits a refresh, reporting partial failures.
             mutating func run() async throws {
-                if let metadataEncoding {
-                    guard rebuild, metadataEncoding == "text" else {
-                        throw ValidationError("--metadata-encoding accepts text and requires --rebuild.")
-                    }
+                if metadataEncoding != nil && (!rebuild || metadataEncoding != "text") {
+                    throw ValidationError("--metadata-encoding accepts text and requires --rebuild.")
+                }
+                if rebuild {
                     let context = try options.context(prepare: false)
-                    try await context.database.rebuildAsText(root: context.canonicalRoot.path,
-                        scratchDirectory: context.canonicalRoot.appendingPathComponent(".md-utils/rebuild/")) { copy, lease in
+                    var settings = try IndexConfiguration.load(root: context.canonicalRoot.path)
+                    if metadataEncoding == "text" { settings.metadataEncoding = .text }
+                    try await context.database.rebuild(root: context.canonicalRoot.path, configuration: settings) { copy, lease in
                         try await options.run(kind: .directory, directory: directory, name: "", rebuild: true,
                             databaseOverride: copy, writerLease: lease)
                     }
@@ -123,7 +124,9 @@ extension CLIEntry {
                 @Option(help: "Projected SQL column name (lowercase letters, numbers, underscores)") var name: String?
                 @OptionGroup var options: IndexOptions
                 mutating func run() throws {
-                    let field = try options.context().database.addField(jsonPath: jsonPath, columnName: name)
+                    let database = try options.context().database
+                    let field = try database.addField(jsonPath: jsonPath, columnName: name)
+                    try database.saveConfiguration()
                     print("\(field.columnName)\t\(field.queryExpression)\t\(field.name)")
                 }
             }
@@ -132,9 +135,11 @@ extension CLIEntry {
                 @Argument(help: "JSON path or projected column name") var field: String
                 @OptionGroup var options: IndexOptions
                 mutating func run() throws {
-                    guard try options.context().database.removeField(field) else {
+                    let database = try options.context().database
+                    guard try database.removeField(field) else {
                         throw ValidationError("No managed field found for \(field).")
                     }
+                    try database.saveConfiguration()
                 }
             }
 

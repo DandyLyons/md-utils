@@ -155,6 +155,15 @@ public struct CollectionIndexer: Sendable {
         if let writerLease { lease = writerLease } else { lease = try await CollectionWriterLease.acquire(root: root) }
         guard lease.root == root.resolvingSymlinksInPath() else { throw SQLiteIndexError(message: "Writer lease belongs to another collection.") }
         defer { withExtendedLifetime(lease) {} }
+        if rebuild && !database.path.contains("/.md-utils/rebuild/") {
+            var report = IndexUpdateReport()
+            try await database.rebuild(root: root.path, writerLease: lease) { fresh, lease in
+                let indexer = try CollectionIndexer(database: fresh, root: root)
+                report = try await indexer.updateMany(adding: scope, writerLease: lease,
+                    fingerprint: fingerprint, verifyHashes: true, limits: limits, evaluate: evaluate)
+            }
+            return report
+        }
         guard limits.candidateBatchCount > 0, limits.discoveryBatchCount > 0,
             limits.discoveryBatchBytes > 0, limits.fileBytes > 0,
             limits.changeBatchCount > 0, limits.changeBatchBytes > 0,
@@ -322,6 +331,7 @@ public struct CollectionIndexer: Sendable {
         try Task.checkCancellation()
         try database.commitStagedRefresh(scopes: scopes, errors: scopeErrors,
             fingerprint: fingerprint, generation: generation)
+        try database.saveConfiguration()
         return report
     }
 

@@ -57,6 +57,7 @@ extension SQLiteIndexDatabase {
             try Self.createCurrentDocumentsView(database, bodyMode: mode)
             try refreshTypeViews(database)
         }
+        try saveConfiguration()
     }
 
     /// Rewrites the database file so pages freed by disabling FTS can be returned.

@@ -6,7 +6,7 @@ Register independent selections and refresh their derived content transactionall
 
 Create the database's parent directory, open ``SQLiteIndexDatabase``, and pass it
 to ``CollectionIndexer/init(database:root:)``. The initializer canonicalizes the
-root, applies migrations, and rejects a database bound to a different project.
+root, checks the cache format, and rejects a database bound to a different project.
 
 ```swift
 let root = URL(fileURLWithPath: "/path/to/project/", isDirectory: true)
@@ -64,9 +64,10 @@ writers cannot stage data or discard a newer writer's work. Scope states remain
 unavailable after an interrupted scan. Watch consumers must exclude the cache
 directory and SQLite journals. SQLite retains freed staging pages for reuse.
 
-Set `rebuild` to reevaluate all candidates. Rebuilding retains saved scopes,
-configuration paths, SQL expression indexes, and views. Removing the database
-also removes those declarations; a rebuild does not restore a folder from SQLite.
+Set `rebuild` to create a fresh cache from files and declarations saved in
+`.md-utils/md-utils.indexconfig.json`. Managed indexes and type views are recreated;
+arbitrary SQL objects and observation history are discarded. Deleting only SQLite
+retains the saved JSON settings. Failed rebuilds retain the previous database.
 
 ## Handle partial failures
 

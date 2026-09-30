@@ -83,6 +83,10 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
     if plan.resources.contains(where: \.searchEnabled), try database.storagePolicy().bodyMode != .fts {
       throw MarkdownServerReadError.searchUnavailable
     }
+    try Self.prepareProjectionTables(database)
+  }
+
+  private static func prepareProjectionTables(_ database: SQLiteIndexDatabase) throws {
     try database.serverWrite { db in
       try db.execute(sql: """
         CREATE TABLE IF NOT EXISTS server_publications(plan TEXT PRIMARY KEY, generation TEXT NOT NULL, source TEXT NOT NULL);
@@ -170,12 +174,14 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
   }
 
   private func sourceGeneration(_ db: Database) throws -> String {
-    try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='published_generation'") ?? "0"
+    let epoch = try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='epoch'") ?? ""
+    return epoch + ":" + (try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='published_generation'") ?? "0")
   }
 
   /// Disk-backed staging keeps the old publication readable until every candidate succeeds.
   private func synchronize() async throws {
     guard !projecting else { return }
+    try Self.prepareProjectionTables(database)
     // Source syntax diagnostics remain visible through rule-selected records. Only
     // operational failures prevent publication; validation is not a refresh failure.
     guard try !hasOperationalFailure() else { throw MarkdownServerReadError.unavailable }

@@ -97,7 +97,7 @@ functions.
 
 Recover an incompatible cache from files with
 `index update --rebuild --metadata-encoding text`. This works on older SQLite
-runtimes without decoding the old JSONB. A private disk copy preserves scopes,
-field/view declarations, and separate pending edits; incomplete refreshes leave
-the original untouched. Stop other index writers during recovery. Existing text
+runtimes without decoding the old JSONB. A fresh database restores scopes and
+managed declarations from JSON; incomplete refreshes leave the original untouched.
+Pending edits belong outside the disposable index. Stop other index writers during recovery. Existing text
 caches stay text on later updates and ordinary rebuilds.
