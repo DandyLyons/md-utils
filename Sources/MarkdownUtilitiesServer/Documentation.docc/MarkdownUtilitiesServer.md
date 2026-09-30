@@ -1,6 +1,6 @@
 # ``MarkdownUtilitiesServer``
 
-Persist canonical Markdown records, compile explicit resources, and serve immutable native reads.
+Persist canonical Markdown records, compile explicit resources, and serve configured reads and mutations.
 
 ## Overview
 
@@ -25,7 +25,12 @@ Server resources are opt-in. A loaded rule or mdtype is never exposed unless a
 ``ResourceMutationPlanner`` uses an explicit writable codec declaration to propose
 and validate complete records without persistence. Destination rules/types must pass;
 by default all other currently passing loaded contracts are preserved as well. An
-explicit endpoint-only override reports permitted losses. HTTP routes remain read-only.
+explicit endpoint-only override reports permitted losses. Configuration version `3`
+can independently enable CRUD, identity edits, and UUID repair through
+``MarkdownMutationConfiguration``. The HTTP adapter delegates writes to a
+``MarkdownMutationService``; the indexed native runtime coordinates canonical
+persistence, refreshed publication, and durable recovery receipts. Generated OpenAPI
+describes these write routes alongside reads. See <doc:GeneratedOpenAPI>.
 
 ```swift
 import MarkdownUtilitiesCore
@@ -115,8 +120,9 @@ plan includes one reserved `GET /_md-utils/path/{path}` contract route. The nati
 adapter maps that semantic route to its `**` catch-all. Resource routes
 cannot use the `/_md-utils` namespace.
 
-``EndpointRouteDescription`` values contain only an HTTP method, canonical path
-template, semantic route kind, optional resource name, and stable operation ID.
+``EndpointRouteDescription`` values contain an HTTP method, canonical path
+template, semantic route kind, optional resource name, stable operation ID, and
+lookup/mutation metadata where applicable.
 ``MarkdownServerHTTPAdapter`` installs these routes in Hummingbird 2, including the
 plan-owned `/openapi.json` route. ``MarkdownServerOpenAPIGenerator`` derives the
 OpenAPI 3.1.1 description from the same plan. See <doc:GeneratedOpenAPI>.
@@ -135,8 +141,9 @@ projection policies without mutating the plan.
 
 ## Configuration boundary
 
-``MarkdownServerConfiguration`` is a versioned `Codable` model, currently version
-`1`. ``MarkdownServerProjectLoader`` decodes the human-authored YAML at
+``MarkdownServerConfiguration`` is a versioned `Codable` model. Versions `1` and
+`2` support read-only resources; version `3` adds explicit mutation configuration.
+``MarkdownServerProjectLoader`` decodes the human-authored YAML at
 `.md-utils/server/server.yaml`, loads rules and mdtypes, recursively imports Markdown, and
 builds the immutable plan and snapshot before route registration. Server
 configuration is separate from the md-utils CLI configuration and does not extend

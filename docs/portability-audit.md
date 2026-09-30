@@ -68,7 +68,7 @@ YAML, diagnostic, and node-association behavior.
 - Put directory scanning, path discovery, file metadata, extended attributes, environment access, and host configuration in `MarkdownUtilities`.
 - Put argument parsing, terminal styling, printing, and exit codes in `md-utils`.
 - Do not use conditional compilation to hide an integration inside Core; introduce a native adapter instead.
-- Re-run the Linux container whenever Core sources or direct dependencies change.
+- Linux container builds run in CI only whenever Core sources or direct dependencies change.
 
 ## Import Migration
 

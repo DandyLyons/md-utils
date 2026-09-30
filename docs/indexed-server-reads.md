@@ -94,7 +94,6 @@ are outside this implementation.
 
 ```sh
 swift test
-docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 python3 scripts/benchmark-server-reads.py --count 1000
 python3 scripts/benchmark-server-reads.py --count 100000
 ```

@@ -12,7 +12,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 ## Project Brief
 
 - **Language**: Swift 6.3+
-- **REST mutations**: Explicit config v3 operation opt-ins use a derived `FileEditPolicy`, #90 codecs, source revision headers, collection writer leases, atomic native writes, and durable receipts outside SQLite. Creation supports expressive filenames, optional slug allocation, creation-only identifiers, and opted-in UUID generation. Identity edits and UUID repair are separate. See `docs/rest-mutations.md`; tests: `swift test --filter MarkdownMutationTests`. Generated mutation OpenAPI remains #108; CLI apply remains #142.
+- **REST mutations**: Explicit config v3 operation opt-ins use a derived `FileEditPolicy`, #90 codecs, source revision headers, collection writer leases, atomic native writes, and durable receipts outside SQLite. Creation supports expressive filenames, optional slug allocation, creation-only identifiers, and opted-in UUID generation. Identity edits and UUID repair are separate. OpenAPI includes enabled mutations, aliases, receipts, status/recovery, and codec-specific requests from the same endpoint plan. See `docs/rest-mutations.md`; tests: `swift test --filter 'MarkdownMutationTests|MarkdownMutationOpenAPITests|MarkdownServerOpenAPITests'`. CLI apply remains #142.
 - **Slug generation**: Core's `MarkdownSlugGenerator` provides pure generation and supplied-value validation; `md-utils slug` prints a candidate without changing files or guaranteeing uniqueness. Heading anchors retain historical behavior. See `docs/slug-generation.md`; tests: `swift test --filter 'MarkdownSlugGeneratorTests|SlugTests|HeadingTextExtractorTests'`.
 - **Named server lookups**: Server config v2 adds explicit named aliases, resource/server uniqueness constraints, and optional shared UUID assessment, retaining v1 reads. Native aliases use bounded disk staging in the existing publication generation; portable snapshots share identity semantics. Lookup/protection/uniqueness are separate. No mutation routes are enabled by #153. See `docs/resource-lookups.md`; tests: `swift test --filter 'NamedLookupTests|IndexedMarkdownRepositoryTests'`.
 - **Writable resource planning**: Core owns explicit top-level metadata/body codecs, revision-bound proposals, and mutation validation; Templates reuses the shared SwiftKnap renderer for creation. Server resources may declare `writable` without enabling HTTP write routes. Validation preserves all currently passing loaded types/rules by default, with an explicit endpoint-only override. Metadata edits preserve values and body bytes, not frontmatter comments/formatting; body-only edits retain frontmatter bytes. See `docs/resource-mutations.md`; tests: `swift test --filter 'ResourceCodecTests|ResourceMutationValidatorTests|TemplateResourceCreationCodecTests|ResourceMutationPlannerTests'`. No persistence or REST mutations are implemented by #90.
@@ -31,7 +31,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 - **Formatter/Linter**: No dedicated formatter or linter is configured in-package
 - **Documentation**: README.md, AGENTS.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
 - **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/TOML/JSON parsing failures as user-visible errors
-- **CI/Coverage**: Schema publication, Pages, WebAssembly, native Linux server, and native SQLite workflows are configured; local verification uses `Dockerfile.server-linux` and `Dockerfile.sqlite-index`; no coverage command is documented. Refresh scale measurements use `scripts/benchmark-index-refresh.py`; see `docs/index-refresh-benchmarks.md` for corpus characteristics and resource budgets.
+- **CI/Coverage**: Schema publication, Pages, WebAssembly, native Linux server, and native SQLite workflows are configured; Docker Linux builds run in CI only; no coverage command is documented. Refresh scale measurements use `scripts/benchmark-index-refresh.py`; see `docs/index-refresh-benchmarks.md` for corpus characteristics and resource budgets.
 
 ## Requirements
 
@@ -48,15 +48,11 @@ swift build
 # Test
 swift test
 
-# Build and test Core on Linux
-docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
-
-# Build and test the native server on Linux
-docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
-
 # Run CLI
 swift run md-utils <command>
 ```
+
+Linux Docker builds and validation run in CI only.
 
 > [!Note] 
 > If no `.build/` directory exists, run `swift build` first to create. Do not use the `.build/` directory from another worktree or branch. 

@@ -169,9 +169,10 @@ in the future mutation coordinator; SQLite cannot transact a filesystem write.
 swift test --filter 'ResourceCodecTests|ResourceMutationValidatorTests|TemplateResourceCreationCodecTests|ResourceMutationPlannerTests'
 swift test --filter IndexedMarkdownRepositoryTests
 swift test
-docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
 scripts/build-wasm.sh
 ```
+
+Linux Docker builds and validation run in CI only.
 
 The native integration test produces identical proposed source and baseline revisions
 with metadata-only and FTS caches, rejects changed authoritative source, and verifies

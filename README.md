@@ -94,11 +94,7 @@ import MarkdownUtilities
 
 ### Linux Validation
 
-Core is tested with Swift 6.3 on Linux in Docker:
-
-```bash
-docker build --file Dockerfile.core-linux --tag md-utils-core-linux .
-```
+Core is tested with Swift 6.3 on Linux in Docker in CI.
 
 ---
 
@@ -638,11 +634,16 @@ and optional FTS search are described by the generated OpenAPI contract. See
 [indexed server reads](docs/indexed-server-reads.md) for query parameters, the
 breaking collection-response change, consistency guarantees, and memory limits.
 
-Verify the native server on Linux with:
+Generated OpenAPI also describes explicitly enabled CRUD, identity edits, UUID
+repair, lookup aliases, and operation status/recovery. Creation requires an
+`Idempotency-Key`; other writes require the `MD-Utils-If-Revision` token returned
+by item reads. For a resource with writable `title`, a PATCH body can be
+`{"frontmatter":{"set":{"title":"Revised title"}}}`. Completed creates return
+`201`; other writes, including DELETE, return `200` with a durable receipt.
+Publication failures can report committed source with recovery still pending.
+See [REST mutations](docs/rest-mutations.md) for configuration and complete examples.
 
-```bash
-docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
-```
+The native server is built and tested on Linux in Docker in CI.
 
 ## Architecture
 
@@ -672,7 +673,7 @@ docker build --file Dockerfile.server-linux --tag md-utils-server-linux .
 ## Platform Compatibility
 **macOS** is the primary development and testing platform. Core, native integrations, and the CLI are covered by the full Swift test suite.
 
-**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.3 using `Dockerfile.core-linux`. The native read-only server is separately built and tested with `Dockerfile.server-linux`. The complete `MarkdownUtilities` and `md-utils` CLI layers are not covered by the Core guarantee.
+**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.3 using `Dockerfile.core-linux` in CI. The native read-only server is separately built and tested with `Dockerfile.server-linux` in CI. The complete `MarkdownUtilities` and `md-utils` CLI layers are not covered by the Core guarantee.
 
 Template rendering uses SwiftKnap on macOS and Linux. Ubuntu 24.04 builds of the CLI
 and server require `libjavascriptcoregtk-4.1-dev` and `pkg-config`; deployment requires
