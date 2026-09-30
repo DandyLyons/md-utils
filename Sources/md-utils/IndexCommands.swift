@@ -15,7 +15,21 @@ extension CLIEntry {
         static let configuration = CommandConfiguration(commandName: "index",
             abstract: "Maintain a rebuildable SQLite collection cache",
             subcommands: [Update.self, Watch.self, SelectType.self, SelectRule.self, Query.self, Explain.self,
-                Field.self, Search.self, Status.self])
+                Field.self, Search.self, Status.self, Provenance.self])
+
+        /// Read-only bounded evidence; never chooses or applies a UUID rewrite.
+        struct Provenance: AsyncParsableCommand {
+            static let configuration = CommandConfiguration(abstract: "Explain retained document observations and managed operations")
+            @Argument(help: "Collection-relative document paths (at most 256)") var paths: [String]
+            @OptionGroup var options: IndexOptions
+            mutating func run() async throws {
+                options.verifyHashes = true
+                let database = try await options.run(kind: .directory, directory: nil, name: "", quiet: true)
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+                print(String(decoding: try encoder.encode(database.provenance(paths: paths)), as: UTF8.self))
+            }
+        }
 
         /// Refreshes every saved scope and optionally registers a directory collection.
         struct Update: AsyncParsableCommand {

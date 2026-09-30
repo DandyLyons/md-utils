@@ -123,9 +123,10 @@ the persistent UUID are protected across resources selecting either the baseline
 or proposal. Ordinary edits cannot bypass them by changing membership. ISBN-like
 fields use creation-only input and explicit identity edits. UUIDs are excluded from
 ordinary identity editing; explicit repair generates a new UUID for the selected
-document and does not rewrite backlinks. With no reliable provenance identifying
-an original, choose the intended duplicate by path. #152 can later supply evidence
-for safe automatic duplicate selection; timestamps alone are not that evidence.
+document and does not rewrite backlinks. Choose the intended duplicate by path.
+The shared read-only provenance assessor explains evidence and uncertainty; it does
+not enable automatic rewrites. See [document provenance](document-provenance.md).
+Timestamps and discovery order never establish ownership.
 
 Metadata edits preserve body bytes and unaffected metadata **values**, but may
 reserialize the entire frontmatter block, losing its comments/formatting. Body-only

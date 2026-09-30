@@ -138,6 +138,7 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
       diagnostics: validation?.diagnostics ?? [],
     )
     receipt.validationPolicy = request.validationPolicy
+    receipt.provenanceEpoch = try database.provenanceEpoch()
     receipt.conformanceChanges = validation?.changes.filter { ($0.previouslyPassed && !$0.passes) || ($0.previouslySelected && !$0.selected) } ?? []
     try writeReceipt(receipt)
     do {
@@ -206,6 +207,7 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     } else {
       receipt.state = .committed
       receipt.sourceCommitted = true
+      receipt.provenanceOperatorConfirmed = true
       try writeReceipt(receipt)
       try await refresh(lease: lease)
       receipt = try await published(receipt)
@@ -243,6 +245,20 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
         throw MarkdownMutationError(503, "publication.pending", "The committed revision is not yet published.")
       }
       receipt.record = record
+    }
+    if receipt.provenanceEpoch == (try database.provenanceEpoch()) {
+      let kind: ManagedDocumentEvent.Kind
+      switch receipt.operation {
+      case .create: kind = .create
+      case .replace, .patch: kind = .edit
+      case .delete: kind = .delete
+      case .identity: kind = .identity
+      case .repairUUID: kind = .repairUUID
+      }
+      try database.recordManagedEvent(.init(id: receipt.id, kind: kind, path: receipt.path.rawValue,
+        revision: receipt.revision?.rawValue, sourceRevision: receipt.baseline?.rawValue,
+        confirmation: receipt.provenanceOperatorConfirmed == true ? .operatorConfirmed : .coordinator,
+        observedAt: receipt.created.timeIntervalSince1970))
     }
     receipt.state = .completed
     receipt.completedAt = Date()

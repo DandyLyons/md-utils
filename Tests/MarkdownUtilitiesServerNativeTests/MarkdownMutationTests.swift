@@ -47,6 +47,27 @@ struct MarkdownMutationTests {
   }
 
   @Test
+  func confirmedReceiptsSupplyEvidenceAndExternalCopiesRemainAmbiguous() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let receipt = try await create(repository)
+    let db = try SQLiteIndexDatabase(path: (root + ".md-utils/index.sqlite").string)
+    let evidence = try db.provenance(paths: [receipt.path.rawValue])
+    #expect(evidence.events.count == 1)
+    #expect(evidence.events.first?.kind == .create)
+    let text = try (root + receipt.path.rawValue).read(.utf8)
+    try (root + "books/copy.md").write(text)
+    guard case .string(let uuid) = receipt.record?.frontmatter?["uuid"] else {
+      Issue.record("Missing generated UUID"); return
+    }
+    let explanation = try await repository.explainUUIDCollision(uuid)
+    #expect(explanation.ambiguous)
+    #expect(!explanation.relationships.isEmpty)
+    _ = try await create(repository)
+    #expect(try db.provenance(paths: [receipt.path.rawValue]).events.count == 1)
+  }
+
+  @Test
   func `template warnings survive durable receipt replay`() async throws {
     let root = try fixture(template: "# Book\n{{ data.text | date:'YYYY' }}")
     defer { try? root.delete() }

@@ -34,7 +34,7 @@ extension SQLiteIndexDatabase {
 
     func discardStagedRefresh(generation: Int) throws {
         try databaseQueue.write { database in
-            for table in ["refresh_diagnostics", "refresh_assessments", "refresh_files", "refresh_seen", "refresh_scopes"] {
+            for table in ["refresh_diagnostics", "refresh_assessments", "refresh_files", "refresh_seen", "refresh_scopes", "refresh_verified"] {
                 try database.execute(sql: "DELETE FROM \(table) WHERE generation=?", arguments: [generation])
             }
         }
@@ -42,7 +42,7 @@ extension SQLiteIndexDatabase {
 
     func beginStagedRefresh(scopes: [IndexScope], fingerprint: String) throws -> Int {
         try databaseQueue.write { database in
-            try database.execute(sql: "DELETE FROM refresh_diagnostics; DELETE FROM refresh_assessments; DELETE FROM refresh_files; DELETE FROM refresh_seen; DELETE FROM refresh_scopes")
+            try database.execute(sql: "DELETE FROM refresh_diagnostics; DELETE FROM refresh_assessments; DELETE FROM refresh_files; DELETE FROM refresh_seen; DELETE FROM refresh_scopes; DELETE FROM refresh_verified")
             let generation = (try Int.fetchOne(database,
                 sql: "SELECT value FROM index_metadata WHERE key='generation'") ?? 0) + 1
             try database.execute(sql: "UPDATE index_metadata SET value=? WHERE key='generation'",
@@ -196,6 +196,7 @@ extension SQLiteIndexDatabase {
                 try database.execute(sql: "INSERT INTO index_metadata VALUES('last_completed_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                     arguments: [String(Date().timeIntervalSince1970)])
             }
+            try publishObservations(database, generation: generation, complete: errors.isEmpty && !stagedFailures)
             try refreshTypeViews(database)
             try database.execute(sql: "INSERT INTO index_metadata VALUES('published_generation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 arguments: [String(generation)])

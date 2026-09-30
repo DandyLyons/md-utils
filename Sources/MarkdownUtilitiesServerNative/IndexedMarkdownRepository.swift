@@ -13,7 +13,7 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
   public nonisolated let plan: EndpointPlan
   let root: URL
   private let configurationFile: String?
-  private let database: SQLiteIndexDatabase
+  let database: SQLiteIndexDatabase
   let evaluator: IndexProjectEvaluator
   private let configurationSignature: Data
   private let projectionKey: String

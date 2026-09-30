@@ -94,6 +94,7 @@ let package = Package(
     .target(
       name: "MarkdownUtilitiesIndex",
       dependencies: [
+        "MarkdownUtilitiesCore",
         .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "SystemPackage", package: "swift-system"),
         .product(name: "GRDB", package: "GRDB.swift"),

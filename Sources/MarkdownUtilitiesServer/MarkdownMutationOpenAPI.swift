@@ -224,6 +224,7 @@ enum MarkdownMutationOpenAPI {
       "validationPolicy": ref("ResourceMutationValidationPolicy"), "conformanceChanges": list(ref("ResourceConformanceChange")),
       "code": enumeration(["mutation.publication-pending", "mutation.recovery-required", "mutation.abandoned"]),
       "operationStatus": text,
+      "provenanceEpoch": text, "provenanceOperatorConfirmed": boolean,
     ]
     receipt["committed"] = .object(["type": strings(["boolean", "null"]), "description": .string("Null means uncertain, true means canonical source committed. This does not imply index publication completed.")])
     let editCases: [JSONValue] = [

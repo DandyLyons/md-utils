@@ -274,6 +274,7 @@ public struct CollectionIndexer: Sendable {
                     guard before == afterRead, Int64(data.count) == size else {
                         throw SQLiteIndexError(message: "File changed while reading; retry update: \(path)")
                     }
+                    try database.stageVerified(generation: generation, path: path)
                     guard let content = String(data: data, encoding: .utf8) else {
                         throw SQLiteIndexError(message: "File is not UTF-8 text: \(path)")
                     }

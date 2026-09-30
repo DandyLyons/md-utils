@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Document provenance**: Core owns portable observations and conservative UUID collision explanations; the native index retains bounded first/latest observations and confirmed receipt events. Rebuild discards history. `index provenance` exposes revision-verified evidence; native `explainUUIDCollision` remains read-only. See `docs/document-provenance.md`; tests: `swift test --filter 'DocumentProvenanceTests|IndexProvenanceTests|MarkdownMutationTests'`.
+
 - **Language**: Swift 6.3+
 - **REST mutations**: Explicit config v3 operation opt-ins use a derived `FileEditPolicy`, #90 codecs, source revision headers, collection writer leases, atomic native writes, and durable receipts outside SQLite. Creation supports expressive filenames, optional slug allocation, creation-only identifiers, and opted-in UUID generation. Identity edits and UUID repair are separate. OpenAPI includes enabled mutations, aliases, receipts, status/recovery, and codec-specific requests from the same endpoint plan. See `docs/rest-mutations.md`; tests: `swift test --filter 'MarkdownMutationTests|MarkdownMutationOpenAPITests|MarkdownServerOpenAPITests'`. CLI apply remains #142.
 - **Slug generation**: Core's `MarkdownSlugGenerator` provides pure generation and supplied-value validation; `md-utils slug` prints a candidate without changing files or guaranteeing uniqueness. Heading anchors retain historical behavior. See `docs/slug-generation.md`; tests: `swift test --filter 'MarkdownSlugGeneratorTests|SlugTests|HeadingTextExtractorTests'`.

@@ -130,6 +130,9 @@ public struct MarkdownMutationReceipt: Codable, Sendable {
   public var diagnostics: [MarkdownDiagnostic]
   public var validationPolicy: ResourceMutationValidationPolicy
   public var conformanceChanges: [ResourceConformanceChange]
+  /// Events from another disposable-cache epoch are not replayed into fresh history.
+  public var provenanceEpoch: String?
+  public var provenanceOperatorConfirmed: Bool?
   public var committed: Bool { sourceCommitted }
   public init(id: String = UUID().uuidString.lowercased(), resource: String, operation: MarkdownMutationOperation,
     path: MarkdownRecordPath, revision: MarkdownRecordRevision?, baseline: MarkdownRecordRevision?,
