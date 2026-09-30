@@ -22,6 +22,7 @@ evaluator.
 - ``IndexRefreshLimits``
 - ``IndexWatcher``
 - ``IndexCacheExclusions``
+- ``IndexSourceCursor``
 
 ### Retaining Setup and Partial Evidence
 

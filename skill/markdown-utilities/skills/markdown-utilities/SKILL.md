@@ -59,6 +59,19 @@ add '$.field'` for an explicit JSON expression index and type-view projection, a
 `index provenance <path>...` prints retained observations and confirmed operations
 after a hash-verified refresh; it never repairs UUIDs automatically.
 
+Stage explicit patch/replace intent with `index draft add <collection-relative-path>
+--resource <name> --revision <source-sha256> --patch-file <file>` (or `--replace-file`).
+Use the configured resource's shared mutation JSON envelope and operation opt-ins.
+`index draft list/show` reads durable intent; `index apply --dry-run` previews exact
+source and diagnostics without refresh, recovery, or persistent state changes.
+`index apply` replans and revision-checks each file, publishing all affected scopes
+and enabled FTS. Drafts remain outside SQLite through refresh/rebuild. Managed move
+evidence can follow a configured UUID; external relocation, UUID collisions, and
+stale hashes require explicit review. Never treat arbitrary indexed-row edits as
+write intent. Partial batches retain completed/pending outcomes; use `index draft
+resolve <id> --decision confirmCommitted|confirmNotCommitted` only after reviewing
+the receipt and actual source. Unresolved submitted drafts cannot be discarded.
+
 Use managed `copy`/`move` for UUID-aware transfers rather than naive filesystem
 copies. Both require `--resource`, `--revision <source-sha256>`, and
 `--idempotency-key`; the source is collection-relative and the destination argument

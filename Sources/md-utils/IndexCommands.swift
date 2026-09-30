@@ -15,7 +15,7 @@ extension CLIEntry {
         static let configuration = CommandConfiguration(commandName: "index",
             abstract: "Maintain a rebuildable SQLite collection cache",
             subcommands: [Update.self, Watch.self, SelectType.self, SelectRule.self, Query.self, Explain.self,
-                Field.self, Search.self, Status.self, Provenance.self])
+                Field.self, Search.self, Status.self, Provenance.self, Draft.self, Apply.self,])
 
         /// Read-only bounded evidence; never chooses or applies a UUID rewrite.
         struct Provenance: AsyncParsableCommand {

@@ -2,6 +2,34 @@
 
 Cache parsed text and type or rule assessments in a rebuildable SQLite database.
 
+## Apply pending source edits
+
+`index draft add <path> --resource <name> --revision <source-sha256> --patch-file
+<file>` persists explicit edit intent outside SQLite. Use `--replace-file` for
+the shared replacement envelope. Resources require a codec and explicit mutation
+opt-ins; no HTTP process is needed. `index draft list/show` reads drafts without
+refresh. `index draft discard <id>` removes unsubmitted or completed intent.
+
+`index apply --dry-run` shows exact original/proposed source, target resolution,
+validation diagnostics, and contract changes without persistent writes. Use
+`--format jsonl` for structured per-draft reports. `index apply` selects all
+noncompleted drafts, or the supplied IDs, in lexicographic ID order. It preflights,
+replans each mutation, and rechecks source hashes at atomic persistence.
+
+Drafts retain original SHA-256, path, and configured UUID across ordinary refresh,
+FTS switches, and fresh rebuilds. A retained coordinator-confirmed move can resolve
+the target at another path; external relocation remains an explicit conflict.
+Duplicate UUIDs, changed source, replaced paths, and incomplete discovery never
+silently select a target or discard its draft. Rebuilt provenance cannot establish
+a previously observed move; explicit review and restaging remain available.
+
+The first execution failure stops later writes and reports completed, unresolved,
+and unattempted work. Stable attempt IDs and pinned receipts recover publication
+without repeating source edits. `index draft resolve <id> --decision
+confirmCommitted` or `confirmNotCommitted` uses explicit operator assertions
+verified against actual source. Submitted unresolved drafts cannot be discarded.
+Files stay authoritative; SQLite cannot atomically transact a multi-file batch.
+
 ## Watching selections
 
 On macOS, `index watch ./notes/` registers a scope, completes initial reconciliation,

@@ -236,6 +236,14 @@ The cache is stored in `.md-utils/index.sqlite`. See
 [collection indexing](docs/collection-index.md) for project/config resolution,
 non-Markdown support, diagnostics, and freshness guarantees.
 
+Stage explicit pending source edits with `md-utils index draft add <path> --resource
+<name> --revision <source-sha256> --patch-file <file>`. Preview concrete source with
+`md-utils index apply --dry-run`, then commit with `md-utils index apply`.
+Drafts live independently under `.md-utils/drafts/` and survive refresh/rebuild.
+Configured UUIDs and retained managed-move evidence resolve targets conservatively;
+stale baselines and ambiguous relocations remain conflicts. No HTTP process is
+required. See [pending edits and recovery](docs/index-apply.md).
+
 ## Open Knowledge Format
 
 `md-utils okf` currently targets the Open Knowledge Format (OKF) v0.1 draft. The draft spec is readable at https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md.

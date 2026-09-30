@@ -141,7 +141,14 @@ representations fail through #90's codec. Input and proposed source are bounded 
 
 ## Commit, retry, and recovery
 
-The shared `MarkdownMutationService` is usable without HTTP. Its native coordinator
+The shared `MarkdownMutationService` is usable without HTTP.
+
+CLI `index apply` stages intent independently of SQLite and shares native codec,
+validation, policy, constraints and persistence with REST. Draft attempts pin
+their receipts until durable acknowledgement so a retry never blindly repeats a
+patch. See [pending edits and recovery](index-apply.md).
+
+The native coordinator
 acquires a collection-level OS writer lease, refreshes authoritative evidence,
 checks revisions and constraints, then persists through a lease-bound `RecordStore`.
 Refresh, CLI index update, and text rebuild use the same lease. Source replacements

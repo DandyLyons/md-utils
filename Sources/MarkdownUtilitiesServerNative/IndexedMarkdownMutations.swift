@@ -13,6 +13,19 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
   ) async throws -> MarkdownMutationReceipt {
     let lease = try await CollectionWriterLease.acquire(root: root)
     defer { withExtendedLifetime(lease) {} }
+    return try await mutate(resource: name, identity: identity, path: requestedPath, request: request,
+      revision: revision, idempotencyKey: idempotencyKey, lease: lease, attemptID: nil)
+  }
+
+  /// Runs under the caller's lease; a draft attempt owns a durable receipt ID before source persistence.
+  func mutate(resource name: String, identity: String?, path requestedPath: MarkdownRecordPath?,
+    request: MarkdownMutationRequest, revision: MarkdownRecordRevision?, idempotencyKey: String?,
+    lease: CollectionWriterLease, attemptID: String?,
+  ) async throws -> MarkdownMutationReceipt {
+    guard lease.root == root else { throw RecordStoreError.unavailable }
+    if let attemptID, UUID(uuidString: attemptID)?.uuidString.lowercased() != attemptID {
+      throw MarkdownMutationError(400, "draft.attempt-invalid", "Expected a lowercase attempt UUID.")
+    }
     try checkConfiguration()
     guard let resource = plan.resources.first(where: { $0.name == name }),
       let settings = resource.mutations, settings.operations.contains(request.operation) else {
@@ -31,10 +44,19 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
       }
       keyHash = IndexFingerprint.combined([name, request.operation.rawValue, key])
     } else { keyHash = nil }
+    if let attemptID, FileManager.default.fileExists(atPath: receiptURL(attemptID).path) {
+      let receipt = try readReceipt(receiptURL(attemptID))
+      guard receipt.resource == name, receipt.operation == request.operation,
+        receipt.path == requestedPath, receipt.baseline == revision, receipt.requestHash == fingerprint else {
+        throw MarkdownMutationError(409, "draft.attempt-mismatch", "The draft attempt belongs to a different request.")
+      }
+      return receipt
+    }
     var pendingPaths = Set<String>()
     for url in try journalFiles() {
       let receipt = try readReceipt(url)
       if (receipt.state == .completed || receipt.state == .abandoned),
+        !FileManager.default.fileExists(atPath: root.appendingPathComponent(".md-utils/mutations/pins/\(receipt.id)").path),
         let retention = plan.resources.first(where: { $0.name == receipt.resource })?.mutations?.idempotencyRetentionSeconds,
         Date().timeIntervalSince(receipt.completedAt ?? receipt.created) > Double(retention) {
         try FileManager.default.removeItem(at: url)
@@ -92,7 +114,8 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
         target = result.target; explicitlyEditing = result.identityFields
       case .delete: proposal = nil; validation = nil
       case .replace, .patch:
-        let result = try await planner.plan(request.edit(), source: mutationSource, resource: resource, policy: request.validationPolicy, proposedContext: proposedContext)
+        let result = try await NativeEditPlanning(plan: plan, evaluator: evaluator).edit(request,
+          source: mutationSource, resource: resource)
         proposal = result.proposal; validation = result
       case .identity, .repairUUID:
         var values: [String: JSONValue]
@@ -144,7 +167,8 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     }
     try checkConfiguration()
     try Task.checkCancellation()
-    var receipt = MarkdownMutationReceipt(resource: name, operation: request.operation, path: target,
+    var receipt = MarkdownMutationReceipt(id: attemptID ?? UUID().uuidString.lowercased(),
+      resource: name, operation: request.operation, path: target,
       revision: proposal.map { .init(rawValue: IndexFingerprint.hash(Data($0.record.content.utf8))) }, baseline: source?.revision,
       requestHash: fingerprint, keyHash: keyHash,
       lostConformance: validation?.lostConformance.map { "\($0.kind.rawValue).\($0.name)" } ?? [],
@@ -213,6 +237,13 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
   public func resolveOperation(resource: String, id: String, decision: MarkdownRecoveryDecision) async throws -> MarkdownMutationReceipt {
     let lease = try await CollectionWriterLease.acquire(root: root)
     defer { withExtendedLifetime(lease) {} }
+    return try await resolveOperation(resource: resource, id: id, decision: decision, lease: lease)
+  }
+
+  func resolveOperation(resource: String, id: String, decision: MarkdownRecoveryDecision,
+    lease: CollectionWriterLease,
+  ) async throws -> MarkdownMutationReceipt {
+    guard lease.root == root else { throw RecordStoreError.unavailable }
     try checkConfiguration()
     var receipt = try await operation(resource: resource, id: id)
     guard receipt.state != .completed && receipt.state != .abandoned else { return receipt }
@@ -245,6 +276,11 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
   public func recoverMutations() async throws {
     let lease = try await CollectionWriterLease.acquire(root: root)
     defer { withExtendedLifetime(lease) {} }
+    try await recoverMutations(lease: lease)
+  }
+
+  func recoverMutations(lease: CollectionWriterLease) async throws {
+    guard lease.root == root else { throw RecordStoreError.unavailable }
     for url in try journalFiles() {
       var receipt = try readReceipt(url)
       if receipt.sourcePath != nil, receipt.destinationCommitted == true,
@@ -507,58 +543,19 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
   }
 
   private func project(_ record: MarkdownRecord) async throws -> GenericMarkdownRecord? {
-    let snapshot = try await MarkdownServerReadSnapshotBuilder(store: SingleRecordStore(record: record),
-      plan: plan, ruleRegistry: evaluator.rules ?? MarkdownRuleCompiler().compile([]), typeRegistry: evaluator.types).build()
-    return snapshot.resources.lazy.compactMap { $0.records.first }.first
+    try await NativeEditPlanning(plan: plan, evaluator: evaluator).project(record)
   }
 
   private func validateCollection(_ proposed: MarkdownRecord, projection: GenericMarkdownRecord?,
     excludingPath: MarkdownRecordPath? = nil,
   ) async throws {
-    let analyzed = await MarkdownRecordAnalyzer.analyze(proposed)
-    let selected = Set(projection?.memberships.map(\.resourceName) ?? [])
-    struct Check { let resource: PlannedMarkdownResource; let policy: MarkdownRecordIdentityPolicy; let value: String; let server: Bool }
-    var checks: [Check] = []
-    for resource in plan.resources {
-      if selected.contains(resource.name) {
-        let primary = MarkdownRecordIdentityIndex.assess(analyzed, policy: resource.identityPolicy)
-        guard let value = primary.primaryIdentity?.rawValue else { throw MarkdownMutationError(422, "identity.invalid", "The proposed primary identity is missing or invalid.") }
-        checks.append(Check(resource: resource, policy: resource.identityPolicy, value: value, server: false))
-      }
-      for lookup in resource.assessmentLookups(persistentIdentity: plan.persistentIdentity) {
-        let constraint = resource.constraint(for: lookup)
-        guard selected.contains(resource.name) || constraint.uniqueWithin == .server,
-          let policy = lookup.policy(persistentIdentity: plan.persistentIdentity) else { continue }
-        let value = MarkdownRecordIdentityIndex.assess(analyzed, policy: policy)
-        if (value.status == .invalid && (selected.contains(resource.name) || lookup.source == .persistentIdentity))
-          || (value.primaryIdentity == nil && constraint.requireValue && selected.contains(resource.name)) {
-          throw MarkdownMutationError(422, "identity.invalid", "The proposed lookup \(lookup.name) violates its format or required-value constraint.")
-        }
-        if let scope = constraint.uniqueWithin, let key = value.primaryIdentity?.rawValue {
-          checks.append(Check(resource: resource, policy: policy, value: key, server: scope == .server))
-        }
-      }
-    }
+    let planning = NativeEditPlanning(plan: plan, evaluator: evaluator)
+    let checks = try await planning.constraints(proposed, projection: projection)
     var token: RecordStoreContinuationToken?
     repeat {
       let page = try await records(matching: RecordStoreQuery(limit: 1, continuationToken: token))
       for other in page.records where other.identity != proposed.identity && (excludingPath == nil || other.context.path != excludingPath) {
-        let otherAnalyzed = await MarkdownRecordAnalyzer.analyze(other)
-        if !checks.isEmpty && otherAnalyzed.parseDiagnostics.contains(where: { $0.severity == .error }) {
-          throw MarkdownMutationError(503, "identity.incomplete", "A collection document cannot be assessed; repair its parse diagnostics before enforcing uniqueness.")
-        }
-        let memberships = try await project(other)?.memberships ?? []
-        for check in checks where check.server || memberships.contains(where: { $0.resourceName == check.resource.name }) {
-          let assessment = MarkdownRecordIdentityIndex.assess(otherAnalyzed, policy: check.policy)
-          if assessment.primaryIdentity?.rawValue == check.value {
-            let location: String
-            if case .frontmatter(let path, _) = check.policy.source { location = "frontmatter." + path.joined(separator: ".") }
-            else { location = "identity" }
-            throw MarkdownMutationError(409, "identity.collision", "The proposal violates a configured identity uniqueness scope.",
-              diagnostics: [.init(code: "identity.collision", severity: .error, domain: .record,
-                location: location, message: "A value already exists in the configured uniqueness scope.")])
-          }
-        }
+        try await planning.validateOther(other, checks: checks)
       }
       token = page.continuationToken
     } while token != nil

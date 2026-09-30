@@ -202,6 +202,13 @@ not imported; supply scopes again. Mutation receipts remain independent in
 `.md-utils/mutations/`. Pending user edits belong outside the disposable cache;
 rebuild refuses databases containing the legacy `pending_edits` table.
 
+`index draft add` stages explicit patch/replace intent in versioned JSON under
+`.md-utils/drafts/`, with original source SHA-256, configured UUID, and independent
+conflict/receipt state. `index apply --dry-run` previews authoritative source edits
+without refresh or draft-state changes; `index apply` uses shared native mutation
+planning and recoverable per-file persistence. Refresh, mode switches and rebuilds
+leave these drafts unchanged. See [pending edits](index-apply.md).
+
 For example, a saved metadata-only setup can contain:
 
 ```json
