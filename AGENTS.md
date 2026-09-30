@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Managed copy/move**: Shared native mutation operations power REST and `md-utils copy`/`move`, with explicit resource opt-ins, revision checks, idempotency, no-clobber destinations and durable two-path recovery. Copy allocates a fresh configured UUID; move preserves bytes/UUIDs. See `docs/copy-move.md`; tests: `swift test --filter 'MarkdownMutationTests|MarkdownMutationOpenAPITests|TransferCommandsTests'`.
+
 - **Document provenance**: Core owns portable observations and conservative UUID collision explanations; the native index retains bounded first/latest observations and confirmed receipt events. Rebuild discards history. `index provenance` exposes revision-verified evidence; native `explainUUIDCollision` remains read-only. See `docs/document-provenance.md`; tests: `swift test --filter 'DocumentProvenanceTests|IndexProvenanceTests|MarkdownMutationTests'`.
 
 - **Language**: Swift 6.3+

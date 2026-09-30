@@ -5,7 +5,7 @@ Generate and publish an OpenAPI 3.1.1 contract for configured reads, writes, and
 ## One Route Source
 
 ``MarkdownServerOpenAPIGenerator`` describes every configured route in ``EndpointPlan``:
-reads, CRUD, identity edits, UUID repair, and operation status/recovery. Runtime
+reads, CRUD, copy/move, identity edits, UUID repair, and operation status/recovery. Runtime
 registration and generated paths use the same ``EndpointRouteDescription`` values,
 including `/openapi.json`. Read and write methods can share a path: `/books` can
 have both `get` and `post`, while `/books/{id}` can have `get`, `put`, `patch`, and
@@ -67,7 +67,7 @@ published contract.
 
 ## Mutation Contracts
 
-Explicitly enabled create, replace, patch, delete, identity-edit, and UUID-repair
+Explicitly enabled create, replace, patch, delete, copy, move, identity-edit, and UUID-repair
 routes are included alongside their named-lookup and exact-path aliases. Operation
 status and recovery routes share the same durable receipt component. A writable
 codec alone does not advertise writes: configuration version `3` requires separate
@@ -86,6 +86,8 @@ routes when the corresponding mutations are enabled:
 | Delete | `DELETE /books/{id}` | Absent or an empty object |
 | Identity edit | `POST /books/{id}/identity` | Configured `identifiers` |
 | UUID repair | `POST /books/{id}/repair-uuid` | Empty object |
+| Copy | `POST /books/{id}/copy` | Destination `filename` and optional configured `identifiers` |
+| Move | `POST /books/{id}/move` | Destination `filename` |
 | Operation status | `GET /books/_operations/{id}` | None; `id` identifies a receipt |
 | Resolve recovery | `POST /books/_operations/{id}/resolve` | `decision`: `confirmCommitted` or `confirmNotCommitted` |
 
@@ -111,6 +113,11 @@ The example token encodes revision `abc`; use the actual `MD-Utils-Revision` tok
 returned by a read. The versioned Base64 token represents the canonical source
 revision, independently of representation ETags and publication generations.
 Creation instead requires an `Idempotency-Key`. Unknown envelope fields are rejected.
+Copy and move require both a canonical revision token and an `Idempotency-Key`.
+They allocate destinations within `creation.directory`, which must already exist.
+Copy assigns a fresh UUID when persistent UUID identity is configured; without
+that configuration it does not guess a UUID field. Move preserves the source bytes
+and UUID. Both operations reject an existing destination.
 PATCH null stores null where supported; remove explicitly deletes a field. PUT
 requires the complete writable projection. Full destination and preservation
 validation still runs after schema validation.
@@ -124,7 +131,7 @@ runtime; a schema-valid request can still receive `422` or a conflict response.
 
 ## Receipts, Revisions, and Recovery
 
-Successful creates return `201`; other completed writes, including DELETE, return
+Successful creates and copies return `201`; other completed writes, including DELETE and move, return
 `200` with a receipt. Receipt dates are numeric seconds since 2001-01-01 UTC.
 Structured errors include shared diagnostics and fix-it proposals. Template
 validation failures return `422`; Knap warnings remain in receipt diagnostics and
@@ -139,3 +146,9 @@ a receipt. Shared components preserve these shapes across resource aliases.
 Read freshness and generation headers remain documented alongside canonical
 revision headers. New publication invalidates pagination cursors; no cross-filesystem
 and SQLite transaction is implied.
+
+A move uses a recoverable two-path sequence: write and durably confirm the
+destination, then revision-check and remove the source, then publish. It is not an
+atomic filesystem transaction. During interruption both paths can exist. Recovery
+will not delete a source or destination whose revision changed. Durable receipts
+reserve both paths and survive index rebuilds; disposable provenance does not.

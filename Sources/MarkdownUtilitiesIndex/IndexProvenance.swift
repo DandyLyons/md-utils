@@ -3,6 +3,11 @@ import GRDB
 import MarkdownUtilitiesCore
 
 extension SQLiteIndexDatabase {
+    /// Returns the cache lifetime identifier, or an empty string if none is stored.
+    ///
+    /// Full rebuilds replace the epoch. Do not replay older receipts into a new
+    /// epoch as if their events were part of its observation history.
+    /// - Throws: A database read error.
     public func provenanceEpoch() throws -> String {
         try databaseQueue.read { try String.fetchOne($0, sql: "SELECT value FROM index_metadata WHERE key='epoch'") ?? "" }
     }
@@ -54,7 +59,15 @@ extension SQLiteIndexDatabase {
         try db.execute(sql: "DELETE FROM refresh_verified WHERE generation=?", arguments: [generation])
     }
 
-    /// Confirmed events only. Receipt identifiers make replay idempotent.
+    /// Retains a confirmed managed event, ignoring an already recorded receipt identifier.
+    ///
+    /// The caller must establish confirmation and match the receipt's provenance
+    /// epoch to the current cache. This method does not verify the source file.
+    /// Only the newest 10,000 events are retained; pruning marks the epoch's
+    /// history as incomplete for subsequent collision assessment.
+    /// - Parameter event: Evidence from a confirmed mutation receipt.
+    /// - Throws: An index error for encoded events larger than 32 KiB, or an
+    ///   encoding or database error.
     public func recordManagedEvent(_ event: ManagedDocumentEvent) throws {
         let payload = try JSONEncoder().encode(event)
         guard payload.count <= 32_768 else { throw SQLiteIndexError(message: "Managed evidence exceeds 32 KiB.") }
@@ -68,7 +81,16 @@ extension SQLiteIndexDatabase {
         }
     }
 
-    /// Bounded evidence for paths in an already assessed collision group.
+    /// Reads bounded evidence for paths in an already assessed collision group.
+    ///
+    /// This query does not refresh files. Observations are sorted by path; events
+    /// are newest first, with receipt identifiers breaking timestamp ties. Missing
+    /// observations mean unknown history. Events may mention other paths as well.
+    /// - Parameters:
+    ///   - paths: One to 256 collection-relative paths.
+    ///   - limit: The maximum number of matching events, from one to 1,000.
+    /// - Returns: Evidence marked as truncated when more matching events exist.
+    /// - Throws: An index error for invalid bounds, or a database or decoding error.
     public func provenance(paths: [String], limit: Int = 256) throws -> DocumentProvenanceEvidence {
         guard !paths.isEmpty, paths.count <= 256, (1...1_000).contains(limit) else {
             throw SQLiteIndexError(message: "Request 1–256 provenance paths and an evidence limit of 1–1000.")

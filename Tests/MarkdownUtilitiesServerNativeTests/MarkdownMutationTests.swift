@@ -33,7 +33,7 @@ struct MarkdownMutationTests {
             codec: {frontmatterFields: [title, subtitle], bodyWritable: true}
             creation: {template: \(String(decoding: try JSONEncoder().encode(template), as: UTF8.self))}
           mutations:
-            operations: [create, replace, patch, delete, identity, repairUUID]
+            operations: [create, replace, patch, delete, identity, repairUUID, copy, move]
             identityFields: [slug]
             creation:
               directory: books/
@@ -44,6 +44,167 @@ struct MarkdownMutationTests {
   }
   private func request(_ operation: MarkdownMutationOperation, _ json: String = "{}") throws -> MarkdownMutationRequest {
     try MarkdownMutationRequest(operation: operation, data: Data(json.utf8))
+  }
+
+  @Test(arguments: [false, true])
+  func copyAndMovePreserveIdentityContractsAndReplay(fts: Bool) async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    if fts {
+      let db = try SQLiteIndexDatabase(path: (root + ".md-utils/index.sqlite").string)
+      try db.prepareCollection(root: root.string)
+      try db.setBodyMode(.fts)
+    }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    let baseline = try #require(created.revision)
+    let original = try (root + created.path.rawValue).read(.utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o444], ofItemAtPath: (root + created.path.rawValue).string)
+    let copyRequest = try request(.copy, #"{"filename":"Copy.md","identifiers":{"slug":"copy"}}"#)
+    let copied = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+      request: copyRequest, revision: baseline, idempotencyKey: "copy")
+    #expect(copied.state == .completed)
+    #expect(copied.record?.frontmatter?["uuid"] != created.record?.frontmatter?["uuid"])
+    #expect(copied.record?.frontmatter?["slug"] == .string("copy"))
+    #expect(try (root + created.path.rawValue).read(.utf8) == original)
+    #expect(copied.record?.body == created.record?.body)
+    let copyRevision = try #require(copied.revision)
+    let copiedBytes = try (root + copied.path.rawValue).read(.utf8)
+    let moveRequest = try request(.move, #"{"filename":"Renamed.md"}"#)
+    let moved = try await repository.mutate(resource: "books", identity: nil, path: copied.path,
+      request: moveRequest, revision: copyRevision, idempotencyKey: "move")
+    #expect(moved.state == .completed)
+    #expect(!(root + copied.path.rawValue).exists)
+    #expect(try (root + moved.path.rawValue).read(.utf8) == copiedBytes)
+    #expect(moved.revision == copyRevision)
+    #expect(try FileManager.default.attributesOfItem(atPath: (root + moved.path.rawValue).string)[.posixPermissions] as? Int == 0o444)
+    let replay = try await repository.mutate(resource: "books", identity: nil, path: copied.path,
+      request: moveRequest, revision: copyRevision, idempotencyKey: "move")
+    #expect(replay.id == moved.id)
+    let db = try SQLiteIndexDatabase(path: (root + ".md-utils/index.sqlite").string)
+    let evidence = try db.provenance(paths: [created.path.rawValue, copied.path.rawValue, moved.path.rawValue])
+    #expect(evidence.events.contains { $0.kind == .copy && $0.sourcePath == created.path.rawValue })
+    #expect(evidence.events.contains { $0.kind == .move && $0.sourcePath == copied.path.rawValue })
+  }
+
+  @Test(arguments: [MutationBoundary.destinationCommitted, .sourceRemoved, .persisted, .committed])
+  func interruptedMoveRecoversWithoutDuplicatingWrites(boundary: MutationBoundary) async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    await repository.setMutationCheckpoint { if $0 == boundary { throw CancellationError() } }
+    let interrupted = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+      request: request(.move, #"{"filename":"Moved.md"}"#), revision: created.revision, idempotencyKey: "move")
+    #expect(interrupted.state != .completed)
+    #expect(interrupted.destinationCommitted == true)
+    let restarted = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await restarted.recoverMutations()
+    let recovered = try await restarted.operation(resource: "books", id: interrupted.id)
+    #expect(recovered.state == .completed)
+    #expect(!(root + created.path.rawValue).exists)
+    #expect((root + "books/Moved.md").exists)
+  }
+
+  @Test func changedSourceDuringInterruptedMoveIsNeverDeleted() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    await repository.setMutationCheckpoint { if $0 == .destinationCommitted { throw CancellationError() } }
+    let receipt = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+      request: request(.move, #"{"filename":"Moved.md"}"#), revision: created.revision, idempotencyKey: "move")
+    try (root + created.path.rawValue).write("external changes")
+    let restarted = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await restarted.recoverMutations()
+    #expect(try (root + created.path.rawValue).read(.utf8) == "external changes")
+    #expect(try await restarted.operation(resource: "books", id: receipt.id).state == .recoveryRequired)
+  }
+
+  @Test func copyingWithoutConfiguredUUIDDoesNotInventAField() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    let config = root + ".md-utils/server/server.yaml"
+    let text = try config.read(.utf8)
+      .replacingOccurrences(of: "persistentIdentity: {path: [uuid]}\n", with: "")
+      .replacingOccurrences(of: "    lookups:\n      - {name: uuid, source: persistentIdentity}\n", with: "")
+      .replacingOccurrences(of: ", repairUUID", with: "")
+    try config.write(text)
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    let copied = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+      request: request(.copy, #"{"filename":"Copy.md","identifiers":{"slug":"copy"}}"#),
+      revision: created.revision, idempotencyKey: "copy")
+    #expect(copied.state == .completed)
+    #expect(copied.record?.frontmatter?["uuid"] == nil)
+  }
+
+  @Test func changedDestinationDuringInterruptedMoveRetainsOriginalSource() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    await repository.setMutationCheckpoint { if $0 == .destinationCommitted { throw CancellationError() } }
+    let receipt = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+      request: request(.move, #"{"filename":"Moved.md"}"#), revision: created.revision, idempotencyKey: "move")
+    try (root + receipt.path.rawValue).write("external destination")
+    let restarted = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await restarted.recoverMutations()
+    #expect((root + created.path.rawValue).exists)
+    #expect(try (root + receipt.path.rawValue).read(.utf8) == "external destination")
+    #expect(try await restarted.operation(resource: "books", id: receipt.id).state == .recoveryRequired)
+  }
+
+  @Test func unconfirmedMoveRequiresExplicitOperatorResolution() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    let original = try (root + created.path.rawValue).read(.utf8)
+    await repository.setMutationCheckpoint { if $0 == .prepared { throw CancellationError() } }
+    let receipt = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+      request: request(.move, #"{"filename":"Moved.md"}"#), revision: created.revision, idempotencyKey: "move")
+    // Model a crash after writing the destination but before durable confirmation.
+    try (root + receipt.path.rawValue).write(original)
+    let restarted = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await restarted.recoverMutations()
+    #expect((root + created.path.rawValue).exists)
+    #expect(try await restarted.operation(resource: "books", id: receipt.id).state == .recoveryRequired)
+    let resolved = try await restarted.resolveOperation(resource: "books", id: receipt.id, decision: .confirmCommitted)
+    #expect(resolved.state == .completed)
+    #expect(!(root + created.path.rawValue).exists)
+    let db = try SQLiteIndexDatabase(path: (root + ".md-utils/index.sqlite").string)
+    #expect(try db.provenance(paths: [receipt.path.rawValue]).events.first?.confirmation == .operatorConfirmed)
+  }
+
+  @Test func committedMoveRecoveryNeverDeletesARecreatedSource() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    let original = try (root + created.path.rawValue).read(.utf8)
+    await repository.setMutationCheckpoint { if $0 == .committed { throw CancellationError() } }
+    let receipt = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+      request: request(.move, #"{"filename":"Moved.md"}"#), revision: created.revision, idempotencyKey: "move")
+    #expect(receipt.sourceCommitted)
+    try (root + created.path.rawValue).write(original)
+    let restarted = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await restarted.recoverMutations()
+    #expect(try (root + created.path.rawValue).read(.utf8) == original)
+    let outcome = try await restarted.operation(resource: "books", id: receipt.id)
+    #expect(outcome.state == .recoveryRequired)
+    #expect(outcome.sourceCommitted)
+  }
+
+  @Test func transfersRejectCollisionsUnsafeNamesAndStaleSources() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    for (index, payload) in [#"{"filename":"Dune.md"}"#, #"{"filename":"../escape.md"}"#,
+      #"{"filename":"Copy.md"}"#, #"{"filename":"Copy.md","identifiers":{"uuid":"forbidden"}}"#].enumerated() {
+      await #expect(throws: MarkdownMutationError.self) {
+        _ = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+          request: request(.copy, payload), revision: created.revision, idempotencyKey: "rejected-\(index)")
+      }
+    }
+    await #expect(throws: MarkdownMutationError.self) {
+      _ = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+        request: request(.move, #"{"filename":"Moved.md"}"#), revision: .init(rawValue: "stale"), idempotencyKey: "stale")
+    }
+    #expect(try (root + "books/").children().count == 1)
   }
 
   @Test

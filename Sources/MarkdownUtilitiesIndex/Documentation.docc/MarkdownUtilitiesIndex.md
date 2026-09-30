@@ -23,6 +23,14 @@ evaluator.
 - ``IndexWatcher``
 - ``IndexCacheExclusions``
 
+### Retaining Setup and Partial Evidence
+
+- ``IndexConfiguration``
+- ``SQLiteIndexDatabase/saveConfiguration()``
+- ``SQLiteIndexDatabase/provenanceEpoch()``
+- ``SQLiteIndexDatabase/provenance(paths:limit:)``
+- ``SQLiteIndexDatabase/recordManagedEvent(_:)``
+
 ### Supplying Evaluations
 
 - ``IndexEvaluation``

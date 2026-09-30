@@ -26,6 +26,7 @@ The `md-utils` CLI provides structured operations on Markdown files. Add `--help
 | `md-utils meta` | Read file metadata |
 | `md-utils rules` | Validate Markdown files with project-level rules |
 | `md-utils index` | Maintain a rebuildable SQLite collection cache with type/rule assessments |
+| `md-utils copy` / `md-utils move` | Revision-checked transfers through configured resource opt-ins; copy allocates a fresh configured UUID |
 
 ## Collection Indexing
 
@@ -40,8 +41,8 @@ Use `--debounce <seconds>` and `--reconcile-interval <seconds>` to tune latency.
 saved scopes in `.md-utils/index.sqlite`. `index type Book ./notes/` selects only
 conforming documents; `index rule books` preserves rule-selected invalid members.
 Use `index update --verify-hashes` to detect stat-preserving edits, or
-`index update --rebuild` to regenerate all scopes while retaining SQL field indexes
-and views. Files remain authoritative. Use `--project-root <directory>/` and
+`index update --rebuild` to create a fresh cache from `.md-utils/md-utils.indexconfig.json`,
+restoring managed fields/type views and discarding observation history. Files remain authoritative. Use `--project-root <directory>/` and
 `--config <file>` for explicit configuration; nonstandard configs require a root.
 `--include-non-md` is saved per scope. Scans skip hidden files and symlinks.
 Incomplete scans retain unavailable rows and report errors. Query
@@ -55,6 +56,18 @@ document and build external-content FTS; `index search disable --vacuum` removes
 bodies and search storage. Use `index explain '<sql>'` for query plans, `index field
 add '$.field'` for an explicit JSON expression index and type-view projection, and
 `index status` for freshness. Type views are named `type_<normalized-name>`.
+`index provenance <path>...` prints retained observations and confirmed operations
+after a hash-verified refresh; it never repairs UUIDs automatically.
+
+Use managed `copy`/`move` for UUID-aware transfers rather than naive filesystem
+copies. Both require `--resource`, `--revision <source-sha256>`, and
+`--idempotency-key`; the source is collection-relative and the destination argument
+is a filename inside the resource's configured `creation.directory`. The server
+resource must explicitly enable the operation. Copy accepts `--identifiers` JSON
+for new configured identifiers (for example a slug), generates a new configured
+UUID and preserves the source. Move preserves bytes/UUIDs. Neither rewrites links.
+Retain the exact revision/key for retries. Incomplete receipts require recovery;
+an interrupted move can leave both paths present. Do not delete either blindly.
 Arrays require explicit `json_each` membership queries; indexing the whole JSON
 array does not accelerate individual elements.
 

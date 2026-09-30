@@ -107,6 +107,7 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 ### Implemented
 
 - **Knap Templates** — Render Markdown using SwiftKnap with explicit YAML frontmatter from JSON; see the [Knap user guide](Sources/MarkdownUtilitiesTemplates/Documentation.docc/RenderingMarkdownWithKnap.md) and [implementation notes](docs/template-rendering.md).
+- **Managed Copy/Move** — Copy records with fresh configured UUIDs or move them with revision checks and durable recovery, through CLI or REST. See [copy/move](docs/copy-move.md) and [partial provenance](docs/document-provenance.md).
 - **Table of Contents** — Generate TOC with multiple output formats (Markdown, JSON, plain text, HTML)
 - **Slug generation** — `md-utils slug 'My Title'` generates a candidate without changing files or guaranteeing uniqueness; see [slug policies and API](docs/slug-generation.md).
 - **REST mutations** — Opt-in server config v3 provides revision-checked CRUD, explicit identity edits, UUID repair, and durable retry/recovery. See [requests and configuration](docs/rest-mutations.md).

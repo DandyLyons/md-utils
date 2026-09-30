@@ -38,7 +38,9 @@ enum NativeMutationFiles {
     return data
   }
 
-  static func persist(url: URL, content: Data?, expected: MarkdownRecordRevision?, modificationDate: Date? = nil) throws {
+  static func persist(url: URL, content: Data?, expected: MarkdownRecordRevision?, modificationDate: Date? = nil,
+    permissions: Int? = nil,
+  ) throws {
     let current = try read(url)
     if let expected {
       guard let current, IndexFingerprint.hash(current) == expected.rawValue else {
@@ -50,12 +52,16 @@ enum NativeMutationFiles {
       let temporary = directory.appendingPathComponent(".md-utils-write-" + UUID().uuidString)
       defer { try? FileManager.default.removeItem(at: temporary) }
       try content.write(to: temporary, options: .withoutOverwriting)
+      // Open before applying a read-only source mode, so copied/moved 0444
+      // documents can still have their staged bytes synchronized durably.
+      let handle = try FileHandle(forWritingTo: temporary)
+      defer { try? handle.close() }
+      if let permissions { try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: temporary.path) }
       if let mode = try? FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] {
         try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: temporary.path)
       }
       if let modificationDate { try FileManager.default.setAttributes([.modificationDate: modificationDate], ofItemAtPath: temporary.path) }
-      let handle = try FileHandle(forWritingTo: temporary)
-      try handle.synchronize(); try handle.close()
+      try handle.synchronize()
       // Recheck after staging. External editors may still race this final check.
       let latest = try read(url)
       if let expected {

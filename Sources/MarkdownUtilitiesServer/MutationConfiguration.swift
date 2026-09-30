@@ -3,11 +3,33 @@ import MarkdownUtilitiesCore
 
 /// Write capabilities are separate from read operations and require configuration v3.
 public enum MarkdownMutationOperation: String, Codable, CaseIterable, Sendable {
-  case create, replace, patch, delete, identity, repairUUID
+  /// Creates a document through the configured creation codec and allocation policy.
+  case create
+  /// Replaces the complete writable projection of an existing document.
+  case replace
+  /// Applies a partial update to writable metadata or body content.
+  case patch
+  /// Deletes the canonical document rather than only its resource membership.
+  case delete
+  /// Updates explicitly configured identity fields on a selected document.
+  case identity
+  /// Assigns a new UUID to an explicitly selected document without rewriting references.
+  case repairUUID
+  /// Copies a document with a fresh UUID when persistent UUID identity is configured.
+  ///
+  /// Requires a source revision, an idempotency key, and a destination filename.
+  /// The destination must not exist; creation templates are not rendered.
+  case copy
+  /// Relocates a document while preserving its source bytes and configured UUID.
+  ///
+  /// Requires a source revision and an idempotency key. Native recovery coordinates
+  /// both paths; the operation is not an atomic filesystem transaction.
+  case move
 
+  /// The HTTP method used by this operation's configured routes.
   public var method: EndpointHTTPMethod {
     switch self {
-    case .create, .identity, .repairUUID: .post
+    case .create, .identity, .repairUUID, .copy, .move: .post
     case .replace: .put
     case .patch: .patch
     case .delete: .delete

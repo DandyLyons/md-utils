@@ -35,6 +35,37 @@ private func selectAll(_ scope: IndexScope, _ path: String, _ content: String, _
 }
 
 @Suite struct JSONBCompatibilityTests {
+    @Test func `unchanged refresh does not rewrite watched declarations`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "body")
+        _ = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1", evaluate: selectAll)
+        let url = IndexConfiguration.url(root: fixture.root.path)
+        let modified = Date(timeIntervalSince1970: 1234)
+        try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: url.path)
+        _ = try await fixture.indexer.update(fingerprint: "v1", evaluate: selectAll)
+        #expect(try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date == modified)
+    }
+
+    @Test func `refresh never overwrites manually edited JSON settings`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "body")
+        _ = try await fixture.indexer.update(adding: IndexScope(path: "notes/"), fingerprint: "v1", evaluate: selectAll)
+        var settings = try IndexConfiguration.load(root: fixture.root.path)
+        settings.metadataEncoding = .text
+        settings.bodyMode = .fts
+        try settings.save(root: fixture.root.path)
+        await #expect(throws: SQLiteIndexError.self) {
+            _ = try await fixture.indexer.update(fingerprint: "v1", evaluate: selectAll)
+        }
+        #expect(try IndexConfiguration.load(root: fixture.root.path) == settings)
+        #expect(try fixture.database.storagePolicy().bodyMode == .metadataOnly)
+        _ = try await fixture.indexer.update(fingerprint: "v1", rebuild: true, evaluate: selectAll)
+        #expect(try fixture.database.storagePolicy().bodyMode == .fts)
+        #expect(try fixture.database.storagePolicy().metadataEncoding == .text)
+    }
+
     @Test func `JSON declarations recreate a deleted cache and rebuild overrides persist`() async throws {
         let fixture = try IndexFixture()
         defer { fixture.remove() }

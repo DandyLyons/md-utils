@@ -253,6 +253,9 @@ public struct EndpointPlanCompiler: Sendable {
         if mutations.operations.contains(.create) && (mutations.creation == nil || resource.writable?.creation == nil) {
           reasons.append("Creation requires allocation settings and a template.")
         }
+        if mutations.operations.contains(where: { $0 == .copy || $0 == .move }), mutations.creation == nil {
+          reasons.append("Copy and move require a configured destination allocation directory.")
+        }
         let protected = planned.protectedIdentityFields(persistentIdentity: configuration.persistentIdentity)
         if !Set(mutations.identityFields + (mutations.creation?.identifiers ?? [])).isSubset(of: Set(protected)) {
           reasons.append("Identity-edit and creation identifiers must be explicitly protected identifiers.")
@@ -277,6 +280,8 @@ public struct EndpointPlanCompiler: Sendable {
           case .create: suffix = ""
           case .identity: suffix = "/{id}/identity"
           case .repairUUID: suffix = "/{id}/repair-uuid"
+          case .copy: suffix = "/{id}/copy"
+          case .move: suffix = "/{id}/move"
           default: suffix = "/{id}"
           }
           let id = "\(resource.name).\(operation.rawValue)"
@@ -288,7 +293,8 @@ public struct EndpointPlanCompiler: Sendable {
           if operation != .create {
             for lookup in resource.lookups {
               for query in [true, false] where query || lookup.source != .logicalPath {
-                let actionSuffix = operation == .identity ? "/identity" : operation == .repairUUID ? "/repair-uuid" : ""
+                let actionSuffix = operation == .identity ? "/identity" : operation == .repairUUID ? "/repair-uuid"
+                  : operation == .copy ? "/copy" : operation == .move ? "/move" : ""
                 let lookupID = id + ".by." + lookup.name + (query ? ".query" : ".segment")
                 routeCandidates.append(RouteCandidate(description: .init(method: operation.method,
                   path: .init(validated: resource.route + "/by/" + lookup.name + (query ? "" : "/{id}") + actionSuffix),
@@ -478,7 +484,7 @@ public struct EndpointPlanCompiler: Sendable {
   /// Validates public route values decoded independently from an ``EndpointPlan``.
   static func isSafeRouteTemplate(_ route: String) -> Bool {
     if route == logicalPathRoute { return true }
-    for suffix in ["/{id}/identity", "/{id}/repair-uuid", "/{id}/resolve"] where route.hasSuffix(suffix) {
+    for suffix in ["/{id}/identity", "/{id}/repair-uuid", "/{id}/resolve", "/{id}/copy", "/{id}/move"] where route.hasSuffix(suffix) {
       return isSafeResourceRoute(String(route.dropLast(suffix.count)))
     }
     let base = route.hasSuffix("/{id}") ? String(route.dropLast(5)) : route

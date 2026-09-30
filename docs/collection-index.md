@@ -202,6 +202,26 @@ not imported; supply scopes again. Mutation receipts remain independent in
 `.md-utils/mutations/`. Pending user edits belong outside the disposable cache;
 rebuild refuses databases containing the legacy `pending_edits` table.
 
+For example, a saved metadata-only setup can contain:
+
+```json
+{
+  "version": 1,
+  "scopes": [
+    {"kind": "directory", "path": "notes/", "name": "", "includeNonMarkdown": false}
+  ],
+  "bodyMode": "metadata-only",
+  "metadataEncoding": "text",
+  "fields": []
+}
+```
+
+`configurationPath` is optional. Use `index field add` to register managed JSON
+indexes; the command saves their declarations. Rebuild after editing settings by
+hand so the SQLite cache matches the new declarations.
+Refresh detects declaration drift and refuses to overwrite manually edited JSON
+with stale cached settings. The same check protects edits from running watchers.
+
 `index query` and `index explain` always perform the same incremental refresh of
 every saved scope before opening a serialized read snapshot. Any incomplete scan,
 parse failure, or evaluation failure exits unsuccessfully without running the SQL;

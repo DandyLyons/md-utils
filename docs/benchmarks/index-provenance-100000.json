@@ -1,0 +1,216 @@
+{
+  "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "python": "3.14.5",
+  "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0",
+  "sqlite_observer": "3.53.4",
+  "build_description": "release",
+  "budgets": {
+    "peak_rss_bytes": 268435456,
+    "seconds_per_100000_documents": 600
+  },
+  "distribution": {
+    "1024_bytes": 90,
+    "8192_bytes": 9,
+    "65536_bytes": 1
+  },
+  "directory_fanout": 1000,
+  "results": [
+    {
+      "documents": 100000,
+      "mode": "metadata",
+      "phase": "initial",
+      "seconds": 82.148,
+      "peak_rss_bytes": 136675328,
+      "peak_database_and_journal_bytes": 149192704,
+      "database_bytes": 149192704,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 100000,
+      "cached": 0,
+      "hashed": 100000,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "metadata",
+      "phase": "rebuild",
+      "seconds": 54.68,
+      "peak_rss_bytes": 146669568,
+      "peak_database_and_journal_bytes": 278982976,
+      "database_bytes": 149192704,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 100000,
+      "cached": 0,
+      "hashed": 100000,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "metadata",
+      "phase": "unchanged",
+      "seconds": 7.345,
+      "peak_rss_bytes": 58654720,
+      "peak_database_and_journal_bytes": 163237104,
+      "database_bytes": 149192704,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 0,
+      "cached": 100000,
+      "hashed": 0,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "metadata",
+      "phase": "small-update",
+      "seconds": 7.364,
+      "peak_rss_bytes": 62259200,
+      "peak_database_and_journal_bytes": 162096192,
+      "database_bytes": 149192704,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 100,
+      "cached": 99900,
+      "hashed": 100,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "metadata",
+      "phase": "overlap",
+      "seconds": 61.277,
+      "peak_rss_bytes": 168247296,
+      "peak_database_and_journal_bytes": 284580836,
+      "database_bytes": 220155904,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 200000,
+      "cached": 0,
+      "hashed": 100000,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "fts",
+      "phase": "initial",
+      "seconds": 52.677,
+      "peak_rss_bytes": 229900288,
+      "peak_database_and_journal_bytes": 689377280,
+      "database_bytes": 689377280,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 100000,
+      "cached": 0,
+      "hashed": 100000,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "fts",
+      "phase": "rebuild",
+      "seconds": 55.259,
+      "peak_rss_bytes": 230637568,
+      "peak_database_and_journal_bytes": 1333542896,
+      "database_bytes": 689377280,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 100000,
+      "cached": 0,
+      "hashed": 100000,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "fts",
+      "phase": "unchanged",
+      "seconds": 7.071,
+      "peak_rss_bytes": 58834944,
+      "peak_database_and_journal_bytes": 704205544,
+      "database_bytes": 689377280,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 0,
+      "cached": 100000,
+      "hashed": 0,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "fts",
+      "phase": "small-update",
+      "seconds": 7.318,
+      "peak_rss_bytes": 67780608,
+      "peak_database_and_journal_bytes": 711079744,
+      "database_bytes": 689377280,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 100,
+      "cached": 99900,
+      "hashed": 100,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    },
+    {
+      "documents": 100000,
+      "mode": "fts",
+      "phase": "overlap",
+      "seconds": 64.32,
+      "peak_rss_bytes": 251658240,
+      "peak_database_and_journal_bytes": 1380107648,
+      "database_bytes": 760340480,
+      "remaining_staged_files": 0,
+      "published_documents": 100000,
+      "metadata_encoding": [
+        "jsonb"
+      ],
+      "evaluated": 200000,
+      "cached": 0,
+      "hashed": 100000,
+      "within_memory_budget": true,
+      "within_time_budget": true
+    }
+  ],
+  "hardware": "Apple M5 Pro\n68719476736",
+  "corpora": {
+    "100000": {
+      "source_bytes": 231424000
+    }
+  }
+}

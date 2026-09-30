@@ -530,7 +530,9 @@
               "patch",
               "delete",
               "identity",
-              "repairUUID"
+              "repairUUID",
+              "copy",
+              "move"
             ]
           }
         },

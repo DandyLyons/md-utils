@@ -1,19 +1,34 @@
 import Foundation
 
-/// Partial observations, never a canonical identity or a document backup.
+/// A retained summary of observations at one collection-relative path.
+///
+/// Revisions and times describe observations within one index epoch, not creation
+/// dates or canonical identity. The summary cannot reconstruct document content.
 public struct DocumentObservation: Codable, Equatable, Sendable {
+  /// The collection-relative path, including the filename.
   public var path: String
+  /// The earliest retained content revision, or `nil` when unavailable.
   public var firstRevision: String?
+  /// The latest retained content revision, or `nil` when unavailable.
   public var lastRevision: String?
+  /// The publication generation that first retained this path in the epoch.
   public var firstGeneration: Int
+  /// The latest publication generation that observed this path.
   public var lastGeneration: Int
+  /// The first retained observation time, in seconds since the Unix epoch.
   public var firstObservedAt: Double
+  /// The latest observation time, in seconds since the Unix epoch.
   public var lastObservedAt: Double
+  /// Whether the latest observation verified the source bytes successfully.
   public var verified: Bool
+  /// Whether the refresh that last observed this path completed its scan.
   public var completeScan: Bool
+  /// Whether the path is absent from the current indexed file set.
   public var absent: Bool
+  /// Whether retained observations include a disappearance or scan discontinuity.
   public var historyGap: Bool
 
+  /// Creates a summary from host-supplied observations without validating them.
   public init(path: String, firstRevision: String?, lastRevision: String?, firstGeneration: Int,
     lastGeneration: Int, firstObservedAt: Double, lastObservedAt: Double, verified: Bool,
     completeScan: Bool, absent: Bool = false, historyGap: Bool = false,
@@ -25,19 +40,54 @@ public struct DocumentObservation: Codable, Equatable, Sendable {
   }
 }
 
-/// A coordinator-confirmed operation, separate from filesystem observations.
+/// A retained managed operation with an explicit confirmation source.
+///
+/// Hosts record these events from confirmed mutation receipts. An operator's
+/// confirmation is weaker evidence than a coordinator-verified source commit.
+/// Constructing an event does not verify that an operation occurred.
 public struct ManagedDocumentEvent: Codable, Equatable, Sendable {
-  public enum Kind: String, Codable, Sendable { case create, edit, identity, repairUUID, delete, copy, move }
-  public enum Confirmation: String, Codable, Sendable { case coordinator, operatorConfirmed }
+  /// The operation recorded by the mutation coordinator.
+  public enum Kind: String, Codable, Sendable {
+    /// Creation of a new document.
+    case create
+    /// A content or metadata edit.
+    case edit
+    /// An intentional identity change.
+    case identity
+    /// A targeted UUID repair.
+    case repairUUID
+    /// Removal of a document.
+    case delete
+    /// Creation of a document from an existing source.
+    case copy
+    /// Relocation of a document to another path.
+    case move
+  }
+  /// How the host established that a managed operation occurred.
+  public enum Confirmation: String, Codable, Sendable {
+    /// The coordinator verified the source-file commit.
+    case coordinator
+    /// An operator resolved an otherwise unconfirmed operation.
+    case operatorConfirmed
+  }
+  /// The durable receipt identifier used to make evidence replay idempotent.
   public var id: String
+  /// The managed operation's category.
   public var kind: Kind
+  /// The affected collection-relative path; the destination for copy and move.
   public var path: String
+  /// The resulting revision, or `nil` when the operation has no retained result.
   public var revision: String?
+  /// The collection-relative source path for a transfer, when available.
   public var sourcePath: String?
+  /// The source revision before the operation, when available.
   public var sourceRevision: String?
+  /// The evidence used to confirm the operation.
   public var confirmation: Confirmation
+  /// The event observation time, in seconds since the Unix epoch.
   public var observedAt: Double
 
+  /// Creates an event from host-supplied receipt details without verifying them.
   public init(id: String, kind: Kind, path: String, revision: String?, sourcePath: String? = nil,
     sourceRevision: String? = nil, confirmation: Confirmation = .coordinator, observedAt: Double,
   ) {
@@ -47,12 +97,19 @@ public struct ManagedDocumentEvent: Codable, Equatable, Sendable {
   }
 }
 
+/// A bounded selection of observations and managed events from one cache epoch.
 public struct DocumentProvenanceEvidence: Codable, Equatable, Sendable {
+  /// The cache lifetime identifier; a full rebuild starts a new epoch.
   public var epoch: String
+  /// Retained summaries for the requested paths, which may omit unknown paths.
   public var observations: [DocumentObservation]
+  /// Retained managed events involving the requested paths.
   public var events: [ManagedDocumentEvent]
+  /// Whether retention has discarded history anywhere in this epoch.
   public var historyPruned: Bool
+  /// Whether the query omitted matching events to satisfy its result limit.
   public var truncated: Bool
+  /// Creates an evidence bundle without checking completeness or consistency.
   public init(epoch: String, observations: [DocumentObservation], events: [ManagedDocumentEvent],
     historyPruned: Bool = false, truncated: Bool = false,
   ) {
@@ -61,30 +118,66 @@ public struct DocumentProvenanceEvidence: Codable, Equatable, Sendable {
   }
 }
 
-/// Callers supply all current holders of one normalized UUID after authoritative refresh.
+/// A current holder of the UUID being assessed, verified by the calling host.
 public struct UUIDCollisionCandidate: Codable, Equatable, Sendable {
+  /// The holder's collection-relative path.
   public var path: String
+  /// The current source revision verified from the holder's bytes.
   public var revision: String
+  /// Creates a candidate without reading its file or validating its UUID.
   public init(path: String, revision: String) { self.path = path; self.revision = revision }
 }
 
+/// An explanation of candidate relationships and remaining ownership uncertainty.
 public struct UUIDCollisionExplanation: Codable, Equatable, Sendable {
+  /// A directed relationship reported by retained evidence or a content match.
   public struct Relationship: Codable, Equatable, Sendable {
-    public enum Strength: String, Codable, Sendable { case possible, confirmed }
+    /// The strength of a relationship, independent of the overall recommendation.
+    public enum Strength: String, Codable, Sendable {
+      /// Evidence cannot establish the direction or current ownership.
+      case possible
+      /// A coordinator-confirmed copy matches both holders' current revisions.
+      case confirmed
+    }
+    /// The proposed source path; possible relationships do not establish direction.
     public var source: String
+    /// The proposed destination path.
     public var destination: String
+    /// Whether retained evidence confirms this particular copy relationship.
     public var strength: Strength
+    /// A human-readable explanation of the relationship's strength.
     public var reason: String
   }
+  /// Relationships that may remain useful even when overall ownership is ambiguous.
   public var relationships: [Relationship]
+  /// Human-readable reasons that prevent an ownership recommendation.
   public var reasons: [String]
   /// A recommendation only; never permission to write a source file.
   public var originalPath: String?
+  /// Other current holders, sorted by path, when an original is recommended.
   public var duplicatePaths: [String]
+  /// Whether the evidence does not identify a recommended original.
   public var ambiguous: Bool { originalPath == nil }
 }
 
+/// Assesses UUID collisions without filesystem access or permission to mutate files.
 public enum UUIDCollisionAssessor {
+  /// Explains a collision using current holders and retained partial evidence.
+  ///
+  /// A recommendation requires continuous, complete, verified observations and
+  /// a single rooted graph of coordinator-confirmed copies matching current
+  /// revisions. Pruned history, truncated evidence, or an incomplete holder set
+  /// prevents a recommendation. Discovery order, timestamps, and equal content
+  /// do not establish ownership. Managed moves alone do not establish a copy.
+  ///
+  /// - Parameters:
+  ///   - candidates: Two to 256 distinct paths holding the same normalized UUID.
+  ///     The host must verify their current revisions and UUID membership.
+  ///   - evidence: Retained evidence from a single current cache epoch.
+  ///   - completeHolderSet: Whether the host found every current holder,
+  ///     including documents outside exposed resource selections.
+  /// - Returns: An explanation with an optional recommendation. Invalid candidate
+  ///   counts or repeated paths produce ambiguity rather than throwing an error.
   public static func assess(_ candidates: [UUIDCollisionCandidate], evidence: DocumentProvenanceEvidence,
     completeHolderSet: Bool,
   ) -> UUIDCollisionExplanation {

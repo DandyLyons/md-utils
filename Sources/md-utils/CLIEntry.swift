@@ -39,6 +39,8 @@ public struct CLIEntry: AsyncParsableCommand {
       Slug.self,
       TemplateCommands.self,
       TypesCommands.self,
+      Copy.self,
+      Move.self,
     ],
     helpNames: [.long, .short]
   )

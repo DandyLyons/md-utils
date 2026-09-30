@@ -21,7 +21,7 @@ let scope = IndexScope(kind: .type, path: "notes/", name: "Book")
 
 ## Supply the existing evaluator
 
-Call ``CollectionIndexer/update(adding:fingerprint:rebuild:verifyHashes:limits:evaluate:)``
+Call ``CollectionIndexer/update(adding:writerLease:fingerprint:rebuild:verifyHashes:limits:evaluate:)``
 with a combined fingerprint and an evaluation closure. The closure receives the
 scope, project-relative path, UTF-8 source, and observed modification timestamp.
 It returns ``IndexEvaluation`` containing valid JSON metadata, extracted source
@@ -38,7 +38,7 @@ Include a host version component when custom extraction or evaluation changes.
 The database keeps fingerprints and runtime provenance, not a definition catalog.
 
 For overlapping scopes, prefer
-``CollectionIndexer/updateMany(adding:fingerprint:rebuild:verifyHashes:limits:evaluate:)``.
+``CollectionIndexer/updateMany(adding:writerLease:fingerprint:rebuild:verifyHashes:limits:evaluate:)``.
 It reads and hashes one changed file once and passes every scope needing assessment
 to one closure, allowing the host to parse/extract once and evaluate many policies.
 
@@ -68,6 +68,37 @@ Set `rebuild` to create a fresh cache from files and declarations saved in
 `.md-utils/md-utils.indexconfig.json`. Managed indexes and type views are recreated;
 arbitrary SQL objects and observation history are discarded. Deleting only SQLite
 retains the saved JSON settings. Failed rebuilds retain the previous database.
+
+``IndexConfiguration`` stores scopes, the optional evaluator configuration path,
+body-storage mode, metadata encoding, and managed field declarations. A rebuild
+can apply explicitly supplied overrides. Internal SQLite format changes require
+recreation rather than a sequence of schema migrations. Neither refresh nor
+rebuild migrates user-authored Markdown or mdtype schemas.
+
+Manual JSON changes require a rebuild; a stale watcher refuses to overwrite them.
+Publication coordinates with writers and updates the existing database connection,
+so a running native server can invalidate its old publication generation. Mutation
+receipts remain independent of the cache. Rebuild refuses legacy pending-edit
+tables rather than silently discarding unfinished drafts.
+
+## Inspect partial provenance
+
+Observations publish in the same transaction as files and assessments. A failed
+or interrupted refresh does not publish its staged verification evidence. A
+complete scan can establish absence; incomplete scans cannot establish ownership.
+Freshness checks still apply before a client uses retained evidence.
+
+Use ``SQLiteIndexDatabase/provenance(paths:limit:)`` after verifying current holders.
+The query returns first/latest summaries for at most 256 requested paths and up to
+1,000 managed events. It reports truncation instead of hiding omitted history.
+Retention keeps summaries for current paths plus at most 10,000 absent paths and
+10,000 managed events. Pruning marks history as incomplete for the remainder of
+the epoch. A full rebuild discards all provenance and creates a new epoch.
+
+Call ``SQLiteIndexDatabase/recordManagedEvent(_:)`` only for confirmed receipts
+from the current epoch. Event IDs make replay idempotent, but this API does not
+verify the operation or infer events from matching file content. Provenance is
+evidence for an explanation, not a document backup or permission to repair UUIDs.
 
 ## Handle partial failures
 

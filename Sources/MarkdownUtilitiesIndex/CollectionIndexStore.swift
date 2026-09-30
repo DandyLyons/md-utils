@@ -165,7 +165,7 @@ extension SQLiteIndexDatabase {
         try createCollection(root: root, configuration: configuration, checkFTSCapability: checkFTSCapability, jsonbProbe: jsonbProbe)
     }
 
-    static let cacheFormat = "7"
+    static let cacheFormat = "8"
 
     func createCollection(root: String, configuration: IndexConfiguration,
         checkFTSCapability: (Database) throws -> Void = SQLiteIndexDatabase.checkFTSCapability,
@@ -238,6 +238,7 @@ extension SQLiteIndexDatabase {
             try Self.createProvenance(db)
         }
         try installConfiguration(configuration)
+        try recordConfigurationFingerprint(configuration)
     }
 
     /// Returns saved declarations, including incomplete scopes, in stable identifier order.

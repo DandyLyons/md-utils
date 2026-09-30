@@ -51,6 +51,8 @@ public struct MarkdownMutationRequest: Sendable {
     case .replace, .patch: allowed = ["frontmatter", "body", "validationPolicy"]
     case .identity: allowed = ["identifiers", "validationPolicy"]
     case .repairUUID, .delete: allowed = []
+    case .copy: allowed = ["filename", "identifiers"]
+    case .move: allowed = ["filename"]
     }
     guard Set(payload.keys).isSubset(of: allowed) else {
       throw MarkdownMutationError(400, "request.unknown-field", "Unknown request field.")
@@ -66,6 +68,10 @@ public struct MarkdownMutationRequest: Sendable {
     if operation == .replace || operation == .patch { _ = try edit() }
     if operation == .create { _ = try object("frontmatter"); _ = try object("identifiers"); _ = try string("filename") }
     if operation == .identity { _ = try object("identifiers", required: true) }
+    if operation == .copy || operation == .move {
+      guard try string("filename") != nil else { throw MarkdownMutationError(400, "request.filename", "Supply the destination filename.") }
+      if operation == .copy { _ = try object("identifiers") }
+    }
   }
   public func object(_ key: String, required: Bool = false) throws -> [String: JSONValue] {
     guard let value = payload[key] else {
@@ -132,7 +138,14 @@ public struct MarkdownMutationReceipt: Codable, Sendable {
   public var conformanceChanges: [ResourceConformanceChange]
   /// Events from another disposable-cache epoch are not replayed into fresh history.
   public var provenanceEpoch: String?
+  /// Whether an operator confirmed the outcome rather than the coordinator alone.
+  /// A missing value preserves the default coordinator origin for older receipts.
   public var provenanceOperatorConfirmed: Bool?
+  /// The collection-relative source of a copy or move, separate from the destination path.
+  public var sourcePath: MarkdownRecordPath?
+  /// Whether a move's destination was durably confirmed before source removal.
+  /// This phase does not imply completion of source removal or index publication.
+  public var destinationCommitted: Bool?
   public var committed: Bool { sourceCommitted }
   public init(id: String = UUID().uuidString.lowercased(), resource: String, operation: MarkdownMutationOperation,
     path: MarkdownRecordPath, revision: MarkdownRecordRevision?, baseline: MarkdownRecordRevision?,

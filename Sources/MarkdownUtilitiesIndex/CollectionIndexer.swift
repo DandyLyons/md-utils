@@ -5,7 +5,7 @@ import SystemPackage
 
 /// Stable SHA-256 fingerprints for content and evaluator cache provenance.
 public enum IndexFingerprint {
-    /// Bump when extraction or evaluator semantics change, independently of database migrations.
+    /// Bump when extraction or evaluator semantics change, independently of cache format changes.
     public static let runtimeVersion = "collection-extraction-evaluation-1"
 
     /// Returns the lowercase hexadecimal SHA-256 digest of the exact supplied bytes.
@@ -88,9 +88,11 @@ public struct CollectionIndexer: Sendable {
     /// Canonical project directory used to resolve all saved relative scope paths.
     public let root: URL
 
-    /// Binds a checked database to its canonical project root and applies migrations.
+    /// Binds a current-format database to its canonical project root.
     ///
-    /// - Throws: Migration errors, unsupported newer schemas, or a different persisted root.
+    /// - Throws: Database errors, an incompatible cache format, invalid saved
+    ///   declarations, or a different persisted root. Incompatible caches require
+    ///   recreation; this initializer does not migrate historical schemas.
     public init(database: SQLiteIndexDatabase, root: URL) throws {
         self.database = database
         self.root = root.standardizedFileURL.resolvingSymlinksInPath()
@@ -100,14 +102,18 @@ public struct CollectionIndexer: Sendable {
     /// Refreshes every persisted scope, optionally registering another selection.
     ///
     /// Hidden entries and symlinks are skipped. Missing entries are pruned only after
-    /// successful enumeration of their scope. Rebuild keeps saved scopes, SQL field
-    /// indexes, and views, and ignores all cached candidate assessments.
+    /// successful enumeration of their scope. Rebuild creates a fresh cache from
+    /// saved JSON declarations, recreating managed field indexes and type views.
+    /// It discards provenance and arbitrary SQL objects.
     ///
     /// - Parameters:
     ///   - scope: Optional additional declaration; existing scopes remain registered.
+    ///   - writerLease: A lease for this collection already held by the caller,
+    ///     or `nil` to acquire one for this update.
     ///   - fingerprint: Combined configuration, schema, and evaluator provenance.
-    ///   - rebuild: Reevaluate every candidate regardless of cached state.
+    ///   - rebuild: Replace the cache with a fresh, hash-verified publication.
     ///   - verifyHashes: Read and hash candidates even when mtime and size are unchanged.
+    ///   - limits: Positive bounds for discovery, source reads, and staging batches.
     ///   - evaluate: Receives the scope, root-relative path, decoded UTF-8 source,
     ///     and observed modification date. Return extracted content and assessment.
     /// - Returns: Per-scope work counts and recoverable failures. Inspect
@@ -142,6 +148,9 @@ public struct CollectionIndexer: Sendable {
     /// assessments are scope-dependent. Payloads larger than the change batch byte
     /// limit are staged individually, after flushing the previous batch. Evaluator
     /// working memory and one file's output are additional to the batch budget.
+    ///
+    /// Scope registration, writer leases, rebuilds, and error reporting follow
+    /// ``update(adding:writerLease:fingerprint:rebuild:verifyHashes:limits:evaluate:)``.
     public func updateMany(
         adding scope: IndexScope? = nil,
         writerLease: CollectionWriterLease? = nil,
@@ -164,6 +173,7 @@ public struct CollectionIndexer: Sendable {
             }
             return report
         }
+        try database.validateSavedConfiguration()
         guard limits.candidateBatchCount > 0, limits.discoveryBatchCount > 0,
             limits.discoveryBatchBytes > 0, limits.fileBytes > 0,
             limits.changeBatchCount > 0, limits.changeBatchBytes > 0,

@@ -78,7 +78,7 @@ enum MarkdownMutationHTTP {
       payload["code"] = .string(receipt.state == .committed ? "mutation.publication-pending" : receipt.state == .abandoned ? "mutation.abandoned" : "mutation.recovery-required")
     }
     payload["operationStatus"] = .string(collectionRoute + "/_operations/" + receipt.id)
-    var result = try json(payload, status: statusQuery ? 200 : receipt.state == .completed ? (receipt.operation == .create ? 201 : 200) : receipt.state == .abandoned ? 409 : 503)
+    var result = try json(payload, status: statusQuery ? 200 : receipt.state == .completed ? (receipt.operation == .create || receipt.operation == .copy ? 201 : 200) : receipt.state == .abandoned ? 409 : 503)
     if let revision = receipt.revision, receipt.committed, let name = HTTPFields.Element.Name("MD-Utils-Revision") {
       result.headers[name] = MarkdownRevisionHeader.encode(revision)
     }

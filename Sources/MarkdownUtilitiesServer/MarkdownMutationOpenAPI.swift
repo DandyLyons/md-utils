@@ -49,11 +49,12 @@ enum MarkdownMutationOpenAPI {
     } else if let operation = route.mutationOperation {
       result["summary"] = .string("\(operation.rawValue) \(resource.name)")
       result["description"] = .string("Writes affect the canonical document across resource aliases. Ordinary success requires index and server publication; publication changes invalidate generation-bound cursors. A receipt can report source committed with publication pending. Inspect operationStatus before retrying. UUID repair requires an explicitly selected document and does not rewrite references. DELETE removes the canonical document, not just resource membership.")
-      if operation == .create {
+      if operation == .create || operation == .copy || operation == .move {
         parameters.append(parameter("Idempotency-Key", location: "header",
           description: "Required, 1–256 UTF-8 bytes. Same key and payload replays the original operation; different payload conflicts. Completed receipts are retained for \(resource.mutations?.idempotencyRetentionSeconds ?? 604_800) seconds; unresolved operations are retained.",
           schema: .object(["type": .string("string"), "minLength": .integer(1), "maxLength": .integer(256)])))
-      } else {
+      }
+      if operation != .create {
         parameters.append(parameter("MD-Utils-If-Revision", location: "header", description: revisionDescription, schema: ref("MarkdownRevisionToken")))
         if route.lookupUsesQuery == true {
           parameters.append(parameter(route.lookupName == nil ? "path" : "value", location: "query",
@@ -100,6 +101,12 @@ enum MarkdownMutationOpenAPI {
     var properties: [String: JSONValue] = [:]
     var required: [String] = []
     switch operation {
+    case .copy, .move:
+      properties["filename"] = text
+      required.append("filename")
+      if operation == .copy {
+        properties["identifiers"] = object(Dictionary(uniqueKeysWithValues: (resource.mutations?.creation?.identifiers ?? []).map { ($0, JSONValue.object([:])) }))
+      }
     case .create:
       properties = [
         "frontmatter": frontmatter,
@@ -182,7 +189,7 @@ enum MarkdownMutationOpenAPI {
         if route.mutationOperation != .create {
           result["428"] = response("MD-Utils-If-Revision is required", schema: error)
         }
-        result[route.mutationOperation == .create ? "201" : "200"] = response("Completed mutation receipt. DELETE also returns a JSON receipt with 200.", schema: receipt, revision: true)
+        result[route.mutationOperation == .create || route.mutationOperation == .copy ? "201" : "200"] = response("Completed mutation receipt. DELETE also returns a JSON receipt with 200.", schema: receipt, revision: true)
       } else {
         result["200"] = response("Resolved completed non-creation operation", schema: receipt, revision: true)
         result["201"] = response("Resolved completed creation", schema: receipt, revision: true)
@@ -225,6 +232,7 @@ enum MarkdownMutationOpenAPI {
       "code": enumeration(["mutation.publication-pending", "mutation.recovery-required", "mutation.abandoned"]),
       "operationStatus": text,
       "provenanceEpoch": text, "provenanceOperatorConfirmed": boolean,
+      "sourcePath": text, "destinationCommitted": boolean,
     ]
     receipt["committed"] = .object(["type": strings(["boolean", "null"]), "description": .string("Null means uncertain, true means canonical source committed. This does not imply index publication completed.")])
     let editCases: [JSONValue] = [

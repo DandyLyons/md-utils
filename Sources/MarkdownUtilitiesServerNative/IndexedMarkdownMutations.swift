@@ -4,7 +4,7 @@ import MarkdownUtilitiesIndex
 import MarkdownUtilitiesServer
 import MarkdownUtilitiesTemplates
 
-enum MutationBoundary: Equatable, Sendable { case prepared, persisted, committed, published }
+enum MutationBoundary: Equatable, Sendable { case prepared, persisted, committed, published, destinationPersisted, destinationCommitted, sourceRemoved }
 
 extension IndexedMarkdownRepository: MarkdownMutationService {
   /// The same entry point is available to non-HTTP clients such as index apply.
@@ -19,11 +19,15 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
       throw MarkdownMutationError(405, "operation.disabled", "This resource does not enable the requested mutation.")
     }
     let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-    let fingerprint = IndexFingerprint.hash(try encoder.encode(request.payload))
+    let transfer = request.operation == .copy || request.operation == .move
+    let fingerprint = transfer
+      ? IndexFingerprint.combined([String(decoding: try encoder.encode(request.payload), as: UTF8.self),
+          requestedPath?.rawValue ?? "", identity ?? "", request.lookupName ?? "", revision?.rawValue ?? ""])
+      : IndexFingerprint.hash(try encoder.encode(request.payload))
     let keyHash: String?
-    if request.operation == .create {
+    if request.operation == .create || transfer {
       guard let key = idempotencyKey, !key.isEmpty, key.utf8.count <= 256 else {
-        throw MarkdownMutationError(400, "idempotency.required", "Creation requires an Idempotency-Key of 1–256 bytes.")
+        throw MarkdownMutationError(400, "idempotency.required", "Creation, copy and move require an Idempotency-Key of 1–256 bytes.")
       }
       keyHash = IndexFingerprint.combined([name, request.operation.rawValue, key])
     } else { keyHash = nil }
@@ -36,7 +40,10 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
         try FileManager.default.removeItem(at: url)
         continue
       }
-      if receipt.state != .completed && receipt.state != .abandoned { pendingPaths.insert(receipt.path.rawValue) }
+      if receipt.state != .completed && receipt.state != .abandoned {
+        pendingPaths.insert(receipt.path.rawValue)
+        if let source = receipt.sourcePath { pendingPaths.insert(source.rawValue) }
+      }
       if receipt.keyHash == keyHash, keyHash != nil {
         guard receipt.requestHash == fingerprint else { throw MarkdownMutationError(409, "idempotency.mismatch", "This key belongs to a different request.") }
         return receipt
@@ -48,7 +55,7 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     let proposal: ResourceMutationProposal?
     let validation: ResourceMutationValidation?
     let source: MarkdownRecord?
-    let target: MarkdownRecordPath
+    var target: MarkdownRecordPath
     var explicitlyEditing = Set<String>()
     if request.operation == .create {
       let creation = try await prepareCreation(request: request, resource: resource, planner: planner)
@@ -79,6 +86,10 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
       var proposedContext = original.context
       proposedContext.modificationDate = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down))
       switch request.operation {
+      case .copy, .move:
+        let result = try await prepareTransfer(request: request, resource: resource, source: mutationSource, planner: planner)
+        proposal = result.validation.proposal; validation = result.validation
+        target = result.target; explicitlyEditing = result.identityFields
       case .delete: proposal = nil; validation = nil
       case .replace, .patch:
         let result = try await planner.plan(request.edit(), source: mutationSource, resource: resource, policy: request.validationPolicy, proposedContext: proposedContext)
@@ -109,7 +120,7 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
       case .create: throw RecordStoreError.unavailable
       }
     }
-    guard !pendingPaths.contains(target.rawValue) else {
+    guard !pendingPaths.contains(target.rawValue), source?.context.path.map({ !pendingPaths.contains($0.rawValue) }) ?? true else {
       throw MarkdownMutationError(409, "recovery.required", "An unresolved operation owns this path. Inspect operation status before writing.")
     }
     if let validation, !validation.isValid {
@@ -126,7 +137,10 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
         let policy = FileEditPolicy(revision: source.revision, memberships: names, plan: plan, contracts: validation?.changes ?? [])
         try policy.validate(before: before.userFrontmatter ?? [:], after: after.userFrontmatter ?? [:], explicitlyEditing: explicitlyEditing)
       }
-      if source != nil { try await validateCollection(proposal.record, projection: afterProjection) }
+      if source != nil {
+        try await validateCollection(proposal.record, projection: afterProjection,
+          excludingPath: request.operation == .move ? source?.context.path : nil)
+      }
     }
     try checkConfiguration()
     try Task.checkCancellation()
@@ -139,12 +153,15 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     )
     receipt.validationPolicy = request.validationPolicy
     receipt.provenanceEpoch = try database.provenanceEpoch()
+    if transfer { receipt.sourcePath = source?.context.path }
     receipt.conformanceChanges = validation?.changes.filter { ($0.previouslyPassed && !$0.passes) || ($0.previouslySelected && !$0.selected) } ?? []
     try writeReceipt(receipt)
     do {
       try mutationCheckpoint?(.prepared)
       let store: any RecordStore = CoordinatedNativeRecordStore(repository: self, root: root, lease: lease)
-      if let proposal {
+      if transfer, let proposal, let source {
+        try persistTransfer(proposal.record, source: source, receipt: &receipt)
+      } else if let proposal {
         if let revision = source?.revision { _ = try await store.replace(proposal.record, ifRevision: revision) }
         else { _ = try await store.create(proposal.record) }
       } else if let revision = source?.revision {
@@ -152,6 +169,11 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
       } else { throw RecordStoreError.unavailable }
       try mutationCheckpoint?(.persisted)
     } catch let error as MarkdownMutationError where [409, 412, 413, 422].contains(error.status) {
+      if transfer && receipt.destinationCommitted == true {
+        receipt.state = .recoveryRequired
+        try? writeReceipt(receipt)
+        return receipt
+      }
       try FileManager.default.removeItem(at: receiptURL(receipt.id))
       throw error
     } catch {
@@ -194,6 +216,9 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     try checkConfiguration()
     var receipt = try await operation(resource: resource, id: id)
     guard receipt.state != .completed && receipt.state != .abandoned else { return receipt }
+    if receipt.sourcePath != nil {
+      return try await resolveTransfer(receipt, decision: decision, lease: lease)
+    }
     let data = try NativeMutationFiles.read(NativeMutationFiles.url(root: root, path: receipt.path))
     let expected = decision == .confirmCommitted ? receipt.revision : receipt.baseline
     guard data.map(IndexFingerprint.hash) == expected?.rawValue else {
@@ -222,6 +247,20 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     defer { withExtendedLifetime(lease) {} }
     for url in try journalFiles() {
       var receipt = try readReceipt(url)
+      if receipt.sourcePath != nil, receipt.destinationCommitted == true,
+        receipt.state != .completed && receipt.state != .abandoned {
+        do { _ = try await finishTransfer(receipt, lease: lease) }
+        catch {
+          // finishTransfer may already have durably confirmed source removal.
+          // Preserve that fact if subsequent refresh/publication fails.
+          receipt = try readReceipt(url)
+          if receipt.state != .committed || (error as? MarkdownMutationError)?.code == "recovery.source-changed" {
+            receipt.state = .recoveryRequired
+          }
+          try writeReceipt(receipt)
+        }
+        continue
+      }
       if receipt.state == .prepared { receipt.state = .recoveryRequired; try writeReceipt(receipt) }
       guard receipt.state == .committed else { continue }
       let data = try NativeMutationFiles.read(NativeMutationFiles.url(root: root, path: receipt.path))
@@ -240,6 +279,10 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     guard source.map(IndexFingerprint.hash) == receipt.revision?.rawValue else {
       throw MarkdownMutationError(409, "recovery.source-changed", "Source changed after commit; the operation needs recovery.")
     }
+    if receipt.operation == .move, let path = receipt.sourcePath,
+      try NativeMutationFiles.read(NativeMutationFiles.url(root: root, path: path)) != nil {
+      throw MarkdownMutationError(409, "recovery.source-changed", "Move source still exists; inspect recovery status.")
+    }
     if receipt.operation != .delete {
       guard case .record(let record) = try await lookup(path: receipt.path), record.revision == receipt.revision else {
         throw MarkdownMutationError(503, "publication.pending", "The committed revision is not yet published.")
@@ -254,14 +297,133 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
       case .delete: kind = .delete
       case .identity: kind = .identity
       case .repairUUID: kind = .repairUUID
+      case .copy: kind = .copy
+      case .move: kind = .move
       }
       try database.recordManagedEvent(.init(id: receipt.id, kind: kind, path: receipt.path.rawValue,
-        revision: receipt.revision?.rawValue, sourceRevision: receipt.baseline?.rawValue,
+        revision: receipt.revision?.rawValue, sourcePath: receipt.sourcePath?.rawValue, sourceRevision: receipt.baseline?.rawValue,
         confirmation: receipt.provenanceOperatorConfirmed == true ? .operatorConfirmed : .coordinator,
         observedAt: receipt.created.timeIntervalSince1970))
     }
     receipt.state = .completed
     receipt.completedAt = Date()
+    return receipt
+  }
+
+  private func prepareTransfer(request: MarkdownMutationRequest, resource: PlannedMarkdownResource,
+    source: ResourceMutationSource, planner: ResourceMutationPlanner,
+  ) async throws -> (validation: ResourceMutationValidation, target: MarkdownRecordPath, identityFields: Set<String>) {
+    guard let allocation = resource.mutations?.creation, let filename = try request.string("filename"),
+      !filename.isEmpty, !filename.hasPrefix("."), !filename.contains("/"), !filename.contains("\\"), !filename.contains("\0"),
+      ["md", "markdown"].contains(URL(fileURLWithPath: filename).pathExtension.lowercased()) else {
+      throw MarkdownMutationError(422, "filename.invalid", "Supply a visible Markdown filename in the configured allocation directory.")
+    }
+    let directory = allocation.directory.rawValue == "." ? "" : allocation.directory.rawValue
+    let target = try MarkdownRecordPath(directory + filename)
+    guard target != source.record.context.path else { throw MarkdownMutationError(409, "path.same", "Source and destination must differ.") }
+    let destination = try NativeMutationFiles.url(root: root, path: target)
+    guard try NativeMutationFiles.read(destination) == nil else { throw MarkdownMutationError(409, "path.exists", "Destination already exists.") }
+    var content = source.record.content
+    var identifiers: [String: JSONValue] = [:]
+    if request.operation == .copy {
+      identifiers = try request.object("identifiers")
+      guard Set(identifiers.keys).isSubset(of: Set(allocation.identifiers)) else {
+        throw MarkdownMutationError(422, "copy.identifiers", "Copy accepts only configured creation identifiers.")
+      }
+      if let uuid = plan.persistentIdentity, let first = uuid.path.first {
+        var metadata = await MarkdownRecordAnalyzer.analyze(source.record).userFrontmatter ?? [:]
+        set(.string(UUID().uuidString.lowercased()), path: uuid.path[...], in: &metadata)
+        identifiers[first] = metadata[first]
+      }
+      if !identifiers.isEmpty {
+        let codec = try MarkdownResourceCodec(configuration: .init(frontmatterFields: identifiers.keys.sorted(), bodyWritable: false))
+        content = try codec.plan(.patch(frontmatter: identifiers.mapValues { .set($0) }, body: nil), source: source).record.content
+      }
+    }
+    var context = source.record.context
+    context.path = target
+    if request.operation == .copy { context.modificationDate = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down)) }
+    let proposal = ResourceMutationProposal(content: content, source: source, proposedContext: context,
+      proposedIdentity: .init(rawValue: target.rawValue))
+    return (try await planner.validator.validate(proposal, destination: planner.requirements(for: resource)), target, Set(identifiers.keys))
+  }
+
+  private func persistTransfer(_ proposed: MarkdownRecord, source: MarkdownRecord,
+    receipt: inout MarkdownMutationReceipt,
+  ) throws {
+    guard let sourcePath = source.context.path, let revision = source.revision else { throw RecordStoreError.unavailable }
+    let from = try NativeMutationFiles.url(root: root, path: sourcePath)
+    let to = try NativeMutationFiles.url(root: root, path: receipt.path)
+    if receipt.operation == .move {
+      let sourceVolume = try FileManager.default.attributesOfFileSystem(forPath: from.path)[.systemNumber] as? NSNumber
+      let targetVolume = try FileManager.default.attributesOfFileSystem(forPath: to.deletingLastPathComponent().path)[.systemNumber] as? NSNumber
+      guard let sourceVolume, sourceVolume == targetVolume else {
+        throw MarkdownMutationError(422, "move.filesystem", "Move requires source and destination on the same filesystem.")
+      }
+    }
+    guard try NativeMutationFiles.read(from).map(IndexFingerprint.hash) == revision.rawValue else {
+      throw MarkdownMutationError(412, "revision.stale", "Transfer source changed before commit.")
+    }
+    let permissions = try FileManager.default.attributesOfItem(atPath: from.path)[.posixPermissions] as? Int
+    try NativeMutationFiles.persist(url: to, content: Data(proposed.content.utf8), expected: nil,
+      modificationDate: proposed.context.modificationDate, permissions: permissions)
+    receipt.destinationCommitted = true
+    try mutationCheckpoint?(.destinationPersisted)
+    try writeReceipt(receipt)
+    try mutationCheckpoint?(.destinationCommitted)
+    if receipt.operation == .move {
+      guard try NativeMutationFiles.read(to).map(IndexFingerprint.hash) == receipt.revision?.rawValue else {
+        throw MarkdownMutationError(409, "recovery.source-changed", "Move destination changed; source was retained.")
+      }
+      try NativeMutationFiles.persist(url: from, content: nil, expected: revision)
+      try mutationCheckpoint?(.sourceRemoved)
+    }
+  }
+
+  private func resolveTransfer(_ value: MarkdownMutationReceipt, decision: MarkdownRecoveryDecision,
+    lease: CollectionWriterLease,
+  ) async throws -> MarkdownMutationReceipt {
+    var receipt = value
+    guard let sourcePath = receipt.sourcePath else { throw RecordStoreError.unavailable }
+    let destination = try NativeMutationFiles.read(NativeMutationFiles.url(root: root, path: receipt.path))
+    if decision == .confirmNotCommitted {
+      let source = try NativeMutationFiles.read(NativeMutationFiles.url(root: root, path: sourcePath))
+      guard !receipt.sourceCommitted, destination == nil, source.map(IndexFingerprint.hash) == receipt.baseline?.rawValue else {
+        throw MarkdownMutationError(409, "recovery.source-changed", "Abandon requires an absent destination and unchanged original source.")
+      }
+      receipt.state = .abandoned; receipt.completedAt = Date()
+      try writeReceipt(receipt)
+      return receipt
+    }
+    guard destination.map(IndexFingerprint.hash) == receipt.revision?.rawValue else {
+      throw MarkdownMutationError(409, "recovery.source-changed", "Destination no longer matches the recorded transfer.")
+    }
+    receipt.destinationCommitted = true
+    receipt.provenanceOperatorConfirmed = true
+    try writeReceipt(receipt)
+    return try await finishTransfer(receipt, lease: lease)
+  }
+
+  /// A confirmed destination permits completing a move only while the source
+  /// still matches its baseline. Changed sources are never deleted by recovery.
+  private func finishTransfer(_ value: MarkdownMutationReceipt, lease: CollectionWriterLease) async throws -> MarkdownMutationReceipt {
+    var receipt = value
+    guard receipt.destinationCommitted == true, let path = receipt.sourcePath,
+      try NativeMutationFiles.read(NativeMutationFiles.url(root: root, path: receipt.path)).map(IndexFingerprint.hash) == receipt.revision?.rawValue else {
+      throw MarkdownMutationError(409, "recovery.source-changed", "Transfer destination changed; operator recovery is required.")
+    }
+    if receipt.operation == .move && !receipt.sourceCommitted {
+      let source = try NativeMutationFiles.url(root: root, path: path)
+      if try NativeMutationFiles.read(source) != nil {
+        guard let baseline = receipt.baseline else { throw RecordStoreError.unavailable }
+        try NativeMutationFiles.persist(url: source, content: nil, expected: baseline)
+      }
+    }
+    receipt.state = .committed; receipt.sourceCommitted = true
+    try writeReceipt(receipt)
+    try await refresh(lease: lease)
+    receipt = try await published(receipt)
+    try writeReceipt(receipt)
     return receipt
   }
 
@@ -350,7 +512,9 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     return snapshot.resources.lazy.compactMap { $0.records.first }.first
   }
 
-  private func validateCollection(_ proposed: MarkdownRecord, projection: GenericMarkdownRecord?) async throws {
+  private func validateCollection(_ proposed: MarkdownRecord, projection: GenericMarkdownRecord?,
+    excludingPath: MarkdownRecordPath? = nil,
+  ) async throws {
     let analyzed = await MarkdownRecordAnalyzer.analyze(proposed)
     let selected = Set(projection?.memberships.map(\.resourceName) ?? [])
     struct Check { let resource: PlannedMarkdownResource; let policy: MarkdownRecordIdentityPolicy; let value: String; let server: Bool }
@@ -378,7 +542,7 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     var token: RecordStoreContinuationToken?
     repeat {
       let page = try await records(matching: RecordStoreQuery(limit: 1, continuationToken: token))
-      for other in page.records where other.identity != proposed.identity {
+      for other in page.records where other.identity != proposed.identity && (excludingPath == nil || other.context.path != excludingPath) {
         let otherAnalyzed = await MarkdownRecordAnalyzer.analyze(other)
         if !checks.isEmpty && otherAnalyzed.parseDiagnostics.contains(where: { $0.severity == .error }) {
           throw MarkdownMutationError(503, "identity.incomplete", "A collection document cannot be assessed; repair its parse diagnostics before enforcing uniqueness.")

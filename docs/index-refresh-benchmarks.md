@@ -118,6 +118,36 @@ for exact byte counts, corpus size, counters, and machine/toolchain provenance.
 
 ## Further improvement
 
+### Fresh-cache and provenance validation (2026-09-30)
+
+The release CLI was also measured after adding fresh-database rebuilds and bounded
+document observations, on the same 100,000-document distribution. This run used
+Apple Swift 6.4 on macOS 27 ARM64. The final bounded JSON configuration drift
+guard was added afterward and is covered by the test suite, not these timings.
+
+| Mode | Phase | Seconds | Peak RSS MiB |
+| --- | --- | ---: | ---: |
+| Metadata-only | initial | 82.15 | 130.34 |
+| Metadata-only | rebuild | 54.68 | 139.88 |
+| Metadata-only | unchanged | 7.35 | 55.94 |
+| Metadata-only | small-update | 7.36 | 59.38 |
+| Metadata-only | overlap | 61.28 | 160.45 |
+| FTS | initial | 52.68 | 219.25 |
+| FTS | rebuild | 55.26 | 219.95 |
+| FTS | unchanged | 7.07 | 56.11 |
+| FTS | small-update | 7.32 | 64.64 |
+| FTS | overlap | 64.32 | 240.00 |
+
+All ten phases met the existing 256 MiB/600-second budgets, published 100,000
+documents, and left zero staged file rows. Overlap hashed each file once for
+200,000 assessments. See [raw measurements](benchmarks/index-provenance-100000.json).
+The legacy benchmark's peak disk counter includes only the primary database and
+its journals; it excludes the new private rebuild database. Fresh rebuilds need
+additional disk for that database as well as the original and rollback journal.
+These disk counters must not be interpreted as total rebuild workspace usage.
+
+### Larger collections
+
 Million-document validation is deliberately outside #147's revised acceptance
 criteria. The benchmark accepts `--counts 1000000` for future investigation, but
 the final implementation makes no measured million-document memory or runtime

@@ -16,6 +16,16 @@ Use this target for content-only Markdown operations that must run on Apple plat
 - <doc:MarkdownTypes>
 - <doc:RecordIdentity>
 
+### Explaining Identity Collisions
+
+- <doc:DocumentProvenance>
+- ``DocumentObservation``
+- ``ManagedDocumentEvent``
+- ``DocumentProvenanceEvidence``
+- ``UUIDCollisionCandidate``
+- ``UUIDCollisionExplanation``
+- ``UUIDCollisionAssessor``
+
 ### Rules
 
 - <doc:MarkdownRules>

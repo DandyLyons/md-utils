@@ -98,6 +98,13 @@ struct MarkdownMutationOpenAPITests {
     let repair = try request("/books/{id}/repair-uuid", "post")
     #expect(try valid([:], schema: repair, document: document))
     #expect(try !valid(["uuid": "no"], schema: repair, document: document))
+    let copy = try request("/books/{id}/copy", "post")
+    #expect(try valid(["filename": "Copy.md", "identifiers": ["slug": "copy"]], schema: copy, document: document))
+    #expect(try !valid(["filename": "Copy.md", "identifiers": ["uuid": "no"]], schema: copy, document: document))
+    #expect(try !valid([:], schema: copy, document: document))
+    let move = try request("/books/{id}/move", "post")
+    #expect(try valid(["filename": "Moved.md"], schema: move, document: document))
+    #expect(try !valid(["filename": "Moved.md", "identifiers": [:]], schema: move, document: document))
     for route in plan.routes where route.kind == .mutation {
       let operation = try #require(paths[route.path.rawValue]?.objectValue?[route.method.rawValue.lowercased()]?.objectValue)
       guard case .array(let parameters) = operation["parameters"] else {
@@ -105,6 +112,9 @@ struct MarkdownMutationOpenAPITests {
       }
       let header = route.mutationOperation == .create ? "Idempotency-Key" : "MD-Utils-If-Revision"
       #expect(parameters.contains { $0.objectValue?["name"] == .string(header) && $0.objectValue?["required"] == .boolean(true) })
+      if route.mutationOperation == .copy || route.mutationOperation == .move {
+        #expect(parameters.contains { $0.objectValue?["name"] == .string("Idempotency-Key") && $0.objectValue?["required"] == .boolean(true) })
+      }
       if route.lookupUsesQuery == true {
         #expect(parameters.contains { $0.objectValue?["name"] == .string(route.lookupName == nil ? "path" : "value") })
       }
@@ -130,6 +140,8 @@ struct MarkdownMutationOpenAPITests {
         ("/books/test", .patch, "/books/{id}", writeHeaders, "{}"),
         ("/books/test/identity", .post, "/books/{id}/identity", writeHeaders, "{\"identifiers\":{\"slug\":\"new\"}}"),
         ("/books/test/repair-uuid", .post, "/books/{id}/repair-uuid", writeHeaders, "{}"),
+        ("/books/test/copy", .post, "/books/{id}/copy", writeHeaders, "{\"filename\":\"Copy.md\"}"),
+        ("/books/test/move", .post, "/books/{id}/move", writeHeaders, "{\"filename\":\"Moved.md\"}"),
         ("/books/_operations/test/resolve", .post, "/books/_operations/{id}/resolve", [.contentType: "application/json"], "{\"decision\":\"confirmCommitted\"}"),
         ("/books/test", .delete, "/books/{id}", [revision: MarkdownRevisionHeader.encode(.init(rawValue: "abc"))], ""),
         ("/books/test", .patch, "/books/{id}", [.contentType: "application/json"], "{}"),

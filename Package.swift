@@ -235,6 +235,8 @@ let package = Package(
     .executableTarget(
       name: "md-utils",
       dependencies: [
+        "MarkdownUtilitiesServerNative",
+        "MarkdownUtilitiesServer",
         "MarkdownUtilitiesTemplates",
         "MarkdownUtilitiesIndexNative",
         "MarkdownUtilitiesIndex",

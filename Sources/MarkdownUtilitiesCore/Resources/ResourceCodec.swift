@@ -103,10 +103,13 @@ public struct ResourceMutationProposal: Equatable, Sendable {
     self.diagnostics = diagnostics
   }
 
-  public init(content: String, source: ResourceMutationSource, proposedContext: MarkdownRecordContext? = nil) {
+  public init(content: String, source: ResourceMutationSource, proposedContext: MarkdownRecordContext? = nil,
+    proposedIdentity: MarkdownRecordIdentity? = nil,
+  ) {
     var proposed = source.record
     proposed.content = content
     if let proposedContext { proposed.context = proposedContext }
+    if let proposedIdentity { proposed.identity = proposedIdentity }
     proposed.revision = nil
     record = proposed
     original = source.record

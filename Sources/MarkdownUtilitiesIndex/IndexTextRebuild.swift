@@ -47,6 +47,7 @@ extension SQLiteIndexDatabase {
             throw SQLiteIndexError(message: "Rebuild incomplete; original cache and settings retained.")
         }
         let effective = try fresh.configuration()
+        try fresh.recordConfigurationFingerprint(effective)
         // Backup publishes through the existing connection instead of renaming a live SQLite file.
         try fresh.databaseQueue.backup(to: databaseQueue)
         try effective.save(root: root)

@@ -53,6 +53,11 @@ resources advertise no mutation operations.
 | Delete | `DELETE /books/{id}` | No body or an empty object |
 | Identity edit | `POST /books/{id}/identity` | `identifiers` object containing configured identity fields |
 | UUID repair | `POST /books/{id}/repair-uuid` | Empty object; host generates a new UUID |
+| Copy | `POST /books/{id}/copy` | Destination filename and optional configured creation identifiers |
+| Move/rename | `POST /books/{id}/move` | Destination filename |
+
+Copy and move require independent opt-ins and both revision and idempotency headers.
+See [managed copy/move](copy-move.md) for UUID handling, CLI usage and two-path recovery.
 
 Named lookup routes accept the corresponding item methods, including query-value
 transport. For example `PATCH /books/by/uuid/{uuid}` and

@@ -11,8 +11,9 @@ See [collection indexing](collection-index.md). Files remain authoritative.
 
 **Selected: option 1, GRDB with system SQLite.** No amalgamation, custom SQLite
 build, or second runtime is shipped. SwiftPM currently resolves GRDB 7.11.1.
-GRDB owns connection serialization and provides statement, transaction, and
-migration infrastructure for later indexing work.
+GRDB owns connection serialization, statements, transactions, and backup publication.
+Internal cache formats are recreated on incompatibility rather than migrated;
+index declarations live in `.md-utils/md-utils.indexconfig.json`.
 
 **Fallback: option 3, a source-based SwiftPM adaptation of GRDB with bundled
 SQLite.** Reconsider only if system SQLite cannot meet supported deployment
