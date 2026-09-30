@@ -2,7 +2,9 @@
 """Measure native GRDB overhead and test copied production sources in isolation.
 
 Every run uses a fresh project-local build directory. The generated package uses
-the root lockfile's GRDB pin, but no unrelated CLI/server dependencies or builds.
+the root lockfile's pins and the index's Core dependency, but no unrelated
+CLI/server dependencies or builds. Measurements include the production index
+dependency graph, including portable provenance support.
 """
 import json
 from pathlib import Path
@@ -18,6 +20,21 @@ pin = next(pin for pin in pins if pin["identity"] == "grdb.swift")
 version = pin["state"]["version"]
 crypto_version = next(pin for pin in pins if pin["identity"] == "swift-crypto")["state"]["version"]
 system_version = next(pin for pin in pins if pin["identity"] == "swift-system")["state"]["version"]
+core_packages = [
+    ("https://github.com/hebertialmeida/MarkdownSyntax", "markdownsyntax"),
+    ("https://github.com/pointfreeco/swift-parsing.git", "swift-parsing"),
+    ("https://github.com/kylef/JSONSchema.swift", "jsonschema.swift"),
+    ("https://github.com/objecthub/swift-dynamicjson.git", "swift-dynamicjson"),
+    ("https://github.com/jpsim/Yams.git", "yams"),
+    ("https://github.com/mattt/swift-toml.git", "swift-toml"),
+    # Parsing's broad constraint also admits incompatible CasePaths releases.
+    # Preserve the root's tested transitive version in this fresh package.
+    ("https://github.com/pointfreeco/swift-case-paths", "swift-case-paths"),
+]
+core_dependencies = "\n".join(
+    f'        .package(url: "{url}", exact: "{next(pin for pin in pins if pin["identity"] == identity)["state"]["version"]}"),'
+    for url, identity in core_packages
+)
 scratch = ROOT / "tmp/"
 scratch.mkdir(exist_ok=True)
 work = Path(tempfile.mkdtemp(prefix="grdb-measure-", dir=scratch))
@@ -25,6 +42,7 @@ print(f"Measurement workspace: {work}/", flush=True)
 
 # Copy source, never reuse another build directory. Also run the actual index tests.
 for source, destination in [
+    ("Sources/MarkdownUtilitiesCore/", "Sources/MarkdownUtilitiesCore/"),
     ("Sources/MarkdownUtilitiesIndex/", "Sources/MarkdownUtilitiesIndex/"),
     ("IntegrationTests/SQLiteIndexSmoke/", "Sources/SQLiteIndexSmoke/"),
     ("Tests/MarkdownUtilitiesIndexTests/", "Tests/MarkdownUtilitiesIndexTests/"),
@@ -43,9 +61,19 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift.git", exact: "GRDB_VERSION"),
         .package(url: "https://github.com/apple/swift-crypto.git", exact: "CRYPTO_VERSION"),
         .package(url: "https://github.com/apple/swift-system", exact: "SYSTEM_VERSION"),
+CORE_DEPENDENCIES
     ],
     targets: [
+        .target(name: "MarkdownUtilitiesCore", dependencies: [
+            .product(name: "MarkdownSyntax", package: "MarkdownSyntax"),
+            .product(name: "Parsing", package: "swift-parsing"),
+            .product(name: "JSONSchema", package: "JSONSchema.swift"),
+            .product(name: "DynamicJSON", package: "swift-dynamicjson"),
+            "Yams",
+            .product(name: "TOML", package: "swift-toml"),
+        ]),
         .target(name: "MarkdownUtilitiesIndex", dependencies: [
+            "MarkdownUtilitiesCore",
             .product(name: "Crypto", package: "swift-crypto"),
             .product(name: "SystemPackage", package: "swift-system"),
             .product(name: "GRDB", package: "GRDB.swift"),
@@ -58,9 +86,9 @@ let package = Package(
             .product(name: "GRDBSQLite", package: "GRDB.swift"),
         ]),
         .testTarget(name: "MarkdownUtilitiesIndexTests", dependencies: ["MarkdownUtilitiesIndex"]),
-    ]
+    ],
 )
-'''.replace("GRDB_VERSION", version).replace("CRYPTO_VERSION", crypto_version).replace("SYSTEM_VERSION", system_version))
+'''.replace("GRDB_VERSION", version).replace("CRYPTO_VERSION", crypto_version).replace("SYSTEM_VERSION", system_version).replace("CORE_DEPENDENCIES", core_dependencies))
 
 def run(arguments):
     print("+", " ".join(map(str, arguments)), flush=True)

@@ -124,12 +124,14 @@ scripts/build-wasm.sh
 Docker Linux builds and validation run in CI only.
 
 The measurement script creates a fresh package under `tmp/`, copies the actual
-index/smoke/test sources, and uses the root lockfile's GRDB version. It does not
-reuse build products. This isolates native overhead from the CLI/server graph;
-the Docker recipe also builds the real root-package smoke target.
+Core/index/smoke/test sources, and uses the root lockfile's dependency versions.
+The index requires Core for portable provenance, so the isolated package includes
+Core and its dependencies. It does not reuse build products. This measures the
+production index dependency graph independently of CLI/server builds; the Docker
+recipe also builds the real root-package smoke target.
 
 The baseline is a Swift executable calling system SQLite directly. The index
-smoke adds GRDB and the checked connection facade. Download/resolution time is
+smoke adds GRDB, Core, and the checked connection facade. Download/resolution time is
 reported separately. The baseline compiles first; GRDB has not been compiled
 when the index release build starts. Both original release and stripped sizes
 are reported; both executables are run, followed by linkage/symbol checks. Tests
@@ -140,6 +142,9 @@ CLI/server size predictions. No indexing throughput claim is made. Reports are
 saved as `report.json` in each workspace and printed in CI. Existing CLI/server
 products acquire no GRDB linkage until they explicitly depend on the index.
 Package resolution still sees GRDB even when building unrelated products.
+
+The following historical measurements predate the index's Core provenance
+dependency and do not describe the current complete dependency graph.
 
 Local measurements (September 16, 2026, GRDB 7.11.1): macOS 27 arm64 uses
 system SQLite 3.54.0 and Swift 6.4 with its matching SDK 27; Ubuntu Noble arm64
