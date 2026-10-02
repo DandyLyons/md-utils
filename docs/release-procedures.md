@@ -1,198 +1,127 @@
 # Release Procedures
 
-## Overview
+The [platform/build guide](building-and-platforms.md) describes support and CI
+coverage. macOS users build from source or use Mint. Ubuntu 24.04 ARM64 has an
+automated CLI prerelease archive workflow. There is no automated binary release
+for macOS, Linux x86_64, `md-utils-server`, or WebAssembly.
 
-md-utils is distributed via [Mint](https://github.com/yonaskolb/Mint). Releasing a new version requires tagging a commit on `main` with a semantic version tag and creating a GitHub release.
+## Versions and release preparation
 
-Builds require Swift 6.3. Template consumers use SwiftKnap; follow its
-[third-party distribution notices](https://github.com/DandyLyons/SwiftKnap/blob/main/ThirdParty/README.md)
-when distributing binaries. Include the dependency license notices, preserve SwiftPM
-resource bundles, and meet the applicable JXKit source/relinking requirements.
-Dynamic system runtime linkage alone does not cover JXKit's separate license.
-Ubuntu 24.04 installations need `libjavascriptcoregtk-4.1-0`; building also needs
-`libjavascriptcoregtk-4.1-dev` and `pkg-config`. See [template rendering](template-rendering.md).
+The first Linux preview is planned as **`0.3.0-linux.1`**. It does not reconcile
+historical release numbering or complete the config-format work in
+[#135](https://github.com/DandyLyons/md-utils/issues/135). Config/schema versions
+are independent of CLI artifact versions: project config 0.3.0 is opt-in,
+`config init` and the `latest` schema alias remain at 0.2.0. See
+[config 0.3](config-v0.3.md). Do not retag an existing release.
 
-## Pre-Release Checklist
+The CLI reads `Sources/md-utils/Resources/BuildVersion.txt`. Native source/Mint
+builds use the checked-in value, currently `0.3.0-linux.1-dev`. The Linux workflow
+stamps the exact prerelease tag for tagged builds and
+`0.3.0-linux.1-dev.<12-character-commit>` otherwise. A Git tag alone does not
+stamp source/Mint builds; update the resource in the release commit when preparing
+a future general source release. The packaging script currently accepts only
+`0.x.y-<prerelease>` versions, so a stable release needs a deliberate packaging
+policy update before Linux binaries can accompany it.
 
-### Linux ARM64 preview
+Before tagging a candidate on `main`:
 
-The first Linux artifact uses `0.3.0-linux.1`, independently of config/schema
-versions and the eventual stable 0.3 release. The Linux workflow currently accepts
-only `0.x.y-<prerelease>` versions. Do not retag an existing release.
+- [ ] Confirm the intended changes are merged and the working tree is clean.
+- [ ] Review changes from the previous release and document breaking changes.
+- [ ] Run `swift build` and `swift test` with a matching native compiler/SDK.
+- [ ] Confirm relevant Linux, SQLite, server, and WASI CI checks pass for the candidate.
+- [ ] Update public API documentation, CLI help, README, and platform/release guidance.
+- [ ] Check the intended CLI version separately from schema versions.
+- [ ] For binaries, preserve SwiftPM resources, dependency notices, and corresponding source.
 
-Before publishing, require the `Linux ARM64 CLI distribution` workflow to pass
-for the candidate commit, including clean runtime installation and offline
-source/JXKit rebuild. Follow the CI verification commands in
-[Linux ARM64 distribution](linux-arm64-distribution.md). Linux validation runs
-in CI only. The tag workflow publishes the verified binary/source archives and
-their SHA-256 files as a GitHub prerelease; it does not mark it latest. For these
-tags, let the workflow create the release instead of racing it with `gh release create`.
-Only the publication job has release-write permissions. Existing assets are never
-silently overwritten. Keep matching source archives available with binary assets.
+Use `gh release list` and `git tag --sort=-v:refname` to select an explicit previous
+tag, then review `git log <previous-tag>..HEAD --oneline` and
+`git diff <previous-tag>..HEAD --stat`. Choose a new, unused version. The project
+uses `0.x.x` SemVer releases; breaking changes can occur between minor versions
+and must be described in release notes.
+
+## Publish the Linux ARM64 preview
+
+Require the **Linux ARM64 CLI distribution** workflow to pass for the candidate,
+including clean runtime installation and offline source/JXKit rebuilding.
+Linux validation runs in CI only. PR, main-branch, and manual runs produce CI
+artifacts retained for 14 days; they are not published releases.
+
+Once the candidate is verified, tag that commit (these commands assume it is
+checked out):
 
 ```sh
 git tag 0.3.0-linux.1
 git push origin 0.3.0-linux.1
 ```
 
-The binary version resource is stamped from the tag during packaging. This does
-not change any schema version or schema initialization default.
+The tag-push workflow verifies the tagged build again, then publishes these four
+assets without rebuilding them in the publication job:
 
-### General checklist
+- `md-utils-0.3.0-linux.1-linux-aarch64-ubuntu24.04.tar.gz`
+- `md-utils-0.3.0-linux.1-linux-aarch64-ubuntu24.04.tar.gz.sha256`
+- `md-utils-0.3.0-linux.1-source.tar.gz`
+- `md-utils-0.3.0-linux.1-source.tar.gz.sha256`
 
-Before releasing, complete every item:
+Let the workflow create the GitHub release; do not race it with manual
+`gh release create`. It marks the release **prerelease**, with **latest disabled**.
+Only the publication job has release-write permission. Manual dispatch, even on
+a tag, does not publish. Existing assets are never silently overwritten, and an
+existing stable release is rejected. Investigate partial publication before any
+retry; use a fresh prerelease version if artifact contents need to change.
 
-- [ ] All feature branches are merged to `main`
-- [ ] `swift build` succeeds with no warnings
-- [ ] `swift test` passes (all tests green)
-- [ ] New public API has documentation comments
-- [ ] Breaking changes (if any) are noted for the release description
-- [ ] `AGENTS.md` and docs are up to date with any new commands or features
-- [ ] You are on the `main` branch with a clean working tree (`git status` shows nothing)
-- [ ] `main` is up to date with the remote (`git pull`)
-- [ ] `README.md` is updated with any new features or usage instructions
-- [ ] Each help page in the `md-utils` is up to date (`abstract` and `discussion` properties in `Command` conformances are updated)
+After publication, verify the prerelease flag, all four assets, and the downloaded
+archives' checksums. Follow the pinned
+[downstream installation example](linux-arm64-distribution.md) to confirm the
+published binary's version and resources in CI. Keep matching source archives
+available alongside every binary, beyond CI artifact expiration.
 
-## Deciding the Version Number
+The archive links Swift statically and uses Ubuntu system shared libraries. It
+preserves SwiftPM resources, Swift/Knap/Day.js and other dependency notices, and
+JXKit's LGPL source/relinking materials. See the [source rebuild guide](../scripts/release/REBUILD.md).
+Dynamic system JavaScriptCore linkage does not replace JXKit's separate
+requirements. Packaging does not assign a new license to md-utils.
 
-Follow [Semantic Versioning](https://semver.org/):
+## General source releases and Mint
 
-| Change type | Version bump | Example |
-|---|---|---|
-| Bug fixes, patches | `0.x.Y` | `0.3.1` -> `0.3.2` |
-| New features or breaking changes (while `0.x.x`) | `0.X.0` | `0.3.2` -> `0.4.0` |
+For a future general source release, first complete the checklist and commit the
+intended `BuildVersion.txt` value. A stable tag does not trigger the current Linux
+prerelease workflow. After pushing the new tag, choose one way to create its
+GitHub release, for example:
 
-## Reviewing Changes Since Last Release
-
-Before writing release notes, review what has changed since the last tagged release.
-
-### Find the latest release tag
-
-```bash
-gh release list --limit 1
+```sh
+# Replace 0.x.y with the selected, already-pushed tag.
+gh release create 0.x.y --verify-tag --generate-notes
 ```
 
-Or list all tags:
+Alternatively, write reviewed notes to a project-local file such as
+`tmp/release-notes.md` and use `--notes-file tmp/release-notes.md` instead of
+`--generate-notes`. Add `--draft` to review before publishing. These manual
+instructions are separate from the automated Linux prerelease path above.
 
-```bash
-git tag --sort=-v:refname
-```
+Mint clones and builds source; it does not download the Linux binary archive.
+It requires the native Swift build prerequisites. Pin a published source tag
+when reproducibility matters:
 
-### Diff against the last release
-
-```bash
-# Summary of changed files
-git diff 0.x.y..HEAD --stat
-
-# Full diff
-git diff 0.x.y..HEAD
-
-# Commits since last release (most useful for writing notes)
-git log 0.x.y..HEAD --oneline
-
-# Commits with more detail
-git log 0.x.y..HEAD --format="%h %s"
-```
-
-Replace `0.x.y` with the previous release tag (e.g. `0.3.1`).
-
-### View merged PRs since last release
-
-```bash
-gh pr list --state merged --search "merged:>$(git log -1 --format=%aI 0.x.y)"
-```
-
-Use this output to identify new features, bug fixes, and breaking changes for the release notes.
-
-## Creating a Release with `gh` CLI
-
-### 1. Tag the commit
-
-```bash
-git tag 0.x.y
-git push origin 0.x.y
-```
-
-### 2. Create the release with auto-generated notes
-
-```bash
-gh release create 0.x.y --generate-notes
-```
-
-This generates release notes from merged PRs and commit messages since the previous tag.
-
-### 3. Create the release with a custom title
-
-```bash
-gh release create 0.x.y --generate-notes --title "v0.x.y - Short Description"
-```
-
-### 4. Create the release with hand-written notes
-
-```bash
-gh release create 0.x.y --title "v0.x.y" --notes "$(cat <<'EOF'
-## What's New
-
-- Added `foo` command
-- Improved performance of `bar`
-
-## Breaking Changes
-
-- Renamed `baz` to `qux`
-EOF
-)"
-```
-
-### 5. Draft a release (publish later from GitHub UI)
-
-```bash
-gh release create 0.x.y --generate-notes --draft
-```
-
-### Useful `gh release` Options
-
-| Flag | Purpose |
-|---|---|
-| `--generate-notes` | Auto-generate notes from PRs/commits |
-| `--title "..."` | Set the release title |
-| `--notes "..."` | Provide release notes inline |
-| `--notes-file CHANGELOG.md` | Read notes from a file |
-| `--draft` | Create as draft (not published) |
-| `--prerelease` | Mark as pre-release |
-| `--latest` | Explicitly mark as latest release |
-| `--verify-tag` | Abort if the tag doesn't already exist |
-
-## How Mint Installation Works
-
-Mint installs packages by cloning the repo at the specified tag, resolving dependencies, and building the executable product defined in `Package.swift`. No additional packaging or registry publishing is needed.
-
-Users install with:
-
-```bash
-mint install DandyLyons/md-utils
-```
-
-Or pin a specific version:
-
-```bash
+```sh
 mint install DandyLyons/md-utils@0.x.y
 ```
 
-## Versioning Policy
+GitHub's automatic repository source downloads are not substitutes for the
+Linux workflow's corresponding-source archive, which also includes exact
+dependency and recursive submodule Git bundles and rebuilding instructions.
 
-- The project follows [Semantic Versioning](https://semver.org/)
-- While on `0.x.x`, breaking changes may occur between minor versions
-- Breaking changes are documented in release notes
+## Publishing JSON schemas
 
-## Publishing JSON Schemas
+Bundled files in `Sources/md-utils/Resources/` are canonical. Generate and
+validate public copies with:
 
-Bundled files in `Sources/md-utils/Resources/` are the canonical source for
-each schema version. Generate and validate public copies with:
-
-```bash
+```sh
 python3 scripts/sync-schema-publication.py
 python3 scripts/validate-schema-publication.py
 ```
 
 The 0.1.0 and 0.2.0 named aliases are generated for compatibility. Existing
-versioned URLs are immutable; add a new versioned directory for changes.
+versioned URLs are immutable; add a new versioned directory for changes. The
+schema-validation and Pages workflows handle website/schema publication
+separately from executable releases. Do not advance schema defaults or aliases
+merely because a CLI prerelease is published.

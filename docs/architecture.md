@@ -13,12 +13,16 @@ The proposed native and Cloudflare server architecture, WebAssembly target split
 The Markdown type system follows the same boundary. Core owns canonical `MarkdownRecord` values, parsed `MarkdownDocument` values, normalized rule configuration, rule and type compilation, portable predicate evaluation, diagnostics, and in-memory fix application. `MarkdownUtilities` loads `.md-utils/types/`, resolves filesystem schema resources, constructs logical record paths, acquires modification timestamps, and performs atomic record writes. The executable owns command parsing, the serialized JMESPath capability provider, prompts, formatting, and exit status.
 
 The full source and dependency classification is recorded in the [portability audit](portability-audit.md).
+See [building and platform support](building-and-platforms.md) for native and
+WASI builds, CI coverage, and distribution status.
 
 `MarkdownUtilitiesIndex` provides the native SQLite collection cache, persisted
 selection scopes, incremental filesystem scanning, and transactional FTS updates.
 It depends on GRDB/system SQLite and Swift Crypto. The CLI injects existing Core
-parsers and type/rule evaluators; Core, WASM, and the server do not depend on the
-index target. See [collection indexing](collection-index.md) for its freshness
+parsers and type/rule evaluators; Core, WASM, and the storage-neutral
+`MarkdownUtilitiesServer` library do not depend on the index target. The native
+`md-utils-server` executable does, through `MarkdownUtilitiesServerNative` and
+`MarkdownUtilitiesIndexNative`. See [collection indexing](collection-index.md) for its freshness
 and failure contract.
 
 ## Core Library (MarkdownUtilitiesCore)

@@ -41,9 +41,9 @@ FTS5 must be enabled in the runtime build when search is used. [SQLite JSON](htt
 | Platform or product | Policy |
 | --- | --- |
 | Native index, macOS 13+ | Use system SQLite with mandatory capability probes. Local validation uses macOS 27 arm64, not every older OS. |
-| Native index, Linux | Use distribution SQLite. Ubuntu Noble with Swift 6.3 is the reference container; CI covers x86_64. Docker Linux validation runs in CI only. Other distributions require validation. |
-| iOS 16+, tvOS 16+, watchOS 9+, Mac Catalyst 16+ | Package minimums are unchanged. The prototype has not validated these SDKs/runtimes; do not infer index support from the manifest alone. |
-| Windows, Android | Not supported by this prototype. |
+| Native index, Linux | Use distribution SQLite. Ubuntu 24.04 with Swift 6.3.1 is the reference container; CI covers x86_64 and ARM64. ARM64 archive smoke tests also verify JSON/index queries and FTS5 without Swift installed. Linux validation runs in CI only. Other distributions require validation. |
+| iOS 16+, tvOS 16+, watchOS 9+, Mac Catalyst 16+ | Package minimums are unchanged. These SDKs/runtimes have not been validated; do not infer index support from the manifest alone. |
+| Windows, Android | No supported index distribution or validation. |
 | `MarkdownUtilitiesCore` and Core WASM smoke | No dependency path to GRDB or SQLite. |
 | `MarkdownUtilities`, `MarkdownUtilitiesServer` | Do not depend on the index target. |
 | `MarkdownUtilitiesServerNative`, `md-utils-server` | Native indexed reads require system SQLite. |
@@ -140,8 +140,12 @@ run in the isolated package as well as the host's full suite.
 Measurements are single-run observations, not statistical benchmarks or final
 CLI/server size predictions. No indexing throughput claim is made. Reports are
 saved as `report.json` in each workspace and printed in CI. Existing CLI/server
-products acquire no GRDB linkage until they explicitly depend on the index.
+products both link GRDB through their native index dependencies.
 Package resolution still sees GRDB even when building unrelated products.
+
+Current binary packaging and runtime package installation are documented in
+[Linux ARM64 distribution](linux-arm64-distribution.md) and the
+[platform/build guide](building-and-platforms.md).
 
 The following historical measurements predate the index's Core provenance
 dependency and do not describe the current complete dependency graph.

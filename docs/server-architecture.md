@@ -130,7 +130,7 @@ md-utils-server
 └── Signal-aware process lifecycle
 ```
 
-`MarkdownUtilitiesCore` runs on Linux and compiles to WebAssembly. It avoids direct filesystem access, process execution, CLI dependencies, and platform-specific APIs. Linux support is verified with `Dockerfile.core-linux`; WASI compilation and representative runtime behavior are verified with `scripts/build-wasm.sh`.
+`MarkdownUtilitiesCore` runs on Linux and compiles to WebAssembly. It avoids direct filesystem access, process execution, CLI dependencies, and platform-specific APIs. Native Linux CI compiles it through server/index/CLI consumers; `Dockerfile.core-linux` remains an isolated verification recipe. WASI compilation and representative runtime behavior are verified with `scripts/build-wasm.sh`. See [platform coverage](building-and-platforms.md) for the active workflows.
 
 `MarkdownUtilities` contains functionality appropriate for native platforms but unavailable or unsuitable in WebAssembly. The `md-utils` executable is not a server runtime and must not be spawned by server code.
 
@@ -369,7 +369,13 @@ The same snapshot fixtures produce the same resource responses through direct li
 
 ## Native Server Architecture
 
-The conventional server will run as a native Swift application on Linux. It should call library APIs directly rather than spawning the `md-utils` CLI.
+The conventional server runs as the native `md-utils-server` Swift executable
+on macOS and Linux, calling library APIs directly. Build it with
+`swift build -c release --product md-utils-server`. Ubuntu 24.04 x86_64 and ARM64
+CI exercise native server routes and tests. The Linux CLI prerelease archive
+does not contain the server; separate server distribution is tracked by
+[#159](https://github.com/DandyLyons/md-utils/issues/159). See
+[build prerequisites and resource installation](building-and-platforms.md).
 
 ```text
 rules + mdtype definitions + resource configuration

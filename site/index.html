@@ -14,8 +14,8 @@
       <div class="title-row">
         <h1 id="title">md-utils</h1>
         <div class="badges" aria-label="Project metadata">
-          <a href="https://github.com/DandyLyons/md-utils/releases/tag/0.1.0">v0.1.0</a>
-          <span>macOS 13+</span>
+          <a href="https://github.com/DandyLyons/md-utils/releases">Releases</a>
+          <span>macOS · Linux</span>
         </div>
       </div>
       <p class="lede">Parse, inspect, and reshape Markdown from Swift code, shell scripts, and AI agent workflows.</p>
@@ -62,21 +62,28 @@
     <section class="installation" aria-labelledby="installation-title">
       <details>
         <summary id="installation-title">Installation</summary>
-        <p><code>md-utils</code> currently supports macOS 13 and newer. Version 0.1.0 is source-build only, so installing through Mint or Swift Package Manager requires a Swift 6-capable build environment, usually Xcode 16+.</p>
+        <p>Current native source builds require Swift 6.3 or later with a matching SDK. macOS is the primary development platform; Ubuntu 24.04 x86_64 and ARM64 have native CI coverage. See the <a href="https://github.com/DandyLyons/md-utils/blob/main/docs/building-and-platforms.md">platform and build guide</a> for prerequisites and distribution status.</p>
 
         <details class="install-method">
-          <summary>Mint</summary>
-          <pre><code class="language-bash">mint install DandyLyons/md-utils@0.1.0
-mint run DandyLyons/md-utils@0.1.0 --help</code></pre>
+          <summary>macOS with Mint</summary>
+          <pre><code class="language-bash">mint install DandyLyons/md-utils
+mint run DandyLyons/md-utils --help</code></pre>
           <p><a href="https://github.com/yonaskolb/Mint">Mint</a> builds the Swift executable package from the tagged GitHub source.</p>
         </details>
 
         <details class="install-method">
           <summary>From Source</summary>
           <pre><code class="language-bash">git clone https://github.com/DandyLyons/md-utils.git
-cd md-utils
-swift build -c release</code></pre>
-          <p>Swift Package Manager builds the <code>MarkdownUtilities</code> library and the <code>md-utils</code> executable from source.</p>
+cd md-utils/
+swift build -c release --product md-utils
+swift build -c release --show-bin-path</code></pre>
+          <p>Run the CLI from the reported directory. Preserve SwiftPM resource bundles beside the executable when installing elsewhere. Build the native server separately with <code>swift build -c release --product md-utils-server</code>.</p>
+        </details>
+
+        <details class="install-method">
+          <summary>Linux ARM64 preview</summary>
+          <p>The Ubuntu 24.04 ARM64 CLI archive is verified without a Swift toolchain. The first planned prerelease, <code>0.3.0-linux.1</code>, awaits tagged publication. Follow the <a href="https://github.com/DandyLyons/md-utils/blob/main/docs/linux-arm64-distribution.md">archive installation guide</a> for runtime packages, checksums, resources, and corresponding source. Server archives and other Linux binary targets are not yet available.</p>
+          <p>WebAssembly support is separate: <code>MarkdownUtilitiesCore</code> builds with the Swift 6.3.1 WASI SDK, but has no packaged release or stable JavaScript interface.</p>
         </details>
 
         <details class="install-method">
@@ -100,12 +107,13 @@ md-utils schema init books --path "Books/**/*.md" --tag Book
 
     <section class="quickstart" aria-labelledby="schema-title">
       <h2 id="schema-title">Hosted Schema</h2>
-      <p>The <code>md-utils</code> configuration schema is published with this site so editors and tools can reference a stable public URL. The current immutable schema endpoint is <a href="https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json"><code>https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json</code></a>.</p>
-      <p>The moving <a href="https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json"><code>/schemas/latest/md-utils.schema.json</code></a> alias points to the latest published schema, and <a href="https://dandylyons.github.io/md-utils/md-utils.schema.json"><code>/md-utils.schema.json</code></a> is maintained as a root compatibility alias.</p>
+      <p>The default configuration schema is <a href="https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json">version 0.2.0</a>. Configuration schema versions evolve independently of CLI releases; configuration 0.3.0 remains opt-in.</p>
+      <p>The moving <a href="https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json"><code>/schemas/latest/md-utils.schema.json</code></a> alias and <a href="https://dandylyons.github.io/md-utils/md-utils.schema.json"><code>/md-utils.schema.json</code></a> root compatibility alias currently point to 0.2.0. Existing versioned schema URLs remain available.</p>
       <pre><code class="language-json">{
-  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.1.0/md-utils.schema.json",
+  "$schema": "https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json",
+  "configVersion": "0.2.0",
   "schemaDirectory": ".md-utils/schemas/",
-  "schemaRules": []
+  "rules": []
 }</code></pre>
     </section>
   </main>

@@ -1,7 +1,8 @@
 # Linux ARM64 CLI archives
 
 The Linux CLI distribution targets **Ubuntu 24.04 (Noble), glibc, aarch64**.
-The initial version is a prerelease, `0.3.0-linux.1`. The CLI release version is
+The initial planned version is a prerelease, `0.3.0-linux.1`; its tagged publication
+is still pending. The CLI release version is
 independent of config/schema versions; this preview does not declare the broader
 0.3 release or issue #135 complete. Development CI artifacts add `-dev.<commit>`.
 
@@ -13,7 +14,10 @@ The workflow publishes these assets for prerelease tags:
 Download from the matching [GitHub release](https://github.com/DandyLyons/md-utils/releases).
 Only tagged, verified builds are published. PR/manual builds are CI artifacts.
 Other distributions, older glibc, Alpine/musl, and other architectures are outside
-this artifact's supported baseline. The server will have a separate artifact.
+this artifact's supported baseline. A separate server artifact is tracked by
+[#159](https://github.com/DandyLyons/md-utils/issues/159). See
+[platform coverage](building-and-platforms.md) for other build paths and
+[release procedures](release-procedures.md) for publishing this preview.
 
 ## Downstream Docker installation
 
