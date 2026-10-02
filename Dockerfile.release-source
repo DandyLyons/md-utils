@@ -1,0 +1,15 @@
+FROM swift:6.3.1-noble
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsqlite3-dev libjavascriptcoregtk-4.1-dev pkg-config python3 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /rebuild/
+COPY md-utils-*-source.tar.gz md-utils-*-source.tar.gz.sha256 ./
+ARG RELEASE_VERSION
+RUN sha256sum -c "md-utils-${RELEASE_VERSION}-source.tar.gz.sha256" \
+    && tar -xzf "md-utils-${RELEASE_VERSION}-source.tar.gz"
+# The Git bundles must suffice to resolve, edit, and rebuild without GitHub.
+RUN --network=none cd "md-utils-${RELEASE_VERSION}-source/" \
+    && python3 rebuild-source.py --prepare-only \
+    && cd md-utils/ && swift package edit JXKit \
+    && swift build -c release --product md-utils --static-swift-stdlib \
+    && test "$(.build/release/md-utils --version)" = "$RELEASE_VERSION"

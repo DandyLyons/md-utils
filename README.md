@@ -28,6 +28,13 @@ Visit the [skills.sh page](https://skills.sh/dandylyons/md-utils/markdown-utilit
 
 ## CLI Installation
 
+### Linux ARM64 prerelease
+
+Ubuntu 24.04 ARM64 release archives install without a Swift toolchain. See the
+[Linux distribution guide](docs/linux-arm64-distribution.md) for the pinned Docker
+example, checksum verification, runtime packages, and source archives. The first
+planned preview is `0.3.0-linux.1`; config/schema versions remain independent.
+
 ### Using [Mint](https://github.com/yonaskolb/Mint)
 
 ```bash

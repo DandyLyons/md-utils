@@ -14,6 +14,32 @@ Ubuntu 24.04 installations need `libjavascriptcoregtk-4.1-0`; building also need
 
 ## Pre-Release Checklist
 
+### Linux ARM64 preview
+
+The first Linux artifact uses `0.3.0-linux.1`, independently of config/schema
+versions and the eventual stable 0.3 release. The Linux workflow currently accepts
+only `0.x.y-<prerelease>` versions. Do not retag an existing release.
+
+Before publishing, require the `Linux ARM64 CLI distribution` workflow to pass
+for the candidate commit, including clean runtime installation and offline
+source/JXKit rebuild. Follow the CI verification commands in
+[Linux ARM64 distribution](linux-arm64-distribution.md). Linux validation runs
+in CI only. The tag workflow publishes the verified binary/source archives and
+their SHA-256 files as a GitHub prerelease; it does not mark it latest. For these
+tags, let the workflow create the release instead of racing it with `gh release create`.
+Only the publication job has release-write permissions. Existing assets are never
+silently overwritten. Keep matching source archives available with binary assets.
+
+```sh
+git tag 0.3.0-linux.1
+git push origin 0.3.0-linux.1
+```
+
+The binary version resource is stamped from the tag during packaging. This does
+not change any schema version or schema initialization default.
+
+### General checklist
+
 Before releasing, complete every item:
 
 - [ ] All feature branches are merged to `main`

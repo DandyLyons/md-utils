@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Linux ARM64 distribution**: Prerelease CLI archives target Ubuntu 24.04/glibc/aarch64 with Swift 6.3.1, statically linked Swift runtime, system SQLite/JavaScriptCore, explicit resources, checksums, and companion dependency source/relinking archives. Native ARM64 CI validates archive installation in a toolchain-free runtime and offline source rebuilds. See `docs/linux-arm64-distribution.md` for CI verification commands. CLI artifact versions are independent of config/schema versions; the initial preview is `0.3.0-linux.1`.
+
 - **Pending edits**: `MarkdownDraftService` persists versioned drafts outside SQLite, resolves configured UUIDs conservatively (following only retained coordinator-confirmed moves), and shares codec/policy/uniqueness planning with REST. `index draft` stages/inspects/discards/resolves intent; `index apply --dry-run` has no persistent side effects. Apply uses revision checks, pinned durable receipt linkage, sequential per-file commits, and explicit partial-completion recovery. Refresh, FTS changes, and rebuilds preserve actual drafts and conflict baselines. See `docs/index-apply.md`; tests: `swift test --filter 'MarkdownDraftTests|IndexApplyCommandsTests|MarkdownMutationTests|CollectionIndexerTests'`.
 
 - **Managed copy/move**: Shared native mutation operations power REST and `md-utils copy`/`move`, with explicit resource opt-ins, revision checks, idempotency, no-clobber destinations and durable two-path recovery. Copy allocates a fresh configured UUID; move preserves bytes/UUIDs. See `docs/copy-move.md`; tests: `swift test --filter 'MarkdownMutationTests|MarkdownMutationOpenAPITests|TransferCommandsTests'`.
