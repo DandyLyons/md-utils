@@ -22,11 +22,9 @@ The Swift toolchain and OS development packages are separate prerequisites.
 To modify and relink JXKit:
 
 ```sh
-python3 rebuild-source.py --prepare-only
-cd md-utils/
-swift package edit JXKit
-# Edit the JXKit sources in Packages/JXKit/.
-swift build -c release --product md-utils --static-swift-stdlib
+python3 rebuild-source.py --edit-jxkit --prepare-only
+# Edit the JXKit sources in md-utils/Packages/JXKit/.
+python3 rebuild-source.py
 ```
 
 Install the rebuilt executable and the four resource directories listed in

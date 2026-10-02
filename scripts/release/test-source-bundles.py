@@ -45,6 +45,9 @@ class SourceBundleTests(unittest.TestCase):
             entries = []
             packager["bundle_submodules"](root / "parent", bundles, entries)
             self.assertEqual(len(entries), 2)
+            repeated_entries = []
+            packager["bundle_submodules"](root / "parent", bundles, repeated_entries)
+            self.assertEqual(repeated_entries, entries)
             git(root / "parent", "bundle", "create", str(bundles / "parent.bundle"), "--all", env=environment)
             (root / "gitconfig").write_text("")
             for entry in entries:

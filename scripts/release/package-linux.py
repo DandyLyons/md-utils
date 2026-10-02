@@ -60,6 +60,7 @@ def bundle_submodules(checkout, bundles, entries):
         destination = bundles / f"{name}.bundle"
         if not destination.exists():
             run("git", "bundle", "create", str(destination), "--all", cwd=submodule)
+        if not any(entry["identity"] == name for entry in entries):
             entries.append({"identity": name, "url": url, "revision": revision})
             bundle_submodules(submodule, bundles, entries)
 
