@@ -9,7 +9,8 @@ RUN sha256sum -c "md-utils-${RELEASE_VERSION}-source.tar.gz.sha256" \
     && tar -xzf "md-utils-${RELEASE_VERSION}-source.tar.gz"
 # The Git bundles must suffice to resolve, edit, and rebuild without GitHub.
 RUN --network=none cd "md-utils-${RELEASE_VERSION}-source/" \
-    && python3 rebuild-source.py --edit-jxkit \
+    && python3 rebuild-source.py --edit-jxkit --prepare-only \
+    && python3 rebuild-source.py \
     && test "$(md-utils/.build/release/md-utils --version)" = "$RELEASE_VERSION" \
     && md-utils/.build/release/md-utils template render \
         --template md-utils/examples/templates/report.knap \
