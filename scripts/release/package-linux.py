@@ -42,6 +42,28 @@ def archive(directory, output):
     )
 
 
+def bundle_submodules(checkout, bundles, entries):
+    modules = checkout / ".gitmodules"
+    if not modules.exists():
+        return
+    records = run("git", "config", "--file", str(modules), "--null", "--get-regexp",
+                  r"^submodule\..*\.path$", cwd=checkout)
+    for record in records.rstrip("\0").split("\0"):
+        _, relative_path = record.split("\n", 1)
+        submodule = (checkout / relative_path).resolve()
+        submodule.relative_to(checkout.resolve())
+        url = run("git", "remote", "get-url", "origin", cwd=submodule)
+        revision = run("git", "rev-parse", "HEAD", cwd=submodule)
+        name = "submodule-" + hashlib.sha256(url.encode()).hexdigest()[:16]
+        # A URL may occur in several parents; retain each required revision.
+        name += "-" + revision
+        destination = bundles / f"{name}.bundle"
+        if not destination.exists():
+            run("git", "bundle", "create", str(destination), "--all", cwd=submodule)
+            entries.append({"identity": name, "url": url, "revision": revision})
+            bundle_submodules(submodule, bundles, entries)
+
+
 def package(version, commit, bin_dir):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Expected a full Git source commit")
@@ -74,6 +96,7 @@ def package(version, commit, bin_dir):
     bundles.mkdir()
     state = json.loads((ROOT / ".build/workspace-state.json").read_text())
     dependencies = []
+    submodules = []
     pins = {pin["identity"]: pin for pin in json.loads((ROOT / "Package.resolved").read_text())["pins"]}
     for dependency in state["object"]["dependencies"]:
         reference = dependency["packageRef"]
@@ -86,6 +109,7 @@ def package(version, commit, bin_dir):
         # SwiftPM resolution, without copying Git configuration/credentials.
         run("git", "bundle", "create", str(bundles / f"{identity}.bundle"), "--all", cwd=checkout)
         dependencies.append({"identity": identity, "url": reference["location"], "revision": revision})
+        bundle_submodules(checkout, bundles, submodules)
         for path in checkout.rglob("*"):
             if path.is_file() and any(word in path.name.upper() for word in ("LICENSE", "NOTICE", "COPYING")) and ".git" not in path.parts:
                 target = notices / identity / path.relative_to(checkout)
@@ -96,6 +120,7 @@ def package(version, commit, bin_dir):
     if set(pins) != {item["identity"] for item in dependencies}:
         raise ValueError("Source archive must include every resolved dependency")
     (source / "dependencies.json").write_text(json.dumps(dependencies, indent=2) + "\n")
+    (source / "submodules.json").write_text(json.dumps(submodules, indent=2) + "\n")
     shutil.copy2(ROOT / "scripts/release/rebuild-source.py", source / "rebuild-source.py")
     shutil.copy2(ROOT / "docs/linux-arm64-distribution.md", binary / "INSTALL.md")
     shutil.copy2(ROOT / "scripts/release/REBUILD.md", binary / "SOURCE.md")
@@ -104,7 +129,7 @@ def package(version, commit, bin_dir):
     metadata = {
         "version": version, "commit": commit, "swift": run("swift", "--version"),
         "architecture": "aarch64", "baseline": "Ubuntu 24.04 (glibc)",
-        "resources": RESOURCES, "dependencies": dependencies,
+        "resources": RESOURCES, "dependencies": dependencies, "submodules": submodules,
     }
     (binary / "build.json").write_text(json.dumps(metadata, indent=2) + "\n")
     shutil.copy2(binary / "build.json", source / "build.json")

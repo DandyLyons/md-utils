@@ -61,7 +61,7 @@ OS package updates supply fixes for the shared runtime libraries.
 
 JXKit is linked into the executable and retains LGPL-3.0. System JavaScriptCore
 linkage does not replace JXKit's separate distribution requirements. The companion
-source archive includes the application, exact dependency Git bundles, notices,
+source archive includes the application, exact dependency and recursive submodule Git bundles, notices,
 and `rebuild-source.py`. Its README documents rebuilding and editing/relinking
 JXKit. Publish and retain the matching source archive alongside every binary.
 SwiftKnap's Knap/Day.js resources and their notices are included. No new license
@@ -85,6 +85,7 @@ with network disabled, including SwiftPM's editable JXKit path.
 CI commands (also recorded in the workflow):
 
 ```sh
+python3 scripts/release/test-source-bundles.py
 docker build -f Dockerfile.release-linux --target artifacts \
   --build-arg RELEASE_VERSION=0.3.0-linux.1 \
   --build-arg SOURCE_COMMIT="$GITHUB_SHA" --output type=local,dest=tmp/artifacts/ .

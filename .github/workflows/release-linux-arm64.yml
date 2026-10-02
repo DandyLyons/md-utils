@@ -42,6 +42,8 @@ jobs:
           if [ "$REF_TYPE" = tag ]; then version="$REF_NAME"; fi
           python3 scripts/release/package-linux.py stamp "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Verify recursive source bundling
+        run: python3 scripts/release/test-source-bundles.py
       - name: Build, test, and export archives
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}

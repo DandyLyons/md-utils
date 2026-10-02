@@ -4,7 +4,9 @@ This archive accompanies the binary with the same version. `md-utils/` contains
 the application source and stamped version; `dependencies/` contains Git bundles
 with the exact dependency commits and tags, including unmodified JXKit. Bundles
 include source, not executable build products. `dependencies.json` records their
-original URLs and revisions. `licenses/` contains distribution notices.
+original URLs and revisions. `submodules.json` records recursively bundled Git
+submodules. The rebuild script redirects their fetches to local mirrors only for
+its child processes. `licenses/` contains distribution notices.
 
 Use Ubuntu 24.04 ARM64 with Swift 6.3.1 and install `git`, `python3`, `pkg-config`,
 `libsqlite3-dev`, and `libjavascriptcoregtk-4.1-dev`. From this extracted directory:
