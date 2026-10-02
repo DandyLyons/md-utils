@@ -71,13 +71,19 @@ Swift 6.3 is required. SwiftKnap is pinned to
 `5972f60343683b3d5d7dd3ab0edf2b35085c542f`. Ubuntu 24.04 builds require
 `libjavascriptcoregtk-4.1-dev` and `pkg-config`; deployments require
 `libjavascriptcoregtk-4.1-0`. Preserve SwiftPM resource bundles beside installed
-executables. The server Docker build verifies installed release rendering.
+executables. The ARM64 distribution workflow verifies rendering from the actual
+archive in plain Ubuntu without Swift or a checkout. `Dockerfile.server-linux`
+also contains installed-rendering checks, but is a recipe rather than a workflow
+invoked by current CI, and its final image still contains Swift.
 
 SwiftKnap and bundled Knap/Day.js are MIT; its JXKit dependency is LGPL-3.0. Follow
 the upstream [distribution notices](https://github.com/DandyLyons/SwiftKnap/blob/main/ThirdParty/README.md).
-SwiftPM does not bundle the Linux system runtime; this is not a standalone static
-Linux executable. Upstream verified macOS and Ubuntu 24.04 arm64. Validate other
-distributed architectures. Linux support does not imply WASM support; Workers
+The [Ubuntu ARM64 CLI archive](linux-arm64-distribution.md) statically links the
+Swift runtime and preserves resources/notices and corresponding dependency
+source. It still requires Ubuntu shared libraries, including JavaScriptCore;
+ordinary source builds do not inherit this packaging. Native CI covers Ubuntu
+24.04 x86_64 and ARM64; see [platform coverage](building-and-platforms.md).
+Linux support does not imply WASM support; Workers
 template creation remains separate work.
 
 ## Verification

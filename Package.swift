@@ -252,6 +252,7 @@ let package = Package(
         "Yams",
       ],
       resources: [
+        .process("Resources/BuildVersion.txt"),
         .process("Resources/SKILL.md"),
         .process("Resources/0.1.0_md-utils.schema.json"),
         .process("Resources/0.2.0_md-utils.schema.json"),

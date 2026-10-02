@@ -46,7 +46,9 @@ To use an SDK extracted outside SwiftPM's default SDK directory, provide its par
 SWIFT_WASM_SDKS_PATH=/path/to/swift-sdks/ scripts/build-wasm.sh
 ```
 
-Debug artifacts are written beneath `.build/wasm32-unknown-wasip1/debug/`. The smoke artifact is currently about 69 MB in an unoptimized debug build; this is not a release-size target.
+Debug artifacts are written beneath `.build/wasm32-unknown-wasip1/debug/`.
+The smoke module is an unoptimized validation artifact, not a release package
+or a release-size target.
 
 ## Compatibility Patches
 
@@ -86,3 +88,8 @@ The root package owns the smoke target, so it uses the same `Package.resolved` v
 ## Current Scope
 
 This workflow produces and executes a WASI module. It does not yet define a stable JavaScript ABI, optimize or package a release artifact, or integrate with a specific JavaScript or Workers host. Those layers should build on the verified Core module without introducing host I/O into `MarkdownUtilitiesCore`.
+
+The native Linux CLI prerelease does not include WASM. Neither the native server,
+SQLite index, nor SwiftKnap template runtime is part of this Core build. See
+[building and platform support](building-and-platforms.md) and
+[release procedures](release-procedures.md) for the separate distribution paths.

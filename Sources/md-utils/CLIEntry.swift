@@ -17,7 +17,7 @@ public struct CLIEntry: AsyncParsableCommand {
   public static let configuration = CommandConfiguration(
     commandName: "md-utils",
     abstract: "A utility for working with Markdown files.",
-    version: "0.1.0-alpha",
+    version: buildVersion,
     subcommands: [
       AgentCommands.self,
       Body.self,
@@ -44,6 +44,14 @@ public struct CLIEntry: AsyncParsableCommand {
     ],
     helpNames: [.long, .short]
   )
+
+  /// Artifact version; configuration and schema versions evolve independently.
+  static let buildVersion: String = {
+    guard let url = Bundle.module.url(forResource: "BuildVersion", withExtension: "txt"),
+      let value = try? String(contentsOf: url, encoding: .utf8)
+    else { return "development" }
+    return value.trimmingCharacters(in: .whitespacesAndNewlines)
+  }()
 
   /// The main entry point for the CLI application.
   ///

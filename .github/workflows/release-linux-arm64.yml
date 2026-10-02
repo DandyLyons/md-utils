@@ -1,0 +1,108 @@
+name: Linux ARM64 CLI distribution
+
+on:
+  pull_request:
+    paths:
+      - 'Package.*'
+      - 'Sources/**'
+      - 'Tests/**'
+      - 'scripts/release/**'
+      - 'Dockerfile.release-*'
+      - '.dockerignore'
+      - '.github/workflows/release-linux-arm64.yml'
+      - 'docs/linux-arm64-distribution.md'
+  push:
+    branches: [main]
+    tags: ['0.*-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-arm64-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Select prerelease version
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          version="0.3.0-linux.1-dev.${GITHUB_SHA:0:12}"
+          if [ "$REF_TYPE" = tag ]; then version="$REF_NAME"; fi
+          python3 scripts/release/package-linux.py stamp "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Verify recursive source bundling
+        run: python3 scripts/release/test-source-bundles.py
+      - name: Build, test, and export archives
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          test "$(uname -m)" = aarch64
+          mkdir -p tmp/artifacts/
+          docker build --file Dockerfile.release-linux --target artifacts \
+            --build-arg RELEASE_VERSION="$RELEASE_VERSION" --build-arg SOURCE_COMMIT="$GITHUB_SHA" \
+            --output type=local,dest=tmp/artifacts/ .
+          # Release + debug products are no longer needed after exporting. Free
+          # disk space before the independent source rebuild on hosted runners.
+          docker builder prune --all --force
+      - name: Install the actual archive into a clean runtime
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cp scripts/release/smoke-linux.sh tmp/artifacts/
+          docker build --file Dockerfile.release-runtime \
+            --build-arg RELEASE_VERSION="$RELEASE_VERSION" tmp/artifacts/
+      - name: Verify offline source rebuild and JXKit relinking
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          docker build --file Dockerfile.release-source \
+            --build-arg RELEASE_VERSION="$RELEASE_VERSION" tmp/artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-cli
+          path: |
+            tmp/artifacts/*.tar.gz
+            tmp/artifacts/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: verify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-arm64-cli
+          path: artifacts/
+      - name: Publish verified prerelease assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          # Upload refuses to overwrite an existing asset. Never turn a stable
+          # release into a prerelease implicitly.
+          if gh release view "$RELEASE_TAG" --json isPrerelease > release.json; then
+            python3 -c 'import json; assert json.load(open("release.json"))["isPrerelease"], "Existing release is not a prerelease"'
+            gh release upload "$RELEASE_TAG" artifacts/*.tar.gz artifacts/*.sha256
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --prerelease --latest=false \
+              --title "$RELEASE_TAG — Linux ARM64 preview" --generate-notes \
+              artifacts/*.tar.gz artifacts/*.sha256
+          fi

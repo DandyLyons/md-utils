@@ -1,0 +1,15 @@
+FROM swift:6.3.1-noble AS build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsqlite3-dev libjavascriptcoregtk-4.1-dev pkg-config python3 binutils \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace/
+COPY . .
+ARG RELEASE_VERSION=0.3.0-linux.1-dev
+ARG SOURCE_COMMIT
+RUN mkdir -p tmp/ && bash scripts/release/build-linux.sh "$RELEASE_VERSION" "$SOURCE_COMMIT"
+# Preserve existing Linux coverage and exercise CLI/index consumers on ARM64.
+RUN swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownUtilitiesTemplatesTests|TemplateTests|MarkdownUtilitiesIndexTests|IndexCommandsTests|IndexPayloadTests'
+RUN swift run MarkdownUtilitiesServerLinuxSmoke && swift run SQLiteIndexSmoke
+
+FROM scratch AS artifacts
+COPY --from=build /workspace/tmp/release-output/ /

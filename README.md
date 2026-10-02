@@ -28,7 +28,19 @@ Visit the [skills.sh page](https://skills.sh/dandylyons/md-utils/markdown-utilit
 
 ## CLI Installation
 
-### Using [Mint](https://github.com/yonaskolb/Mint)
+See [building and platform support](docs/building-and-platforms.md) for toolchain
+requirements, server builds, CI coverage, and available distributions.
+
+### Linux ARM64 prerelease
+
+Ubuntu 24.04 ARM64 release archives install without a Swift toolchain. See the
+[Linux distribution guide](docs/linux-arm64-distribution.md) for the pinned Docker
+example, checksum verification, runtime packages, and source archives. The first
+planned preview is `0.3.0-linux.1`; config/schema versions remain independent.
+
+### macOS using [Mint](https://github.com/yonaskolb/Mint)
+
+Mint builds from source and requires Swift; it does not install the Linux archive.
 
 ```bash
 # Install mint (if you haven't done so already)
@@ -43,12 +55,20 @@ mint run DandyLyons/md-utils <command>
 
 ### From Source
 
+Use Swift 6.3 or later with a matching SDK. The following is the macOS source
+build path; Linux prerequisites and CI recipes are in the platform guide.
+
 ```bash
 git clone https://github.com/DandyLyons/md-utils.git
-cd md-utils
-swift build -c release
-# Binary will be at .build/release/md-utils
+cd md-utils/
+swift build -c release --product md-utils
+swift build -c release --show-bin-path
 ```
+
+Run `md-utils` from the reported directory. If installing elsewhere, preserve
+the SwiftPM resource bundles beside the executable; copying the binary alone
+is insufficient. Build the server separately with
+`swift build -c release --product md-utils-server`.
 
 ---
 
@@ -94,7 +114,9 @@ import MarkdownUtilities
 
 ### Linux Validation
 
-Core is tested with Swift 6.3 on Linux in Docker in CI.
+Native Linux CI uses Swift 6.3.1 on Ubuntu 24.04 for server/template/index checks
+on x86_64 and ARM64, including CLI archive installation and source rebuilding
+on ARM64. See the [coverage matrix](docs/building-and-platforms.md).
 
 ---
 
@@ -682,18 +704,26 @@ The native server is built and tested on Linux in Docker in CI.
 ## Platform Compatibility
 **macOS** is the primary development and testing platform. Core, native integrations, and the CLI are covered by the full Swift test suite.
 
-**Linux**: `MarkdownUtilitiesCore` is supported and verified with Swift 6.3 using `Dockerfile.core-linux` in CI. The native read-only server is separately built and tested with `Dockerfile.server-linux` in CI. The complete `MarkdownUtilities` and `md-utils` CLI layers are not covered by the Core guarantee.
+**Linux**: Ubuntu 24.04 x86_64 and ARM64 have native server/template/index CI
+coverage using Swift 6.3.1. The ARM64 CLI archive is additionally verified in
+plain Ubuntu without Swift or a source checkout. Its first prerelease publication
+is pending a tag push. Linux file watching is unsupported; use explicit index
+updates. Other Linux distributions and architectures require separate validation.
 
 Template rendering uses SwiftKnap on macOS and Linux. Ubuntu 24.04 builds of the CLI
-and server require `libjavascriptcoregtk-4.1-dev` and `pkg-config`; deployment requires
-`libjavascriptcoregtk-4.1-0` and the SwiftPM resource bundles. See
+and server require `libsqlite3-dev`, `libjavascriptcoregtk-4.1-dev`, and `pkg-config`.
+Deployments need system runtime libraries and SwiftPM resource bundles; use the
+[ARM64 installation guide](docs/linux-arm64-distribution.md) for the complete
+archive package list. See
 [template rendering and distribution requirements](docs/template-rendering.md).
 
 **WebAssembly**: `MarkdownUtilitiesCore` is supported with the official Swift 6.3.1 WASI SDK. Run `scripts/build-wasm.sh` to compile Core and execute the root-package smoke target under WasmKit. See [WebAssembly Support](docs/webassembly.md) for SDK installation, dependency compatibility patches, artifact location, and current scope.
 
 **Windows**: Not currently tested or verified. Compatibility is unknown.
 
-See the [portability audit](docs/portability-audit.md) for the source boundary and dependency assessment.
+See [building and platform support](docs/building-and-platforms.md) for all
+platforms and [release procedures](docs/release-procedures.md) for publishing.
+The [portability audit](docs/portability-audit.md) describes library boundaries.
 
 ## Contributing
 

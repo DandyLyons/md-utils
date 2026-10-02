@@ -1,0 +1,17 @@
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsqlite3-0 libjavascriptcoregtk-4.1-0 libcurl4t64 libxml2 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+# Context is the exported artifacts directory, never the source checkout.
+COPY md-utils-*-linux-aarch64-ubuntu24.04.tar.gz* /artifacts/
+ARG RELEASE_VERSION
+RUN cd /artifacts/ && sha256sum -c "md-utils-${RELEASE_VERSION}-linux-aarch64-ubuntu24.04.tar.gz.sha256" \
+    && mkdir -p /opt/md-utils/ \
+    && tar -xzf "md-utils-${RELEASE_VERSION}-linux-aarch64-ubuntu24.04.tar.gz" --strip-components=1 -C /opt/md-utils/ \
+    && printf '#!/bin/sh\nexec /opt/md-utils/md-utils "$@"\n' > /usr/local/bin/md-utils \
+    && chmod 755 /usr/local/bin/md-utils \
+    && rm -rf /artifacts/
+WORKDIR /work/
+COPY smoke-linux.sh /checks/smoke-linux.sh
+RUN test "$(uname -m)" = aarch64 && ! command -v swift && ! test -d /workspace/ \
+    && bash /checks/smoke-linux.sh "$RELEASE_VERSION"

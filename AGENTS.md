@@ -11,6 +11,10 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Builds and distribution**: See `docs/building-and-platforms.md` for the platform/CI matrix and resource-preserving installation. Linux ARM64 CLI prereleases target Ubuntu 24.04 with static Swift runtime and system shared libraries; tagged publication is separate from verified CI artifacts. macOS uses source/Mint; server archive packaging and WASM release packaging remain pending. CLI and schema versions evolve independently; see `docs/release-procedures.md`.
+
+- **Linux ARM64 distribution**: Prerelease CLI archives target Ubuntu 24.04/glibc/aarch64 with Swift 6.3.1, statically linked Swift runtime, system SQLite/JavaScriptCore, explicit resources, checksums, and companion dependency source/relinking archives. Native ARM64 CI validates archive installation in a toolchain-free runtime and offline source rebuilds. See `docs/linux-arm64-distribution.md` for CI verification commands. CLI artifact versions are independent of config/schema versions; the initial preview is `0.3.0-linux.1`.
+
 - **Pending edits**: `MarkdownDraftService` persists versioned drafts outside SQLite, resolves configured UUIDs conservatively (following only retained coordinator-confirmed moves), and shares codec/policy/uniqueness planning with REST. `index draft` stages/inspects/discards/resolves intent; `index apply --dry-run` has no persistent side effects. Apply uses revision checks, pinned durable receipt linkage, sequential per-file commits, and explicit partial-completion recovery. Refresh, FTS changes, and rebuilds preserve actual drafts and conflict baselines. See `docs/index-apply.md`; tests: `swift test --filter 'MarkdownDraftTests|IndexApplyCommandsTests|MarkdownMutationTests|CollectionIndexerTests'`.
 
 - **Managed copy/move**: Shared native mutation operations power REST and `md-utils copy`/`move`, with explicit resource opt-ins, revision checks, idempotency, no-clobber destinations and durable two-path recovery. Copy allocates a fresh configured UUID; move preserves bytes/UUIDs. See `docs/copy-move.md`; tests: `swift test --filter 'MarkdownMutationTests|MarkdownMutationOpenAPITests|TransferCommandsTests'`.
@@ -37,7 +41,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 - **Formatter/Linter**: No dedicated formatter or linter is configured in-package
 - **Documentation**: README.md, AGENTS.md, docs/*.md, generated CLI help, and bundled Agent Skill docs
 - **Security**: Avoid unsafe optional force unwraps; treat filesystem and YAML/TOML/JSON parsing failures as user-visible errors
-- **CI/Coverage**: Schema publication, Pages, WebAssembly, native Linux server, and native SQLite workflows are configured; Docker Linux builds run in CI only; no coverage command is documented. Refresh scale measurements use `scripts/benchmark-index-refresh.py`; see `docs/index-refresh-benchmarks.md` for corpus characteristics and resource budgets.
+- **CI/Coverage**: Schema publication, Pages, WebAssembly, native Linux server, native SQLite, and Linux ARM64 CLI distribution workflows are configured; Linux builds run in CI only. The ARM64 workflow verifies clean runtime installation and offline corresponding-source rebuilding. No coverage command is documented. Refresh scale measurements use `scripts/benchmark-index-refresh.py`; see `docs/index-refresh-benchmarks.md` for corpus characteristics and resource budgets.
 
 ## Requirements
 
@@ -98,6 +102,7 @@ Detailed guidance organized by topic:
 - **[Swift Coding Standards](docs/swift-coding-standards.md)** - Language-specific rules and safe practices
 - **[CLI Patterns](docs/cli-patterns.md)** - Command structure and argument parsing
 - **[Development Workflow](docs/development-workflow.md)** - Feature addition process and commit checklist
+- **[Building and Platforms](docs/building-and-platforms.md)** - Toolchains, platform support, CI coverage, resources, and distributions
 - **[Common Use Cases](docs/common-use-cases.md)** - CLI usage examples and recipes
 - **[Release Procedures](docs/release-procedures.md)** - Versioning and release process
 

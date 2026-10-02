@@ -14,7 +14,9 @@ struct CLIEntryTests {
     let config = CLIEntry.configuration
 
     #expect(config.commandName == "md-utils")
-    #expect(config.version == "0.1.0-alpha")
+    #expect(config.version == CLIEntry.buildVersion)
+    #expect(config.version.isEmpty == false)
+    #expect(config.version != "development")
     #expect(config.subcommands.count == 22)
 
     // Verify the subcommands are registered (in order as listed in CLIEntry)
