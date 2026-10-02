@@ -3,7 +3,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-0 libjavascriptcoregtk-4.1-0 libcurl4t64 libxml2 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 # Context is the exported artifacts directory, never the source checkout.
-COPY md-utils-*.tar.gz.sha256 md-utils-*.tar.gz /artifacts/
+COPY md-utils-*-linux-aarch64-ubuntu24.04.tar.gz* /artifacts/
 ARG RELEASE_VERSION
 RUN cd /artifacts/ && sha256sum -c "md-utils-${RELEASE_VERSION}-linux-aarch64-ubuntu24.04.tar.gz.sha256" \
     && mkdir -p /opt/md-utils/ \

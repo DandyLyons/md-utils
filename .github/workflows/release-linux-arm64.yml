@@ -51,6 +51,9 @@ jobs:
           docker build --file Dockerfile.release-linux --target artifacts \
             --build-arg RELEASE_VERSION="$RELEASE_VERSION" --build-arg SOURCE_COMMIT="$GITHUB_SHA" \
             --output type=local,dest=tmp/artifacts/ .
+          # Release + debug products are no longer needed after exporting. Free
+          # disk space before the independent source rebuild on hosted runners.
+          docker builder prune --all --force
       - name: Install the actual archive into a clean runtime
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}

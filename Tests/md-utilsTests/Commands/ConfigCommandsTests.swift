@@ -240,7 +240,7 @@ struct ConfigCommandsTests {
   func `config info text output reports supported versions and CLI version`() {
     let output = ConfigInfoFormatter.renderText()
 
-    #expect(output.contains("You are using md-utils CLI version 0.1.0-alpha"))
+    #expect(output.contains("You are using md-utils CLI version \(CLIEntry.configuration.version)"))
     #expect(output.contains("Supported md-utils config schema versions:"))
     #expect(output.contains("  0.2.0\n  0.1.0"))
     #expect(output.contains("Default generated config schema version: 0.2.0"))
@@ -251,7 +251,7 @@ struct ConfigCommandsTests {
     let data = try #require(try ConfigInfoFormatter.renderJSON().data(using: .utf8))
     let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
-    #expect(object["cliVersion"] as? String == "0.1.0-alpha")
+    #expect(object["cliVersion"] as? String == CLIEntry.configuration.version)
     #expect(object["defaultConfigVersion"] as? String == "0.2.0")
     #expect(object["supportedConfigVersions"] as? [String] == ["0.1.0", "0.2.0", "0.3.0"])
   }

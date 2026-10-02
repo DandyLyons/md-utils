@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ulimit -c 0
 version="${1:?Expected artifact version}"
 test "$(md-utils --version)" = "$version"
 md-utils --help > help.txt
