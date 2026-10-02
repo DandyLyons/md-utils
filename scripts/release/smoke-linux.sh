@@ -13,7 +13,9 @@ mkdir notes/
 printf '%s\n' '---' 'title: Smoke' '---' '# Packaged runtime' 'uniqueprobe' > notes/sample.md
 md-utils body notes/sample.md > body.md
 grep -q '# Packaged runtime' body.md
-! grep -q 'title: Smoke' body.md
+if grep -q 'title: Smoke' body.md; then
+    echo 'Body extraction retained frontmatter' >&2; exit 1
+fi
 printf '%s\n' '{{ frontmatter.title | h1 }}' '{{ data.message }}' > template.knap
 printf '%s\n' '{"frontmatter":{"title":"Archive template"},"data":{"message":"Knap works"}}' > data.json
 md-utils template render --template template.knap --data data.json --output rendered.md
