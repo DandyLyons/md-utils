@@ -18,6 +18,12 @@ RESOURCES = (
     "SwiftKnap_SwiftKnap.resources",
     "JXKit_JXKit.resources",
 )
+SERVER_RESOURCES = (
+    "md-utils_md-utils-server.resources",
+    "md-utils_MarkdownUtilitiesServer.resources",
+    "SwiftKnap_SwiftKnap.resources",
+    "JXKit_JXKit.resources",
+)
 
 
 def validate_version(version):
@@ -136,6 +142,19 @@ def package(version, commit, bin_dir):
     shutil.copy2(binary / "build.json", source / "build.json")
     shutil.copy2(ROOT / "tmp/release-linkage.txt", binary / "linkage.txt")
     archive(binary, output)
+    server = stage / f"md-utils-server-{version}-linux-aarch64-ubuntu24.04"
+    server.mkdir()
+    shutil.copy2(bin_dir / "md-utils-server", server)
+    for resource in SERVER_RESOURCES:
+        shutil.copytree(bin_dir / resource, server / resource)
+    shutil.copytree(notices, server / "licenses")
+    shutil.copy2(ROOT / "docs/linux-arm64-server-distribution.md", server / "INSTALL.md")
+    shutil.copy2(ROOT / "scripts/release/REBUILD.md", server / "SOURCE.md")
+    server_metadata = {**metadata, "product": "md-utils-server", "resources": SERVER_RESOURCES}
+    (server / "build.json").write_text(json.dumps(server_metadata, indent=2) + "\n")
+    shutil.copy2(ROOT / "tmp/release-server-linkage.txt", server / "linkage.txt")
+    (source / "server-build.json").write_text(json.dumps(server_metadata, indent=2) + "\n")
+    archive(server, output)
     archive(source, output)
 
 
@@ -144,6 +163,7 @@ if __name__ == "__main__":
     validate_version(version)
     if operation == "stamp" and not arguments:
         (ROOT / "Sources/md-utils/Resources/BuildVersion.txt").write_text(version + "\n")
+        (ROOT / "Sources/md-utils-server/Resources/BuildVersion.txt").write_text(version + "\n")
     elif operation == "package" and len(arguments) == 2:
         package(version, arguments[0], Path(arguments[1]))
     else:

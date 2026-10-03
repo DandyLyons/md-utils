@@ -9,6 +9,7 @@ from pathlib import Path
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--prepare-only", action="store_true")
 parser.add_argument("--edit-jxkit", action="store_true")
+parser.add_argument("--product", choices=("md-utils", "md-utils-server"), default="md-utils")
 options = parser.parse_args()
 root = Path(__file__).resolve().parent
 project = root / "md-utils"
@@ -46,4 +47,4 @@ if options.edit_jxkit or (project / "Packages/JXKit").exists():
     if not edited:
         subprocess.run(["swift", "package", "edit", "JXKit"], cwd=project, env=environment, check=True)
 if not options.prepare_only:
-    subprocess.run(["swift", "build", "-c", "release", "--product", "md-utils", "--static-swift-stdlib"], cwd=project, env=environment, check=True)
+    subprocess.run(["swift", "build", "-c", "release", "--product", options.product, "--static-swift-stdlib"], cwd=project, env=environment, check=True)

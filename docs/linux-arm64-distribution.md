@@ -14,8 +14,8 @@ The workflow publishes these assets for prerelease tags:
 Download from the matching [GitHub release](https://github.com/DandyLyons/md-utils/releases).
 Only tagged, verified builds are published. PR/manual builds are CI artifacts.
 Other distributions, older glibc, Alpine/musl, and other architectures are outside
-this artifact's supported baseline. A separate server artifact is tracked by
-[#159](https://github.com/DandyLyons/md-utils/issues/159). See
+this artifact's supported baseline. The independently installed server artifact
+is described in [server distribution](linux-arm64-server-distribution.md). See
 [platform coverage](building-and-platforms.md) for other build paths and
 [release procedures](release-procedures.md) for publishing this preview.
 
@@ -90,7 +90,7 @@ formatting; the captured failure reports arrays as the wrong type. Separately,
 `JSONValue` now distinguishes Foundation booleans from numeric `0`/`1` before
 conditional casts, preserving scalar types in rule operands and schemas.
 
-Linux builds run in CI only. The `Linux ARM64 CLI distribution` workflow uses a
+Linux builds run in CI only. The `Linux ARM64 CLI and server distribution` workflow uses a
 native `ubuntu-24.04-arm` runner and `swift:6.3.1-noble` builder. It builds release
 mode with the checked-in lockfile, verifies ELF architecture/linkage, preserves
 existing Linux tests, and exports archives. `Dockerfile.release-runtime` installs

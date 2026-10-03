@@ -13,6 +13,7 @@ Use Ubuntu 24.04 ARM64 with Swift 6.3.1 and install `git`, `python3`, `pkg-confi
 
 ```sh
 python3 rebuild-source.py
+python3 rebuild-source.py --product md-utils-server
 ```
 
 The script restores local Git mirrors, resolves the supplied lockfile, and builds
@@ -30,8 +31,14 @@ python3 rebuild-source.py --edit-jxkit --prepare-only
 python3 rebuild-source.py
 ```
 
+The same source archive supports both independently installed products. The
+server builds to `md-utils/.build/release/md-utils-server`; `--product` also works
+with `--edit-jxkit` and `--prepare-only`.
+
 Install the rebuilt executable and the four resource directories listed in
-`build.json` together, as described in `md-utils/docs/linux-arm64-distribution.md`.
+`build.json` (CLI) or `server-build.json` (server) together, as described in
+`md-utils/docs/linux-arm64-distribution.md` or
+`md-utils/docs/linux-arm64-server-distribution.md`.
 There is no signature or installation restriction on replacing this executable.
 JXKit retains LGPL-3.0. Both LGPL-3.0 and GPL-3.0 license texts and upstream
 notices accompany the binary and source archives. This packaging change does
