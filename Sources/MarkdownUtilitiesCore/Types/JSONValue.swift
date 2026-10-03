@@ -15,17 +15,13 @@ public enum JSONValue: Equatable, Sendable {
   public init(any value: Any) throws {
     if value is NSNull {
       self = .null
-    } else if let value = value as? Bool {
-      self = .boolean(value)
-    } else if let value = value as? Int {
-      self = .integer(value)
     } else if let value = value as? NSNumber {
+      // Foundation can conditionally cast numeric 0/1 to Bool, and booleans
+      // to Int. Inspect NSNumber's identity before either scalar conversion.
       if CFGetTypeID(value) == CFBooleanGetTypeID() {
         self = .boolean(value.boolValue)
-      } else if value.doubleValue.rounded() == value.doubleValue,
-                value.doubleValue >= Double(Int.min),
-                value.doubleValue <= Double(Int.max) {
-        self = .integer(value.intValue)
+      } else if let integer = value as? Int {
+        self = .integer(integer)
       } else {
         self = .number(value.doubleValue)
       }
