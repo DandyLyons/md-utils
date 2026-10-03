@@ -1,0 +1,19 @@
+diff --git a/Sources/Validators.swift b/Sources/Validators.swift
+--- a/Sources/Validators.swift
++++ b/Sources/Validators.swift
+@@ -73,11 +73,13 @@ func isObject(_ instance: Any) -> Bool {
+ }
+ 
+ func isDictionary(_ instance: Any) -> Bool {
+-  return instance is NSDictionary
++  // JSONSerialization and callers supply native Swift containers on Linux.
++  return instance is [String: Any]
+ }
+ 
+ func isArray(_ instance: Any) -> Bool {
+-  return instance is NSArray
++  // Do not depend on Objective-C collection bridging for JSON type checks.
++  return instance is [Any]
+ }
+ 
+ func isBoolean(_ instance: Any) -> Bool {

@@ -7,6 +7,7 @@ commit="${2:?Expected source commit}"
 # The Python packager validates the version before it is written into resources.
 python3 scripts/release/package-linux.py stamp "$version"
 swift package resolve --force-resolved-versions
+bash scripts/release/patch-jsonschema.sh
 swift build -c release --product md-utils --static-swift-stdlib
 bin_dir="$(swift build -c release --show-bin-path)"
 readelf -h "$bin_dir/md-utils" | grep -q AArch64

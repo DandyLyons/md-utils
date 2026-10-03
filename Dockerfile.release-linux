@@ -8,7 +8,7 @@ ARG RELEASE_VERSION=0.3.0-linux.1-dev
 ARG SOURCE_COMMIT
 RUN mkdir -p tmp/ && bash scripts/release/build-linux.sh "$RELEASE_VERSION" "$SOURCE_COMMIT"
 # Preserve existing Linux coverage and exercise CLI/index consumers on ARM64.
-RUN swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownUtilitiesTemplatesTests|TemplateTests|MarkdownUtilitiesIndexTests|IndexCommandsTests|IndexPayloadTests'
+RUN swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownUtilitiesTemplatesTests|TemplateTests|MarkdownUtilitiesIndexTests|IndexCommandsTests|IndexPayloadTests|ConfigCommandsTests|ConfigScalarValidationTests|RulesCommandsTests|JSONValueTests|MarkdownTypeCheckerTests'
 RUN swift run MarkdownUtilitiesServerLinuxSmoke && swift run SQLiteIndexSmoke
 
 FROM scratch AS artifacts

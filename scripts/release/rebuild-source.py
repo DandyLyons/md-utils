@@ -36,6 +36,7 @@ environment["GIT_CONFIG_COUNT"] = "1"
 environment["GIT_CONFIG_KEY_0"] = "protocol.file.allow"
 environment["GIT_CONFIG_VALUE_0"] = "always"
 subprocess.run(["swift", "package", "resolve", "--force-resolved-versions"], cwd=project, env=environment, check=True)
+subprocess.run(["bash", "scripts/release/patch-jsonschema.sh"], cwd=project, env=environment, check=True)
 if options.edit_jxkit or (project / "Packages/JXKit").exists():
     # Forced resolution may detach edit mode, but leaves the user's checkout
     # intact. Reattach it so subsequent rebuilds consume their modified source.

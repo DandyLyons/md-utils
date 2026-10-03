@@ -17,6 +17,9 @@ python3 rebuild-source.py
 
 The script restores local Git mirrors, resolves the supplied lockfile, and builds
 `md-utils/.build/release/md-utils`. Dependency sources come from the archive.
+Before building, it applies the included, revision-checked JSONSchema.swift 0.6.0
+container-type patch, matching the binary build. The upstream Git bundle remains
+unmodified; the patch and its application script are in `md-utils/scripts/release/`.
 The Swift toolchain and OS development packages are separate prerequisites.
 
 To modify and relink JXKit:
