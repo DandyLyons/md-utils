@@ -174,6 +174,12 @@ the shell interprets backticks as command substitution.
 For frontmatter keys that hold arrays (e.g. `tags: [swift, ios]`):
 
 ```bash
+# Create an empty array if the key is missing or null; preserve existing arrays
+md-utils fm array init --key tags posts/
+
+# Empty an existing array while retaining the key
+md-utils fm array clear --key tags post.md
+
 # Check if array contains value (outputs matching file paths)
 md-utils fm array contains --key tags --value swift posts/
 
@@ -186,6 +192,17 @@ md-utils fm array prepend --key tags --value featured posts/*.md
 # Remove first occurrence of a value
 md-utils fm array remove --key tags --value draft posts/*.md
 ```
+
+`init` reports existing nonempty arrays on stderr and preserves their values.
+`clear` leaves missing keys and already-empty arrays unchanged and never creates
+frontmatter. `init` converts null values to empty arrays; `clear` rejects null.
+Both reject other non-array values and use literal
+top-level keys. No-op files retain their bytes and modification time;
+`--frontmatter-format yaml|toml` applies only to changed files. Use `fm remove`
+to delete a key. `init` follows existing `--create-frontmatter` authorization
+rules for non-Markdown files. Bulk errors are reported per file, processing
+continues, and any failure produces a nonzero exit status. Status and counts
+are written to stderr; stdout remains empty.
 
 ## Common Pipelines
 

@@ -172,6 +172,8 @@ if let heading = ast.children.first as? Heading {
   - `fm sort-keys` / `fm sk` - Sort frontmatter keys
   - `fm touch` - Add frontmatter keys without values
   - `fm array` - Array manipulation commands:
+    - `fm array init` - Create an empty array if the key is missing or null
+    - `fm array clear` - Empty an array while retaining its key
     - `fm array append` - Append value to array
     - `fm array contains` - Check if array contains value
     - `fm array prepend` - Prepend value to array
@@ -239,7 +241,7 @@ Full CRUD operations plus advanced features:
 - **CLI**: `md-utils frontmatter` (alias `fm`) with subcommands:
   - Basic CRUD: `get`, `set`, `has`, `remove`, `rename`, `list`, `dump`
   - Advanced: `replace`, `search` (JMESPath queries), `sort-keys`, `touch`
-  - Array operations: `array append`, `array contains`, `array prepend`, `array remove`
+  - Array operations: `array init`, `array clear`, `array append`, `array contains`, `array prepend`, `array remove`
 - **Dump Feature**: Output entire frontmatter in multiple formats
   - Formats: JSON (default), YAML, TOML, raw, PropertyList (XML)
   - Single file: direct output without wrapper

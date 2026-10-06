@@ -108,6 +108,10 @@ md-utils fm get --key title tool.conf --line-comment-frontmatter
 # Find files with a specific tag
 md-utils fm array contains --key tags --value swift posts/
 
+# Initialize missing or null values while preserving existing arrays, or empty an array
+md-utils fm array init --key tags posts/
+md-utils fm array clear --key tags post.md
+
 # Check that every frontmatter ID is unique
 md-utils fm unique 'id' posts/
 

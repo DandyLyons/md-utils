@@ -10,7 +10,7 @@ struct NonMDFrontmatterCLISemanticsTests {
     nil,
     "dump", "get", "has", "list", "remove", "rename", "replace", "search", "set",
     "remove-frontmatter", "sort-keys", "touch", "unique", "array", "array append", "array contains",
-    "array prepend", "array remove",
+    "array prepend", "array remove", "array init", "array clear",
   ] as [String?])
   func `relevant help pages explain valid wrapped frontmatter`(_ commandPath: String?) throws {
     var arguments = ["fm"]
@@ -32,7 +32,7 @@ struct NonMDFrontmatterCLISemanticsTests {
   @Test(arguments: [
     "dump", "get", "has", "list", "remove", "rename", "replace", "search", "set",
     "remove-frontmatter", "sort-keys", "touch", "unique", "array append", "array contains",
-    "array prepend", "array remove",
+    "array prepend", "array remove", "array init", "array clear",
   ])
   func `every fm leaf exposes the explicit line-comment override`(_ commandPath: String) throws {
     let result = try CLIProcessTestHelper.run(
