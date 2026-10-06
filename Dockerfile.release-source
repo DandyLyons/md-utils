@@ -19,3 +19,9 @@ RUN --network=none cd "md-utils-${RELEASE_VERSION}-source/" \
         --template md-utils/examples/templates/report.knap \
         --data md-utils/examples/templates/report.json --output /rebuild/rendered.md \
     && grep -q 'Revenue increased.' /rebuild/rendered.md
+# Reuse the editable dependency graph and prove the server also relinks offline.
+RUN --network=none cd "md-utils-${RELEASE_VERSION}-source/" \
+    && python3 rebuild-source.py --product md-utils-server \
+    && test "$(md-utils/.build/release/md-utils-server --version)" = "$RELEASE_VERSION" \
+    && cd md-utils/ \
+    && python3 scripts/release/smoke-server.py --executable .build/release/md-utils-server --version "$RELEASE_VERSION"

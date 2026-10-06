@@ -219,7 +219,8 @@ let package = Package(
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "Logging", package: "swift-log"),
         .product(name: "PathKit", package: "PathKit"),
-      ]
+      ],
+      resources: [.process("Resources")],
     ),
     .testTarget(
       name: "md-utils-serverTests",

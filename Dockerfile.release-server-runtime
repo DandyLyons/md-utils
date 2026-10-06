@@ -1,0 +1,20 @@
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libsqlite3-0 libjavascriptcoregtk-4.1-0 libcurl4t64 libxml2 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+# Build context contains exported archives only; no source or build tree.
+ARG RELEASE_VERSION
+COPY md-utils-server-*-linux-aarch64-ubuntu24.04.tar.gz* /artifacts/
+RUN cd /artifacts/ && sha256sum -c "md-utils-server-${RELEASE_VERSION}-linux-aarch64-ubuntu24.04.tar.gz.sha256" \
+    && mkdir -p /opt/md-utils-server/ \
+    && tar -xzf "md-utils-server-${RELEASE_VERSION}-linux-aarch64-ubuntu24.04.tar.gz" --strip-components=1 -C /opt/md-utils-server/ \
+    && rm -rf /artifacts/ \
+    && test "$(uname -m)" = aarch64 \
+    && ! command -v swift && ! command -v md-utils && ! test -d /workspace/ \
+    && test ! -e /opt/md-utils-server/md-utils \
+    && test "$(/opt/md-utils-server/md-utils-server --version)" = "$RELEASE_VERSION"
+WORKDIR /collection/
+EXPOSE 8080
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["/opt/md-utils-server/md-utils-server"]
+CMD ["serve", "--project-root", "/collection/", "--config", ".md-utils/server/server.yaml", "--hostname", "0.0.0.0", "--port", "8080"]

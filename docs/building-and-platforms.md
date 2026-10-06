@@ -11,7 +11,7 @@ by hand.
 | --- | --- | --- |
 | macOS | Primary development platform; full native test suite. Manifest minimum is macOS 13; native SQLite CI uses macOS 26. Every older OS/compiler combination is not tested. | Source/SwiftPM and Mint. No automated binary archive, universal binary, signing, or notarization pipeline. |
 | Ubuntu 24.04 x86_64 | Swift 6.3.1 container CI builds the native server and runs server/template and SQLite/index checks. | Source builds; no prebuilt x86_64 release archive. |
-| Ubuntu 24.04 aarch64 | Native ARM64 CI builds the release CLI, runs native server/template/index checks, installs the archive without Swift, and rebuilds its source offline. | CLI prerelease binary/source archives. Initial tag `0.3.0-linux.1` is planned; publication requires a tag push. Separate server packaging is pending [#159](https://github.com/DandyLyons/md-utils/issues/159). |
+| Ubuntu 24.04 aarch64 | Native ARM64 CI builds release CLI/server products, runs native tests, installs each archive independently without Swift, and rebuilds both from source offline. | Separate CLI/server prerelease binaries and shared source archive. Server tagged publication is pending; see [server installation](linux-arm64-server-distribution.md). |
 | WASI, `wasm32-unknown-wasip1` | Core builds and its smoke module executes under WasmKit with the Swift 6.3.1 WASI SDK. | Build output only; no packaged release, stable JavaScript ABI, browser integration, or Workers deployment. |
 | Other Apple SDKs | Manifest declares iOS 16, tvOS 16, watchOS 9, and Mac Catalyst 16 minimums. These do not establish support for every product or dependency. | No native CLI/server distribution or CI validation for these SDKs. |
 | Other Linux distributions, Alpine/musl, Windows, Android | No verified distribution baseline. | No supported binary artifact. |
@@ -70,7 +70,7 @@ the ARM64 workflow verifies and uploads CI artifacts but does not publish a rele
 | --- | --- |
 | [Native SQLite](../.github/workflows/sqlite-index.yml) | macOS smoke/tests/measurements; x86_64 Linux builds [Dockerfile.sqlite-index](../Dockerfile.sqlite-index). |
 | [Native Server Linux](../.github/workflows/server-linux.yml) | Runs Swift build, focused tests, and route smoke directly inside a Swift Noble container. |
-| [Linux ARM64 CLI distribution](../.github/workflows/release-linux-arm64.yml) | Builds [Dockerfile.release-linux](../Dockerfile.release-linux), tests the checksummed archive in [Dockerfile.release-runtime](../Dockerfile.release-runtime), then checks offline source rebuilding and editable JXKit in [Dockerfile.release-source](../Dockerfile.release-source). |
+| [Linux ARM64 CLI and server distribution](../.github/workflows/release-linux-arm64.yml) | Builds [Dockerfile.release-linux](../Dockerfile.release-linux), installs independent CLI and server archives using the release-runtime Dockerfiles, tests HTTP/SQLite/Knap and shutdown against the installed server, and checks both offline source rebuilds with editable JXKit in [Dockerfile.release-source](../Dockerfile.release-source). |
 | [WebAssembly Core](../.github/workflows/webassembly.yml) | Installs the matching WASI SDK, then runs [scripts/build-wasm.sh](../scripts/build-wasm.sh). |
 
 [Dockerfile.core-linux](../Dockerfile.core-linux) is an isolated Core build/smoke

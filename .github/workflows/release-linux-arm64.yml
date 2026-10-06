@@ -1,4 +1,4 @@
-name: Linux ARM64 CLI distribution
+name: Linux ARM64 CLI and server distribution
 
 on:
   pull_request:
@@ -11,6 +11,7 @@ on:
       - '.dockerignore'
       - '.github/workflows/release-linux-arm64.yml'
       - 'docs/linux-arm64-distribution.md'
+      - 'docs/linux-arm64-server-distribution.md'
   push:
     branches: [main]
     tags: ['0.*-*']
@@ -63,6 +64,13 @@ jobs:
           cp scripts/release/smoke-linux.sh tmp/artifacts/
           docker build --file Dockerfile.release-runtime \
             --build-arg RELEASE_VERSION="$RELEASE_VERSION" tmp/artifacts/
+      - name: Install and exercise the independent server archive
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          docker build --file Dockerfile.release-server-runtime --tag md-utils-server-smoke \
+            --build-arg RELEASE_VERSION="$RELEASE_VERSION" tmp/artifacts/
+          python3 scripts/release/smoke-server.py --image md-utils-server-smoke --version "$RELEASE_VERSION"
       - name: Verify offline source rebuild and JXKit relinking
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
@@ -71,7 +79,7 @@ jobs:
             --build-arg RELEASE_VERSION="$RELEASE_VERSION" tmp/artifacts/
       - uses: actions/upload-artifact@v4
         with:
-          name: linux-arm64-cli
+          name: linux-arm64-native
           path: |
             tmp/artifacts/*.tar.gz
             tmp/artifacts/*.sha256
@@ -87,7 +95,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: linux-arm64-cli
+          name: linux-arm64-native
           path: artifacts/
       - name: Publish verified prerelease assets
         env:

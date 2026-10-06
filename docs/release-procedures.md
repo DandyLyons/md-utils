@@ -2,8 +2,9 @@
 
 The [platform/build guide](building-and-platforms.md) describes support and CI
 coverage. macOS users build from source or use Mint. Ubuntu 24.04 ARM64 has an
-automated CLI prerelease archive workflow. There is no automated binary release
-for macOS, Linux x86_64, `md-utils-server`, or WebAssembly.
+automated CLI and server prerelease archive workflow. There is no automated binary
+release for macOS, Linux x86_64, or WebAssembly. Server publication requires a new
+verified tag; existing CLI-only releases are not modified.
 
 ## Versions and release preparation
 
@@ -14,7 +15,8 @@ are independent of CLI artifact versions: project config 0.3.0 is opt-in,
 `config init` and the `latest` schema alias remain at 0.2.0. See
 [config 0.3](config-v0.3.md). Do not retag an existing release.
 
-The CLI reads `Sources/md-utils/Resources/BuildVersion.txt`. Native source/Mint
+The CLI and server read their respective `Sources/<product>/Resources/BuildVersion.txt`.
+Native source/Mint
 builds use the checked-in value, currently `0.3.0-linux.1-dev`. The Linux workflow
 stamps the exact prerelease tag for tagged builds and
 `0.3.0-linux.1-dev.<12-character-commit>` otherwise. A Git tag alone does not
@@ -41,8 +43,9 @@ and must be described in release notes.
 
 ## Publish the Linux ARM64 preview
 
-Require the **Linux ARM64 CLI distribution** workflow to pass for the candidate,
-including clean runtime installation and offline source/JXKit rebuilding.
+Require the **Linux ARM64 CLI and server distribution** workflow to pass for the candidate,
+including independent clean runtime installations, installed-server HTTP/SQLite/Knap
+and SIGTERM checks, and offline source/JXKit rebuilding for both products.
 Linux validation runs in CI only. PR, main-branch, and manual runs produce CI
 artifacts retained for 14 days; they are not published releases.
 
@@ -54,13 +57,21 @@ git tag 0.3.0-linux.1
 git push origin 0.3.0-linux.1
 ```
 
-The tag-push workflow verifies the tagged build again, then publishes these four
+The tag-push workflow verifies the tagged build again, then publishes these six
 assets without rebuilding them in the publication job:
 
 - `md-utils-0.3.0-linux.1-linux-aarch64-ubuntu24.04.tar.gz`
 - `md-utils-0.3.0-linux.1-linux-aarch64-ubuntu24.04.tar.gz.sha256`
 - `md-utils-0.3.0-linux.1-source.tar.gz`
 - `md-utils-0.3.0-linux.1-source.tar.gz.sha256`
+- `md-utils-server-0.3.0-linux.1-linux-aarch64-ubuntu24.04.tar.gz`
+- `md-utils-server-0.3.0-linux.1-linux-aarch64-ubuntu24.04.tar.gz.sha256`
+
+These filenames illustrate the version substitution; do not reuse an existing tag.
+The pinned server Docker example uses the proposed `0.3.0-linux-prerelease.3`
+candidate, whose availability must be checked before installation or publication.
+Both binary archives use the same corresponding-source archive. CI uploads all
+six files as `linux-arm64-native`; publication downloads these verified bytes.
 
 Let the workflow create the GitHub release; do not race it with manual
 `gh release create`. It marks the release **prerelease**, with **latest disabled**.
@@ -69,10 +80,12 @@ a tag, does not publish. Existing assets are never silently overwritten, and an
 existing stable release is rejected. Investigate partial publication before any
 retry; use a fresh prerelease version if artifact contents need to change.
 
-After publication, verify the prerelease flag, all four assets, and the downloaded
+After publication, verify the prerelease flag, all six assets, and the downloaded
 archives' checksums. Follow the pinned
 [downstream installation example](linux-arm64-distribution.md) to confirm the
-published binary's version and resources in CI. Keep matching source archives
+published CLI's version and resources in CI, and follow the
+[server installation example](linux-arm64-server-distribution.md) to verify its
+version, mounted collection, template creation and shutdown. Keep matching source archives
 available alongside every binary, beyond CI artifact expiration.
 
 The archive links Swift statically and uses Ubuntu system shared libraries. It

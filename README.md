@@ -502,7 +502,12 @@ The bundled CLI schema in `Sources/md-utils/Resources/0.2.0_md-utils.schema.json
 
 When the Pages workflow prepares its artifact, it copies `site/schemas/$CURRENT_MD_UTILS_JSONSCHEMA_VERSION/md-utils.schema.json` to both `md-utils.schema.json` at the site root and `schemas/latest/md-utils.schema.json`. Versioned schema URLs are immutable after release. For future schema releases, add a new versioned folder under `site/schemas/`, update `CURRENT_MD_UTILS_JSONSCHEMA_VERSION` in `.github/workflows/pages.yml`, and keep the canonical bundled schema synchronized with the new published copy. Do not edit already-published versioned schema files; publish a new version instead.
 
-## Native Read-Only Server
+## Native Server
+
+For an independently installed Ubuntu ARM64 binary, see the
+[server archive and Docker guide](docs/linux-arm64-server-distribution.md).
+The release workflow verifies installed HTTP, SQLite, and template behavior;
+tagged server publication is pending.
 
 `md-utils-server` uses Hummingbird 2 to expose explicitly configured resources. It
 loads `.md-utils/server/server.yaml`, rules from `.md-utils/md-utils.json`, mdtypes from
@@ -705,9 +710,10 @@ The native server is built and tested on Linux in Docker in CI.
 **macOS** is the primary development and testing platform. Core, native integrations, and the CLI are covered by the full Swift test suite.
 
 **Linux**: Ubuntu 24.04 x86_64 and ARM64 have native server/template/index CI
-coverage using Swift 6.3.1. The ARM64 CLI archive is additionally verified in
-plain Ubuntu without Swift or a source checkout. Its first prerelease publication
-is pending a tag push. Linux file watching is unsupported; use explicit index
+coverage using Swift 6.3.1. Independent ARM64 CLI and server archives are verified in
+plain Ubuntu without Swift or a source checkout. See the
+[server Docker installation and verification guide](docs/linux-arm64-server-distribution.md);
+tagged server publication is pending. Linux file watching is unsupported; use explicit index
 updates. Other Linux distributions and architectures require separate validation.
 
 Template rendering uses SwiftKnap on macOS and Linux. Ubuntu 24.04 builds of the CLI

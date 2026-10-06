@@ -373,8 +373,9 @@ The conventional server runs as the native `md-utils-server` Swift executable
 on macOS and Linux, calling library APIs directly. Build it with
 `swift build -c release --product md-utils-server`. Ubuntu 24.04 x86_64 and ARM64
 CI exercise native server routes and tests. The Linux CLI prerelease archive
-does not contain the server; separate server distribution is tracked by
-[#159](https://github.com/DandyLyons/md-utils/issues/159). See
+does not contain the server; the independent ARM64 server archive, installed
+HTTP/template/index checks, and Docker recipe are described in
+[server distribution](linux-arm64-server-distribution.md). See
 [build prerequisites and resource installation](building-and-platforms.md).
 
 ```text
