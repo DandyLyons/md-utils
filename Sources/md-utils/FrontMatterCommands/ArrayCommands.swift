@@ -21,6 +21,8 @@ extension CLIEntry.FrontMatterCommands {
         Manipulate arrays in YAML or TOML frontmatter with various subcommands.
 
         SUBCOMMANDS:
+          init       Create an empty array if the key is missing or null
+          clear      Empty an existing array while retaining its key
           contains   Check if arrays contain specific values
           append     Add values to end of arrays
           prepend    Add values to beginning of arrays
@@ -29,9 +31,16 @@ extension CLIEntry.FrontMatterCommands {
         All subcommands support:
           - Multiple file processing
           - Recursive directory traversal (enabled by default)
-          - Case-insensitive comparison options
+
+        Value comparison subcommands also support case-insensitive options.
 
         EXAMPLES:
+          # Initialize missing or null tags while preserving existing arrays
+          md-utils fm array init --key tags posts/
+
+          # Empty an array while retaining the key
+          md-utils fm array clear --key tags post.md
+
           # Check if files contain a tag
           md-utils fm array contains --key tags --value swift posts/
 
@@ -50,7 +59,7 @@ extension CLIEntry.FrontMatterCommands {
           # Find files and update them
           md-utils fm array contains --key tags --value swift . | xargs md-utils fm set --key published --value true
         """),
-      subcommands: [Contains.self, Append.self, Prepend.self, Remove.self]
+      subcommands: [Initialize.self, Clear.self, Contains.self, Append.self, Prepend.self, Remove.self],
     )
   }
 }

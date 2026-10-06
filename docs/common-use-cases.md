@@ -187,7 +187,7 @@ md-utils fm set Sources/ --key status --value approved \
 Every `fm` leaf command supports mapped non-Markdown files. This includes
 `remove`, `rename`, `replace`, `sort-keys`, `touch`, and all `fm array`
 subcommands in addition to the read and `set` commands. Mutations that can
-create frontmatter—`set`, `replace`, `touch`, `array append`, and
+create frontmatter—`set`, `replace`, `touch`, `array init`, `array append`, and
 `array prepend`—accept `--create-frontmatter`. The flag does not suppress
 `fm replace`'s separate destructive-replacement confirmation; use `--yes` for
 that confirmation when appropriate.
@@ -221,6 +221,28 @@ md-utils fm search 'status == `"published"`' posts/
 `fm search` is YAML-only; TOML support is intentionally out of scope for that command.
 
 ### Frontmatter Array Operations
+
+#### Initialize or clear an array
+```bash
+# Create tags as an empty array if missing or null
+md-utils fm array init --key tags posts/
+
+# Empty an existing array while retaining the key
+md-utils fm array clear --key tags post.md
+```
+
+`init` preserves existing arrays and reports nonempty arrays on stderr. `clear`
+leaves missing keys and empty arrays unchanged. `init` converts null values to
+empty arrays; `clear` rejects null. Both reject other non-array values and treat
+the key as a literal top-level name. No-op files retain
+their bytes and modification time, even with `--frontmatter-format`; that option
+applies only to files whose arrays are changed. `clear` never creates frontmatter.
+Use `fm remove --key tags post.md` to delete the key instead.
+
+Both commands report modified, unchanged, and failed counts on stderr. Bulk
+operations continue after individual failures and return failure if any file fails.
+Actual writes use the shared frontmatter serializer and may reformat frontmatter
+or discard its comments, consistent with existing array mutations.
 
 #### Add tag to frontmatter array
 ```bash
