@@ -147,7 +147,9 @@ public enum FrontMatterConversion {
     case .boolean(let value): .scalar(.init(value ? "true" : "false"))
     case .integer(let value): .scalar(.init(String(value)))
     case .number(let value): .scalar(.init(String(value)))
-    case .string(let value): .scalar(.init(value))
+    // Yams' string representer quotes values that would otherwise resolve as null,
+    // booleans, or numbers, preserving the frontmatter value's explicit type.
+    case .string(let value): .scalar(value.represented())
     case .offsetDateTime(let value): .scalar(.init(ISO8601DateFormatter().string(from: value)))
     case .localDateTime(let value): .scalar(.init(format(value)))
     case .localDate(let value): .scalar(.init(format(value)))

@@ -10,6 +10,12 @@ Common operations include reading values, setting values, checking for keys, rem
 
 Do not put comments in frontmatter that will be mutated by `md-utils`. YAML and TOML are parsed into a format-neutral value model and serialized again, so comments are not guaranteed to survive.
 
+`fm set --key summary --value '' post.md` stores an empty string.
+`fm set --key summary --null post.md` stores a YAML null. Supply exactly one of
+`--value` or `--null`; `--value null` stores the literal string `null`.
+TOML rejects `--null` without writing unless you explicitly convert using
+`--frontmatter-format yaml`.
+
 ## Non-Markdown Hash Comments
 
 Shipped shell, Ruby, R, YAML/TOML, Make/CMake, properties, Nix, Bazel, Terraform,

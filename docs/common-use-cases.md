@@ -111,6 +111,15 @@ md-utils fm get --key tags --format numbered-list document.md
 ```bash
 md-utils fm set --key author --value "Jane Doe" document.md
 
+# Store an empty string (distinct from null)
+md-utils fm set --key summary --value '' document.md
+
+# Store a YAML null
+md-utils fm set --key summary --null document.md
+
+# Explicitly convert a TOML document to YAML when setting null
+md-utils fm set --key summary --null --frontmatter-format yaml document.md
+
 # Create a TOML block when the document has no frontmatter
 md-utils fm set --key author --value "Jane Doe" --frontmatter-format toml document.md
 ```
@@ -120,6 +129,10 @@ Mutations preserve the existing format. Creation-capable commands default to
 YAML unless `--frontmatter-format toml` is supplied. Avoid comments inside either
 format: parsing and reserialization do not guarantee that comments are preserved.
 TOML cannot represent null, so `fm touch` is unavailable for TOML blocks.
+`fm set --value` stores a string, including empty strings and literal `null`,
+`true`, or numeric text. Existing YAML null values at other keys remain null.
+Supply exactly one of `--value` or `--null`. Setting `--null` in TOML reports
+an error without writing unless `--frontmatter-format yaml` is supplied.
 
 ### Frontmatter in Non-Markdown Text Files
 

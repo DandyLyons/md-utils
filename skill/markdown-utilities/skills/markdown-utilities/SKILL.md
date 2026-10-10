@@ -110,6 +110,13 @@ md-utils toc docs/*.md
 # Get a frontmatter value
 md-utils fm get --key title post.md
 
+# Set an empty string or an explicit YAML null (mutually exclusive options)
+md-utils fm set --key summary --value '' post.md
+md-utils fm set --key summary --null post.md
+
+# TOML cannot represent null; explicitly convert to YAML when needed
+md-utils fm set --key summary --null --frontmatter-format yaml post.md
+
 # Create TOML frontmatter in a document that has none
 md-utils fm set --key title --value "TOML Note" --frontmatter-format toml post.md
 
