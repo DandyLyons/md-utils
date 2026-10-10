@@ -55,7 +55,7 @@ extension SQLiteIndexDatabase {
                 WHERE fingerprint IS NULL OR fingerprint!=?
                 """, arguments: [fingerprint])
             for scope in scopes {
-                let reusable = try Bool.fetchOne(database, sql: "SELECT state='complete' AND fingerprint=? FROM scopes WHERE id=?",
+                let reusable = try Bool.fetchOne(database, sql: "SELECT state IN ('complete','limited') AND fingerprint=? FROM scopes WHERE id=?",
                     arguments: [fingerprint, scope.id]) ?? false
                 try database.execute(sql: "INSERT INTO refresh_scopes VALUES(?,?,?)",
                     arguments: [generation, scope.id, reusable])
@@ -77,6 +77,17 @@ extension SQLiteIndexDatabase {
                 try database.execute(sql: "INSERT OR IGNORE INTO refresh_seen VALUES(?,?,?)",
                     arguments: [generation, scopeID, path])
             }
+        }
+    }
+
+    /// Copies every recorded candidate, including nonmembers, without filesystem discovery.
+    func stageRecordedCandidates(generation: Int, scopeID: String) throws {
+        try databaseQueue.write { database in
+            try requireGeneration(generation, in: database)
+            try database.execute(sql: """
+                INSERT INTO refresh_seen(generation,scope_id,path)
+                SELECT ?,scope_id,path FROM assessments WHERE scope_id=?
+                """, arguments: [generation, scopeID])
         }
     }
 
@@ -150,7 +161,7 @@ extension SQLiteIndexDatabase {
     }
 
     func commitStagedRefresh(scopes: [IndexScope], errors: [String: String], fingerprint: String,
-        generation: Int) throws {
+        generation: Int, indexedOnly: Bool = false) throws {
         try databaseQueue.write { database in
             guard try Int.fetchOne(database,
                 sql: "SELECT value FROM index_metadata WHERE key='generation'") == generation else {
@@ -207,7 +218,7 @@ extension SQLiteIndexDatabase {
                 """, arguments: [generation])
             for scope in scopes {
                 try database.execute(sql: "UPDATE scopes SET state=?,error=?,fingerprint=? WHERE id=?",
-                    arguments: [errors[scope.id] == nil ? "complete" : "incomplete", errors[scope.id], fingerprint, scope.id])
+                    arguments: [errors[scope.id] == nil ? (indexedOnly ? "limited" : "complete") : "incomplete", errors[scope.id], fingerprint, scope.id])
             }
             try database.execute(sql: "DELETE FROM documents WHERE NOT EXISTS(SELECT 1 FROM assessments a WHERE a.path=documents.path AND a.selected=1)")
             try database.execute(sql: "DELETE FROM files WHERE NOT EXISTS(SELECT 1 FROM assessments a WHERE a.path=files.path)")
@@ -218,11 +229,11 @@ extension SQLiteIndexDatabase {
                   OR EXISTS(SELECT 1 FROM refresh_assessments WHERE generation=? AND status='evaluation-error')
                 """, arguments: [generation, generation]) ?? false
             let allComplete = try Bool.fetchOne(database, sql: "SELECT NOT EXISTS(SELECT 1 FROM scopes WHERE state!='complete')") ?? false
-            if errors.isEmpty && !stagedFailures && allComplete {
+            if !indexedOnly && errors.isEmpty && !stagedFailures && allComplete {
                 try database.execute(sql: "INSERT INTO index_metadata VALUES('last_completed_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                     arguments: [String(Date().timeIntervalSince1970)])
             }
-            try publishObservations(database, generation: generation, complete: errors.isEmpty && !stagedFailures)
+            try publishObservations(database, generation: generation, complete: !indexedOnly && errors.isEmpty && !stagedFailures)
             try refreshTypeViews(database)
             try database.execute(sql: "INSERT INTO index_metadata VALUES('published_generation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 arguments: [String(generation)])

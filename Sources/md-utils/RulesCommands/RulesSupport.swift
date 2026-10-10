@@ -1390,6 +1390,8 @@ struct RuleValidationSummary {
   var results: [RuleValidationResult]
   var totalFiles: Int
   var indexReport: IndexUpdateReport? = nil
+  var indexedOnly = false
+  var uncoveredRules: [String] = []
 
   var errors: Int {
     results.reduce(0) { count, result in

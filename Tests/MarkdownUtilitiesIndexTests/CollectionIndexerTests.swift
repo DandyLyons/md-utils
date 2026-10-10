@@ -35,6 +35,51 @@ private func selectAll(_ scope: IndexScope, _ path: String, _ content: String, _
 }
 
 struct SelectiveIndexRefreshTests {
+    @Test func `recorded refresh bypasses discovery and updates prior nonmembers and overlapping baselines`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "excluded")
+        let directory = IndexScope(path: "notes/")
+        let rule = IndexScope(kind: .rule, name: "books")
+        _ = try await fixture.indexer.update(adding: directory, fingerprint: "v1", evaluate: selectAll)
+        _ = try await fixture.indexer.update(adding: rule, fingerprint: "v1") { _, _, content, _ in
+            IndexEvaluation(metadata: "{}", body: content,
+                assessment: IndexAssessment(selected: false, status: "notApplicable"))
+        }
+        try fixture.write("notes/one.md", "included now")
+        try fixture.write("notes/new.md", "included new")
+        // Invalid discovery roots would fail if enumeration were accidentally invoked.
+        let report = try await fixture.indexer.updateMany(refreshing: [rule],
+            discoveryDirectories: [rule.id: ["../outside/"]], indexedOnly: true, fingerprint: "v1") { scopes, _, content, _ in
+            Dictionary(uniqueKeysWithValues: scopes.map { scope in
+                (scope.id, IndexEvaluation(metadata: "{}", body: content,
+                    assessment: IndexAssessment(selected: content.hasPrefix("included"), status: "passed")))
+            })
+        }
+        #expect(report.errors.isEmpty)
+        #expect(report.evaluated == 1)
+        let selected = try await fixture.database.databaseQueue.read {
+            try String.fetchAll($0, sql: "SELECT path FROM assessments WHERE scope_id=? AND selected=1", arguments: [rule.id])
+        }
+        #expect(selected == ["notes/one.md"])
+        let freshness = try fixture.database.freshness()
+        #expect(freshness.isCurrent == false)
+        #expect(freshness.scopes.first { $0.definition == directory }?.state == "incomplete")
+        #expect(freshness.scopes.first { $0.definition == rule }?.state == "limited")
+        try fixture.write("notes/one.md", "excluded again")
+        _ = try await fixture.indexer.updateMany(refreshing: [rule], indexedOnly: true, fingerprint: "v1") { scopes, _, content, _ in
+            Dictionary(uniqueKeysWithValues: scopes.map { scope in
+                (scope.id, IndexEvaluation(metadata: "{}", body: content,
+                    assessment: IndexAssessment(selected: false, status: "notApplicable")))
+            })
+        }
+        #expect(try fixture.count("assessments") == 2)
+        let remainingSelected = try await fixture.database.databaseQueue.read {
+            try Int.fetchOne($0, sql: "SELECT selected FROM assessments WHERE scope_id=?", arguments: [rule.id])
+        }
+        #expect(remainingSelected == 0)
+    }
+
     @Test func `selective refresh preserves unchanged overlapping scopes and invalidates changed baselines`() async throws {
         let fixture = try IndexFixture()
         defer { fixture.remove() }

@@ -74,6 +74,45 @@ evaluation. Definitions and transitive schema changes invalidate assessments.
 Use `rules validate --verify-hashes` to detect edits preserving size and mtime,
 or `rules validate --no-index` to bypass the index entirely.
 
+For explicit validation without file discovery, use:
+
+```bash
+md-utils rules validate books --indexed-only
+md-utils rules validate --indexed-only
+md-utils rules validate books --indexed-only --verify-hashes
+```
+
+`--indexed-only` requires an existing compatible index and registered rule scopes
+with the requested non-Markdown inclusion setting. A named missing scope fails.
+Without a name, only registered configured rule scopes are checked, and output
+lists configured rules not covered. It rejects `--no-index` and never falls back
+to a source scan. Only recorded candidates are checked, including prior
+nonmembers. Changed definitions reevaluate those candidates even when selectors
+broaden. New files and rename destinations remain undiscovered until ordinary
+validation or index refresh. Deleted, unreadable, and symlink-replaced candidates
+remain recorded as failures with membership removed, so repeated checks cannot
+silently forget them. Ordinary discovery removes obsolete paths.
+
+Output always states `New files were not discovered.` Success applies only to
+recorded candidates. Scopes receive a `limited` coverage state; assessments can
+be reused by subsequent checks, but this state does not establish global
+freshness or expose globally current document views. Default size/mtime checks
+can miss stat-preserving edits; `--verify-hashes` checks known candidates' content.
+Writer coordination, generation checks, cancellation, and overlapping-scope
+invalidation apply as for ordinary refresh.
+
+Run the repeatable multi-scope comparison with:
+
+```bash
+python3 scripts/benchmark-indexed-only.py --binary .build/release/md-utils --files 10000 --scopes 5 --runs 5
+```
+
+The script retains its corpus under `tmp/` and reports individual samples and
+medians. A macOS ARM64 debug smoke measurement on 2026-10-09, with 1,000 files,
+five broad rule scopes, and three measured runs per mode, took a median 1.064 s
+with unchanged discovery and 0.586 s with indexed-only validation (about 45%
+less elapsed time). This small debug measurement is not a release scale claim.
+
 An absent index is never created by validation. A direct scan of more than 1,000
 files emits indexing guidance to stderr, including commands for the requested
 rules and project options. `--no-index` suppresses this advisory.

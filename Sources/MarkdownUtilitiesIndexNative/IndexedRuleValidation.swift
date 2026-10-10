@@ -19,9 +19,11 @@ public struct IndexedRuleValidation: Sendable {
     public var report: IndexUpdateReport
 
     /// Registers and refreshes only the requested project-wide rule scopes.
-    /// Unavailable cached data throws so callers can validate authoritative files.
+    /// Unavailable cached data throws. With `indexedOnly`, refreshes only recorded
+    /// candidates and reports read failures as assessments; callers must not fall
+    /// back to discovery and must explicitly report limited coverage.
     public static func validate(database: SQLiteIndexDatabase, root: Path, configPath: Path,
-        ruleNames: [String], includeNonMarkdown: Bool, verifyHashes: Bool) async throws -> Self {
+        ruleNames: [String], includeNonMarkdown: Bool, verifyHashes: Bool, indexedOnly: Bool = false) async throws -> Self {
         let evaluator = try IndexProjectEvaluator(root: root, configPath: configPath)
         let scopes = ruleNames.map { IndexScope(kind: .rule, name: $0, includeNonMarkdown: includeNonMarkdown) }
         for scope in scopes { try evaluator.validate(scope) }
@@ -35,26 +37,26 @@ public struct IndexedRuleValidation: Sendable {
         try database.validateSavedConfiguration()
         _ = try database.configurationPath(configPath.absolute().normalize().string)
         let directories = Dictionary(uniqueKeysWithValues: scopes.map { ($0.id, evaluator.discoveryDirectories(for: $0)) })
-        let report = try await indexer.updateMany(refreshing: scopes, discoveryDirectories: directories, writerLease: lease,
+        let report = try await indexer.updateMany(refreshing: scopes, discoveryDirectories: directories, indexedOnly: indexedOnly, writerLease: lease,
             fingerprint: evaluator.fingerprint, verifyHashes: verifyHashes, evaluate: evaluator.evaluate)
         try Task.checkCancellation()
-        guard report.errors.isEmpty && report.omittedErrorCount == 0 else {
+        guard indexedOnly || (report.errors.isEmpty && report.omittedErrorCount == 0) else {
             throw IndexProjectError(report.errors.first ?? "Index refresh failed.")
         }
-        return try snapshot(database: database, scopes: scopes, fingerprint: evaluator.fingerprint, report: report)
+        return try snapshot(database: database, scopes: scopes, fingerprint: evaluator.fingerprint, report: report, indexedOnly: indexedOnly)
     }
 
     /// Checks freshness and reads assessments and diagnostics in one serialized snapshot.
     package static func snapshot(database: SQLiteIndexDatabase, scopes: [IndexScope],
-        fingerprint: String, report: IndexUpdateReport) throws -> Self {
+        fingerprint: String, report: IndexUpdateReport, indexedOnly: Bool = false) throws -> Self {
         try database.serverRead { db in
             guard try Int.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='generation'") == report.generation,
                 try Int.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='published_generation'") == report.generation else {
                 throw IndexProjectError("Index validation snapshot was superseded; retry validation.")
             }
             for scope in scopes {
-                guard try Bool.fetchOne(db, sql: "SELECT state='complete' AND fingerprint=? FROM scopes WHERE id=?",
-                    arguments: [fingerprint, scope.id]) == true else {
+                guard try Bool.fetchOne(db, sql: "SELECT state=? AND fingerprint=? FROM scopes WHERE id=?",
+                    arguments: [indexedOnly ? "limited" : "complete", fingerprint, scope.id]) == true else {
                     throw IndexProjectError("Rule scope is unavailable: \(scope.name)")
                 }
             }
@@ -78,7 +80,8 @@ public struct IndexedRuleValidation: Sendable {
                 let scopeID: String = row["scope_id"]
                 let path: String = row["path"]
                 if previous?.0 != scopeID || previous?.1 != path {
-                    guard let status = MarkdownRuleAssessmentStatus(rawValue: row["status"]) else {
+                    let rawStatus: String = row["status"]
+                    guard let status = rawStatus == "evaluation-error" ? .failed : MarkdownRuleAssessmentStatus(rawValue: rawStatus) else {
                         throw IndexProjectError("Rule assessment is unavailable: \(path)")
                     }
                     activeIndex = nil

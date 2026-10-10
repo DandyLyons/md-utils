@@ -14,16 +14,24 @@ extension RulesValidatorRunner {
     configPath: Path = RulesPaths.configFile,
     projectRoot: Path? = nil,
     noIndex: Bool = false,
+    indexedOnly: Bool = false,
     verifyHashes: Bool = false,
     warning: (String) -> Void = { FileHandle.standardError.write(Data(($0 + "\n").utf8)) },
   ) async throws -> RuleValidationSummary {
     try Task.checkCancellation()
+    guard !indexedOnly || !noIndex else {
+      throw ValidationError("--indexed-only cannot be combined with --no-index.")
+    }
     let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
     let resolvedRoot = config.standaloneProject?.projectRoot ?? projectRoot ?? root
-    let rules = try selectedRules(config: config, ruleName: ruleName)
+    var rules = try selectedRules(config: config, ruleName: ruleName)
+    var uncoveredRules: [String] = []
     let canonicalRoot = URL(fileURLWithPath: resolvedRoot.absolute().normalize().string).resolvingSymlinksInPath()
     let databasePath = canonicalRoot.appendingPathComponent(".md-utils/index.sqlite").path
     let hasIndex = FileManager.default.fileExists(atPath: databasePath)
+    guard !indexedOnly || hasIndex else {
+      throw ValidationError("--indexed-only requires an existing compatible index. Run ordinary validation/index refresh to discover files.")
+    }
     if hasIndex && !noIndex && !rules.isEmpty {
       do {
         let directory = canonicalRoot.appendingPathComponent(".md-utils/", isDirectory: true)
@@ -32,9 +40,18 @@ extension RulesValidatorRunner {
           throw IndexProjectError("The project index must not be a symlink.")
         }
         let database = try SQLiteIndexDatabase(path: databasePath)
+        if indexedOnly {
+          let registered = try database.scopes()
+          uncoveredRules = rules.filter { !registered.contains(IndexScope(kind: .rule, name: $0.name, includeNonMarkdown: includeNonMarkdown)) }.map(\.name)
+          if ruleName != nil && !uncoveredRules.isEmpty {
+            throw ValidationError("Rule scope is not registered: \(uncoveredRules.joined(separator: ", "))")
+          }
+          rules.removeAll { uncoveredRules.contains($0.name) }
+          guard !rules.isEmpty else { throw ValidationError("No requested rule scopes registered. Uncovered rules: \(uncoveredRules.joined(separator: ", "))") }
+        }
         let cached = try await IndexedRuleValidation.validate(database: database, root: Path(canonicalRoot.path),
           configPath: configPath, ruleNames: rules.map(\.name), includeNonMarkdown: includeNonMarkdown,
-          verifyHashes: verifyHashes)
+          verifyHashes: verifyHashes, indexedOnly: indexedOnly)
         let schemaPaths = Dictionary(uniqueKeysWithValues: rules.map { rule in
           (rule.name, rule.schema.isEmpty ? "" : RulesPaths.schemaFile(rule: rule, config: config, root: resolvedRoot).string)
         })
@@ -54,14 +71,17 @@ extension RulesValidatorRunner {
           if $0.filePath != $1.filePath { return $0.filePath < $1.filePath }
           return (ruleOrder[$0.ruleName] ?? 0) < (ruleOrder[$1.ruleName] ?? 0)
         }
-        return RuleValidationSummary(results: results, totalFiles: cached.totalFiles, indexReport: cached.report)
+        return RuleValidationSummary(results: results, totalFiles: cached.totalFiles, indexReport: cached.report,
+          indexedOnly: indexedOnly, uncoveredRules: uncoveredRules)
       } catch is CancellationError {
         throw CancellationError()
       } catch {
         try Task.checkCancellation()
+        if indexedOnly { throw error }
         warning("Warning: index validation unavailable (\(error)); validating source files directly.")
       }
     }
+    if indexedOnly { throw ValidationError("No requested rule scopes registered.") }
     let summary = try await validateDirect(ruleName: ruleName, includeNonMarkdown: includeNonMarkdown,
       root: root, configPath: configPath, projectRoot: projectRoot)
     if !hasIndex && !noIndex && summary.totalFiles > 1_000 && !rules.isEmpty {

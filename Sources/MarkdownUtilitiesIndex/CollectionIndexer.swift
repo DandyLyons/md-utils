@@ -163,6 +163,7 @@ public struct CollectionIndexer: Sendable {
         adding scope: IndexScope? = nil,
         refreshing requestedScopes: [IndexScope]? = nil,
         discoveryDirectories: [String: [String]] = [:],
+        indexedOnly: Bool = false,
         writerLease: CollectionWriterLease? = nil,
         fingerprint: String,
         rebuild: Bool = false,
@@ -170,6 +171,9 @@ public struct CollectionIndexer: Sendable {
         limits: IndexRefreshLimits = IndexRefreshLimits(),
         evaluate: ([IndexScope], String, String, Date) async throws -> [String: IndexEvaluation]
     ) async throws -> IndexUpdateReport {
+        guard !indexedOnly || (!rebuild && scope == nil) else {
+            throw SQLiteIndexError(message: "Indexed-only refresh cannot rebuild or register scopes.")
+        }
         guard requestedScopes == nil || !rebuild else {
             throw SQLiteIndexError(message: "A rebuild must refresh all saved scopes.")
         }
@@ -200,6 +204,12 @@ public struct CollectionIndexer: Sendable {
         if let scope, !scopes.contains(scope) { scopes.append(scope) }
         guard !scopes.isEmpty else { throw SQLiteIndexError(message: "No index scopes registered. Supply a directory to index update.") }
         for scope in scopes { try validate(scope) }
+        if indexedOnly {
+            let registered = try database.scopes()
+            for scope in scopes where !registered.contains(scope) {
+                throw SQLiteIndexError(message: "Rule scope is not registered: \(scope.name)")
+            }
+        }
         let generation = try database.beginStagedRefresh(scopes: scopes, fingerprint: fingerprint)
         // Generation-specific cleanup cannot discard a newer writer's work. After a
         // crash, beginStagedRefresh reclaims abandoned staging on the next refresh.
@@ -218,6 +228,10 @@ public struct CollectionIndexer: Sendable {
                 pathBytes = 0
             }
             do {
+                if indexedOnly {
+                    try database.stageRecordedCandidates(generation: generation, scopeID: scope.id)
+                    continue
+                }
                 try enumerate(scope, directories: discoveryDirectories[scope.id]) { file in
                     let path = String(file.path.dropFirst(root.path.count + 1))
                     if !paths.isEmpty && path.utf8.count > limits.discoveryBatchBytes - pathBytes {
@@ -272,6 +286,9 @@ public struct CollectionIndexer: Sendable {
                 var size: Int64 = 0
                 var hash = ""
                 do {
+                    if indexedOnly && file.resolvingSymlinksInPath().path != file.standardizedFileURL.path {
+                        throw SQLiteIndexError(message: "Known candidate has a symlink ancestor or target: \(path)")
+                    }
                     let before = try stat(file)
                     mtime = before.0
                     size = before.1
@@ -358,7 +375,7 @@ public struct CollectionIndexer: Sendable {
         try flushChanges()
         try Task.checkCancellation()
         try database.commitStagedRefresh(scopes: scopes, errors: scopeErrors,
-            fingerprint: fingerprint, generation: generation)
+            fingerprint: fingerprint, generation: generation, indexedOnly: indexedOnly)
         try database.saveConfiguration()
         return report
     }

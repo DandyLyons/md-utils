@@ -44,6 +44,16 @@ to one closure, allowing the host to parse/extract once and evaluate many polici
 
 ## Refresh and rebuild
 
+`updateMany` accepts `indexedOnly: true` to stage the requested scopes' existing
+assessment paths directly from SQLite, including nonmembers. It requires already
+registered scopes and rejects rebuilds and scope registration. No candidate
+directory enumeration occurs. The normal stat/hash/evaluation and publication
+pipeline still runs; unavailable paths become failed, unselected candidates.
+The resulting `limited` scope state permits cached assessment reuse but does not
+claim discovery completeness, update the global completion timestamp, or expose
+current document views. Ordinary discovery restores complete coverage. Hosts must
+label this coverage explicitly and must not fall back to discovery after errors.
+
 Every update refreshes all registered scopes. Normal refreshes reuse successful
 assessments when file mtime, size, and the fingerprint match. Enable `verifyHashes`
 to hash every candidate and detect stat-preserving edits. A timestamp change

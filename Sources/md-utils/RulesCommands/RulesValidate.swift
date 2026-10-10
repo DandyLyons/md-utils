@@ -16,7 +16,7 @@ extension CLIEntry.RulesCommands {
       commandName: "validate",
       abstract: "Validate files against configured rules",
       discussion: RulesNonMarkdownHelp.appending(
-        to: "Uses and refreshes an existing project index automatically, falling back to source files if the index is unavailable. Project scans remain Markdown-only unless non-Markdown files are explicitly included."
+        to: "Uses and refreshes an existing project index automatically, falling back to source files if the index is unavailable. --indexed-only requires registered scopes and checks only recorded candidates without discovery or fallback; success has limited coverage. Ordinary validation/index refresh discovers new files. Project scans remain Markdown-only unless non-Markdown files are explicitly included."
       )
     )
 
@@ -30,6 +30,8 @@ extension CLIEntry.RulesCommands {
     var includeNonMD = false
     @Flag(name: .long, help: "Validate source files directly without using the project index")
     var noIndex = false
+    @Flag(name: .long, help: "Validate only recorded candidates in registered rule scopes; require an index and never discover new files or fall back")
+    var indexedOnly = false
     @Flag(name: .long, help: "Hash every indexed candidate to detect edits preserving size and modification time")
     var verifyHashes = false
     @OptionGroup var project: RuleProjectOptions
@@ -44,6 +46,7 @@ extension CLIEntry.RulesCommands {
         configPath: project.configPath,
         projectRoot: project.root,
         noIndex: noIndex,
+        indexedOnly: indexedOnly,
         verifyHashes: verifyHashes,
       )
       print(RuleValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk))
@@ -67,9 +70,15 @@ enum RuleValidationSummaryFormatter {
     includeOk: Bool = false
   ) -> String {
     var lines: [String] = []
+    if summary.indexedOnly {
+      lines.append("Limited coverage: only recorded candidates were validated. New files were not discovered.")
+      if !summary.uncoveredRules.isEmpty {
+        lines.append("Configured rules not covered: \(summary.uncoveredRules.sorted().joined(separator: ", ")).")
+      }
+    }
 
     guard !summary.results.isEmpty else {
-      return "No files matched configured rules."
+      return (lines + ["No files matched configured rules."]).joined(separator: "\n")
     }
 
     if let ruleName {

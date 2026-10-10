@@ -51,14 +51,97 @@ private struct RulesIndexFixture {
     return db
   }
   func validate(rule: String? = "books", noIndex: Bool = false, verifyHashes: Bool = false,
+    indexedOnly: Bool = false,
     includeNonMarkdown: Bool = false, warning: (String) -> Void = { _ in },
   ) async throws -> RuleValidationSummary {
     try await RulesValidatorRunner.validate(ruleName: rule, includeNonMarkdown: includeNonMarkdown,
-      root: root, configPath: config, projectRoot: root, noIndex: noIndex, verifyHashes: verifyHashes, warning: warning)
+      root: root, configPath: config, projectRoot: root, noIndex: noIndex, indexedOnly: indexedOnly, verifyHashes: verifyHashes, warning: warning)
   }
 }
 
 struct RulesIndexedValidationTests {
+  @Test func `indexed only omits new paths reuses candidates and retains limited freshness`() async throws {
+    let fixture = try RulesIndexFixture()
+    defer { fixture.remove() }
+    try fixture.write("notes/one.md", "---\ntitle: One\n---\n")
+    _ = try fixture.database()
+    _ = try await fixture.validate()
+    try fixture.write("notes/new.md", "---\nother: New\n---\n")
+    let unchanged = try await fixture.validate(indexedOnly: true)
+    #expect(unchanged.totalFiles == 1)
+    #expect(try #require(unchanged.indexReport).cached == 1)
+    #expect(RuleValidationSummaryFormatter.render(unchanged).contains("New files were not discovered."))
+    #expect(try fixture.database().freshness().scopes.first?.state == "limited")
+    let repeated = try await fixture.validate(indexedOnly: true)
+    #expect(try #require(repeated.indexReport).hashed == 0)
+    try fixture.write("notes/one.md", "---\nother: Changed\n---\n")
+    #expect(try await fixture.validate(indexedOnly: true).hasFailures)
+    try (fixture.root + "notes/one.md").move(fixture.root + "notes/renamed.md")
+    let deleted = try await fixture.validate(indexedOnly: true)
+    #expect(deleted.hasFailures)
+    #expect(deleted.results.map(\.filePath) == ["notes/one.md"])
+    #expect(try await fixture.validate().totalFiles == 2)
+  }
+
+  @Test func `indexed only requires existing registered scopes and never falls back`() async throws {
+    let fixture = try RulesIndexFixture()
+    defer { fixture.remove() }
+    await #expect(throws: (any Error).self) { try await fixture.validate(indexedOnly: true) }
+    _ = try fixture.database()
+    await #expect(throws: (any Error).self) { try await fixture.validate(indexedOnly: true) }
+    await #expect(throws: (any Error).self) { try await fixture.validate(noIndex: true, indexedOnly: true) }
+    try fixture.write("notes/one.md", "---\ntitle: One\n---\n")
+    _ = try await fixture.validate()
+    await #expect(throws: (any Error).self) {
+      try await fixture.validate(indexedOnly: true, includeNonMarkdown: true)
+    }
+    try fixture.write(".md-utils/rules/also.mdrule.json", "{\"name\":\"also\",\"types\":\"book.mdtype.json\"}")
+    let all = try await fixture.validate(rule: nil, indexedOnly: true)
+    #expect(all.uncoveredRules == ["also"])
+    #expect(try #require(all.indexReport).evaluated == 1)
+    try Data([0xff]).write(to: URL(fileURLWithPath: (fixture.root + "notes/one.md").string))
+    let unreadable = try await fixture.validate(indexedOnly: true)
+    #expect(unreadable.hasFailures)
+    #expect(unreadable.indexReport != nil)
+  }
+
+  @Test func `indexed only rejects symlink replaced known candidates`() async throws {
+    let fixture = try RulesIndexFixture()
+    defer { fixture.remove() }
+    try fixture.write("notes/one.md", "---\ntitle: One\n---\n")
+    _ = try fixture.database()
+    _ = try await fixture.validate()
+    try (fixture.root + "notes/").move(fixture.root + "moved/")
+    try FileManager.default.createSymbolicLink(atPath: URL(fileURLWithPath: (fixture.root + "notes/").string).path,
+      withDestinationPath: (fixture.root + "moved/").string)
+    let result = try await fixture.validate(indexedOnly: true)
+    #expect(result.hasFailures)
+    #expect(result.results.first?.errors.first?.message.contains("symlink") == true)
+  }
+
+  @Test func `indexed only verifies hashes and rechecks prior nonmembers after definitions change`() async throws {
+    let fixture = try RulesIndexFixture()
+    defer { fixture.remove() }
+    let file = fixture.root + "notes/one.md"
+    try file.write("---\ntitle: One\n---\n")
+    // Use the broad path selector first to establish a recorded candidate baseline.
+    try fixture.write(".md-utils/rules/books.mdrule.json", "{\"name\":\"books\",\"match\":{\"paths\":[\"notes/**\"]},\"types\":\"book.mdtype.json\"}")
+    // Whole-second timestamps avoid precision loss when Foundation restores mtime.
+    let modified = Date(timeIntervalSince1970: 1_700_000_000)
+    try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: file.string)
+    _ = try fixture.database()
+    _ = try await fixture.validate()
+    try file.write("---\nother: One\n---\n")
+    try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: file.string)
+    #expect(try await fixture.validate(indexedOnly: true).hasFailures == false)
+    #expect(try await fixture.validate(verifyHashes: true, indexedOnly: true).hasFailures)
+    try fixture.write(".md-utils/rules/books.mdrule.json", "{\"name\":\"books\",\"match\":{\"paths\":[\"elsewhere/**\"]},\"types\":\"book.mdtype.json\"}")
+    #expect(try await fixture.validate(indexedOnly: true).results.isEmpty)
+    try fixture.write(".md-utils/rules/books.mdrule.json", "{\"name\":\"books\",\"types\":\"book.mdtype.json\"}")
+    let broader = try await fixture.validate(indexedOnly: true)
+    #expect(broader.totalFiles == 1)
+    #expect(broader.hasFailures)
+  }
   @Test func `positive rule paths avoid irrelevant trees and missing prefixes prune old members`() async throws {
     let fixture = try RulesIndexFixture()
     defer { fixture.remove() }
@@ -79,7 +162,8 @@ struct RulesIndexedValidationTests {
     #expect(try fixture.database().selectedPaths().isEmpty)
   }
 
-  @Test func `nonstandard config uses explicit root and cancellation never falls back`() async throws {
+  @Test(arguments: [false, true])
+  func `nonstandard config uses explicit root and cancellation never falls back`(indexedOnly: Bool) async throws {
     let fixture = try RulesIndexFixture()
     defer { fixture.remove() }
     try fixture.write("notes/one.md", "---\ntitle: One\n---\n")
@@ -98,7 +182,7 @@ struct RulesIndexedValidationTests {
       var warnings: [String] = []
       do {
         _ = try await RulesValidatorRunner.validate(ruleName: "books", configPath: Path(configString),
-          projectRoot: Path(rootString), warning: { warnings.append($0) })
+          projectRoot: Path(rootString), indexedOnly: indexedOnly, warning: { warnings.append($0) })
         Issue.record("Expected cancellation")
       } catch is CancellationError {
         #expect(warnings.isEmpty)
@@ -110,18 +194,20 @@ struct RulesIndexedValidationTests {
     #expect(try fixture.database().freshness().generation == generation)
   }
 
-  @Test func `superseded validation snapshot rejects a newer writer generation`() async throws {
+  @Test(arguments: [false, true])
+  func `superseded validation snapshot rejects a newer writer generation`(indexedOnly: Bool) async throws {
     let fixture = try RulesIndexFixture()
     defer { fixture.remove() }
     try fixture.write("notes/one.md", "---\ntitle: One\n---\n")
     let db = try fixture.database()
-    let first = try await fixture.validate()
+    _ = try await fixture.validate()
+    let first = try await fixture.validate(indexedOnly: indexedOnly)
     let report = try #require(first.indexReport)
     _ = try await fixture.validate()
     let evaluator = try IndexProjectEvaluator(root: fixture.root, configPath: fixture.config)
     #expect(throws: IndexProjectError.self) {
       try IndexedRuleValidation.snapshot(database: db, scopes: [IndexScope(kind: .rule, name: "books")],
-        fingerprint: evaluator.fingerprint, report: report)
+        fingerprint: evaluator.fingerprint, report: report, indexedOnly: indexedOnly)
     }
   }
 
@@ -139,6 +225,7 @@ struct RulesIndexedValidationTests {
     #expect(fallback.indexReport == nil)
     #expect(warnings.first?.contains("--rebuild") == true)
     #expect(try IndexConfiguration.load(root: fixture.root.string) == settings)
+    await #expect(throws: (any Error).self) { try await fixture.validate(indexedOnly: true) }
     try await DatabaseQueue(path: fixture.databasePath.string).write { db in
       try db.execute(sql: "UPDATE index_metadata SET value='incompatible' WHERE key='format'")
     }
@@ -147,6 +234,7 @@ struct RulesIndexedValidationTests {
     #expect(incompatible.indexReport == nil)
     #expect(incompatible.hasFailures == false)
     #expect(warnings.first?.contains("--rebuild") == true)
+    await #expect(throws: (any Error).self) { try await fixture.validate(indexedOnly: true) }
   }
 
   @Test func `non UTF8 source fails direct fallback rather than validating stale content`() async throws {
@@ -188,6 +276,10 @@ struct RulesIndexedValidationTests {
     ]) as? CLIEntry.RulesCommands.Validate)
     #expect(command.noIndex)
     #expect(command.verifyHashes)
+    let limited = try #require(CLIEntry.parseAsRoot([
+      "rules", "validate", "books", "--indexed-only", "--verify-hashes",
+    ]) as? CLIEntry.RulesCommands.Validate)
+    #expect(limited.indexedOnly)
   }
 
   @Test(arguments: ["0.1.0", "0.2.0", "0.3.0"])
@@ -279,6 +371,7 @@ struct RulesIndexedValidationTests {
     #expect(warnings.first?.contains("validating source files directly") == true)
     #expect(RuleValidationSummaryFormatter.render(fallback, includeOk: true)
       == RuleValidationSummaryFormatter.render(direct, includeOk: true))
+    await #expect(throws: (any Error).self) { try await fixture.validate(indexedOnly: true) }
   }
 
   @Test func `parse errors fall back and remain validation errors`() async throws {
