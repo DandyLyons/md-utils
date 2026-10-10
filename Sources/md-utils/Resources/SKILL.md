@@ -37,6 +37,17 @@ reconciles missed events while retaining the persisted metadata-only/FTS mode.
 Ctrl-C/SIGTERM cancels pending work. Other platforms require `index update`.
 Use `--debounce <seconds>` and `--reconcile-interval <seconds>` to tune latency.
 
+`md-utils rules validate` automatically refreshes an existing project index's
+requested rule scopes and reuses current assessments. Without an index it validates
+directly, suggesting indexing after scans above 1,000 files. Index failures warn
+on stderr and fall back to source validation. `--no-index` bypasses indexing and
+suppresses advice; `--verify-hashes` detects stat-preserving edits. Both validation
+paths skip symlinks; consistent symlink support including indexing is future work.
+Simple positive rule paths such as `PROBLEMS/**/*.md` automatically narrow direct
+validation and native CLI index discovery to `PROBLEMS/`. Broad globs and recursive
+match groups retain full-project discovery; manual narrowing is unnecessary for
+simple directory-based rules.
+
 `md-utils index update ./notes/` registers a directory scope and refreshes all
 saved scopes in `.md-utils/index.sqlite`. `index type Book ./notes/` selects only
 conforming documents; `index rule books` preserves rule-selected invalid members.

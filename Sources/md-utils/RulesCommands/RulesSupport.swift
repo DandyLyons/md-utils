@@ -9,6 +9,7 @@ import JMESPath
 import JSONSchema
 import MarkdownUtilities
 import MarkdownUtilitiesCore
+import MarkdownUtilitiesIndex
 import PathKit
 import Yams
 
@@ -1297,28 +1298,14 @@ enum RuleFileScanner {
   /// Finds eligible files below the project root for rules validation.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  static func files(root: Path = .current, includeNonMarkdown: Bool = false) throws -> [Path] {
-    let manager = FileManager.default
-    let rootURL = URL(fileURLWithPath: root.absolute().string)
-    guard let enumerator = manager.enumerator(
-      at: rootURL,
-      includingPropertiesForKeys: [.isDirectoryKey],
-      options: [.skipsHiddenFiles]
-    ) else {
-      return []
+  static func files(root: Path = .current, includeNonMarkdown: Bool = false, directories: [String] = [""]) throws -> [Path] {
+    let rootURL = URL(fileURLWithPath: root.absolute().string).resolvingSymlinksInPath()
+    var files: Set<Path> = []
+    for directory in try IndexSourceCursor.discoveryDirectories(root: rootURL, paths: directories) {
+      let cursor = try IndexSourceCursor(directory: directory, includeNonMarkdown: includeNonMarkdown)
+      while let url = try cursor.next() { files.insert(Path(url.path)) }
     }
-
-    var files: [Path] = []
-    for case let url as URL in enumerator {
-      let path = Path(url.path)
-      guard !path.isDirectory else { continue }
-      if includeNonMarkdown == false {
-        guard let ext = path.extension?.lowercased(), ["md", "markdown"].contains(ext) else { continue }
-      }
-      files.append(path)
-    }
-    files.sort { $0.string < $1.string }
-    return files
+    return files.sorted { $0.string < $1.string }
   }
 }
 /// Describes one validation issue for a file.
@@ -1402,6 +1389,7 @@ struct RuleMatchEvaluation {
 struct RuleValidationSummary {
   var results: [RuleValidationResult]
   var totalFiles: Int
+  var indexReport: IndexUpdateReport? = nil
 
   var errors: Int {
     results.reduce(0) { count, result in
@@ -1432,7 +1420,7 @@ enum RulesValidatorRunner {
   /// Validates the input and returns validation results.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  static func validate(
+  static func validateDirect(
     ruleName: String? = nil,
     includeNonMarkdown: Bool = false,
     root: Path = .current,
@@ -1440,7 +1428,7 @@ enum RulesValidatorRunner {
     projectRoot: Path? = nil
   ) async throws -> RuleValidationSummary {
     let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
-    let root = config.standaloneProject?.projectRoot ?? root
+    let root = config.standaloneProject?.projectRoot ?? projectRoot ?? root
     let rules: [Rule]
     if let ruleName {
       guard let rule = config.schemaRules.first(where: { $0.name == ruleName }) else {
@@ -1457,7 +1445,8 @@ enum RulesValidatorRunner {
       guard let compiled = registry.rule(named: rule.name) else { return nil }
       return (rule, compiled)
     }
-    let files = try RuleFileScanner.files(root: root, includeNonMarkdown: includeNonMarkdown)
+    let directories = compiledRules.flatMap { checker.discoveryDirectories(for: $0.compiled) }
+    let files = try RuleFileScanner.files(root: root, includeNonMarkdown: includeNonMarkdown, directories: directories)
     let rootString = root.absolute().normalize().string
     let schemaPaths = Dictionary(uniqueKeysWithValues: rules.map { rule in
       (
@@ -1505,16 +1494,7 @@ enum RulesValidatorRunner {
         let errors = (assessment.applicabilityDiagnostics + assessment.diagnostics).map { diagnostic in
           RuleValidationErrorDetail(
             path: diagnostic.location,
-            message: {
-              switch diagnostic.code {
-              case "record.frontmatter.invalid-yaml":
-                return diagnostic.message.replacingOccurrences(of: "Invalid YAML:", with: "invalid YAML:")
-              case "record.frontmatter.invalid-toml":
-                return diagnostic.message.replacingOccurrences(of: "Invalid TOML:", with: "invalid TOML:")
-              default:
-                return diagnostic.message
-              }
-            }()
+            message: validationMessage(code: diagnostic.code, message: diagnostic.message),
           )
         }
         let status: RuleValidationResult.Status

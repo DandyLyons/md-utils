@@ -7,6 +7,28 @@ import SystemPackage
 /// not be accessed concurrently. Enumeration and metadata failures propagate;
 /// reaching the end therefore establishes complete traversal of the directory.
 public final class IndexSourceCursor {
+    /// Resolves planned relative directories without following symlink ancestors.
+    /// Missing prefixes have no candidates; access errors still fail discovery.
+    public static func discoveryDirectories(root: URL, paths: [String]) throws -> [URL] {
+        guard try Stat(FilePath(root.path), followTargetSymlink: false).type == .directory else {
+            throw SQLiteIndexError(message: "Not a directory: \(root.path)/")
+        }
+        return try paths.compactMap { path in
+            var directory = root
+            for component in path.split(separator: "/") {
+                guard component != ".", component != ".." else {
+                    throw SQLiteIndexError(message: "Invalid discovery directory: \(path)")
+                }
+                directory.appendPathComponent(String(component), isDirectory: true)
+                do {
+                    guard try Stat(FilePath(directory.path), followTargetSymlink: false).type == .directory else { return nil }
+                } catch let error as Errno where error == .noSuchFileOrDirectory || error == .notDirectory {
+                    return nil
+                }
+            }
+            return directory
+        }
+    }
     private final class Failure { var error: (any Error)? }
     private let failure = Failure()
     private let entries: FileManager.DirectoryEnumerator
@@ -51,6 +73,9 @@ public final class IndexSourceCursor {
                 }
                 continue
             }
+            // Enumeration descends directories itself. Markdown-only discovery
+            // need not stat every unrelated export, audio, or source-code file.
+            if !includeNonMarkdown && !["md", "markdown"].contains(file.pathExtension.lowercased()) { continue }
             let metadata = try Stat(FilePath(file.path), followTargetSymlink: false)
             if metadata.type == .symbolicLink { continue }
             if metadata.type == .regular,

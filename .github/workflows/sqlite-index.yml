@@ -5,10 +5,14 @@ on:
       - 'Package.swift'
       - 'Package.resolved'
       - 'Sources/MarkdownUtilitiesIndex/**'
+      - 'Sources/MarkdownUtilitiesIndexNative/**'
+      - 'Sources/md-utils/RulesCommands/**'
       - 'Sources/md-utils/IndexCommands.swift'
       - 'Sources/md-utils/IndexAssessmentPayload.swift'
       - 'Tests/md-utilsTests/Commands/IndexCommandsTests.swift'
       - 'Tests/md-utilsTests/Commands/IndexPayloadTests.swift'
+      - 'Tests/md-utilsTests/Commands/RulesIndexedValidationTests.swift'
+      - 'Tests/md-utilsTests/Commands/RulesCommandsTests.swift'
       - 'Tests/MarkdownUtilitiesIndexTests/**'
       - 'IntegrationTests/SQLiteIndexSmoke/**'
       - 'scripts/*sqlite*'
@@ -34,5 +38,5 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           swift run -c release SQLiteIndexSmoke
-          swift test --filter 'MarkdownUtilitiesIndexTests|IndexCommandsTests|IndexPayloadTests'
+          swift test --filter 'MarkdownUtilitiesIndexTests|IndexCommandsTests|IndexPayloadTests|RulesIndexedValidationTests|RulesCommandsTests'
           python3 scripts/measure-sqlite.py

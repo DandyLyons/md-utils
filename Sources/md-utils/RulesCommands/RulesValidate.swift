@@ -16,7 +16,7 @@ extension CLIEntry.RulesCommands {
       commandName: "validate",
       abstract: "Validate files against configured rules",
       discussion: RulesNonMarkdownHelp.appending(
-        to: "Project scans remain Markdown-only unless non-Markdown files are explicitly included."
+        to: "Uses and refreshes an existing project index automatically, falling back to source files if the index is unavailable. Project scans remain Markdown-only unless non-Markdown files are explicitly included."
       )
     )
 
@@ -28,6 +28,10 @@ extension CLIEntry.RulesCommands {
 
     @Flag(name: .long, help: "Include non-Markdown files selected by configured rule paths")
     var includeNonMD = false
+    @Flag(name: .long, help: "Validate source files directly without using the project index")
+    var noIndex = false
+    @Flag(name: .long, help: "Hash every indexed candidate to detect edits preserving size and modification time")
+    var verifyHashes = false
     @OptionGroup var project: RuleProjectOptions
     /// Runs the command using the parsed command-line arguments.
     ///
@@ -38,7 +42,9 @@ extension CLIEntry.RulesCommands {
         ruleName: ruleName,
         includeNonMarkdown: includeNonMD,
         configPath: project.configPath,
-        projectRoot: project.root
+        projectRoot: project.root,
+        noIndex: noIndex,
+        verifyHashes: verifyHashes,
       )
       print(RuleValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk))
       timer.writeStatus("Validated \(summary.matchedFiles) file(s)")

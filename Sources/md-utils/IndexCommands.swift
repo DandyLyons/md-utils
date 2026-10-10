@@ -352,7 +352,10 @@ struct IndexOptions: ParsableArguments {
             try database.invalidate(message: String(describing: error))
             throw error
         }
-        let report = try await indexer.updateMany(adding: scope, writerLease: writerLease, fingerprint: evaluator.fingerprint,
+        var refreshScopes = try database.scopes()
+        if let scope, !refreshScopes.contains(scope) { refreshScopes.append(scope) }
+        let directories = Dictionary(uniqueKeysWithValues: refreshScopes.map { ($0.id, evaluator.discoveryDirectories(for: $0)) })
+        let report = try await indexer.updateMany(adding: scope, discoveryDirectories: directories, writerLease: writerLease, fingerprint: evaluator.fingerprint,
             rebuild: rebuild, verifyHashes: verifyHashes, evaluate: evaluator.evaluate)
         if !quiet {
             print("Index: \(report.evaluated) evaluated, \(report.cached) cached, \(report.hashed) hashed; \(try database.selectedCount()) current documents.")

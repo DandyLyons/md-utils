@@ -20,6 +20,12 @@ public struct IndexProjectEvaluator: Sendable {
     /// Combined configuration and transitive-schema provenance used for broad invalidation.
     public let fingerprint: String
 
+    /// Rule path prefixes narrow discovery without changing the persisted scope identity.
+    public func discoveryDirectories(for scope: IndexScope) -> [String] {
+        guard scope.kind == .rule, scope.path.isEmpty, let rules, let rule = rules.rule(named: scope.name) else { return [""] }
+        return MarkdownRuleChecker(registry: rules).discoveryDirectories(for: rule)
+    }
+
     /// Loads definitions and compiles the existing runtime before any candidate is assessed.
     public init(root: Path, configPath: Path) throws {
         types = (root + MarkdownTypeFileRegistryLoader.relativeTypesDirectory).exists

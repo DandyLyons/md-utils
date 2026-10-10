@@ -30,7 +30,8 @@ registers a directory collection containing only conforming records. `rule`
 registers a project-wide collection selected by the named rule, including
 selected records that fail validation. Every invocation refreshes **all saved
 scopes**. Adding another selection does not replace existing scopes. Nonmembers
-have cached assessments but are not documents unless another scope selects them.
+within scanned directories have cached assessments but are not documents unless
+another scope selects them.
 
 The cache lives at `<project-root>/.md-utils/index.sqlite`. The root defaults to
 the current directory. A conventional `--config <root>/.md-utils/md-utils.json`
@@ -48,6 +49,55 @@ a scope to include other UTF-8 text files. This option is saved per scope.
 Extraction uses existing YAML/TOML, wrapped-frontmatter, and hash-comment parsers.
 Unmapped host files retain raw text; predicates needing unavailable syntax report
 the existing evaluator diagnostics. Binary/non-UTF-8 files report read failures.
+
+## Automatic Rule Validation
+
+`md-utils rules validate` and `md-utils rules validate books` automatically use
+an existing `<project-root>/.md-utils/index.sqlite`. Missing rule scopes are
+registered with the requested non-Markdown inclusion setting. Only the requested
+rule scopes refresh, then assessments and diagnostics are read from one committed
+snapshot. Output and validation exit status match direct validation, including
+failed and skipped records. An index does not automatically accelerate other
+commands.
+
+Simple positive rule globs automatically narrow discovery to their literal
+directory prefixes: `PROBLEMS/**/*.md` scans `PROBLEMS/`, not unrelated project
+trees. Overlapping prefixes are collapsed, missing prefixes produce no members,
+and symlink ancestors are excluded. Recursive match groups and globs without a
+safe prefix retain full-project discovery. This applies to direct validation and
+native CLI rule indexing; no manual directory scope is required. Named validation
+does not refresh unrelated saved directory scopes.
+
+Refresh still discovers candidates and checks file size and modification time.
+Unchanged assessments are reused; changed candidates are read and hashed before
+evaluation. Definitions and transitive schema changes invalidate assessments.
+Use `rules validate --verify-hashes` to detect edits preserving size and mtime,
+or `rules validate --no-index` to bypass the index entirely.
+
+An absent index is never created by validation. A direct scan of more than 1,000
+files emits indexing guidance to stderr, including commands for the requested
+rules and project options. `--no-index` suppresses this advisory.
+
+An unusable index or failed refresh emits a stderr warning and falls back to
+authoritative source validation. The fallback determines the final exit status;
+source/configuration failures remain failures. Stale assessments are never used.
+Cancellation stops validation rather than triggering fallback.
+
+Selective refresh preserves other scopes, but marks them incomplete if their
+definitions or shared file baselines changed. An ordinary `index update` or watcher
+refresh restores those scopes. This prevents new file data from being paired with
+old type/rule memberships. Unrelated missing directories do not block indexed
+rule validation.
+
+Both indexed and direct rule scans currently exclude hidden entries and file or
+directory symlinks. Direct validation now shares the index's native source cursor;
+this changes historical direct validation that could include symlinked files.
+Future work should support symlinks consistently in both paths, including the
+index, with explicit handling of traversal cycles and project boundaries. See
+[issue #163](https://github.com/DandyLyons/md-utils/issues/163).
+
+See [rule validation measurements](index-rule-validation-benchmarks.md) for the
+reproducible benchmark and measured performance limits.
 
 ## Native watching
 

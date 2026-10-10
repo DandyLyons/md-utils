@@ -6,7 +6,7 @@ import SystemPackage
 /// Stable SHA-256 fingerprints for content and evaluator cache provenance.
 public enum IndexFingerprint {
     /// Bump when extraction or evaluator semantics change, independently of cache format changes.
-    public static let runtimeVersion = "collection-extraction-evaluation-1"
+    public static let runtimeVersion = "collection-extraction-evaluation-2"
 
     /// Returns the lowercase hexadecimal SHA-256 digest of the exact supplied bytes.
     public static func hash(_ data: Data) -> String {
@@ -31,6 +31,8 @@ public enum IndexFingerprint {
 /// Evaluation and cache counts are per scope-candidate pair; hashes count unique
 /// files. A successful return does not imply an error-free scan.
 public struct IndexUpdateReport: Sendable {
+    /// Committed generation, used to reject superseded validation snapshots.
+    public var generation = 0
     /// Number of completed evaluator calls, including returned parse or validation failures.
     public var evaluated = 0
     /// Number of candidates whose prior assessment was reused.
@@ -42,6 +44,9 @@ public struct IndexUpdateReport: Sendable {
     public var errors: [String] = []
     /// Additional failures persisted in SQLite after the report's 100-message limit.
     public var omittedErrorCount = 0
+
+    /// Creates an empty report before refresh work begins.
+    public init() {}
 
     mutating func recordError(_ message: String) {
         if errors.count < 100 { errors.append(String(message.prefix(4_096))) }
@@ -142,6 +147,9 @@ public struct CollectionIndexer: Sendable {
     /// Refreshes persisted scopes while extracting each changed source only once.
     ///
     /// The evaluator receives every scope needing a fresh assessment for the file.
+    /// `refreshing` registers and refreshes only those scopes; nil refreshes all
+    /// saved scopes. Unrefreshed scopes become unavailable when definitions or
+    /// shared source baselines change. Selective refresh cannot rebuild a cache.
     /// Returning results keyed by ``IndexScope/id`` lets a host parse or otherwise
     /// extract the source once and apply multiple selection policies to that result.
     /// All results for a file must share metadata, body, and parse state; only their
@@ -153,6 +161,8 @@ public struct CollectionIndexer: Sendable {
     /// ``update(adding:writerLease:fingerprint:rebuild:verifyHashes:limits:evaluate:)``.
     public func updateMany(
         adding scope: IndexScope? = nil,
+        refreshing requestedScopes: [IndexScope]? = nil,
+        discoveryDirectories: [String: [String]] = [:],
         writerLease: CollectionWriterLease? = nil,
         fingerprint: String,
         rebuild: Bool = false,
@@ -160,6 +170,9 @@ public struct CollectionIndexer: Sendable {
         limits: IndexRefreshLimits = IndexRefreshLimits(),
         evaluate: ([IndexScope], String, String, Date) async throws -> [String: IndexEvaluation]
     ) async throws -> IndexUpdateReport {
+        guard requestedScopes == nil || !rebuild else {
+            throw SQLiteIndexError(message: "A rebuild must refresh all saved scopes.")
+        }
         let lease: CollectionWriterLease
         if let writerLease { lease = writerLease } else { lease = try await CollectionWriterLease.acquire(root: root) }
         guard lease.root == root.resolvingSymlinksInPath() else { throw SQLiteIndexError(message: "Writer lease belongs to another collection.") }
@@ -168,7 +181,7 @@ public struct CollectionIndexer: Sendable {
             var report = IndexUpdateReport()
             try await database.rebuild(root: root.path, writerLease: lease) { fresh, lease in
                 let indexer = try CollectionIndexer(database: fresh, root: root)
-                report = try await indexer.updateMany(adding: scope, writerLease: lease,
+                report = try await indexer.updateMany(adding: scope, discoveryDirectories: discoveryDirectories, writerLease: lease,
                     fingerprint: fingerprint, verifyHashes: true, limits: limits, evaluate: evaluate)
             }
             return report
@@ -180,7 +193,10 @@ public struct CollectionIndexer: Sendable {
             let maximumRead = Int(exactly: limits.fileBytes), maximumRead < Int.max else {
             throw SQLiteIndexError(message: "Refresh limits must be positive.")
         }
-        var scopes = try database.scopes()
+        var scopes = try requestedScopes ?? database.scopes()
+        scopes = scopes.reduce(into: []) { result, scope in
+            if !result.contains(scope) { result.append(scope) }
+        }
         if let scope, !scopes.contains(scope) { scopes.append(scope) }
         guard !scopes.isEmpty else { throw SQLiteIndexError(message: "No index scopes registered. Supply a directory to index update.") }
         for scope in scopes { try validate(scope) }
@@ -189,6 +205,7 @@ public struct CollectionIndexer: Sendable {
         // crash, beginStagedRefresh reclaims abandoned staging on the next refresh.
         defer { try? database.discardStagedRefresh(generation: generation) }
         var report = IndexUpdateReport()
+        report.generation = generation
         var scopeErrors: [String: String] = [:]
         let scopesByID = Dictionary(uniqueKeysWithValues: scopes.map { ($0.id, $0) })
         for scope in scopes {
@@ -201,7 +218,7 @@ public struct CollectionIndexer: Sendable {
                 pathBytes = 0
             }
             do {
-                try enumerate(scope) { file in
+                try enumerate(scope, directories: discoveryDirectories[scope.id]) { file in
                     let path = String(file.path.dropFirst(root.path.count + 1))
                     if !paths.isEmpty && path.utf8.count > limits.discoveryBatchBytes - pathBytes {
                         try flush()
@@ -380,7 +397,7 @@ public struct CollectionIndexer: Sendable {
         return data
     }
 
-    private func enumerate(_ scope: IndexScope, visitFile: (URL) throws -> Void) throws {
+    private func enumerate(_ scope: IndexScope, directories: [String]? = nil, visitFile: (URL) throws -> Void) throws {
         let directory = root.appendingPathComponent(scope.path, isDirectory: true)
         let canonical = directory.resolvingSymlinksInPath().standardizedFileURL
         guard canonical.path == root.path || canonical.path.hasPrefix(root.path + "/") else {
@@ -388,7 +405,13 @@ public struct CollectionIndexer: Sendable {
         }
         let cachePath = URL(fileURLWithPath: database.databaseQueue.path).standardizedFileURL.path
         let cacheFiles = IndexCacheExclusions(root: root, databasePath: cachePath)
-        try IndexDirectoryTraversal.visit(directory, excluding: cacheFiles,
-            includeNonMarkdown: scope.includeNonMarkdown, visitFile: visitFile)
+        let roots: [URL]
+        if let directories {
+            roots = try IndexSourceCursor.discoveryDirectories(root: canonical, paths: directories)
+        } else { roots = [directory] }
+        for selected in roots {
+            try IndexDirectoryTraversal.visit(selected, excluding: cacheFiles,
+                includeNonMarkdown: scope.includeNonMarkdown, visitFile: visitFile)
+        }
     }
 }

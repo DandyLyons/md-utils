@@ -92,7 +92,7 @@ extension SQLiteIndexDatabase {
     }
 
     /// Never overwrite manually edited declarations from a stale cache or watcher.
-    func validateSavedConfiguration() throws {
+    package func validateSavedConfiguration() throws {
         guard path != ":memory:", !path.contains("/.md-utils/rebuild/") else { return }
         let values = try databaseQueue.read { db in
             (try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='root'"),

@@ -49,6 +49,11 @@ extension SQLiteIndexDatabase {
                 arguments: [String(generation)])
             try database.execute(sql: "INSERT INTO index_metadata VALUES('last_started_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 arguments: [String(Date().timeIntervalSince1970)])
+            // Selective refresh cannot leave assessments from older definitions current.
+            try database.execute(sql: """
+                UPDATE scopes SET state='incomplete',error='Definitions changed; refresh this scope.'
+                WHERE fingerprint IS NULL OR fingerprint!=?
+                """, arguments: [fingerprint])
             for scope in scopes {
                 let reusable = try Bool.fetchOne(database, sql: "SELECT state='complete' AND fingerprint=? FROM scopes WHERE id=?",
                     arguments: [fingerprint, scope.id]) ?? false
@@ -151,6 +156,26 @@ extension SQLiteIndexDatabase {
                 sql: "SELECT value FROM index_metadata WHERE key='generation'") == generation else {
                 throw SQLiteIndexError(message: "Another index update started during this scan; retry the update.")
             }
+            // Files are shared by scopes. Invalidate unrefreshed assessments before
+            // replacing their source baseline, including paths removed by a complete scan.
+            try database.execute(sql: """
+                UPDATE scopes SET state='incomplete',error='Shared files changed; refresh this scope.'
+                WHERE id NOT IN (SELECT scope_id FROM refresh_scopes WHERE generation=?)
+                  AND EXISTS(SELECT 1 FROM assessments a WHERE a.scope_id=scopes.id
+                    AND EXISTS(SELECT 1 FROM refresh_files r LEFT JOIN files f USING(path)
+                      WHERE r.generation=? AND r.path=a.path
+                        AND (f.path IS NULL OR f.hash!=r.hash OR f.mtime!=r.mtime
+                          OR f.size!=r.size OR f.state!=r.state)))
+                """, arguments: [generation, generation])
+            for scope in scopes where errors[scope.id] == nil {
+                try database.execute(sql: """
+                    UPDATE scopes SET state='incomplete',error='Shared files removed; refresh this scope.'
+                    WHERE id NOT IN (SELECT scope_id FROM refresh_scopes WHERE generation=?)
+                      AND EXISTS(SELECT 1 FROM assessments a JOIN assessments removed USING(path)
+                        WHERE a.scope_id=scopes.id AND removed.scope_id=? AND NOT EXISTS(
+                          SELECT 1 FROM refresh_seen r WHERE r.generation=? AND r.scope_id=? AND r.path=a.path))
+                    """, arguments: [generation, scope.id, generation, scope.id])
+            }
             for scope in scopes where errors[scope.id] == nil {
                 try database.execute(sql: """
                     DELETE FROM assessments WHERE scope_id=? AND NOT EXISTS(
@@ -192,7 +217,8 @@ extension SQLiteIndexDatabase {
                 SELECT EXISTS(SELECT 1 FROM refresh_files WHERE generation=? AND state!='ok')
                   OR EXISTS(SELECT 1 FROM refresh_assessments WHERE generation=? AND status='evaluation-error')
                 """, arguments: [generation, generation]) ?? false
-            if errors.isEmpty && !stagedFailures {
+            let allComplete = try Bool.fetchOne(database, sql: "SELECT NOT EXISTS(SELECT 1 FROM scopes WHERE state!='complete')") ?? false
+            if errors.isEmpty && !stagedFailures && allComplete {
                 try database.execute(sql: "INSERT INTO index_metadata VALUES('last_completed_at',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                     arguments: [String(Date().timeIntervalSince1970)])
             }

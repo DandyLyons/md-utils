@@ -254,6 +254,13 @@ saved scopes current with native notifications and periodic reconciliation.
 Omit the directory to watch existing scopes; Ctrl-C stops the watcher. Other
 platforms should use `index update`.
 
+`md-utils rules validate` automatically refreshes an existing project index and
+reuses assessments for the requested rules. Index failures warn and fall back to
+source validation. Without an index, validation remains direct and suggests
+indexing after scans above 1,000 files. Use `--no-index` to bypass the cache or
+`--verify-hashes` to detect edits preserving size and modification time. Both
+validation paths currently skip symlinks; consistent symlink support is planned.
+
 The cache is stored in `.md-utils/index.sqlite`. See
 [collection indexing](docs/collection-index.md) for project/config resolution,
 non-Markdown support, diagnostics, and freshness guarantees.

@@ -34,6 +34,79 @@ private func selectAll(_ scope: IndexScope, _ path: String, _ content: String, _
     IndexEvaluation(metadata: "{}", body: content, assessment: IndexAssessment(selected: true, status: "selected"))
 }
 
+struct SelectiveIndexRefreshTests {
+    @Test func `selective refresh preserves unchanged overlapping scopes and invalidates changed baselines`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "original")
+        let directory = IndexScope(path: "notes/")
+        let rule = IndexScope(kind: .rule, name: "books")
+        _ = try await fixture.indexer.update(adding: directory, fingerprint: "v1", evaluate: selectAll)
+        _ = try await fixture.indexer.update(adding: rule, fingerprint: "v1", evaluate: selectAll)
+        let evaluate: ([IndexScope], String, String, Date) async throws -> [String: IndexEvaluation] = { scopes, path, content, modified in
+            var results: [String: IndexEvaluation] = [:]
+            for scope in scopes { results[scope.id] = try await selectAll(scope, path, content, modified) }
+            return results
+        }
+        let unchanged = try await fixture.indexer.updateMany(refreshing: [rule], fingerprint: "v1", evaluate: evaluate)
+        #expect(unchanged.evaluated == 0)
+        #expect(unchanged.cached == 1)
+        #expect(try fixture.database.freshness().isCurrent)
+        try fixture.write("notes/one.md", "changed baseline")
+        let changed = try await fixture.indexer.updateMany(refreshing: [rule], fingerprint: "v1", evaluate: evaluate)
+        #expect(changed.evaluated == 1)
+        #expect(try fixture.database.selectedPaths(scope: directory).isEmpty)
+        #expect(try fixture.database.selectedPaths(scope: rule) == ["notes/one.md"])
+        #expect(try fixture.database.freshness().isCurrent == false)
+        let restore = try await fixture.indexer.update(fingerprint: "v1", evaluate: selectAll)
+        #expect(restore.evaluated == 1)
+        #expect(restore.cached == 1)
+        #expect(try fixture.database.selectedPaths(scope: directory) == ["notes/one.md"])
+    }
+
+    @Test func `selective deletion and fingerprint changes invalidate other scopes`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "original")
+        let directory = IndexScope(path: "notes/")
+        let rule = IndexScope(kind: .rule, name: "books")
+        _ = try await fixture.indexer.update(adding: directory, fingerprint: "v1", evaluate: selectAll)
+        _ = try await fixture.indexer.update(adding: rule, fingerprint: "v1", evaluate: selectAll)
+        try FileManager.default.removeItem(at: fixture.root.appendingPathComponent("notes/one.md"))
+        _ = try await fixture.indexer.updateMany(refreshing: [rule], fingerprint: "v1") { scopes, path, content, modified in
+            var results: [String: IndexEvaluation] = [:]
+            for scope in scopes { results[scope.id] = try await selectAll(scope, path, content, modified) }
+            return results
+        }
+        #expect(try fixture.database.selectedPaths().isEmpty)
+        #expect(try fixture.database.freshness().scopes.first { $0.definition == directory }?.state == "incomplete")
+        _ = try await fixture.indexer.update(fingerprint: "v1", evaluate: selectAll)
+        _ = try await fixture.indexer.updateMany(refreshing: [rule], fingerprint: "v2") { _, _, _, _ in [:] }
+        #expect(try fixture.database.freshness().scopes.first { $0.definition == directory }?.state == "incomplete")
+        #expect(try fixture.database.freshness().scopes.first { $0.definition == rule }?.state == "complete")
+    }
+
+    @Test func `interrupted selective refresh leaves requested scopes unavailable and discards staging`() async throws {
+        let fixture = try IndexFixture()
+        defer { fixture.remove() }
+        try fixture.write("notes/one.md", "original")
+        let rule = IndexScope(kind: .rule, name: "books")
+        _ = try await fixture.indexer.update(adding: rule, fingerprint: "v1", evaluate: selectAll)
+        try fixture.write("notes/one.md", "changed")
+        await #expect(throws: CancellationError.self) {
+            _ = try await fixture.indexer.updateMany(refreshing: [rule], fingerprint: "v1") { _, _, _, _ in
+                throw CancellationError()
+            }
+        }
+        #expect(try fixture.database.selectedPaths().isEmpty)
+        #expect(try fixture.count("refresh_files") == 0)
+        #expect(try fixture.count("refresh_seen") == 0)
+        let recovered = try await fixture.indexer.update(fingerprint: "v1", evaluate: selectAll)
+        #expect(recovered.evaluated == 1)
+        #expect(try fixture.database.selectedPaths() == ["notes/one.md"])
+    }
+}
+
 @Suite struct JSONBCompatibilityTests {
     @Test func `unchanged refresh does not rewrite watched declarations`() async throws {
         let fixture = try IndexFixture()

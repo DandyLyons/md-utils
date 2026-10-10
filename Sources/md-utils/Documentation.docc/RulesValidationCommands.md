@@ -31,6 +31,28 @@ md-utils rules list
 md-utils rules describe books
 ```
 
+## Automatic Index Use
+
+Validation automatically refreshes an existing project index and reuses cached
+rule assessments. Only the requested rule scopes refresh; missing scopes are
+registered automatically. Results and exit status match source validation.
+Simple positive path globs narrow filesystem discovery automatically. For example,
+`PROBLEMS/**/*.md` scans only `PROBLEMS/`. Broad globs and recursive match groups
+retain conservative full-project discovery; users do not need to narrow scopes
+manually for simple directory-based rules.
+Without an index, validation reads source files and never creates a cache. Scans
+of more than 1,000 files emit actionable indexing guidance to stderr.
+
+Use `--no-index` to validate directly and suppress indexing advice, or
+`--verify-hashes` to detect indexed-file edits preserving size and modification
+time. Index failures warn on stderr and fall back to direct validation; stale
+results are never reported as current. Cancellation stops the command.
+
+Both paths skip hidden entries and symlinks using the same native cursor. Historical
+direct validation could include symlinked files. Future indexing and direct
+validation should support symlinks consistently; see issue #163 and
+`docs/collection-index.md` for the current limitation and follow-up direction.
+
 ## Non-Markdown Files
 
 Project scans are Markdown-only by default, even when configured paths match other
