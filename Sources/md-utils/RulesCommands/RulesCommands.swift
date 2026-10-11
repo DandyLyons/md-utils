@@ -22,6 +22,7 @@ extension CLIEntry {
         Matching.self,
         Describe.self,
         Validate.self,
+        New.self,
       ]
     )
   }

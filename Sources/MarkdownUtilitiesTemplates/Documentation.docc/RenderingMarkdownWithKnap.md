@@ -26,11 +26,16 @@ Save `report.knap`:
 ```
 
 ```console
-md-utils template render --template ./report.knap --data ./report.json --output ./report.md
+md-utils template render --mode body --template ./report.knap --data ./report.json --output ./report.md
 ```
 
 Omit `--output` for stdout. Warnings go to stderr. Optional
-`--schema ./report.schema.json` validates the entire envelope without adding defaults.
+`--schema ./report.schema.json` applies missing defaults and validates the effective input.
+
+The default `document` mode accepts a JSON object of named Knap variables and
+renders the whole document, including frontmatter. Use Knap's `yaml` and
+`yaml_property` filters for YAML values. No implicit root variable is introduced.
+The envelope example above selects `body` explicitly.
 
 ## Language
 

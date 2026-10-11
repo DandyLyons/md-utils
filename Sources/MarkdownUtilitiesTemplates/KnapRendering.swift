@@ -7,10 +7,15 @@ actor KnapRendering {
   private var engine: KnapEngine?
 
   func render(_ template: String, input: MarkdownTemplateInput, limits: RenderLimits) async throws -> RenderResult {
-    var variables = ["data": try Self.value(input.data)]
+    var values = ["data": input.data]
     if let frontmatter = input.frontmatter {
-      variables["frontmatter"] = try Self.value(.object(frontmatter))
+      values["frontmatter"] = .object(frontmatter)
     }
+    return try await render(template, values: values, limits: limits)
+  }
+
+  func render(_ template: String, values: [String: JSONValue], limits: RenderLimits) async throws -> RenderResult {
+    let variables = try values.mapValues(Self.value)
     let renderer: KnapEngine
     if let engine { renderer = engine }
     else {

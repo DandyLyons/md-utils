@@ -2,6 +2,17 @@
 
 Validate files against project-level rules.
 
+## Create an instance
+
+`rules new --rule Books --value ./dune.json --filename-data '$.title'` uses a
+standalone rule's explicit `creation.directory` and its type's `creation.template`.
+The directory is relative to the project root and must exist; no glob inference
+occurs. Declare `creation.type` when more than one type is referenced. Use an exact
+`--filename` instead of JSONPath, or set `--extension` for an extracted stem.
+`--dry-run` renders and assesses without saving. Input and persistence errors block
+creation; type/rule nonconformance is explicitly reported as advisory and still
+saves the document with a successful exit status.
+
 ## Overview
 
 The `rules` command group manages `.md-utils/` project configuration and validates files. Configuration is read from the current working directory; `md-utils` does not search parent directories for a project root.

@@ -9,6 +9,7 @@ extension InteractiveAuthoring {
       var result: [String: Any] = ["name": file.name, "types": file.types.jsonValue.foundationValue]
       if let match = file.match { result["match"] = match.foundationValue }
       if let schema = file.schemaReference { result["$schema"] = schema }
+      if let creation = file.creation { result["creation"] = creation.jsonValue.foundationValue }
       return result
     } ?? [:]
     object["name"] = try prompts.required("Rule name", default: original?.name)
@@ -16,7 +17,7 @@ extension InteractiveAuthoring {
       prompts.required("Rule filename relative to rules/ (include .mdrule.json)"), types: false)
     if original == nil { object["types"] = try typeExpression(session: &session).foundationValue }
     while true {
-      let action = try prompts.choose("Rule definition", ["Done", "Rename", "Type expression", "Matcher expression"])
+      let action = try prompts.choose("Rule definition", ["Done", "Rename", "Type expression", "Matcher expression", "Creation target"])
       switch action {
       case "Done":
         var proposed = session
@@ -28,6 +29,14 @@ extension InteractiveAuthoring {
         } catch { prompts.output(CLIStyle.error(error.localizedDescription)) }
       case "Rename": object["name"] = try prompts.required("Rule name", default: object["name"] as? String)
       case "Type expression": object["types"] = try typeExpression(session: &session).foundationValue
+      case "Creation target":
+        let action = try prompts.choose("Creation target", ["Keep existing", "Set target", "Remove target"])
+        if action == "Remove target" { object.removeValue(forKey: "creation") }
+        if action == "Set target" {
+          let value = try prompts.json("Creation JSON: directory relative to project root (./Books/) and optional type name",
+            default: try object["creation"].map { try JSONValue(any: $0) })
+          object["creation"] = try MarkdownRuleCreation.decode(value, source: path.string).jsonValue.foundationValue
+        }
       default:
         if let match = object["match"] { prompts.output(try InteractiveDraftSession.json(match)) }
         let mode = try prompts.choose("Selection", ["Keep existing", "Match every candidate", "Build expression", "Enter JSON expression"])

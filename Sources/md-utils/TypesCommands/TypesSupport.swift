@@ -253,6 +253,9 @@ enum TypesRenderer {
       lines.append(contentsOf: definition.context.requirements.map { "  \($0.id): \(predicateDescription($0.predicate))" })
       lines.append("Context recommendations: \(definition.context.recommendations.count)")
       lines.append(contentsOf: definition.context.recommendations.map { "  \($0.id): \(predicateDescription($0.predicate))" })
+      if let creation = definition.creation {
+        lines.append("Creation: \(creation.mode.rawValue) template (\(creation.reference ?? "inline"))")
+      }
       return lines.joined(separator: "\n")
     case .markdown:
       return """
@@ -363,7 +366,7 @@ enum TypesRenderer {
     if let presence = definition.frontmatter.presence {
       frontmatter["presence"] = presence.rawValue
     }
-    return [
+    var object: [String: Any] = [
       "md-utils-type-schema": definition.typeSchemaVersion,
       "name": definition.name.rawValue,
       "version": definition.version,
@@ -371,6 +374,8 @@ enum TypesRenderer {
       "body": groupObject(definition.body),
       "context": groupObject(definition.context),
     ]
+    if let creation = definition.creation { object["creation"] = creation.jsonValue.foundationValue }
+    return object
   }
 
   static func assessmentObject(_ assessment: MarkdownTypeAssessment, path: String?) -> [String: Any] {

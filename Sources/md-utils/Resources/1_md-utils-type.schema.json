@@ -10,7 +10,29 @@
     "version": { "type": "string", "minLength": 1 },
     "frontmatter": { "$ref": "#/$defs/frontmatter" },
     "body": { "$ref": "#/$defs/constraintGroup" },
-    "context": { "$ref": "#/$defs/constraintGroup" }
+    "context": { "$ref": "#/$defs/constraintGroup" },
+    "creation": {
+      "type": "object", "required": ["template"], "additionalProperties": false,
+      "properties": {
+        "template": {
+          "type": "object", "additionalProperties": false,
+          "oneOf": [{"required": ["inline"]}, {"required": ["ref"]}],
+          "properties": {
+            "inline": {"type": "string"},
+            "ref": {"type": "string", "minLength": 1},
+            "mode": {"enum": ["document", "body"], "default": "document"},
+            "inputSchema": {
+              "type": "object", "additionalProperties": false,
+              "oneOf": [{"required": ["inline"]}, {"required": ["ref"]}],
+              "properties": {
+                "inline": {"type": ["object", "boolean"]},
+                "ref": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "additionalProperties": false,
   "$defs": {

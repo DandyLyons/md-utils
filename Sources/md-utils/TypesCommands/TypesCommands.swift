@@ -18,6 +18,7 @@ extension CLIEntry {
         Find.self,
         Fix.self,
         Schema.self,
+        New.self,
       ]
     )
   }

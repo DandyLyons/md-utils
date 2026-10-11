@@ -49,6 +49,7 @@ struct InteractiveAuthoringTests {
         recommendations: [.init(id: "short", predicate: .maxBodyWords(400))]),
       context: .init(requirements: [.init(id: "path", predicate: .path(.init(glob: "Books/**")))]), source: path.string)
     try path.parent().mkpath()
+    definition.creation = try MarkdownCreationTemplate.decode(.object(["template": .object(["inline": .string("{{ title | h1 }}")])]))
     try path.write(InteractiveDraftSession.encode(definition, path: path))
     let schema = try (root + ".md-utils/schemas/book.schema.json").read(.utf8)
     let script = Script(choices: ["Edit", "Done"], texts: ["renamed", "2"])
@@ -70,13 +71,14 @@ struct InteractiveAuthoringTests {
     try seedType(root)
     let path = root + ".md-utils/rules/nested/original.mdrule.json"
     try path.parent().mkpath()
-    try path.write(#"{"$schema":"editor-schema","name":"books","types":{"not":{"not":"book.mdtype.json"}},"match":{"anyOf":[{"paths":["Books/**"]},{"frontmatter":{"status":{"equals":"published"}}}]}}"#)
+    try path.write(#"{"$schema":"editor-schema","name":"books","types":{"not":{"not":"book.mdtype.json"}},"match":{"anyOf":[{"paths":["Books/**"]},{"frontmatter":{"status":{"equals":"published"}}}]},"creation":{"directory":"./Books/","type":"book"}}"#)
     let original = try MarkdownRuleFile.decode(path.read(.utf8), source: path.string)
     let script = Script(choices: ["Edit", "Done"], texts: ["renamed"])
     try InteractiveAuthoring(prompts: script.prompts).run(types: false, selectedName: "books", root: root)
     let updated = try MarkdownRuleFile.decode(path.read(.utf8), source: path.string)
     #expect(updated.name == "renamed")
     #expect(updated.match == original.match && updated.types == original.types && updated.schemaReference == original.schemaReference)
+    #expect(updated.creation == original.creation)
     let remove = Script(choices: ["Remove"])
     try InteractiveAuthoring(prompts: remove.prompts).run(types: false, selectedName: "renamed", root: root)
     #expect(path.exists == false)

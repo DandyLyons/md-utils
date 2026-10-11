@@ -7,7 +7,7 @@ extension CLIEntry {
   struct TemplateCommands: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "template",
-      abstract: "Render a Knap body with explicit YAML frontmatter.",
+      abstract: "Render a complete Knap document or an explicit body template.",
       subcommands: [Render.self],
     )
 
@@ -16,13 +16,16 @@ extension CLIEntry {
         abstract: "Render and validate one document before writing it.",
       )
 
-      @Option(help: "Knap body template file (.knap or .knap.md recommended).")
+      @Option(help: "Knap template file (.knap or .knap.md recommended).")
       var template: String
 
-      @Option(help: "JSON envelope containing data and an optional frontmatter object.")
+      @Option(help: "JSON object of variables; body mode requires data and optional frontmatter.")
       var data: String
 
-      @Option(help: "Optional JSON Schema file validating the entire input envelope.")
+      @Option(help: "Rendering mode: document (default) or body with separate JSON frontmatter.")
+      var mode: MarkdownTemplateMode = .document
+
+      @Option(help: "Optional JSON Schema: fill missing defaults, then validate input.")
       var schema: String?
 
       @Option(help: "Markdown output file (.md or .markdown); omit to write Markdown to stdout.")
@@ -40,13 +43,13 @@ extension CLIEntry {
         guard let source = String(data: templateBytes, encoding: .utf8) else {
           throw ValidationError("Template must be UTF-8: \(template)")
         }
-        let input = try JSONDecoder().decode(MarkdownTemplateInput.self,
+        let input = try JSONDecoder().decode(JSONValue.self,
           from: Self.read(data, limit: limits.inputBytes))
         let inputSchema = try schema.map {
           try JSONDecoder().decode(JSONValue.self, from: Self.read($0, limit: limits.inputBytes))
         }
         let result = try await MarkdownTemplateRenderer(limits: limits)
-          .render(template: source, input: input, schema: inputSchema)
+          .render(template: source, variables: TemplateInputDefaults.prepare(input, schema: inputSchema), mode: mode)
         for warning in result.warnings {
           try FileHandle.standardError.write(contentsOf:
             Data("Warning \(warning.location) [\(warning.code)]: \(warning.message)\n".utf8))
@@ -74,3 +77,5 @@ extension CLIEntry {
     }
   }
 }
+
+extension MarkdownTemplateMode: ExpressibleByArgument {}

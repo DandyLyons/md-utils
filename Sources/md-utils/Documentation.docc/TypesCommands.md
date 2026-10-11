@@ -2,6 +2,16 @@
 
 Create, inspect, assess, identify, verify, and repair typed Markdown records.
 
+## Create instances
+
+`types new --type Book --value ./dune.json --filename-data '$.title' ./Books/`
+uses the type's `creation.template` and an existing caller-selected directory.
+Document mode is default; templates own frontmatter and body. `--dry-run` previews
+without saving. Input-schema violations block creation; type nonconformance is
+reported as advisory and the starting document is still saved. `--filename` gives
+an exact name; `--filename-data` uses JSONPath after defaults and appends `.md`
+unless `--extension` changes or omits it. Existing destinations are never replaced.
+
 ## Definitions
 
 Project definitions are YAML, JSON, or TOML files under `.md-utils/types/`. Definition filenames must end in `.mdtype.yaml`, `.mdtype.yml`, `.mdtype.json`, or `.mdtype.toml`. Other structured-data files in the directory are ignored. Add a definition scaffold with:

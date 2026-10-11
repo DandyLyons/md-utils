@@ -23,5 +23,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends libsqlite3-0 li
 COPY --from=build /opt/md-utils/ /opt/md-utils/
 COPY examples/templates/ /opt/md-utils/examples/
 WORKDIR /opt/md-utils/
-RUN ./md-utils template render --template ./examples/report.knap --data ./examples/report.json --output ./report.md && test -s ./report.md
+RUN ./md-utils template render --mode body --template ./examples/report.knap --data ./examples/report.json --output ./report.md && test -s ./report.md
 RUN ./md-utils-server --help

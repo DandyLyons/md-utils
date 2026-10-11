@@ -15,7 +15,7 @@ RUN --network=none cd "md-utils-${RELEASE_VERSION}-source/" \
     && md-utils/.build/release/md-utils config init --root /rebuild/config-probe/ \
     && md-utils/.build/release/md-utils rules list \
         --config /rebuild/config-probe/.md-utils/md-utils.json \
-    && md-utils/.build/release/md-utils template render \
+    && md-utils/.build/release/md-utils template render --mode body \
         --template md-utils/examples/templates/report.knap \
         --data md-utils/examples/templates/report.json --output /rebuild/rendered.md \
     && grep -q 'Revenue increased.' /rebuild/rendered.md

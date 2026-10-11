@@ -93,6 +93,30 @@ public struct MarkdownTemplateRenderer: Sendable {
     self.renderLimits = renderLimits
   }
 
+  /// Renders prepared object variables using upstream Knap semantics. Creation hosts
+  /// apply `TemplateInputDefaults.prepare` before filename selection and rendering.
+  public func render(template: String, variables: JSONValue, mode: MarkdownTemplateMode = .document) async throws -> RenderedMarkdownTemplate {
+    guard let values = variables.objectValue else {
+      throw MarkdownTemplateError(stage: .input, message: "Expected a JSON object of Knap variables.")
+    }
+    try checkSize(template.utf8.count, limit: limits.templateBytes, stage: .template)
+    try checkSize(JSONEncoder().encode(variables).count, limit: limits.inputBytes, stage: .input)
+    if mode == .body {
+      let input = try JSONDecoder().decode(MarkdownTemplateInput.self, from: JSONEncoder().encode(variables))
+      return try await render(template: template, input: input)
+    }
+    let rendered = try await KnapRendering.shared.render(template, values: values, limits: renderLimits)
+    guard rendered.errors.isEmpty else {
+      let diagnostics = rendered.errors.map { KnapRendering.diagnostic($0, severity: .error) }
+      throw MarkdownTemplateError(stage: .template, message: diagnostics.map(\.message).joined(separator: "\n"), diagnostics: diagnostics)
+    }
+    try checkSize(rendered.output.utf8.count, limit: limits.outputBytes, stage: .output)
+    let document = try MarkdownDocument(content: rendered.output)
+    _ = try await document.parseAST()
+    return RenderedMarkdownTemplate(source: rendered.output, document: document,
+      warnings: rendered.warnings.map { KnapRendering.diagnostic($0, severity: .advisory) })
+  }
+
   public func render(
     template: String,
     input: MarkdownTemplateInput,

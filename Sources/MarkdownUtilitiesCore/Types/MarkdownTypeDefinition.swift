@@ -152,6 +152,7 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
   public var body: MarkdownConstraintGroup
   public var context: MarkdownConstraintGroup
   public var source: String?
+  public var creation: MarkdownCreationTemplate?
 
   public init(
     typeSchemaVersion: String = MarkdownTypeSchemaVersion.current,
@@ -160,7 +161,8 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
     frontmatter: MarkdownFrontmatterDefinition = MarkdownFrontmatterDefinition(),
     body: MarkdownConstraintGroup = MarkdownConstraintGroup(),
     context: MarkdownConstraintGroup = MarkdownConstraintGroup(),
-    source: String? = nil
+    source: String? = nil,
+    creation: MarkdownCreationTemplate? = nil,
   ) {
     self.typeSchemaVersion = typeSchemaVersion
     self.name = name
@@ -169,6 +171,7 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
     self.body = body
     self.context = context
     self.source = source
+    self.creation = creation
   }
 }
 

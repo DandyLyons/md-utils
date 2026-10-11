@@ -6,21 +6,29 @@ this implementation. SwiftKnap owns execution and platform support; md-utils use
 only its Swift API. Core/WASM does not depend on SwiftKnap.
 
 ```console
-swift run md-utils template render --template ./examples/templates/report.knap --data ./examples/templates/report.json
-swift run md-utils template render --template ./examples/templates/report.knap --data ./examples/templates/report.json --output ./tmp/report.md
+swift run md-utils template render --mode body --template ./examples/templates/report.knap --data ./examples/templates/report.json
+swift run md-utils template render --mode body --template ./examples/templates/report.knap --data ./examples/templates/report.json --output ./tmp/report.md
 ```
 
 See the [Knap guide](../Sources/MarkdownUtilitiesTemplates/Documentation.docc/RenderingMarkdownWithKnap.md).
 
 ## Document contract
 
-Input is a JSON envelope with required `data` (any JSON value) and optional
+Document mode is the default: input is a JSON object whose properties become Knap
+variables directly, and Knap renders the entire document, including frontmatter.
+Use `yaml` or `yaml_property` for YAML serialization; templated TOML is discouraged
+because no TOML serializer is installed. Root arrays/scalars/null are rejected.
+See [instance creation](instance-creation.md) for mdtype templates and `types new` /
+`rules new`.
+
+Explicit `--mode body` input is a JSON envelope with required `data` (any JSON value) and optional
 `frontmatter` (an object). Both are template variables. Omission produces no
 frontmatter block; `{}` produces an empty YAML block; explicit null frontmatter
-is rejected. Nested null values are preserved. Optional `--schema` validates the
-complete envelope before rendering and never supplies defaults.
+is rejected. Nested null values are preserved. Optional `--schema` inserts missing
+defaults and validates the effective input before rendering. Supplied values are
+never replaced. Input defaults do not change existing validation commands.
 
-Knap renders the body; Yams serializes frontmatter with sorted keys and typed
+In body mode, Knap renders the body; Yams serializes frontmatter with sorted keys and typed
 values. Templates and rendered bodies cannot start with YAML/TOML frontmatter
 delimiters, including CRLF/BOM forms. Use `***` for a leading horizontal rule.
 The assembled document is parsed and verified before output or persistence.

@@ -181,12 +181,24 @@ remain 0.2.0 and retain their existing syntax and behavior.
 ## Knap Templates
 
 Use `md-utils template render --template ./templates/report.knap --data ./data/report.json --output ./reports/report.md`.
-Input is JSON with required `data` and optional `frontmatter` object. Templates use
-Knap for the body; md-utils serializes frontmatter as YAML. Use Knap's standard
-Markdown filters (`h1`, `list`, `table`, `bold`) and `??` fallback. Optional `--schema`
-validates the envelope without supplying defaults. Omit `--output` for stdout;
-warnings go to stderr. Existing output is unchanged on failure. No old template
-language or translation is supported. Keep YAML/TOML delimiters out of templates.
+Default document mode accepts a JSON object of named variables and renders the
+whole document. Use Knap `yaml`/`yaml_property` for YAML frontmatter; avoid templated
+TOML without a serializer. Explicit `--mode body` accepts required `data` and optional
+`frontmatter`, serializing the latter separately. Optional `--schema` inserts missing
+defaults before validation. Supplied null/false/zero/empty strings are preserved.
+Omit `--output` for stdout; warnings go to stderr.
+
+Types may declare `creation.template` with `inline` or `ref`, optional `mode`, and
+nested `inputSchema` (`inline` or `ref`). References are relative to the definition.
+Use `md-utils types new --type Book --value ./dune.json --filename-data '$.title' ./Books/`.
+Rules require `creation.directory`, relative to project root, and `creation.type`
+when ambiguous: `md-utils rules new --rule Books --value ./dune.json --filename Dune.md`.
+No glob destination inference occurs. Exactly one filename option is required;
+`--filename` is exact, while `--filename-data` selects one string via JSONPath after
+defaults and appends `.md`. `--extension txt` changes it; `--extension ''` omits it.
+Directories must exist; writes never overwrite. `--dry-run` has no persistent
+effects. Type/rule nonconformance is advisory and still saves with success; input
+schema, rendering, filename, and persistence errors block creation. Bulk is separate.
 
 ## Reading Long Markdown Files
 

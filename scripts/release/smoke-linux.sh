@@ -59,7 +59,7 @@ if grep -q 'title: Smoke' body.md; then
 fi
 printf '%s\n' '{{ frontmatter.title | h1 }}' '{{ data.message }}' > template.knap
 printf '%s\n' '{"frontmatter":{"title":"Archive template"},"data":{"message":"Knap works"}}' > data.json
-md-utils template render --template template.knap --data data.json --output rendered.md
+md-utils template render --mode body --template template.knap --data data.json --output rendered.md
 grep -q '# Archive template' rendered.md
 grep -q 'Knap works' rendered.md
 md-utils index update ./notes/

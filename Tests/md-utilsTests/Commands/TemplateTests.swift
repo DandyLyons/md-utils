@@ -48,7 +48,7 @@ struct TemplateTests {
     try "{{ frontmatter.title | h1 }}\n{{ data }}".write(to: template, atomically: true, encoding: .utf8)
     try #"{"frontmatter":{"title":"Sales: September"},"data":"Hello"}"#
       .write(to: data, atomically: true, encoding: .utf8)
-    let arguments = ["template", "render", "--template", template.path,
+    let arguments = ["template", "render", "--mode", "body", "--template", template.path,
       "--data", data.path, "--output", output.path]
     var command = try #require(CLIEntry.parseAsRoot(arguments) as? CLIEntry.TemplateCommands.Render)
     try await command.run()

@@ -19,7 +19,8 @@ struct TypesCommandsTests {
     let configuration = CLIEntry.TypesCommands.configuration
 
     #expect(configuration.commandName == "types")
-    #expect(configuration.subcommands.count == 11)
+    #expect(configuration.subcommands.count == 12)
+    #expect(configuration.subcommands[11] is CLIEntry.TypesCommands.New.Type)
     #expect(configuration.subcommands[0] is CLIEntry.TypesCommands.Add.Type)
     #expect(configuration.subcommands[1] is CLIEntry.TypesCommands.Interactive.Type)
     #expect(configuration.subcommands[4] is CLIEntry.TypesCommands.Doctor.Type)

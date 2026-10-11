@@ -78,6 +78,7 @@ public struct MarkdownRuleFile: Equatable, Sendable {
   public let types: MarkdownRuleTypeExpression
   public let schemaReference: String?
   public let source: String
+  public var creation: MarkdownRuleCreation? = nil
 
   public static func decode(_ content: String, source: String) throws -> Self {
     do {
@@ -85,7 +86,7 @@ public struct MarkdownRuleFile: Equatable, Sendable {
       guard case .object(let object) = value else {
         throw MarkdownRuleFileError(source: source, location: "$", message: "Expected one rule object")
       }
-      let unknown = Set(object.keys).subtracting(["$schema", "name", "match", "types"])
+      let unknown = Set(object.keys).subtracting(["$schema", "name", "match", "types", "creation"])
       guard unknown.isEmpty else {
         throw MarkdownRuleFileError(source: source, location: "$", message: "Unknown fields: \(unknown.sorted().joined(separator: ", "))")
       }
@@ -102,7 +103,7 @@ public struct MarkdownRuleFile: Equatable, Sendable {
       if let match = object["match"] { _ = try MarkdownRuleMatchExpression.decode(match, source: source) }
       return Self(name: name, match: object["match"],
         types: try .decode(rawTypes, source: source), schemaReference: object["$schema"]?.stringValue,
-        source: source)
+        source: source, creation: try object["creation"].map { try MarkdownRuleCreation.decode($0, source: source) })
     } catch let error as MarkdownRuleFileError {
       throw error
     } catch {
@@ -114,6 +115,7 @@ public struct MarkdownRuleFile: Equatable, Sendable {
     var object: [String: Any] = ["name": name, "types": types.jsonValue.foundationValue]
     if let match { object["match"] = match.foundationValue }
     if let schemaReference { object["$schema"] = schemaReference }
+    if let creation { object["creation"] = creation.jsonValue.foundationValue }
     let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
     return String(decoding: data, as: UTF8.self) + "\n"
   }

@@ -15,7 +15,7 @@ extension InteractiveAuthoring {
     }
     definition.source = path.string
     while true {
-      let action = try prompts.choose("Type contract", ["Done", "Name and version", "Frontmatter presence", "Schema references", "Body constraints", "Context constraints"])
+      let action = try prompts.choose("Type contract", ["Done", "Name and version", "Frontmatter presence", "Schema references", "Body constraints", "Context constraints", "Creation template"])
       switch action {
       case "Done":
         var proposed = session
@@ -35,6 +35,14 @@ extension InteractiveAuthoring {
         try schemas(&definition.frontmatter.schemas)
       case "Body constraints":
         try constraints(&definition.body, context: false)
+      case "Creation template":
+        let action = try prompts.choose("Creation template", ["Keep existing", "Set template", "Remove template"])
+        if action == "Remove template" { definition.creation = nil }
+        if action == "Set template" {
+          let value = try prompts.json("Creation JSON: {\"template\":{\"ref\":\"./book.knap\"}}; optional mode and inputSchema belong inside template",
+            default: definition.creation?.jsonValue)
+          definition.creation = try MarkdownCreationTemplate.decode(value)
+        }
       default:
         try constraints(&definition.context, context: true)
       }

@@ -18,7 +18,7 @@ public enum MarkdownTypeDefinitionDecoder {
     let object = try rootObject(content, format: format)
     try validateKeys(
       object,
-      allowed: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context"],
+      allowed: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context", "creation"],
       required: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context"],
       context: "type definition"
     )
@@ -37,7 +37,8 @@ public enum MarkdownTypeDefinitionDecoder {
       frontmatter: frontmatter,
       body: body,
       context: context,
-      source: source
+      source: source,
+      creation: try object["creation"].map { try MarkdownCreationTemplate.decode(JSONValue(any: $0)) },
     )
   }
 
