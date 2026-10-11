@@ -8,7 +8,9 @@ import PathKit
 import Yams
 
 struct InstanceCreationOptions: ParsableArguments {
-  @Option(help: "JSON object file containing template variables.") var value: String
+  @Option(help: "JSON object file containing template variables (single instance).") var value: String?
+  @Option(help: "JSON array file containing a nonempty batch of input objects.") var values: String?
+  @Option(help: "JSON object file in a batch; repeat this option for each file.") var valueFile: [String] = []
   @Option(help: "Exact output filename, with any extension or no extension.") var filename: String?
   @Option(help: "JSONPath selecting exactly one filename stem after defaults.") var filenameData: String?
   @Option(name: .customLong("extension"), help: "Suffix for --filename-data (default md); use an empty string for no extension.")
@@ -16,6 +18,12 @@ struct InstanceCreationOptions: ParsableArguments {
   @Flag(help: "Render and assess without creating files.") var dryRun = false
 
   func validate() throws {
+    guard [value != nil, values != nil, !valueFile.isEmpty].filter({ $0 }).count == 1 else {
+      throw ValidationError("Supply exactly one input form: --value, --values, or repeated --value-file.")
+    }
+    guard !isBulk || (filename == nil && filenameData != nil) else {
+      throw ValidationError("Bulk creation requires --filename-data; --filename is only for single instances.")
+    }
     guard (filename != nil) != (filenameData != nil) else {
       throw ValidationError("Supply exactly one of --filename and --filename-data.")
     }
@@ -23,6 +31,8 @@ struct InstanceCreationOptions: ParsableArguments {
       throw ValidationError("--extension cannot be combined with --filename; an explicit filename is complete.")
     }
   }
+
+  var isBulk: Bool { values != nil || !valueFile.isEmpty }
 
   func outputName(input: JSONValue) throws -> String {
     try validate()
@@ -139,21 +149,65 @@ enum InstanceCreation {
       }
     case nil: schema = nil
     }
-    let raw = try JSONDecoder().decode(JSONValue.self, from: read(options.value, limit: MarkdownTemplateLimits().inputBytes))
-    let input = try TemplateInputDefaults.prepare(raw, schema: schema)
-    let filename = try options.outputName(input: input)
-    let destination = URL(fileURLWithPath: directory.absolute().string, isDirectory: true).appendingPathComponent(filename)
-    guard (try? FileManager.default.attributesOfItem(atPath: destination.path)) == nil else {
-      throw ValidationError("Destination already exists: \(destination.path)")
+    var items = try CreationBatch.load(options: options)
+    var outputBytes = 0
+    for index in items.indices {
+      try Task.checkCancellation()
+      guard let raw = items[index].input else { continue }
+      let input: JSONValue
+      do { input = try TemplateInputDefaults.prepare(raw, schema: schema) }
+      catch is CancellationError { throw CancellationError() }
+      catch {
+        items[index].failures.append("Template input: \(error)")
+        continue
+      }
+      do {
+        let filename = try options.outputName(input: input)
+        items[index].destination = URL(fileURLWithPath: directory.absolute().string, isDirectory: true).appendingPathComponent(filename)
+      } catch { items[index].failures.append("Filename: \(error)") }
+      // Rendering is independent of filename selection, so collect both failures.
+      do {
+        let rendered = try await MarkdownTemplateRenderer().render(template: source, variables: input, mode: template.mode)
+        outputBytes += rendered.source.utf8.count
+        guard outputBytes <= CreationBatch.byteLimit else {
+          throw ValidationError("Aggregate rendered output exceeds \(CreationBatch.byteLimit) bytes.")
+        }
+        items[index].content = Data(rendered.source.utf8)
+        items[index].details.append(schema == nil ? "Template input schema: not declared" : "Template input schema: passed")
+        if let destination = items[index].destination {
+          items[index].details += try await assess(source: rendered.source, destination: destination,
+            root: root, typeName: typeName, registry: registry, ruleName: ruleName, rules: rules)
+        }
+        for warning in rendered.warnings {
+          items[index].details.append("Template warning: \(warning.location): \(warning.message)")
+        }
+      } catch is CancellationError { throw CancellationError() }
+      catch { items[index].failures.append("Rendering/assessment: \(error)") }
+      items[index].input = nil
     }
-    let rendered = try await MarkdownTemplateRenderer().render(template: source, variables: input, mode: template.mode)
+    CreationBatch.checkDestinations(&items)
+    if items.contains(where: { !$0.failures.isEmpty }) {
+      let diagnostics = items.flatMap { item in item.failures.map { "- \(item.label): \($0)" } }
+      throw ValidationError((["Creation failed; no files were written."] + diagnostics).joined(separator: "\n"))
+    }
+    let results = CreationBatch.persist(items, dryRun: options.dryRun)
+    for result in results {
+      print("\(result.status) \(result.item.label)\(result.error.map { ": \($0)" } ?? "")")
+      for detail in result.item.details { print("  \(detail)") }
+    }
+    guard !results.contains(where: { $0.error != nil }) else { throw ExitCode.failure }
+  }
+
+  static func assess(source: String, destination: URL, root: Path, typeName: String,
+    registry: MarkdownTypeRegistry, ruleName: String?, rules: MarkdownRuleRegistry?,
+  ) async throws -> [String] {
     let rootURL = URL(fileURLWithPath: root.absolute().string).standardizedFileURL
     let outputURL = destination.standardizedFileURL
     // Explicit type destinations may be outside the project. In that case the path
     // is unavailable to project-relative constraints rather than misrepresented.
     let prefix = rootURL.path + "/"
     let logical = outputURL.path.hasPrefix(prefix) ? try MarkdownRecordPath(String(outputURL.path.dropFirst(prefix.count))) : nil
-    let record = MarkdownRecord(identity: .init(rawValue: outputURL.path), content: rendered.source,
+    let record = MarkdownRecord(identity: .init(rawValue: outputURL.path), content: source,
       context: .init(path: logical, modificationDate: Date()))
     let assessment = try await MarkdownTypeChecker(registry: registry).assess(record, as: typeName)
     let ruleAssessment: MarkdownRuleAssessment?
@@ -161,20 +215,17 @@ enum InstanceCreation {
       ruleAssessment = try await MarkdownRuleChecker(registry: rules).assess(record, ruleNamed: ruleName)
     } else { ruleAssessment = nil }
     try Task.checkCancellation()
-    if !options.dryRun { try create(Data(rendered.source.utf8), at: destination) }
-    print(schema == nil ? "Template input schema: not declared" : "Template input schema: passed")
-    print("\(options.dryRun ? "Would create" : "Created") \(destination.path)")
-    print("Type \(String(reflecting: typeName)): \(assessment.conforms ? "conforms" : "does not conform (advisory)")")
-    for diagnostic in assessment.diagnostics { print("  \(diagnostic.domain.rawValue): \(diagnostic.location): \(diagnostic.message)") }
+    var details = ["Type \(String(reflecting: typeName)): \(assessment.conforms ? "conforms" : "does not conform (advisory)")"]
+    for diagnostic in assessment.diagnostics { details.append("\(diagnostic.domain.rawValue): \(diagnostic.location): \(diagnostic.message)") }
     if let ruleAssessment, let ruleName {
-      print("Rule \(String(reflecting: ruleName)): \(ruleAssessment.status.rawValue) (advisory)")
+      details.append("Rule \(String(reflecting: ruleName)): \(ruleAssessment.status.rawValue) (advisory)")
       for diagnostic in ruleAssessment.applicabilityDiagnostics + ruleAssessment.diagnostics {
-        print("  \(diagnostic.location): \(diagnostic.message)")
+        details.append("\(diagnostic.location): \(diagnostic.message)")
       }
-      if ruleAssessment.status == .notApplicable { print("  The created document does not match this rule's selection conditions.") }
-      for explanation in ruleAssessment.typeExpressionAssessment?.explanation ?? [] { print("  \(explanation)") }
+      if ruleAssessment.status == .notApplicable { details.append("The created document does not match this rule's selection conditions.") }
+      for explanation in ruleAssessment.typeExpressionAssessment?.explanation ?? [] { details.append(explanation) }
     }
-    for warning in rendered.warnings { print("Template warning: \(warning.location): \(warning.message)") }
+    return details
   }
 
   static func requireContained(_ path: Path, root: Path) throws {

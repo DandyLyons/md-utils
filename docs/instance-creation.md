@@ -106,5 +106,58 @@ and use dedicated validation commands when conformance is required.
 `--dry-run` renders and assesses without persistent writes. Directories must exist.
 Creation publishes complete bytes atomically without overwriting, including if
 another writer claims the name after preflight. Existing files remain intact.
-Bulk creation is tracked in #168. Server reuse of mdtype templates is a future
+Server reuse of mdtype templates is a future
 opportunity; existing server mutation authorization/validation still applies.
+
+## Bulk creation
+
+Use `--values` for a nonempty JSON array of input objects, or repeat `--value-file`
+for individual JSON object files. These options and single-instance `--value` are
+mutually exclusive. An array passed to `--value` is rejected, never treated as a batch.
+
+```json
+[
+  { "title": "Dune", "author": "Frank Herbert" },
+  { "title": "Foundation", "author": "Isaac Asimov" }
+]
+```
+
+```bash
+md-utils types new --type Book --values ./books.json --filename-data '$.title' ./Books/
+md-utils rules new --rule Books --value-file ./dune.json --value-file ./foundation.json --filename-data '$.title'
+```
+
+With the template above, these create `./Books/Dune.md` and `./Books/Foundation.md`,
+each containing its title as YAML frontmatter and a level-one heading. Each item
+uses the same template and independently receives schema defaults and validation.
+Bulk requires `--filename-data`, evaluated after defaults; `--filename` is rejected.
+The same extension options apply, including `--extension ''` for no extension.
+Destination directories must already exist.
+
+Array items are identified by source path and zero-based index (`./books.json[0]`).
+File inputs include the path and one-based argument position, distinguishing repeated
+paths. Processing and reports follow input order. Limits are 10,000 items, 64 MiB
+aggregate input bytes, and 64 MiB aggregate rendered UTF-8 output. These bounds keep
+preflight in memory without temporary staging files; exceeding them blocks creation.
+
+The whole request is preflighted before writing. Independent input, defaults, schema,
+rendering, filename, and destination failures are collected. Stages depending on
+failed input are skipped. Duplicate destinations report all participants; existing
+files are never overwritten or silently renamed. Type and rule conformance remain
+advisory. `--dry-run` uses the same preflight without persistent side effects.
+
+```text
+Creation failed; no files were written.
+- ./books.json[0] -> /project/Books/Dune.md: Destination already exists: /project/Books/Dune.md
+- ./books.json[0] -> /project/Books/Dune.md: Duplicate destination shared by 2 inputs.
+- ./books.json[1] -> /project/Books/Dune.md: Destination already exists: /project/Books/Dune.md
+- ./books.json[1] -> /project/Books/Dune.md: Duplicate destination shared by 2 inputs.
+```
+
+After successful preflight, files are published sequentially and atomically without
+overwriting. If a writer claims a destination or another filesystem failure occurs,
+publication stops. Every item is reported as `Created`, `failed`, or `not attempted`;
+completed files remain. This is not a batch transaction and there is no rollback.
+Successful creation and dry run return zero even with advisory nonconformance;
+blocking failures and partial completion return nonzero. Dry-run results say
+`Would create` and include separate type/rule diagnostics.

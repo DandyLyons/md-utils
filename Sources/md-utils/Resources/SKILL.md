@@ -198,7 +198,13 @@ No glob destination inference occurs. Exactly one filename option is required;
 defaults and appends `.md`. `--extension txt` changes it; `--extension ''` omits it.
 Directories must exist; writes never overwrite. `--dry-run` has no persistent
 effects. Type/rule nonconformance is advisory and still saves with success; input
-schema, rendering, filename, and persistence errors block creation. Bulk is separate.
+schema, rendering, filename, and persistence errors block creation.
+For bulk creation use `--values ./books.json` (a nonempty array of objects), or repeat
+`--value-file ./dune.json --value-file ./foundation.json`, instead of `--value`.
+Bulk requires `--filename-data`; extension controls still apply. The entire batch
+is preflighted and all collision participants are reported before any writes.
+`--dry-run` has no persistent side effects. Publication stops at the first write
+failure, preserves created files, and reports created/failed/not-attempted items.
 
 ## Reading Long Markdown Files
 

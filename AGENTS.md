@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Bulk instance creation**: `types new`/`rules new` accept `--values` JSON arrays or repeated `--value-file` objects, requiring JSONPath filenames. Shared preflight applies defaults/rendering/advisory conformance, collects failures and all collision participants, and bounds input/output at 64 MiB and 10,000 items. Atomic no-clobber publication stops on the first failure with complete partial-completion reporting. Dry run has no persistent side effects. See `docs/instance-creation.md`; tests: `swift test --filter 'CreationBatchTests|InstanceCreationTests'`.
+
 - **Instance creation**: `types new` and `rules new` use mdtype Knap creation declarations. Document mode is default with upstream object-variable semantics; explicit body mode serializes frontmatter separately. Input defaults precede JSONPath filename selection and validation; type/rule nonconformance is advisory. Destinations must exist and atomic hard-link publication never overwrites. See `docs/instance-creation.md`; tests: `swift test --filter 'CreationTemplateTests|InstanceCreationTests|TemplateTests'`.
 
 - **Indexed-only rule validation**: `rules validate --indexed-only` checks only registered rule scopes' recorded candidates, including nonmembers, without directory discovery or fallback. Changed definitions/files reevaluate; unavailable paths remain failed candidates until ordinary discovery. Scopes retain `limited` coverage separately from global freshness. `--verify-hashes` detects stat-preserving changes. See `docs/collection-index.md`; tests: `swift test --filter RulesIndexedValidationTests`; benchmark: `scripts/benchmark-indexed-only.py`.
