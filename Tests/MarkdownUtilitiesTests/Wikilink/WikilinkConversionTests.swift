@@ -71,17 +71,17 @@ struct WikilinkConversionTests {
   }
 
   @Test
-  func `duplicates missing names root collisions and shadowed paths are skipped`() throws {
+  func `root paths avoid source shadowing while ambiguous names are skipped`() throws {
     let root = try vault([
       "Alice.md", "People/Alice.md", "Only.md", "notes/source.md",
       "People/Bob.md", "notes/People/Bob.md",
     ])
     defer { try? root.delete() }
     let resolver = try WikilinkResolver(root: root)
-    let source = "[[../Alice.md]] [[Alice]] [[Missing]] [[Only]] [[../People/Bob.md]]"
+    let source = "[[../Alice.md]] [[Alice]] [[Missing]] [[Only]] [[../People/Bob.md]] [[./People/Bob.md]]"
     let plan = try WikilinkConversion.plan(source: source, file: root + "notes/source.md", resolver: resolver, style: .path)
-    #expect(plan.proposed == "[[../Alice.md]] [[Alice]] [[Missing]] [[Only.md]] [[../People/Bob.md]]")
-    #expect(plan.changes.filter { $0.diagnostic != nil }.count == 4)
+    #expect(plan.proposed == "[[../Alice.md]] [[Alice]] [[Missing]] [[Only.md]] [[People/Bob.md]] [[notes/People/Bob.md]]")
+    #expect(plan.changes.filter { $0.diagnostic != nil }.count == 3)
     let names = try WikilinkConversion.plan(source: "[[People/Alice.md]]", file: root + "source.md", resolver: resolver, style: .name)
     #expect(names.hasChanges == false)
     #expect(names.changes.first?.diagnostic != nil)

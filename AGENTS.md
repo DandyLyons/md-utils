@@ -11,6 +11,12 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Wikilink resolution (#170)**: Slash-containing targets are vault-root-relative;
+  only `./` and `../` select source-relative paths. No cross-base or basename
+  fallback is allowed. Bare-name ambiguity, omitted `.md`/`.markdown` support,
+  exact attachment extensions, and snapshot confinement remain. List/check/backlinks
+  share the resolver. Tests: `swift test --filter 'Wikilink|ConvertLinksTests'`.
+
 - **Wikilink extension spelling**: `links convert --markdown-extension auto|include|omit` defaults to including actual Markdown extensions for `wiki-path` and omitting them for `wiki-link`. Other extensions are always preserved; ambiguous omission is skipped. Covered by `WikilinkConversionTests` and `ConvertLinksTests`.
 
 - **Wikilink conversion**: `links convert --to wiki-path|wiki-link` requires explicit `--root`, previews by default, and writes with `--in-place`. Shared planning checks destination equivalence and preserves aliases/fragments/embeds, with body/frontmatter/key selection, revision-checked writes, no-op preservation, and partial batch reports. Explicit paths never fall back to basename matching; root-level ambiguity is skipped. See `docs/wikilink-conversion.md`; tests: `swift test --filter 'Wikilink|ConvertLinksTests'`. Markdown-link and server support remain separate (#182/#183).

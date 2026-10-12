@@ -15,7 +15,7 @@ struct WikilinkResolverTests {
   /// Creates a temporary vault directory with the given file structure.
   /// Keys are relative paths, values are file contents.
   private func createVault(_ files: [String: String]) throws -> Path {
-    let vault = Path(NSTemporaryDirectory()) + "test-vault-\(UUID().uuidString)"
+    let vault = Path(#filePath).parent().parent().parent().parent() + "tmp/test-vault-\(UUID().uuidString)/"
     try vault.mkpath()
 
     for (relativePath, content) in files {
@@ -141,16 +141,70 @@ struct WikilinkResolverTests {
 
   // MARK: - Relative Path
 
+  @Test(arguments: [".md", ""])
+  func `explicit paths choose only their declared base`(suffix: String) throws {
+    let vault = try createVault([
+      "About/Daniel Lyons.md": "",
+      "notes/About/Daniel Lyons.md": "",
+      "notes/Local/Daniel Lyons.md": "",
+      "notes/source.md": "",
+    ])
+    defer { try? vault.delete() }
+    let resolver = try WikilinkResolver(root: vault)
+    let source = vault + "notes/source.md"
+    #expect(resolver.resolve(target: "About/Daniel Lyons\(suffix)", from: source) == .resolved(vault + "About/Daniel Lyons.md"))
+    #expect(resolver.resolve(target: "./About/Daniel Lyons\(suffix)", from: source) == .resolved(vault + "notes/About/Daniel Lyons.md"))
+    #expect(resolver.resolve(target: "../About/Daniel Lyons\(suffix)", from: source) == .resolved(vault + "About/Daniel Lyons.md"))
+    #expect(resolver.resolve(target: "Local/Daniel Lyons\(suffix)", from: source) == .unresolved)
+    #expect(resolver.resolve(target: "Missing/Daniel Lyons\(suffix)", from: source) == .unresolved)
+    #expect(resolver.resolve(target: "./About/Daniel Lyons\(suffix)", from: vault + "other/source.md") == .unresolved)
+    guard case .ambiguous(let matches) = resolver.resolve(target: "Daniel Lyons\(suffix)", from: source) else {
+      Issue.record("Bare duplicate names must remain ambiguous")
+      return
+    }
+    #expect(matches.count == 3)
+  }
+
+  @Test
+  func `relative paths cannot reach existing files outside the vault`() throws {
+    let workspace = try createVault([
+      "outside.md": "", "vault/source.md": "",
+    ])
+    defer { try? workspace.delete() }
+    let vault = workspace + "vault/"
+    let resolver = try WikilinkResolver(root: vault)
+    #expect(resolver.resolve(target: "../outside.md", from: vault + "source.md") == .unresolved)
+  }
+
+  @Test
+  func `path extension ambiguity and attachments do not change bases`() throws {
+    let vault = try createVault([
+      "About/Page.md": "", "About/Page.markdown": "",
+      "notes/About/Page.md": "", "About/image.png": "",
+      "notes/About/image.png": "", "notes/source.md": "",
+    ])
+    defer { try? vault.delete() }
+    let resolver = try WikilinkResolver(root: vault)
+    let source = vault + "notes/source.md"
+    #expect(resolver.resolve(target: "About/Page", from: source) == .ambiguous([
+      vault + "About/Page.markdown", vault + "About/Page.md",
+    ]))
+    #expect(resolver.resolve(target: "About/Page.markdown", from: source) == .resolved(vault + "About/Page.markdown"))
+    #expect(resolver.resolve(target: "About/image.png", from: source) == .resolved(vault + "About/image.png"))
+    #expect(resolver.resolve(target: "About/image", from: source) == .unresolved)
+    #expect(resolver.resolve(target: "../../outside.md", from: source) == .unresolved)
+  }
+
   @Test
   func `Resolves relative path from source directory`() async throws {
     let vault = try createVault([
       "notes/sub/Target.md": "# Target",
-      "notes/source.md": "See [[sub/Target]]",
+      "notes/source.md": "See [[./sub/Target]]",
     ])
     defer { try? vault.delete() }
 
     let resolver = try WikilinkResolver(root: vault)
-    let result = resolver.resolve(target: "sub/Target", from: vault + "notes/source.md")
+    let result = resolver.resolve(target: "./sub/Target", from: vault + "notes/source.md")
 
     #expect(result == .resolved((vault + "notes/sub/Target.md").absolute()))
   }

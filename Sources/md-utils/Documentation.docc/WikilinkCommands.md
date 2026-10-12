@@ -8,6 +8,19 @@ The `links` command group scans Markdown content for wikilinks, resolves them ag
 
 Resolution is based on Markdown file names and paths inside the vault. Commands that check link health are intended for automation and can fail when broken or ambiguous links are found.
 
+Bare names use case-insensitive collection-wide matching and duplicate matches
+are ambiguous. Targets containing `/`, such as `[[About/Daniel Lyons.md]]`, are
+vault-root-relative. Only `./` and `../` explicitly select source-relative paths.
+A missing path stays unresolved without trying another directory or basename.
+Omitted extensions match `.md` or `.markdown` (ambiguous if both exist);
+attachments require their extensions. Hidden files, symlinks, and paths outside
+the vault are excluded. Self-heading links resolve to the source file.
+
+Compatibility change (#170): replace formerly implicit source-relative links
+such as `[[sub/Target]]` with `[[./sub/Target]]`. Unprefixed paths now always use
+the vault root. List, check, and backlinks default `--root` to the working
+directory; specify `--root vault/` when working elsewhere.
+
 ## Convert target styles
 
 `md-utils links convert --to wiki-path vault/notes/ --root vault/` previews

@@ -39,6 +39,14 @@ are skipped. Writes check revisions, preserve no-ops, and stop at the first file
 failure with partial-completion reporting. Metadata edits may reformat frontmatter.
 Markdown-link output and server conversion are not supported by this command.
 
+Wikilink paths containing `/` resolve only from the vault root unless prefixed
+with `./` or `../` for source-relative resolution. Missing paths never fall back
+to another directory or basename. Bare names retain collection-wide ambiguity;
+omitted Markdown extensions match `.md`/`.markdown`, while attachments require
+extensions. Paths must be discovered vault files (no hidden files or symlinks).
+Compatibility (#170): change implicit source-relative `[[sub/Target]]` links to
+`[[./sub/Target]]`. List/check/backlinks default `--root` to the working directory.
+
 ## Collection Indexing
 
 On macOS, `md-utils index watch ./notes/` registers a scope and completes an

@@ -6,6 +6,7 @@
 import Foundation
 import MarkdownUtilitiesCore
 import PathKit
+import Parsing
 
 /// The result of resolving a wikilink target to a file on disk.
 public enum WikilinkResolution: @unchecked Sendable, Equatable {
@@ -23,8 +24,9 @@ public enum WikilinkResolution: @unchecked Sendable, Equatable {
 ///
 /// Resolution priority:
 /// Bare names use case-insensitive collection-wide filename matching. Targets
-/// containing `/` use exact source-relative, then root-relative resolution,
-/// without falling back to a filename match.
+/// containing `/` are vault-root-relative, except explicit `./` and `../`
+/// prefixes, which resolve from the source directory. Paths never fall back to
+/// another base directory or a filename match, and must belong to the vault snapshot.
 ///
 /// When a target has no extension, only `.md` and `.markdown` files are matched.
 /// When a target has an explicit extension, it is matched exactly.
@@ -106,9 +108,18 @@ public struct WikilinkResolver: @unchecked Sendable {
     let hasExtension = Path(target).extension != nil
     let targetPath = Path(target)
 
-    // Strategy 1: Filename match (search by stem)
+    // Parse explicit relative prefixes before PathKit normalizes away `./`.
+    if target.contains("/") {
+      var input = target[...]
+      let relativePrefix = OneOf { "./"; "../" }
+      let isSourceRelative = (try? relativePrefix.parse(&input)) != nil
+      let base = isSourceRelative ? sourceFile.absolute().parent() : root
+      return tryResolveExact(base + targetPath, hasExtension: hasExtension) ?? .unresolved
+    }
+
+    // Bare names retain collection-wide matching, including ambiguity.
     let stem = targetPath.lastComponentWithoutExtension.lowercased()
-    if !target.contains("/"), let candidates = stemIndex[stem] {
+    if let candidates = stemIndex[stem] {
       let filtered: [Path]
       if hasExtension {
         // Explicit extension: match exactly
@@ -127,19 +138,6 @@ public struct WikilinkResolver: @unchecked Sendable {
       } else if filtered.count > 1 {
         return .ambiguous(filtered.sorted { $0.string < $1.string })
       }
-    }
-
-    // Strategy 2: Relative path (from source file's parent)
-    let sourceDir = sourceFile.absolute().parent()
-    let relativePath = sourceDir + targetPath
-    if let found = tryResolveExact(relativePath, hasExtension: hasExtension) {
-      return found
-    }
-
-    // Strategy 3: Absolute path (from root)
-    let absolutePath = root + targetPath
-    if let found = tryResolveExact(absolutePath, hasExtension: hasExtension) {
-      return found
     }
 
     return .unresolved

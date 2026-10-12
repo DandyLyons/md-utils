@@ -306,7 +306,10 @@ Parse and resolve Obsidian-flavored wikilinks.
 
 **Resolution (Library)**: `WikilinkResolver`, `WikilinkResolution`, `ResolvedWikilink`
 - `WikilinkResolver(root:)` - Builds a file index from a vault root directory
-- Resolution priority: filename match → relative path → absolute path from root
+- Resolution: bare names use collection-wide case-insensitive filename matching;
+  paths containing `/` are root-relative unless prefixed with `./` or `../`, which
+  select source-relative resolution. Paths never fall back to another base or a
+  basename. Omitted extensions match `.md`/`.markdown`, with ambiguity preserved.
 - No-extension targets match only `.md`/`.markdown`; explicit extensions match exactly
 - Detects ambiguous matches (multiple files with same stem)
 

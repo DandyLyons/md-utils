@@ -154,6 +154,7 @@ let package = Package(
       dependencies: [
         "MarkdownUtilitiesCore",
         .product(name: "PathKit", package: "PathKit"),
+        .product(name: "Parsing", package: "swift-parsing"),
         "Yams",
       ]
     ),

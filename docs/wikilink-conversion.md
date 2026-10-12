@@ -53,12 +53,12 @@ exist), the original link remains unchanged with a diagnostic.
 - By default, `[[Alice]]` can become `[[People/Alice.md]]`; the reverse conversion omits
   `.md`/`.markdown` but preserves attachment extensions.
 - Bare names use collection-wide case-insensitive stem matching. Explicit paths
-  containing `/` resolve from the source directory first, then the collection root,
-  never falling back to an unrelated basename. If both Markdown extensions exist
+  containing `/` resolve from the collection root; only `./` and `../` prefixes
+  select the source directory. Missing paths never fall back to another directory
+  or an unrelated basename. If both Markdown extensions exist
   at an extensionless explicit path, the target is ambiguous.
 - Every proposed target is resolved again and must uniquely identify the original
-  destination. Source-relative shadowing can therefore prevent a root-relative
-  conversion; it is skipped instead of silently changing the destination.
+  destination. Source-relative files cannot shadow root-relative conversions.
 - Root-level output uses `[[Alice.md]]` only when that spelling uniquely resolves
   to the original file. A nested duplicate makes it ambiguous. No special root
   marker is invented.
@@ -69,6 +69,15 @@ exist), the original link remains unchanged with a diagnostic.
 - Body-only changes retain the exact frontmatter envelope. Metadata changes retain
   unaffected values and body text but may reserialize YAML/TOML and remove comments
   or formatting. The existing source format is retained.
+
+## Compatibility
+
+Compatibility change (#170): `[[sub/Target]]` previously tried the source
+directory before the collection root. It now means only the root-relative path;
+use `[[./sub/Target]]` for a file beneath the source directory or `[[../Target]]`
+for one in its parent. Relative paths remain confined to discovered vault files;
+hidden files, symlinks, and files outside the vault are not candidates. This does
+not change `--root` defaults for list/check/backlinks (the working directory).
 
 ## Preview, application, and output
 
