@@ -22,11 +22,22 @@ The `md-utils` CLI provides structured operations on Markdown files. Add `--help
 | `md-utils body` | Output document body without frontmatter |
 | `md-utils lines` | Extract a line range |
 | `md-utils convert` | Convert to plain text or CSV |
-| `md-utils links` | List, check, or find backlinks for wikilinks |
+| `md-utils links` | List, check, find backlinks, or convert wikilink target styles |
 | `md-utils meta` | Read file metadata |
 | `md-utils rules` | Validate Markdown files with project-level rules |
 | `md-utils index` | Maintain a rebuildable SQLite collection cache with type/rule assessments |
 | `md-utils copy` / `md-utils move` | Revision-checked transfers through configured resource opt-ins; copy allocates a fresh configured UUID |
+
+`links convert --to wiki-path|wiki-link files/ --root vault/` requires explicit
+collection context and previews by default; `--in-place` writes.
+`--markdown-extension auto|include|omit` controls Markdown suffixes: `auto`
+includes them for wiki-path and omits them for wiki-link. Other extensions are
+always retained, and omission must preserve unique destination resolution. Select occurrences
+with `--scope all|body|frontmatter`; repeated `--key` requires frontmatter scope.
+`--json` reports per-file outcomes. Missing/ambiguous or destination-changing links
+are skipped. Writes check revisions, preserve no-ops, and stop at the first file
+failure with partial-completion reporting. Metadata edits may reformat frontmatter.
+Markdown-link output and server conversion are not supported by this command.
 
 ## Collection Indexing
 

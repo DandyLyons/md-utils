@@ -62,7 +62,7 @@ struct GlobalOptions: ParsableArguments {
   ///
   /// - Returns: Array of file paths to process
   /// - Throws: If a specified path doesn't exist
-  func resolvedPaths() throws -> [Path] {
+  func resolvedPaths(skipSymlinks: Bool = false) throws -> [Path] {
     // If no paths specified, use current directory
     let pathsToProcess = paths.isEmpty ? [Path.current] : paths
 
@@ -71,6 +71,9 @@ struct GlobalOptions: ParsableArguments {
     let excludePatterns = exclude.map { $0.absolute().string }
 
     for path in pathsToProcess {
+      if skipSymlinks && path.isSymlink {
+        throw ValidationError("Symlink input paths are not supported: \(path)")
+      }
       guard path.exists else {
         throw ValidationError("Path does not exist: \(path)")
       }
@@ -82,7 +85,8 @@ struct GlobalOptions: ParsableArguments {
           recursive: recursive,
           includeHidden: includeHidden,
           extensions: allowedExtensions,
-          excludePatterns: excludePatterns
+          excludePatterns: excludePatterns,
+          skipSymlinks: skipSymlinks,
         )
         resolvedFiles.append(contentsOf: files)
       } else {
@@ -109,13 +113,16 @@ struct GlobalOptions: ParsableArguments {
     recursive: Bool,
     includeHidden: Bool,
     extensions: Set<String>,
-    excludePatterns: [String]
+    excludePatterns: [String],
+    skipSymlinks: Bool = false,
   ) throws -> [Path] {
     var files: [Path] = []
 
     let children = try directory.children()
 
     for child in children {
+      // Mutation callers can exclude symlinks before recursive traversal begins.
+      if skipSymlinks && child.isSymlink { continue }
       // Skip hidden files/directories if not included
       if !includeHidden && child.lastComponent.hasPrefix(".") {
         continue
@@ -134,7 +141,8 @@ struct GlobalOptions: ParsableArguments {
             recursive: recursive,
             includeHidden: includeHidden,
             extensions: extensions,
-            excludePatterns: excludePatterns
+            excludePatterns: excludePatterns,
+            skipSymlinks: skipSymlinks,
           )
           files.append(contentsOf: subdirFiles)
         }

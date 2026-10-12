@@ -51,7 +51,7 @@ public enum FrontMatterFileWriter {
     expectedSource: String
   ) throws {
     let latest = try readSnapshot(from: path)
-    guard latest == expectedSource else {
+    guard latest.utf8.elementsEqual(expectedSource.utf8) else {
       throw FrontMatterFileWriteError.revisionMismatch
     }
     guard let data = content.data(using: .utf8) else {

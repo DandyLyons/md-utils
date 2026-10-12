@@ -34,10 +34,11 @@ struct LinkCommandsTests {
     let config = CLIEntry.LinkCommands.configuration
 
     #expect(config.commandName == "links")
-    #expect(config.subcommands.count == 3)
+    #expect(config.subcommands.count == 4)
     #expect(config.subcommands[0] is CLIEntry.ListLinks.Type)
     #expect(config.subcommands[1] is CLIEntry.Check.Type)
     #expect(config.subcommands[2] is CLIEntry.Backlinks.Type)
+    #expect(config.subcommands[3] is CLIEntry.ConvertLinks.Type)
   }
 
   @Test

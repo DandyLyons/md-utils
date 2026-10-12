@@ -22,9 +22,9 @@ public enum WikilinkResolution: @unchecked Sendable, Equatable {
 /// Resolves wikilink targets to files within a vault (root directory).
 ///
 /// Resolution priority:
-/// 1. **Filename match** — search index for files whose stem matches target (case-insensitive)
-/// 2. **Relative path** — resolve from source file's parent directory
-/// 3. **Absolute path** — resolve from root directory
+/// Bare names use case-insensitive collection-wide filename matching. Targets
+/// containing `/` use exact source-relative, then root-relative resolution,
+/// without falling back to a filename match.
 ///
 /// When a target has no extension, only `.md` and `.markdown` files are matched.
 /// When a target has an explicit extension, it is matched exactly.
@@ -33,7 +33,7 @@ public struct WikilinkResolver: @unchecked Sendable {
   /// The root directory of the vault.
   public let root: Path
 
-  /// All files discovered under root, relative to root.
+  /// All files discovered under root, as absolute paths.
   public let allFiles: [Path]
 
   /// Markdown files discovered under root (absolute paths).
@@ -41,6 +41,9 @@ public struct WikilinkResolver: @unchecked Sendable {
 
   /// Index mapping lowercased file stems to their absolute paths.
   private let stemIndex: [String: [Path]]
+
+  /// Exact snapshot membership also prevents traversal outside the collection.
+  private let exactPaths: Set<Path>
 
   /// Markdown extensions considered for no-extension targets.
   private static let markdownExtensions: Set<String> = ["md", "markdown"]
@@ -73,6 +76,7 @@ public struct WikilinkResolver: @unchecked Sendable {
     )
 
     self.allFiles = discovered
+    self.exactPaths = Set(discovered)
     self.markdownFiles = mdFiles
     self.stemIndex = index
   }
@@ -104,7 +108,7 @@ public struct WikilinkResolver: @unchecked Sendable {
 
     // Strategy 1: Filename match (search by stem)
     let stem = targetPath.lastComponentWithoutExtension.lowercased()
-    if let candidates = stemIndex[stem] {
+    if !target.contains("/"), let candidates = stemIndex[stem] {
       let filtered: [Path]
       if hasExtension {
         // Explicit extension: match exactly
@@ -146,18 +150,19 @@ public struct WikilinkResolver: @unchecked Sendable {
   private func tryResolveExact(_ path: Path, hasExtension: Bool) -> WikilinkResolution? {
     if hasExtension {
       let normalized = path.absolute()
-      if normalized.exists && normalized.isFile {
+      if exactPaths.contains(normalized) {
         return .resolved(normalized)
       }
     } else {
-      // Try markdown extensions
+      // Both Markdown extensions can exist; do not arbitrarily select one.
+      var matches: [Path] = []
       for ext in Self.markdownExtensions.sorted() {
         let withExt = Path(path.string + ".\(ext)")
         let normalized = withExt.absolute()
-        if normalized.exists && normalized.isFile {
-          return .resolved(normalized)
-        }
+        if exactPaths.contains(normalized) { matches.append(normalized) }
       }
+      if matches.count > 1 { return .ambiguous(matches) }
+      if let match = matches.first { return .resolved(match) }
     }
     return nil
   }
@@ -172,6 +177,8 @@ public struct WikilinkResolver: @unchecked Sendable {
   ) throws {
     let children = try directory.children()
     for child in children.sorted(by: { $0.string < $1.string }) {
+      // Do not escape the collection or recurse through symlink cycles.
+      if child.isSymlink { continue }
       // Skip hidden files and directories
       if child.lastComponent.hasPrefix(".") {
         continue

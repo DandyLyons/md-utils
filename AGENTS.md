@@ -11,6 +11,10 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Wikilink extension spelling**: `links convert --markdown-extension auto|include|omit` defaults to including actual Markdown extensions for `wiki-path` and omitting them for `wiki-link`. Other extensions are always preserved; ambiguous omission is skipped. Covered by `WikilinkConversionTests` and `ConvertLinksTests`.
+
+- **Wikilink conversion**: `links convert --to wiki-path|wiki-link` requires explicit `--root`, previews by default, and writes with `--in-place`. Shared planning checks destination equivalence and preserves aliases/fragments/embeds, with body/frontmatter/key selection, revision-checked writes, no-op preservation, and partial batch reports. Explicit paths never fall back to basename matching; root-level ambiguity is skipped. See `docs/wikilink-conversion.md`; tests: `swift test --filter 'Wikilink|ConvertLinksTests'`. Markdown-link and server support remain separate (#182/#183).
+
 - **Bulk instance creation**: `types new`/`rules new` accept `--values` JSON arrays or repeated `--value-file` objects, requiring JSONPath filenames. Shared preflight applies defaults/rendering/advisory conformance, collects failures and all collision participants, and bounds input/output at 64 MiB and 10,000 items. Atomic no-clobber publication stops on the first failure with complete partial-completion reporting. Dry run has no persistent side effects. See `docs/instance-creation.md`; tests: `swift test --filter 'CreationBatchTests|InstanceCreationTests'`.
 
 - **Instance creation**: `types new` and `rules new` use mdtype Knap creation declarations. Document mode is default with upstream object-variable semantics; explicit body mode serializes frontmatter separately. Input defaults precede JSONPath filename selection and validation; type/rule nonconformance is advisory. Destinations must exist and atomic hard-link publication never overwrites. See `docs/instance-creation.md`; tests: `swift test --filter 'CreationTemplateTests|InstanceCreationTests|TemplateTests'`.

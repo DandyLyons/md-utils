@@ -201,6 +201,9 @@ swift run md-utils links check --vault ~/notes/ docs/
 # Find backlinks to a file
 swift run md-utils links backlinks --vault ~/notes/ --target "My Note"
 
+# Preview explicit-path wikilinks; add --in-place to write
+swift run md-utils links convert --to wiki-path ~/notes/ --root ~/notes/
+
 # Validate an OKF v0.1 draft bundle
 swift run md-utils okf validate ./knowledge/
 

@@ -24,6 +24,7 @@ extension CLIEntry {
         - list: List all wikilinks found in files with resolution status
         - check: Check for broken or ambiguous wikilinks
         - backlinks: Find files that link to a given target
+        - convert: Preview or rewrite wikilink target styles
 
         Use --root to specify the vault root directory for link resolution.
         Use --json for machine-readable JSON output.
@@ -36,6 +37,7 @@ extension CLIEntry {
         ListLinks.self,
         Check.self,
         Backlinks.self,
+        ConvertLinks.self,
       ],
       aliases: ["ln"]
     )
