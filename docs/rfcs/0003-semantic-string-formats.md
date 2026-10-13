@@ -1,6 +1,6 @@
 # RFC 0003: Declared Semantic String Formats
 
-- Status: Specified; implementation tracked separately in #173/#174
+- Status: Scalars and lexical wikilink constraints implemented through #173/#174/#176; RFC 0004 relationship runtime remains pending
 - Date: 2026-10-12
 - Tracking: [#171](https://github.com/DandyLyons/md-utils/issues/171), [#169](https://github.com/DandyLyons/md-utils/issues/169)
 - Version coordination: [#135](https://github.com/DandyLyons/md-utils/issues/135), [#184](https://github.com/DandyLyons/md-utils/issues/184)
@@ -8,15 +8,23 @@
 
 ## Purpose and compatibility boundary
 
+Design revision (2026-10-13): mdtype v2 is the shared definition version for this
+RFC's semantic scalars, #176's authored wikilink style/extension constraints, and
+RFC 0004's named document relationships. The earlier scalar-v2/relationship-v3
+split is superseded. Implementation milestones do not create separate language
+versions. Existing scalar-only v2 implementations are partial implementations of
+this combined contract, not evidence that relationship support is available.
+
 Extend mdtype with explicit semantic string contracts while preserving native
 YAML/JSON/TOML value types. A declaration identifies what a string represents and
 how it is represented. Values are never classified by guessing their contents:
 `garden-notes` is not implicitly a Slug. One string may satisfy multiple contracts.
 
-This RFC records the completed specification. It does not enable new
-runtime behavior, publish schemas, or alter [mdtype v1](0001-mdtype.md). Normative
-requirements below describe the future implementation. API mechanics and platform
-verification belong to the implementation issues, not to an alternative contract.
+This RFC records the scalar specification and its place in the combined v2 design.
+Scalar implementation evidence belongs to #173/#174; the complete combined contract
+is not yet implemented. Editing this RFC does not enable runtime behavior, publish
+schemas, or alter [mdtype v1](0001-mdtype.md). Normative requirements describe the
+contract, not claims that every reader or platform already implements it.
 
 ## Declaration model
 
@@ -253,6 +261,95 @@ Syntax validity does not require a destination to exist. Name/path style and ext
 constraints belong to #176; resolution and relationship policies remain separate.
 Cycles are valid data by default and outside this scalar RFC.
 
+### Authored style constraints and explicit conversion (#176)
+
+Wikilink is the subject and Obsidian is its raw format. Future raw formats require
+their own specified grammar; style options do not redefine the Obsidian grammar.
+mdtype owns property-level lexical style and Markdown-extension assertions; mdrule
+selects documents required to conform. These checks belong inside schema branch
+evaluation, including required and recommended schemas. They do not rewrite values
+or prove resolution, destination uniqueness, or destination-type conformance.
+
+Approved design (2026-10-13): a string schema may declare the following object,
+requiring sibling `type: string` and `format: Wikilink` or `Wikilink/Obsidian`:
+
+```yaml
+type: string
+format: Wikilink/Obsidian
+wikilink:
+  styles: [name, vault-path]
+  markdownExtension: omit
+```
+
+`styles` is an unordered, nonempty array of distinct accepted style names. Omission
+imposes no style restriction. Unknown names, duplicate entries, empty arrays, wrong
+value kinds, and unknown policy fields are definition errors. Array order conveys
+no conversion preference.
+
+| Style | Lexical meaning | Example |
+| --- | --- | --- |
+| `name` | Bare destination name, independent of extension | `[[Alice.md]]` |
+| `vault-path` | Vault-root-relative target with an explicit directory component | `[[People/Alice]]` |
+| `relative-path` | Target explicitly prefixed with `./` or `../` | `[[./Alice]]`, `[[../Alice]]` |
+| `self-anchor` | Anchor-only reference with no destination target | `[[#Biography]]`, `[[#^block]]` |
+
+`[[Alice.md]]` remains name style even if it uniquely resolves to a root-level file.
+`[[./Alice.md]]` remains relative-path even when its source is at the vault root.
+No explicit-root marker is introduced: strict vault-path contracts cannot represent
+root-level destinations. Authors may also allow name or relative-path. Filesystem
+absolute-path (`abs-path`) support is deferred; collection confinement is unchanged.
+
+`markdownExtension` accepts `require`, `omit`, or `either` (default). Inspect only
+the parsed target's final component for a case-insensitive `.md` or `.markdown`
+suffix. `require` demands either suffix; `omit` prohibits both; `either` imposes no
+restriction. Other extensions are untouched: `photo.png` passes omit/either and
+fails require. This does not infer file type. Self-anchor links have no suffix and
+pass omit/either but fail require. A self-anchor-only policy combined with require
+is an unsatisfiable declaration and MUST be rejected at compilation.
+
+Aliases, heading/block fragments and embed prefixes do not change target-style or
+extension classification. Preserve their original text; relationship anchor/embed
+restrictions remain separate conjunctive checks.
+
+#### Required capability gate
+
+mdtype v2 definitions using these assertions MUST declare the top-level capability:
+
+```yaml
+md-utils-type-schema: "2"
+requires: [wikilink-constraints]
+```
+
+`requires` is an array of distinct supported capability names. Unknown capabilities,
+duplicates and invalid value kinds are definition errors. Omission or an empty
+array requests no additional capabilities. `wikilink-constraints` is mandatory
+whenever the loaded schema graph contains a `wikilink` policy, including referenced
+resources. RFC 0004 relationships require `document-relationships` on their declaring
+definition. Declarations may request both. A declared unsupported capability or
+feature used without its gate MUST fail compilation, including in advisory schemas.
+
+Existing scalar-only decoders reject unknown top-level fields, so the gate makes
+them reject new policy-bearing definitions rather than silently ignore assertions.
+Verify that behavior before release; older binaries cannot be retroactively fixed.
+The gate does not change the shared mdtype v2 version or scalar defaults.
+
+The CLI remains able to perform explicitly requested conversions. Existing
+`links convert` supports `--to wiki-link|wiki-path` and independent
+`--markdown-extension auto|include|omit`, with preview and revision-checked writes.
+See [wikilink conversion](../wikilink-conversion.md). Its root-level `wiki-path`
+output may be a uniquely resolving bare name; that does not certify a future
+strict vault-path contract. Conversion and conformance have distinct outcomes.
+Contract-aware conversion is approved as separately tracked #185 work: select a
+loaded mdtype's frontmatter values, reuse shared policy evaluation, and preserve
+destination identity. Keep conforming values unchanged; propose a unique valid
+replacement or require an explicit preference among multiple valid replacements.
+Conflicting branches or uncertain rewrite intent produce diagnostics, not guessed
+rewrites. Reassess proposed documents and separately report lexical repairs,
+remaining failures and unavailable relationship checks. Contract mode returns a
+nonzero status when requested repairs remain unresolved, with complete partial-write
+reporting. Existing ad hoc modes retain their behavior. Exact new CLI flag spelling
+belongs to #185; conversion is not a prerequisite for #176 validation.
+
 The pinned SwiftKnap `wikilink` filter generates links; it is not a whole-value
 validator. Reuse Knap infrastructure only where its actual APIs and grammar fit,
 without adding the native template runtime to portable Core.
@@ -264,6 +361,8 @@ instance property path, array index where applicable, subject/raw format, severi
 and a reason. Preserve source locations when available. Use the new diagnostic
 code `frontmatter.format.invalid` with stable reason identifiers `native-kind`,
 `syntax`, `trailing-input`, `calendar-range`, `precision`, and `uuid-layout`.
+Lexical wikilink assertions add `wikilink-style` and `wikilink-extension`, locating
+the exact `wikilink/styles` or `wikilink/markdownExtension` schema member.
 Schema composition retains branch diagnostics as causes without promoting failures
 from a successful alternative into top-level errors. Configuration failures use
 `type.format.unsupported`, `type.format.declaration`, or `type.format.capability`.
@@ -306,7 +405,8 @@ raise deployment minimums or substitute a parser implicitly.
 
 ## Versioning, publication, and migration
 
-Reserve mdtype definition version `"2"` for this contract. This is the specific
+Reserve mdtype definition version `"2"` for the combined contract in this RFC,
+RFC 0004, and #176. This is the specific
 compatibility decision for #135; #184 will incorporate it into the broader matrix.
 Product releases, project config, mdtype language, authored contract versions,
 server formats, and cache/evaluator versions are distinct. No project config or
@@ -315,8 +415,8 @@ existing type references; the reader must support v2 explicitly.
 
 | Reader / writer | v1 | v2 |
 | --- | --- | --- |
-| Current implementation | Existing behavior | Reject unsupported version |
-| Implementation of this RFC | Preserve existing behavior | Assert this profile; reject unsupported declared capabilities |
+| Current scalar implementation | Existing behavior | Scalar subset implemented; combined contract incomplete |
+| Complete implementation of the combined contract | Preserve existing behavior | Assert scalars, authored link constraints, and declared relationships; reject unsupported capabilities |
 | Authoring defaults | Remain v1 until deliberate release activation | Explicit opt-in during implementation |
 
 Publish the v2 definition schema at
@@ -327,6 +427,20 @@ Before activation, publish immutable versioned schemas from canonical bundled
 sources, synchronize public copies, document reader/writer support and defaults,
 and update CLI help, DocC, and the distributed skill. Publishing a package does not
 automatically advance schema aliases or initialization defaults.
+
+The unified v2 design must not cause partial readers to silently ignore new
+assertions. Before activation, verify rejection of unsupported relationship and
+wikilink-policy declarations, including referenced schemas, and document minimum
+reader support. Existing partial readers may ignore unfamiliar schema keywords;
+an evaluator fingerprint alone does not address that compatibility gap. Coordinate
+the capability-gate implementation and any already-published schema artifacts with
+#184; do not overwrite immutable published artifacts or claim older binaries have
+gained these checks. The approved `requires` gate above supplies the rejection
+mechanism. #176 preserves existing schema/registry artifacts and adds the separate
+publication target `schemas/mdtype/2/wikilink-constraints/mdtype.schema.json` for
+the supported capability-bearing subset. This is not publication or activation of
+the full relationship contract; final combined-schema locations still require a
+publication-history audit before release.
 
 Migration is explicit and previewable. Preserve v1 definitions and meanings; never
 infer new format declarations from values, property names, or existing `format`
@@ -339,7 +453,8 @@ may explicitly change its version while preserving all other members. Added sema
 constraints are deliberate user edits, not inferred migration. Downgrading a v2
 definition containing semantic formats or recommended schemas must be refused unless
 the user explicitly removes those features; do not silently discard constraints.
-The specification reserves versions but implements no migration or runtime support.
+This specification text does not implement migration; current scalar runtime
+support remains the subset documented by #173/#174.
 
 ## Extension path and delivery
 
@@ -356,6 +471,8 @@ and compatibility evidence. #172 owns relationships; #176 owns link style constr
 Incremental builds may support only the implemented subjects, but must report
 `type.format.capability` for known, unimplemented subjects. They must not advertise
 the complete v2 registry as implemented until #173/#174 and platform checks pass.
+Complete scalar registry support does not imply complete mdtype v2 support:
+#176 and RFC 0004's relationships must also be implemented and verified.
 Public parser API names, validator adapter mechanics, generation command syntax,
 and CI implementation are delivery tasks; they cannot change this contract silently.
 

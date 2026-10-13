@@ -6,7 +6,7 @@ extension CLIEntry {
     static let configuration = CommandConfiguration(
       commandName: "types",
       abstract: "Work with structural Markdown record types",
-      discussion: "Explicit mdtype v2 definitions assert declared Date, LocalTime, DateTime, UUID, and Wikilink string formats. New definitions still default to v1. Quote temporal frontmatter values to store strings; recommendedSchemas produce advisories.",
+      discussion: "Explicit mdtype v2 definitions assert declared Date, LocalTime, DateTime, UUID, and Wikilink string formats. requires: [wikilink-constraints] enables wikilink styles (name, vault-path, relative-path, self-anchor) and independent markdownExtension policies. Validation never converts links. New definitions still default to v1. Quote temporal frontmatter values to store strings; recommendedSchemas produce advisories.",
       subcommands: [
         Add.self,
         Interactive.self,

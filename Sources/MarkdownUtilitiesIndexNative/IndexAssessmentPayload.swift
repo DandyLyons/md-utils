@@ -8,13 +8,16 @@ struct IndexDefinitionPayload: Encodable {
     var definition: MarkdownTypeDefinition
     private enum CodingKeys: String, CodingKey {
         case schema = "md-utils-type-schema"
-        case name, version, frontmatter, body, context
+        case name, version, frontmatter, body, context, requires
     }
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(definition.typeSchemaVersion, forKey: .schema)
         try container.encode(definition.name.rawValue, forKey: .name)
         try container.encode(definition.version, forKey: .version)
+        if definition.requires.isEmpty == false {
+            try container.encode(definition.requires.sorted(), forKey: .requires)
+        }
         var frontmatter: [String: JSONValue] = ["schemas": .array(definition.frontmatter.schemas.map {
             switch $0 {
             case .reference(let ref): .object(["ref": .string(ref)])

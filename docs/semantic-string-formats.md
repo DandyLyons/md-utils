@@ -104,6 +104,49 @@ resolution, relationships and cycle policies remain separately scoped.
 
 ## Schema assertions, diagnostics and compatibility
 
+### Wikilink spelling constraints
+
+Declare top-level `requires: [wikilink-constraints]` in an explicit mdtype v2
+definition, then constrain string schema nodes:
+
+```yaml
+type: string
+format: Wikilink/Obsidian
+wikilink:
+  styles: [name, vault-path]
+  markdownExtension: omit
+```
+
+Styles are unordered and distinct: `name` (`[[Alice.md]]`), `vault-path`
+(`[[People/Alice]]`), `relative-path` (`[[./Alice]]`, `[[../Alice]]`), and
+`self-anchor` (`[[#Heading]]`). Omission allows any style; empty/duplicate/unknown
+styles fail definition loading. Strict vault-path cannot spell root-level targets:
+a unique root-level `[[Alice.md]]` is still name style. No root marker or filesystem
+absolute-path style is introduced.
+When styles are explicitly constrained, POSIX roots, Windows drive-absolute paths
+and UNC paths do not count as any supported style. Omitting styles retains the
+underlying Wikilink grammar without an additional style restriction.
+
+`markdownExtension` is `require`, `omit`, or `either` (default). Only final target
+suffixes `.md`/`.markdown`, case-insensitively, count. Attachments such as `photo.png`
+pass omit/either and fail require; no destination kind is inferred. Self-anchor
+has no suffix; a self-anchor-only policy with require is a definition error.
+Aliases, fragments, embeds and original text are preserved. These checks neither
+resolve targets nor rewrite links; conversion enhancements belong to #185.
+
+The capability gate applies to all loaded references and advisory schemas. Unknown
+or unsupported capabilities fail, including `document-relationships` until that
+runtime lands. Old scalar-only readers reject the new top-level `requires` field.
+Diagnostics use `frontmatter.format.invalid` with `wikilink-style` and
+`wikilink-extension` reasons and exact instance/schema locations. Indexed evaluation
+uses runtime fingerprint v4 and includes capabilities in definition fingerprints.
+
+`types schema --schema-version 2` exports the capability-bearing schema with the
+new publication target `schemas/mdtype/2/wikilink-constraints/mdtype.schema.json`.
+Original v2 schema/registry artifacts remain unchanged; publication and complete
+relationship-v2 activation remain separate. Shape schemas do not replace runtime
+validation of embedded policy declarations and capability gates.
+
 The pinned JSONSchema.swift engine has no public custom-format hook. The adapter
 specializes each semantic format to an enum of the current record's matching
 strings, including property names. Existing enums are intersected. This is an exact

@@ -12,6 +12,23 @@ public struct ResolvedMarkdownTypeFrontmatterSchema: Codable, Equatable, Sendabl
   public let schemas: [JSONValue]
   public var recommendedSchemas: [JSONValue] = []
   public var typeSchemaVersion: String = "1"
+  public var requires: [String] = []
+
+  private enum CodingKeys: String, CodingKey {
+    case name, version, presence, schemas, recommendedSchemas, typeSchemaVersion, requires
+  }
+
+  /// Older serialized views predate the capability gate; omission means no requirements.
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    name = try container.decode(MarkdownTypeName.self, forKey: .name)
+    version = try container.decode(String.self, forKey: .version)
+    presence = try container.decodeIfPresent(MarkdownFrontmatterPresence.self, forKey: .presence)
+    schemas = try container.decode([JSONValue].self, forKey: .schemas)
+    recommendedSchemas = try container.decodeIfPresent([JSONValue].self, forKey: .recommendedSchemas) ?? []
+    typeSchemaVersion = try container.decodeIfPresent(String.self, forKey: .typeSchemaVersion) ?? "1"
+    requires = try container.decodeIfPresent([String].self, forKey: .requires) ?? []
+  }
 
   /// Creates an immutable frontmatter schema view.
   public init(
@@ -40,6 +57,7 @@ public struct MarkdownTypeRegistry: Sendable {
     var schemasByName: [MarkdownTypeName: [JSONValue]] = [:]
 
     for definition in definitions {
+      try Self.checkCapabilities(definition.requires, version: definition.typeSchemaVersion)
       guard MarkdownTypeSchemaVersion.supported.contains(definition.typeSchemaVersion) else {
         throw MarkdownTypeDefinitionError.unsupportedSchemaVersion(definition.typeSchemaVersion)
       }
@@ -86,7 +104,7 @@ public struct MarkdownTypeRegistry: Sendable {
       }
       if definition.typeSchemaVersion == "2" {
         for schema in schemas {
-          try SemanticSchemaAdapter.check(schema)
+          try SemanticSchemaAdapter.check(schema, capabilities: Set(definition.requires))
           try SemanticSchemaDiagnostics(
             root: schema, instance: .null, nativePaths: [], severity: .error,
             constraint: definition.name.rawValue, source: definition.source,
@@ -100,6 +118,14 @@ public struct MarkdownTypeRegistry: Sendable {
 
     self.definitionsByName = definitionsByName
     self.schemasByName = schemasByName
+  }
+
+  /// Reject unsupported capabilities for decoded and programmatically constructed definitions.
+  static func checkCapabilities(_ names: [String], version: String) throws {
+    guard (version == "2" || names.isEmpty), Set(names).count == names.count,
+      Set(names).isSubset(of: ["wikilink-constraints"]) else {
+      throw MarkdownTypeDefinitionError.invalidField("type.format.capability: unsupported or duplicate requires capability; supported in mdtype v2: wikilink-constraints")
+    }
   }
 
   /// All definitions ordered by case-sensitive type name.
@@ -138,6 +164,7 @@ public struct MarkdownTypeRegistry: Sendable {
     )
     result.recommendedSchemas = resolvedRecommendedSchemas(for: name)
     result.typeSchemaVersion = definition.typeSchemaVersion
+    result.requires = definition.requires
     return result
   }
 

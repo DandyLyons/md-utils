@@ -10,7 +10,7 @@ enum SemanticSchemaAdapter {
   static let singles: Set<String> = ["items", "additionalProperties", "propertyNames", "contains", "not", "if", "then", "else"]
   static let arrays: Set<String> = ["allOf", "anyOf", "oneOf"]
 
-  static func check(_ schema: JSONValue) throws {
+  static func check(_ schema: JSONValue, capabilities: Set<String> = []) throws {
     _ = try transform(schema) { object, path in
       if let dialect = object["$schema"]?.stringValue,
         dialect != "https://json-schema.org/draft/2020-12/schema" {
@@ -52,6 +52,16 @@ enum SemanticSchemaAdapter {
           else { throw configuration("unsupported", path + "/format", "Unsupported semantic format \(name)") }
         }
       }
+      if let policy = object["wikilink"] {
+        guard capabilities.contains("wikilink-constraints") else {
+          throw configuration("capability", path + "/wikilink", "requires must declare wikilink-constraints")
+        }
+        guard object["type"] == .string("string"),
+          ["Wikilink", "Wikilink/Obsidian"].contains(object["format"]?.stringValue ?? "") else {
+          throw configuration("declaration", path + "/wikilink", "wikilink requires sibling type: string and format: Wikilink/Obsidian")
+        }
+        _ = try WikilinkStylePolicy(policy, path: path + "/wikilink")
+      }
       return object
     }
   }
@@ -77,6 +87,14 @@ enum SemanticSchemaAdapter {
           accepted[format] = strings.sorted().filter { (try? MarkdownSemanticScalar.parse($0, format: format)) != nil }.map(JSONValue.string)
         }
         var values = accepted[format] ?? []
+        if let declaration = object["wikilink"] {
+          let policy = try WikilinkStylePolicy(declaration, path: "#/wikilink")
+          values = values.filter { value in
+            guard let source = value.stringValue, let link = try? Wikilink.parse(source, context: .standard) else { return false }
+            return policy.failures(link).isEmpty
+          }
+          object.removeValue(forKey: "wikilink")
+        }
         if case .array(let existing)? = object["enum"] { values = values.filter(existing.contains) }
         object["enum"] = .array(values)
         object.removeValue(forKey: "format")

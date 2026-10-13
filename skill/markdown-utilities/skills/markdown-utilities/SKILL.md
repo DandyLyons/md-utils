@@ -16,6 +16,14 @@ these formats, including nullable branches and array items. New definitions stil
 default to v1. No scalar inference, normalization, destination resolution or UUID
 identity allocation occurs during assessment.
 
+For mdtype v2 wikilink spelling checks, declare top-level
+`requires: [wikilink-constraints]`, then add `wikilink` beside `type: string` and
+`format: Wikilink`: `styles` accepts an unordered array of `name`, `vault-path`,
+`relative-path`, `self-anchor`; `markdownExtension` accepts `require`, `omit`,
+`either`. A root-level bare name is not strict vault-path style. These checks never
+rewrite or resolve links. `document-relationships` remains unsupported. Existing
+`links convert` behavior is unchanged; contract-aware conversion is separate work.
+
 ## Commands at a Glance
 
 | Command | Purpose |

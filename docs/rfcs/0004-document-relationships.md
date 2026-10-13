@@ -1,11 +1,11 @@
 # RFC 0004: Named Document Relationships and Collection Policies
 
-- Status: Specified; runtime implementation tracked separately in #175–#180
+- Status: Relationship contract specified; provenance delivered in #175; lexical constraints delivered in #176; relationship runtime pending #177–#180
 - Date: 2026-10-12
 - Tracking: [#172](https://github.com/DandyLyons/md-utils/issues/172), [#169](https://github.com/DandyLyons/md-utils/issues/169)
 - Depends on: [RFC 0003](0003-semantic-string-formats.md), implemented through #173/#174
 - Coordination: [#135](https://github.com/DandyLyons/md-utils/issues/135), [#184](https://github.com/DandyLyons/md-utils/issues/184), [#70](https://github.com/DandyLyons/md-utils/issues/70)
-- Reserved definition versions: mdtype `"3"`; explicit mdrule `"1"`
+- Reserved definition versions: unified mdtype `"2"`; explicit mdrule `"1"`
 
 ## Purpose and implementation boundary
 
@@ -19,8 +19,11 @@ inferred from arbitrary values or names.
 MUST, MUST NOT, SHOULD, and MAY describe the future implementation contract. This
 RFC reserves formats and defines acceptance examples; it does not enable runtime
 support, publish schemas, change authoring defaults, or complete the implementation
-epic. Existing mdtype v1, scalar-only v2, and project-selected rule semantics remain
-unchanged. The examples below require future readers.
+epic. Existing mdtype v1 and project-selected rule semantics remain unchanged.
+Design revision (2026-10-13): relationships, RFC 0003 semantic scalars, and #176
+wikilink constraints share mdtype v2. This supersedes the earlier reservation of
+v3 for relationships. Existing scalar-only v2 readers implement a subset, not the
+complete contract. The relationship examples below require future capable readers.
 
 ## Ownership and evaluation stages
 
@@ -39,7 +42,7 @@ is not a broken link. Querying an assertion does not prove that it conforms.
 
 ## mdtype declaration
 
-Version `"3"` inherits the v2 contract and adds an optional top-level
+Version `"2"` combines RFC 0003's scalar contract with an optional top-level
 `relationships` object. Keys are nonempty, case-sensitive names without surrounding
 whitespace, unique within the declaring type. A relationship's identity is the
 declaring type identity plus its local name; it is not a dotted string assembled
@@ -47,7 +50,8 @@ from arbitrary names. Registry uniqueness and opaque authored type versions reta
 RFC 0001 semantics. Definitions do not inherit or merge relationships implicitly.
 
 ```yaml
-md-utils-type-schema: "3"
+md-utils-type-schema: "2"
+requires: [document-relationships]
 name: Article
 version: "1.0.0"
 frontmatter:
@@ -74,6 +78,13 @@ context: { requirements: [], recommendations: [] }
 
 All relationship objects reject unknown fields. Their complete envelope is:
 
+A definition containing `relationships` MUST declare `document-relationships` in
+its top-level `requires` array, following RFC 0003's capability gate. If its loaded
+schemas also contain wikilink policies, it MUST additionally declare
+`wikilink-constraints`. Unsupported capabilities and missing gates fail compilation;
+missing collection context during an otherwise supported assessment remains
+unavailable. These are different conditions.
+
 | Field | Contract and default |
 | --- | --- |
 | `select` | Required nonempty sequence of selector steps defined below |
@@ -88,7 +99,7 @@ All relationship objects reject unknown fields. Their complete envelope is:
 `target.type` uses RFC 0002's explicit type-resource references, relative to the
 host's types resource root, not the declaring file's directory. Require a recognized
 mdtype suffix and confinement; do not search by basename. Portable hosts provide
-equivalent explicit resource bindings. The referenced type may be v1, v2, or v3 if
+equivalent explicit resource bindings. The referenced type may be v1 or v2 if
 supported by the reader. Load all reachable definitions before assessment; absent
 definitions, duplicate names, invalid references, and unsupported versions are
 configuration errors. Type hints on destination records are not evidence of
@@ -148,8 +159,13 @@ directed document edges. Allowed anchors refer to the destination document for
 type assessment and policy purposes; this RFC does not assert that the heading or
 block exists. Forbidden anchors/embeds produce dedicated contract failures. An
 anchor-only link targets the source document, which must belong to the snapshot.
-Fragment existence and name/path spelling constraints are separate capabilities;
-the latter remain owned by #176.
+Fragment existence and target-style spelling constraints are separate capabilities;
+the latter remain owned by #176, whose anchor-only style is named `self-anchor`.
+
+Those lexical constraints live in mdtype frontmatter schemas under RFC 0003,
+not in a second relationship-style envelope. A relationship does not implicitly
+require a target spelling. Explicit `links convert` operations remain available;
+validation itself never converts. Filesystem absolute-path support is deferred.
 
 Resolution preserves #170: slash-containing paths are root-relative unless prefixed
 by `./` or `../`; explicit paths never fall back to basename lookup. Bare names use
@@ -178,6 +194,13 @@ unresolved ones. Each occurrence carries:
   unique destination identity/revision when established.
 - Target type assessment, contributing causes, severity, and relevant dependency
   and coverage evidence. Unavailable byte ranges MUST NOT be fabricated.
+
+These are declared-relationship selection requirements for #177. The #175 discovery
+API finds syntactically recognized links in strings; it does not enumerate malformed
+selected relationship values or establish conformance. Reuse its property/source
+provenance without substituting scanner matches for whole-value selection. Decoded
+frontmatter ranges are not raw-file byte ranges; frontmatter edits use structured
+paths and codecs when raw ranges are unavailable.
 
 Outgoing queries retain failed occurrences. Incoming queries use established
 destination identities and retain the asserting source property and relationship;
@@ -239,7 +262,9 @@ It cannot establish absence of incoming links, collection-wide acyclicity,
 uniqueness, or universal reciprocal consistency. A missing reciprocal can be proven
 from complete extraction of the particular target relation and complete resolution
 of its possible return links; it does not inherently require enumerating unrelated
-documents. One unresolved or ambiguous possible return link can prevent that proof.
+documents. A return link with incomplete resolution evidence, or an ambiguous
+candidate set that could include the source, can prevent that proof. A definitively
+unresolved target under complete coverage is not a possible return to the source.
 
 Hosts MUST bound records, bytes, occurrences, resolution candidates, loaded
 definitions, dependency nodes/edges, policy traversal, and diagnostic output. Limits
@@ -423,7 +448,8 @@ single cycle policy explicitly includes them in its union.
 
 A proven return edge satisfies the particular return obligation even if unrelated
 graph coverage is incomplete. Provably no return yields a policy failure; a possible
-but unresolved/ambiguous return yields unavailable. Report target contract failures
+but uncertain return yields unavailable. A proven unresolved link remains a separate
+resolution failure and is not itself evidence of a possible return. Report target contract failures
 independently rather than treating a nonconforming but resolved return as absent.
 Collection-wide pass requires all applicable obligations and scope coverage; known
 violations can be reported without claiming the remaining scope is complete.
@@ -497,34 +523,45 @@ does not expand #70's initial missing-property repair implementation scope.
 
 ## Versioning, schemas, and migration
 
-mdtype v2 remains the scalar contract reserved by RFC 0003. Reserve v3 for its
-inherited semantics plus the relationship envelope above. Reserve explicit mdrule
+mdtype v2 contains the scalar contract in RFC 0003, #176's authored wikilink
+constraints, and the relationship envelope above. No separate relationship mdtype
+version is reserved. Reserve explicit mdrule
 v1 as a new independent discriminator; it is not a renaming of legacy rule formats.
-Readers supporting scalar v2 only MUST reject v3. Existing readers reject explicit
+Partial v2 readers MUST reject unsupported declarations rather than silently
+ignore them; verify this before activating the combined contract. Existing readers reject explicit
 new rule fields; future readers preserve discriminator-free legacy behavior.
 
 Reserve these immutable publication targets (not claims of live availability):
 
-- `https://dandylyons.github.io/md-utils/schemas/mdtype/3/mdtype.schema.json`
+- `https://dandylyons.github.io/md-utils/schemas/mdtype/2/mdtype.schema.json`
 - `https://dandylyons.github.io/md-utils/schemas/mdrule/1/mdrule.schema.json`
 
 The schemas must encode the envelopes, enums, required fields, selector steps, and
 policy discriminated forms in this RFC. Compilation additionally checks resource
 binding, bounds, duplicate names, supported capabilities, and policy interactions.
 Shape-valid JSON alone cannot prove semantic validity. A generic JSON Schema
-validator does not evaluate cross-document relationships. v3 retains the v2 semantic
-format registry/profile; a relationship version does not silently change scalar
+validator does not evaluate cross-document relationships. The combined v2 contract
+retains RFC 0003's semantic format registry/profile; relationships do not change scalar
 defaults. New immutable bundled schemas and public copies are implementation work;
 do not edit previously published versioned schemas to introduce these fields.
 
-Migration is explicit and previewable. A supported older mdtype may opt into v3
-without adding relationships, but a v1 source must first pass RFC 0003's reserved
+Migration is explicit and previewable. A supported v1 mdtype may opt into v2
+without adding relationships, but must first pass RFC 0003's reserved
 format-namespace compatibility checks. Adding declarations requires user authorship;
 never infer them from existing wikilinks or property names. A supported standalone
 legacy rule may explicitly adopt mdrule v1 with its existing fields unchanged.
 Preserve legacy artifacts and reject unsupported features rather than dropping them.
 Downgrade refuses relationships/policies unless the user explicitly removes them;
 remaining v2 features still require their own downgrade checks.
+
+Scalar-only v2 definitions need no version change to add relationships deliberately.
+This does not make existing scalar-only binaries compatible with those declarations.
+The approved top-level `requires` capability gate is specified in RFC 0003.
+The combined release must document minimum reader support and test unsupported
+capability rejection, including #176 keywords in referenced schemas. Reconcile any
+already-published v2 artifacts with #184 without overwriting immutable publication
+history. Implementation milestones and cache fingerprints are not substitutes for
+this reader-compatibility work.
 
 Coordinate migrations, canonical schema sources, DocC/help/skill updates, and
 release activation with #135. #184 records planned versus implemented read/write

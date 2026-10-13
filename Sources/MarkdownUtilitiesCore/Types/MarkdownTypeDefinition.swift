@@ -157,6 +157,8 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
   public var context: MarkdownConstraintGroup
   public var source: String?
   public var creation: MarkdownCreationTemplate?
+  /// Explicit capabilities required by this definition and its loaded schema graph.
+  public var requires: [String]
 
   public init(
     typeSchemaVersion: String = MarkdownTypeSchemaVersion.current,
@@ -167,6 +169,7 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
     context: MarkdownConstraintGroup = MarkdownConstraintGroup(),
     source: String? = nil,
     creation: MarkdownCreationTemplate? = nil,
+    requires: [String] = [],
   ) {
     self.typeSchemaVersion = typeSchemaVersion
     self.name = name
@@ -176,6 +179,7 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
     self.context = context
     self.source = source
     self.creation = creation
+    self.requires = requires
   }
 }
 

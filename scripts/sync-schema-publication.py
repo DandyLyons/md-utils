@@ -46,6 +46,7 @@ def main() -> None:
     for source_name, destination_name in [
         ("2_md-utils-type.schema.json", "mdtype.schema.json"),
         ("2_semantic-formats.json", "semantic-formats.json"),
+        ("2-capabilities_md-utils-type.schema.json", "wikilink-constraints/mdtype.schema.json"),
     ]:
         source = resources / source_name
         destination = site / "mdtype/2" / destination_name

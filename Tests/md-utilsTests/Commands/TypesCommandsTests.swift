@@ -147,8 +147,24 @@ struct TypesCommandsTests {
     #expect(command.schemaVersion == "2")
     let content = try TypesProject.schemaContent(version: command.schemaVersion)
     let object = try #require(JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any])
-    #expect(object["$id"] as? String == "https://dandylyons.github.io/md-utils/schemas/mdtype/2/mdtype.schema.json")
+    #expect(object["$id"] as? String == "https://dandylyons.github.io/md-utils/schemas/mdtype/2/wikilink-constraints/mdtype.schema.json")
     #expect(try TypesProject.schemaContent() != content)
+  }
+
+  @Test func capabilityDefinitionsRoundTripAndOldSchemaRejectsGate() throws {
+    let definition = MarkdownTypeDefinition(
+      typeSchemaVersion: "2", name: .init(rawValue: "Links"), version: "1",
+      requires: ["wikilink-constraints"],
+    )
+    let data = try JSONSerialization.data(withJSONObject: TypesRenderer.definitionObject(definition))
+    let text = try #require(String(data: data, encoding: .utf8))
+    #expect(try MarkdownTypeDefinitionDecoder.decode(text, format: .json) == definition)
+    let oldPath = Path(#filePath).parent().parent().parent().parent() + "Sources/md-utils/Resources/2_md-utils-type.schema.json"
+    let oldURL = URL(fileURLWithPath: oldPath.string)
+    let oldSchema = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: oldURL)) as? [String: Any])
+    let oldProperties = try #require(oldSchema["properties"] as? [String: Any])
+    #expect(oldProperties["requires"] == nil)
+    #expect(oldSchema["additionalProperties"] as? Bool == false)
   }
 
   @Test

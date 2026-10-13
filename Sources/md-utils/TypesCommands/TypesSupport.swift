@@ -85,7 +85,8 @@ enum TypesProject {
     guard MarkdownTypeSchemaVersion.supported.contains(version) else {
       throw ValidationError("Unsupported mdtype schema version \(version); choose 1 or 2")
     }
-    guard let url = Bundle.module.url(forResource: "\(version)_md-utils-type.schema", withExtension: "json") else {
+    let resourceVersion = version == "2" ? "2-capabilities" : version
+    guard let url = Bundle.module.url(forResource: "\(resourceVersion)_md-utils-type.schema", withExtension: "json") else {
       throw ValidationError("Bundled md-utils type-definition schema is missing")
     }
     return try String(contentsOf: url, encoding: .utf8)
@@ -386,6 +387,7 @@ enum TypesRenderer {
       "context": groupObject(definition.context),
     ]
     if let creation = definition.creation { object["creation"] = creation.jsonValue.foundationValue }
+    if definition.requires.isEmpty == false { object["requires"] = definition.requires }
     return object
   }
 

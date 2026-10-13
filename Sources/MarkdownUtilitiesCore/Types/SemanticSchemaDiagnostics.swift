@@ -63,6 +63,20 @@ struct SemanticSchemaDiagnostics {
       let resolved = resolve(reference.hasPrefix("#") ? base + reference : reference) {
       result += try explain(resolved, value: value, path: path, schemaPath: reference.hasPrefix("#") ? base + reference : reference, depth: depth + 1)
     }
+    if let declaration = object["wikilink"], let text = value.stringValue,
+      let link = try? Wikilink.parse(text, context: .standard) {
+      for failure in try WikilinkStylePolicy(declaration, path: schemaPath + "/wikilink").failures(link) {
+        var diagnostic = MarkdownDiagnostic(
+          code: "frontmatter.format.invalid", severity: severity, domain: .frontmatter,
+          constraintID: constraint, location: path.isEmpty ? "/" : path, message: failure.message,
+        )
+        diagnostic.schemaLocation = schemaPath + "/wikilink/" + failure.field
+        diagnostic.definitionSource = source
+        diagnostic.format = "Wikilink/Obsidian"
+        diagnostic.reason = failure.reason
+        result.append(diagnostic)
+      }
+    }
     for keyword in ["allOf", "anyOf", "oneOf"] {
       guard case .array(let branches)? = object[keyword] else { continue }
       var causes: [MarkdownDiagnostic] = []

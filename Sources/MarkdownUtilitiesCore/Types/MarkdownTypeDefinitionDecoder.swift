@@ -18,7 +18,7 @@ public enum MarkdownTypeDefinitionDecoder {
     let object = try rootObject(content, format: format)
     try validateKeys(
       object,
-      allowed: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context", "creation"],
+      allowed: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context", "creation", "requires"],
       required: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context"],
       context: "type definition"
     )
@@ -30,6 +30,14 @@ public enum MarkdownTypeDefinitionDecoder {
       throw MarkdownTypeDefinitionError.unsupportedSchemaVersion(schemaVersion)
     }
     var frontmatterObject = object["frontmatter"] as? [String: Any]
+    var capabilities: [String] = []
+    if let value = object["requires"] {
+      guard schemaVersion == "2", let names = value as? [String] else {
+        throw MarkdownTypeDefinitionError.invalidField("requires must be a string array in mdtype v2")
+      }
+      capabilities = names
+    }
+    try MarkdownTypeRegistry.checkCapabilities(capabilities, version: schemaVersion)
     let recommended = frontmatterObject?.removeValue(forKey: "recommendedSchemas")
     guard recommended == nil || schemaVersion == "2" else {
       throw MarkdownTypeDefinitionError.invalidField("recommendedSchemas requires mdtype v2")
@@ -50,6 +58,7 @@ public enum MarkdownTypeDefinitionDecoder {
       context: context,
       source: source,
       creation: try object["creation"].map { try MarkdownCreationTemplate.decode(JSONValue(any: $0)) },
+      requires: capabilities,
     )
   }
 
