@@ -33,9 +33,20 @@ public enum WikilinkScanner {
     _ text: String,
     context: WikilinkParsingContext = .standard,
   ) -> [Wikilink] {
-    var results: [Wikilink] = []
+    scanOccurrences(text, context: context).map(\.link)
+  }
+
+  /// Scans with zero-based, half-open UTF-8 ranges relative to the supplied text.
+  /// The ranges include embed prefixes and delimiters. They are not file offsets
+  /// when the supplied text is a decoded frontmatter scalar or a document body.
+  public static func scanOccurrences(
+    _ text: String,
+    context: WikilinkParsingContext = .standard,
+  ) -> [WikilinkTextOccurrence] {
+    var results: [WikilinkTextOccurrence] = []
     let parser = WikilinkParser(context: context)
     var remaining = text[...]
+    var consumedBytes = 0
 
     while let bracketRange = remaining.range(of: "[[") {
       // Check for `!` embed prefix immediately before `[[`
@@ -51,11 +62,15 @@ public enum WikilinkScanner {
       var candidate = remaining[parseStart...]
       do {
         let wikilink = try parser.parse(&candidate)
-        results.append(wikilink)
+        let start = consumedBytes + remaining[..<parseStart].utf8.count
+        let end = start + remaining[parseStart..<candidate.startIndex].utf8.count
+        results.append(.init(link: wikilink, utf8Range: start..<end))
         // Continue scanning from where the parser stopped
+        consumedBytes = end
         remaining = candidate
       } catch {
         // Skip past the `[[` that failed and continue
+        consumedBytes += remaining[..<bracketRange.upperBound].utf8.count
         remaining = remaining[bracketRange.upperBound...]
       }
     }

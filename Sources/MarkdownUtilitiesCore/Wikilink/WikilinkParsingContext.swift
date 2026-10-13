@@ -1,6 +1,6 @@
 /// Selects source escaping and compatibility rules, independently of discovery
 /// versus whole-value parsing. Callers must retain the context when reparsing.
-public enum WikilinkParsingContext: Sendable, Equatable, CaseIterable {
+public enum WikilinkParsingContext: Sendable, Equatable, CaseIterable, Codable {
   /// Decoded metadata or ordinary link text. An escaped pipe is a literal target pipe.
   case standard
   /// A host-selected Markdown table cell. An escaped pipe separates the alias.

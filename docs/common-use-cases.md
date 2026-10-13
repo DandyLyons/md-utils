@@ -1,5 +1,8 @@
 # Common Use Cases
 
+For library extraction with source records, property paths and explicit UTF-8
+coordinate conventions, see [wikilink occurrence provenance](wikilink-provenance.md).
+
 This document provides common use cases for the `md-utils` CLI and its subcommands.
 
 ## Extraction Operations

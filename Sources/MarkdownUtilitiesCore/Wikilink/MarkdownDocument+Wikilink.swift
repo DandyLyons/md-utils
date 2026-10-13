@@ -10,6 +10,7 @@ extension MarkdownDocument {
   /// Frontmatter wikilinks appear first (in the order they are encountered
   /// while walking the YAML tree), followed by body wikilinks in document order.
   /// Defaults to historical legacy syntax; retain the selected context when reparsing.
+  /// Use ``wikilinkOccurrences(context:)`` to retain property paths and locations.
   ///
   /// - Returns: An array of ``Wikilink`` values found in the entire document.
   public func wikilinks(context: WikilinkParsingContext = .legacy) -> [Wikilink] {

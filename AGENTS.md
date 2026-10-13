@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Wikilink provenance (#175)**: Core document/record occurrence APIs retain literal property keys, all array indices, duplicates, parsing context and decoded-text UTF-8 ranges. Record snapshots retain identity/revision/context and supply exact raw ranges for body matches only; frontmatter raw ranges are unavailable. Discovery remains separate from scalar/relationship validation. See `docs/wikilink-provenance.md`; tests: `swift test --filter 'Wikilink|MarkdownSemanticScalarTests|ConvertLinksTests'`.
+
 - **Wikilink parsing contexts**: Discovery and whole-value parsing share syntax validity and escaping within explicit standard, Markdown table, or legacy contexts. Declared scalars use standard text; document discovery retains legacy defaults. Body occurrences do not automatically assert frontmatter contracts. Tests: `swift test --filter 'Wikilink|MarkdownSemanticScalarTests|ConvertLinksTests'`.
 
 - **Declared semantic strings (#173/#174)**: Explicit mdtype v2 supports whole-value Wikilink, Date, LocalTime, DateTime and UUID profiles, schema-level recommendations, native temporal kind evidence, and branch-aware assertions through a finite-instance schema adapter. Defaults remain v1; evaluator fingerprint v3 invalidates cached assessments. See `docs/semantic-string-formats.md`; tests: `swift test --filter 'MarkdownSemanticScalarTests|RulesIndexedValidationTests'`. Linux verification remains CI-only.
