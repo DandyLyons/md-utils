@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Semantic string formats (specified #171)**: RFC 0003 reserves mdtype v2 for `type: string` / `format: Subject/RawFormat`, Foundation-backed validation, schema-level advisories, nullable branches, and v4-only UUID generation with multi-version input. Implementation is #173/#174; publication/default activation remains separate, and #184 owns the broader compatibility matrix. See `docs/rfcs/0003-semantic-string-formats.md`; current mdtype v1 is unchanged.
+
 - **Wikilink resolution (#170)**: Slash-containing targets are vault-root-relative;
   only `./` and `../` select source-relative paths. No cross-base or basename
   fallback is allowed. Bare-name ambiguity, omitted `.md`/`.markdown` support,
