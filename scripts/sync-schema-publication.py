@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Generate public schema copies from canonical bundled resources."""
+"""Generate public schema copies from canonical bundled resources.
+
+Copy each versioned contract to its publication path, or compare bytes in check
+mode. Explicit mdtype mappings keep language versions separate from config versions
+and avoid changing default aliases when adding semantic-format publication inputs.
+"""
 from __future__ import annotations
 import argparse
 import re
@@ -37,6 +42,19 @@ def main() -> None:
                 copyfile(source, destination)
     if not found:
         raise SystemExit("error: no canonical schema resources found")
+    # mdtype language versions use their own namespace and include a registry.
+    for source_name, destination_name in [
+        ("2_md-utils-type.schema.json", "mdtype.schema.json"),
+        ("2_semantic-formats.json", "semantic-formats.json"),
+    ]:
+        source = resources / source_name
+        destination = site / "mdtype/2" / destination_name
+        if args.check:
+            if not destination.exists() or source.read_bytes() != destination.read_bytes():
+                raise SystemExit(f"error: generated schema is out of date: {destination}")
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(source, destination)
     actual = set(site.glob("*/*.schema.json"))
     unexpected = sorted(actual - expected)
     if unexpected:

@@ -1,5 +1,12 @@
 # Markdown Types
 
+Explicit mdtype v2 definitions assert semantic string formats: `Date/ISO8601`,
+`LocalTime/ISO8601`, `DateTime/RFC3339`, `UUID/RFC9562`, and `Wikilink/Obsidian`.
+Use `type: string` with `format`, including inside nullable branches and array
+items. `frontmatter.recommendedSchemas` applies the same checks as advisories.
+Quote temporal frontmatter values; native dates/times are not coerced to strings.
+Authoring defaults remain v1. See ``MarkdownSemanticScalar`` and ``Wikilink/parse(_:context:)``.
+
 Assess complete Markdown records against reusable structural contracts.
 
 ## Records and Conformance

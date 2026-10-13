@@ -20,6 +20,7 @@ enum WikilinkParserError: Error {
 ///
 /// Conforms to `Parsing.Parser` with `Input = Substring` and `Output = Wikilink`.
 struct WikilinkParser: Parsing.Parser {
+  var context: WikilinkParsingContext = .standard
   typealias Input = Substring
   typealias Output = Wikilink
   /// Parses input into structured Markdown data.
@@ -86,20 +87,42 @@ struct WikilinkParser: Parsing.Parser {
     // 7. Extract anchor from target part
     let (target, anchor) = extractAnchor(from: targetPart)
 
-    return Wikilink(
+    let link = Wikilink(
       rawValue: rawValue,
       target: target,
       displayText: displayText,
       anchor: anchor,
-      isEmbed: isEmbed
+      isEmbed: isEmbed,
     )
+    if context != .legacy {
+      guard rawValue.contains(where: { $0.isNewline || $0 == "\0" }) == false,
+        target.trimmingCharacters(in: .whitespaces).isEmpty == false || anchor != nil
+      else {
+        input = original
+        throw WikilinkParserError.invalidContent
+      }
+      let validAnchor: Bool
+      switch anchor {
+      case .heading(let text):
+        validAnchor = text.trimmingCharacters(in: .whitespaces).isEmpty == false
+      case .blockID(let text):
+        validAnchor = text.isEmpty == false && text.allSatisfy {
+          $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-")
+        }
+      case nil: validAnchor = true
+      }
+      guard validAnchor else {
+        input = original
+        throw WikilinkParserError.invalidContent
+      }
+    }
+    return link
   }
 
   /// Splits a string on the first unescaped `|` character.
   ///
-  /// A `|` preceded by `\` is treated as an escaped literal pipe and is not
-  /// used as a separator. Escape sequences (`\|`) in the target portion are
-  /// resolved to literal `|`.
+  /// Standard and legacy contexts resolve `\|` to a literal target pipe.
+  /// Markdown table context instead treats that spelling as an alias separator.
   ///
   /// - Returns: A tuple of (target, displayText?) where displayText is nil
   ///   if no unescaped pipe was found.
@@ -109,6 +132,10 @@ struct WikilinkParser: Parsing.Parser {
     while index < interior.endIndex {
       let char = interior[index]
       if char == "\\" {
+        if context == .markdownTable, interior[interior.index(after: index)...].hasPrefix("|") {
+          let displayStart = interior.index(index, offsetBy: 2)
+          return (String(interior[..<index]), String(interior[displayStart...]))
+        }
         // Skip the next character (it's escaped)
         let next = interior.index(after: index)
         if next < interior.endIndex {

@@ -4,7 +4,7 @@
 - Date: 2026-10-12
 - Tracking: [#171](https://github.com/DandyLyons/md-utils/issues/171), [#169](https://github.com/DandyLyons/md-utils/issues/169)
 - Version coordination: [#135](https://github.com/DandyLyons/md-utils/issues/135), [#184](https://github.com/DandyLyons/md-utils/issues/184)
-- Definition version: `md-utils-type-schema: "2"`; reserved by this RFC, not yet implemented
+- Definition version: `md-utils-type-schema: "2"`; explicit opt-in implementation documented in [semantic string formats](../semantic-string-formats.md)
 
 ## Purpose and compatibility boundary
 
@@ -233,6 +233,21 @@ Follow Obsidian's documented links, aliases, and embeds. Reuse and audit the exi
 Wikilink model/parser rather than introducing a second grammar. Preserve target,
 alias, heading/block fragment, embed flag, and source text. `[[Bob]]` is a scalar;
 `See [[Bob]]` and `[[Bob]] plus [[Alice]]` are not.
+
+Semantic value parsers are reusable across document locations; this RFC's
+declaration and assessment mechanism is scoped to frontmatter. An extracted body
+link is a Wikilink occurrence, not an automatically declared scalar assertion or
+named relationship. Discovery and whole-value parsing must share interpretation
+and syntax validity when given the same explicit parsing context; whole-value
+parsing additionally requires complete input consumption.
+
+Context selects source escaping and compatibility rules independently of discovery.
+Decoded frontmatter uses standard text rules. Markdown table escaping must be
+selected explicitly by the host: `[[Note\|Alias]]` has an alias in table context,
+but a literal target pipe in standard context. Historical permissive discovery may
+use an explicit legacy context. Context does not itself select Markdown regions,
+exclude code examples, or detect tables. Future body contracts require separately
+specified selectors and must not infer semantic assertions from arbitrary prose.
 
 Syntax validity does not require a destination to exist. Name/path style and extension
 constraints belong to #176; resolution and relationship policies remain separate.

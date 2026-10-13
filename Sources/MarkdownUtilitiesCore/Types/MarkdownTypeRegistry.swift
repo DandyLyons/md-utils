@@ -10,6 +10,8 @@ public struct ResolvedMarkdownTypeFrontmatterSchema: Codable, Equatable, Sendabl
   public let presence: MarkdownFrontmatterPresence?
   /// Fully resolved JSON Schema Draft 2020-12 documents in declaration order.
   public let schemas: [JSONValue]
+  public var recommendedSchemas: [JSONValue] = []
+  public var typeSchemaVersion: String = "1"
 
   /// Creates an immutable frontmatter schema view.
   public init(
@@ -38,8 +40,11 @@ public struct MarkdownTypeRegistry: Sendable {
     var schemasByName: [MarkdownTypeName: [JSONValue]] = [:]
 
     for definition in definitions {
-      guard definition.typeSchemaVersion == MarkdownTypeSchemaVersion.current else {
+      guard MarkdownTypeSchemaVersion.supported.contains(definition.typeSchemaVersion) else {
         throw MarkdownTypeDefinitionError.unsupportedSchemaVersion(definition.typeSchemaVersion)
+      }
+      guard definition.typeSchemaVersion == "2" || definition.frontmatter.recommendedSchemas.isEmpty else {
+        throw MarkdownTypeDefinitionError.invalidField("recommendedSchemas requires mdtype v2")
       }
       guard definitionsByName[definition.name] == nil else {
         throw MarkdownTypeDefinitionError.duplicateType(definition.name.rawValue)
@@ -58,9 +63,10 @@ public struct MarkdownTypeRegistry: Sendable {
 
       let compiler = MarkdownSchemaGraphCompiler(
         typeName: definition.name.rawValue,
-        provider: schemaProvider
+        provider: schemaProvider,
+        semanticProfile: definition.typeSchemaVersion == "2",
       )
-      let schemas = try definition.frontmatter.schemas.map { source in
+      let schemas = try (definition.frontmatter.schemas + definition.frontmatter.recommendedSchemas).map { source in
         switch source {
         case .inline(let value):
           return try compiler.compile(value, source: definition.source)
@@ -76,6 +82,15 @@ public struct MarkdownTypeRegistry: Sendable {
             relativeTo: definition.source
           )
           return try compiler.compile(resource.schema, source: resource.source)
+        }
+      }
+      if definition.typeSchemaVersion == "2" {
+        for schema in schemas {
+          try SemanticSchemaAdapter.check(schema)
+          try SemanticSchemaDiagnostics(
+            root: schema, instance: .null, nativePaths: [], severity: .error,
+            constraint: definition.name.rawValue, source: definition.source,
+          ).checkReferences()
         }
       }
 
@@ -112,32 +127,41 @@ public struct MarkdownTypeRegistry: Sendable {
   ) -> ResolvedMarkdownTypeFrontmatterSchema? {
     guard let definition = definitionsByName[name] else { return nil }
     var uniqueSchemas: [JSONValue] = []
-    for schema in schemasByName[name] ?? [] where uniqueSchemas.contains(schema) == false {
+    for schema in resolvedSchemas(for: name) where uniqueSchemas.contains(schema) == false {
       uniqueSchemas.append(schema)
     }
-    return ResolvedMarkdownTypeFrontmatterSchema(
+    var result = ResolvedMarkdownTypeFrontmatterSchema(
       name: name,
       version: definition.version,
       presence: definition.frontmatter.effectivePresence,
       schemas: uniqueSchemas
     )
+    result.recommendedSchemas = resolvedRecommendedSchemas(for: name)
+    result.typeSchemaVersion = definition.typeSchemaVersion
+    return result
   }
 
   func resolvedSchemas(for name: MarkdownTypeName) -> [JSONValue] {
-    schemasByName[name] ?? []
+    Array((schemasByName[name] ?? []).prefix(definitionsByName[name]?.frontmatter.schemas.count ?? 0))
+  }
+
+  func resolvedRecommendedSchemas(for name: MarkdownTypeName) -> [JSONValue] {
+    Array((schemasByName[name] ?? []).dropFirst(definitionsByName[name]?.frontmatter.schemas.count ?? 0))
   }
 }
 
 private final class MarkdownSchemaGraphCompiler {
   private let typeName: String
   private let provider: (any MarkdownSchemaResourceProvider)?
+  private let semanticProfile: Bool
   private var resources: [String: JSONValue] = [:]
   private var activeResources: [String] = []
   private var identifiers: [String: JSONValue] = [:]
 
-  init(typeName: String, provider: (any MarkdownSchemaResourceProvider)?) {
+  init(typeName: String, provider: (any MarkdownSchemaResourceProvider)?, semanticProfile: Bool) {
     self.typeName = typeName
     self.provider = provider
+    self.semanticProfile = semanticProfile
   }
 
   func compile(_ schema: JSONValue, source: String?) throws -> JSONValue {
@@ -152,6 +176,9 @@ private final class MarkdownSchemaGraphCompiler {
     }
     if rootObject["$schema"] == nil {
       rootObject["$schema"] = .string("https://json-schema.org/draft/2020-12/schema")
+    }
+    if semanticProfile, rootObject["$id"] == nil, let source {
+      rootObject["$id"] = .string(source)
     }
     guard resources.isEmpty == false else { return .object(rootObject) }
 

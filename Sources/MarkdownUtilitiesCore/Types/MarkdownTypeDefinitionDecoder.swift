@@ -26,7 +26,18 @@ public enum MarkdownTypeDefinitionDecoder {
     let name = try requiredString(object, key: "name", context: "type definition")
     let version = try requiredString(object, key: "version", context: "type definition")
 
-    let frontmatter = try parseFrontmatter(object["frontmatter"])
+    guard MarkdownTypeSchemaVersion.supported.contains(schemaVersion) else {
+      throw MarkdownTypeDefinitionError.unsupportedSchemaVersion(schemaVersion)
+    }
+    var frontmatterObject = object["frontmatter"] as? [String: Any]
+    let recommended = frontmatterObject?.removeValue(forKey: "recommendedSchemas")
+    guard recommended == nil || schemaVersion == "2" else {
+      throw MarkdownTypeDefinitionError.invalidField("recommendedSchemas requires mdtype v2")
+    }
+    var frontmatter = try parseFrontmatter(frontmatterObject ?? object["frontmatter"])
+    if let recommended {
+      frontmatter.recommendedSchemas = try parseFrontmatter(["schemas": recommended]).schemas
+    }
     let body = try parseGroup(object["body"], domain: .body, typeName: name)
     let context = try parseGroup(object["context"], domain: .context, typeName: name)
 

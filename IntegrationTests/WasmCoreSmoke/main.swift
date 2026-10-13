@@ -21,6 +21,29 @@ enum WasmCoreSmokeError: Error {
 @main
 struct WasmCoreSmoke {
   static func main() async throws {
+    // Exercise semantic profiles on the deployed Foundation runtime as well as
+    // composition through the same portable mdtype evaluator used by native hosts.
+    for (format, text) in [
+      ("Date", "2024-02-29"), ("LocalTime", "09:30:00.123456789"),
+      ("DateTime", "0001-01-01T00:00:00+23:59"),
+      ("UUID", "019a1234-5678-7abc-8def-123456789abc"),
+      ("Wikilink", "![[Bob#^block-1|Robert]]"),
+    ] {
+      _ = try MarkdownSemanticScalar.parse(text, format: format)
+    }
+    let scalarDefinition = MarkdownTypeDefinition(
+      typeSchemaVersion: "2", name: .init(rawValue: "Scalar"), version: "1",
+      frontmatter: .init(schemas: [.inline(.object([
+        "properties": .object(["date": .object(["anyOf": .array([
+          .object(["type": .string("string"), "format": .string("Date")]),
+          .object(["type": .string("null")]),
+        ])])]),
+      ]))]),
+    )
+    let scalarChecker = MarkdownTypeChecker(registry: try .init(definitions: [scalarDefinition]))
+    guard try await scalarChecker.assess(.init(content: "---\ndate: null\n---\n"), as: "Scalar").conforms,
+      try await scalarChecker.assess(.init(content: "---\ndate: '2023-02-29'\n---\n"), as: "Scalar").conforms == false
+    else { throw WasmCoreSmokeError.typeAssessmentFailed }
     let content = """
       ---
       title: WebAssembly

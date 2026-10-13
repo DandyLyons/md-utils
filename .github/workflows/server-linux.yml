@@ -58,7 +58,7 @@ jobs:
         run: apt-get update && apt-get install -y --no-install-recommends libsqlite3-dev libjavascriptcoregtk-4.1-dev pkg-config && swift build --product md-utils-server
 
       - name: Test indexed native server
-        run: swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownUtilitiesTemplatesTests|TemplateTests'
+        run: swift test --filter 'MarkdownUtilitiesServerNativeTests|MarkdownUtilitiesServerTests|MarkdownUtilitiesTemplatesTests|TemplateTests|MarkdownSemanticScalarTests'
 
       - name: Run native server route smoke test
         run: swift run MarkdownUtilitiesServerLinuxSmoke

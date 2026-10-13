@@ -11,6 +11,10 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Wikilink parsing contexts**: Discovery and whole-value parsing share syntax validity and escaping within explicit standard, Markdown table, or legacy contexts. Declared scalars use standard text; document discovery retains legacy defaults. Body occurrences do not automatically assert frontmatter contracts. Tests: `swift test --filter 'Wikilink|MarkdownSemanticScalarTests|ConvertLinksTests'`.
+
+- **Declared semantic strings (#173/#174)**: Explicit mdtype v2 supports whole-value Wikilink, Date, LocalTime, DateTime and UUID profiles, schema-level recommendations, native temporal kind evidence, and branch-aware assertions through a finite-instance schema adapter. Defaults remain v1; evaluator fingerprint v3 invalidates cached assessments. See `docs/semantic-string-formats.md`; tests: `swift test --filter 'MarkdownSemanticScalarTests|RulesIndexedValidationTests'`. Linux verification remains CI-only.
+
 - **Document relationships (specified #172)**: RFC 0004 reserves mdtype v3 and explicit mdrule v1 for named frontmatter references, bounded host-supplied collection evidence, positive recursive conformance, and separately declared cycle/reciprocal/inverse policies. Partial coverage cannot establish global consistency; candidate-set changes invalidate dependent assessments. Implementation is #175–#180; runtime support, schema publication, and defaults remain unchanged. See `docs/rfcs/0004-document-relationships.md`.
 
 - **Semantic string formats (specified #171)**: RFC 0003 reserves mdtype v2 for `type: string` / `format: Subject/RawFormat`, Foundation-backed validation, schema-level advisories, nullable branches, and v4-only UUID generation with multi-version input. Implementation is #173/#174; publication/default activation remains separate, and #184 owns the broader compatibility matrix. See `docs/rfcs/0003-semantic-string-formats.md`; current mdtype v1 is unchanged.

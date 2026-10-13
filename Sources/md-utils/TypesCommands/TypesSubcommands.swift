@@ -374,8 +374,11 @@ extension CLIEntry.TypesCommands {
     @Option(name: .long, help: "Output format: json, yaml, or toml")
     var format: TypesDefinitionFormat = .json
 
+    @Option(name: .long, help: "Definition schema version: 1 (default) or 2 (semantic string formats)")
+    var schemaVersion: String = "1"
+
     mutating func run() async throws {
-      let content = try TypesProject.schemaContent()
+      let content = try TypesProject.schemaContent(version: schemaVersion)
       if format == .json {
         print(content, terminator: content.hasSuffix("\n") ? "" : "\n")
       } else {

@@ -60,6 +60,32 @@ private struct RulesIndexFixture {
 }
 
 struct RulesIndexedValidationTests {
+  @Test func `semantic formats agree in direct and indexed assessments and refresh definitions`() async throws {
+    let fixture = try RulesIndexFixture()
+    defer { fixture.remove() }
+    let definition = """
+      {"md-utils-type-schema":"2","name":"Book","version":"1",
+       "frontmatter":{"schemas":[{"ref":"../schemas/scalar.json"}]},
+       "body":{"requirements":[],"recommendations":[]},"context":{"requirements":[],"recommendations":[]}}
+      """
+    try fixture.write(".md-utils/types/book.mdtype.json", definition)
+    try fixture.write(".md-utils/schemas/scalar.json", """
+      {"type":"object","properties":{"date":{"type":"string","format":"Date"},
+      "links":{"type":"array","items":{"type":"string","format":"Wikilink"}}}}
+      """)
+    try fixture.write("notes/one.md", "---\ndate: '2024-02-29'\nlinks: ['[[Bob]]']\n---\n")
+    #expect(try await fixture.validate(noIndex: true).hasFailures == false)
+    _ = try fixture.database()
+    #expect(try await fixture.validate().hasFailures == false)
+    try fixture.write("notes/one.md", "---\ndate: '2023-02-29'\nlinks: ['[[Bob]]', 'See [[Alice]]']\n---\n")
+    #expect(try await fixture.validate(noIndex: true).hasFailures)
+    #expect(try await fixture.validate().hasFailures)
+    #expect(try await fixture.validate(indexedOnly: true).hasFailures)
+    try fixture.write(".md-utils/schemas/scalar.json", "{\"type\":\"object\"}")
+    #expect(try await fixture.validate().hasFailures == false)
+    #expect(try await fixture.validate(noIndex: true).hasFailures == false)
+  }
+
   @Test func `indexed only omits new paths reuses candidates and retains limited freshness`() async throws {
     let fixture = try RulesIndexFixture()
     defer { fixture.remove() }

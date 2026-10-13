@@ -81,8 +81,11 @@ enum TypesProject {
     try MarkdownTypeFileRegistryLoader.load(projectRoot: root)
   }
 
-  static func schemaContent() throws -> String {
-    guard let url = Bundle.module.url(forResource: "1_md-utils-type.schema", withExtension: "json") else {
+  static func schemaContent(version: String = "1") throws -> String {
+    guard MarkdownTypeSchemaVersion.supported.contains(version) else {
+      throw ValidationError("Unsupported mdtype schema version \(version); choose 1 or 2")
+    }
+    guard let url = Bundle.module.url(forResource: "\(version)_md-utils-type.schema", withExtension: "json") else {
       throw ValidationError("Bundled md-utils type-definition schema is missing")
     }
     return try String(contentsOf: url, encoding: .utf8)
@@ -366,6 +369,14 @@ enum TypesRenderer {
     if let presence = definition.frontmatter.presence {
       frontmatter["presence"] = presence.rawValue
     }
+    if definition.typeSchemaVersion == "2" {
+      frontmatter["recommendedSchemas"] = definition.frontmatter.recommendedSchemas.map { schema -> [String: Any] in
+        switch schema {
+        case .reference(let reference): return ["ref": reference]
+        case .inline(let value): return ["inline": value.foundationValue]
+        }
+      }
+    }
     var object: [String: Any] = [
       "md-utils-type-schema": definition.typeSchemaVersion,
       "name": definition.name.rawValue,
@@ -450,6 +461,11 @@ enum TypesRenderer {
       "fixIts": diagnostic.fixIts.map(fixItObject),
     ]
     if let id = diagnostic.constraintID { object["constraintID"] = id }
+    if let value = diagnostic.schemaLocation { object["schemaLocation"] = value }
+    if let value = diagnostic.definitionSource { object["definitionSource"] = value }
+    if let value = diagnostic.format { object["format"] = value }
+    if let value = diagnostic.reason { object["reason"] = value }
+    if let values = diagnostic.causes { object["causes"] = values.map(diagnosticObject) }
     return object
   }
 

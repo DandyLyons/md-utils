@@ -22,6 +22,14 @@ struct IndexDefinitionPayload: Encodable {
             }
         })]
         if let presence = definition.frontmatter.presence { frontmatter["presence"] = .string(presence.rawValue) }
+        if definition.typeSchemaVersion == "2" {
+            frontmatter["recommendedSchemas"] = .array(definition.frontmatter.recommendedSchemas.map {
+                switch $0 {
+                case .reference(let ref): .object(["ref": .string(ref)])
+                case .inline(let value): .object(["inline": value])
+                }
+            })
+        }
         try container.encode(frontmatter, forKey: .frontmatter)
         try container.encode(Group(definition.body), forKey: .body)
         try container.encode(Group(definition.context), forKey: .context)
@@ -81,6 +89,11 @@ struct IndexTypePayload: Codable {
         var message: String
         var fixIts: [FixIt]
         var constraintID: String?
+        var schemaLocation: String?
+        var definitionSource: String?
+        var format: String?
+        var reason: String?
+        var causes: [Diagnostic]?
 
         init(_ diagnostic: MarkdownDiagnostic) {
             code = diagnostic.code
@@ -90,6 +103,11 @@ struct IndexTypePayload: Codable {
             message = diagnostic.message
             fixIts = diagnostic.fixIts.map(FixIt.init)
             constraintID = diagnostic.constraintID
+            schemaLocation = diagnostic.schemaLocation
+            definitionSource = diagnostic.definitionSource
+            format = diagnostic.format
+            reason = diagnostic.reason
+            causes = diagnostic.causes?.map(Diagnostic.init)
         }
     }
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Validate md-utils public schema publication files."""
+"""Validate md-utils public schema publication files.
+
+Compare generated copies with canonical bundled contracts and verify immutable
+identifiers. Optional network checks verify deployed endpoints; ordinary checks
+validate local publication inputs without claiming deployment or moving aliases.
+"""
 
 from __future__ import annotations
 
@@ -73,6 +78,14 @@ def main() -> None:
         compare_files(resource, public)
         expected_id = f"https://dandylyons.github.io/md-utils/schemas/0.3.0/{name}.schema.json"
         if load_json(resource).get("$id") != expected_id:
+            fail(f"schema $id must be {expected_id}")
+        if args.check_published and fetch_json(expected_id) != load_json(public):
+            fail(f"published schema differs from local schema: {expected_id}")
+
+    for filename in ["mdtype.schema.json", "semantic-formats.json"]:
+        public = repo_root / "site/schemas/mdtype/2" / filename
+        expected_id = f"https://dandylyons.github.io/md-utils/schemas/mdtype/2/{filename}"
+        if load_json(public).get("$id") != expected_id:
             fail(f"schema $id must be {expected_id}")
         if args.check_published and fetch_json(expected_id) != load_json(public):
             fail(f"published schema differs from local schema: {expected_id}")

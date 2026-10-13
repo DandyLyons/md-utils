@@ -84,7 +84,7 @@ public enum WikilinkConversion {
         guard target != link.target else { return nil }
         let replacement = WikilinkRewriter.rewrite(link.rawValue) { _ in target }
         // Reject filenames that the supported wikilink grammar cannot represent.
-        guard let parsed = WikilinkScanner.scan(replacement).first,
+        guard let parsed = WikilinkScanner.scan(replacement, context: .legacy).first,
           parsed.target == target, parsed.anchor == link.anchor,
           parsed.displayText == link.displayText, parsed.isEmbed == link.isEmbed
         else { return skip("target cannot be represented safely as a wikilink") }

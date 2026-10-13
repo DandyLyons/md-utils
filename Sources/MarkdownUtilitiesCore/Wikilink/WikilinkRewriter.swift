@@ -9,7 +9,7 @@ public enum WikilinkRewriter {
   ) -> String {
     var remaining = text[...]
     var output = ""
-    let parser = WikilinkParser()
+    let parser = WikilinkParser(context: .legacy)
     while let brackets = remaining.range(of: "[[") {
       var start = brackets.lowerBound
       if start > remaining.startIndex, remaining[remaining.index(before: start)] == "!" {

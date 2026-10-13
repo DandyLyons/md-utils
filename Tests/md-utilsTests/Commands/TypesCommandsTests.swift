@@ -142,6 +142,15 @@ struct TypesCommandsTests {
     #expect(object["$schema"] as? String == "https://json-schema.org/draft/2020-12/schema")
   }
 
+  @Test func `types schema explicitly selects version two`() throws {
+    let command = try CLIEntry.TypesCommands.Schema.parse(["--schema-version", "2"])
+    #expect(command.schemaVersion == "2")
+    let content = try TypesProject.schemaContent(version: command.schemaVersion)
+    let object = try #require(JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any])
+    #expect(object["$id"] as? String == "https://dandylyons.github.io/md-utils/schemas/mdtype/2/mdtype.schema.json")
+    #expect(try TypesProject.schemaContent() != content)
+  }
+
   @Test
   func `types fix dry run does not write and accepted fixes are reassessed`() async throws {
     let project = Path(NSTemporaryDirectory()) + "types-fix-command-\(UUID().uuidString)"

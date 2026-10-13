@@ -5,7 +5,7 @@
 
 /// Scans raw Markdown text to extract all wikilinks.
 ///
-/// This is a caseless enum namespace (no instances). Use ``scan(_:)`` to find
+/// This is a caseless enum namespace (no instances). Use ``scan(_:context:)`` to find
 /// all wikilinks in a string. Malformed brackets are silently skipped.
 ///
 /// ## Example
@@ -22,11 +22,19 @@ public enum WikilinkScanner {
   /// is collected and scanning continues after it; on failure the scanner advances
   /// past the failed position and keeps looking.
   ///
-  /// - Parameter text: The raw Markdown text to scan.
+  /// Context selects grammar, not Markdown regions: this raw scanner does not
+  /// exclude code spans/fences or automatically identify table cells.
+  ///
+  /// - Parameters:
+  ///   - text: The raw Markdown text to scan.
+  ///   - context: Source escaping and syntax validity rules. Defaults to standard text.
   /// - Returns: An array of ``Wikilink`` values in the order they appear.
-  public static func scan(_ text: String) -> [Wikilink] {
+  public static func scan(
+    _ text: String,
+    context: WikilinkParsingContext = .standard,
+  ) -> [Wikilink] {
     var results: [Wikilink] = []
-    let parser = WikilinkParser()
+    let parser = WikilinkParser(context: context)
     var remaining = text[...]
 
     while let bracketRange = remaining.range(of: "[[") {

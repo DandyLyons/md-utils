@@ -90,6 +90,7 @@ package enum MarkdownRecordContentKind: Sendable {
 /// Package visibility keeps parser implementation details out of the public API while
 /// allowing sibling targets to guarantee that one snapshot build parses each record once.
 package struct AnalyzedMarkdownRecord: Sendable {
+  package var nativeTemporalPaths: Set<String> = []
   package var record: MarkdownRecord
   package var body: String
   package var hasFrontmatter: Bool
@@ -201,6 +202,7 @@ package enum MarkdownRecordAnalyzer {
     }
 
     var userFrontmatter: [String: JSONValue]?
+    var nativeTemporalPaths: Set<String> = []
     var hints: [MarkdownTypeHint] = []
     var diagnostics = parts.diagnostics
 
@@ -211,6 +213,9 @@ package enum MarkdownRecordAnalyzer {
           format: parts.format ?? .yaml
         )
         let dynamicValue = FrontMatterConversion.foundationValue(frontMatter)
+        nativeTemporalPaths = try NativeTemporalEvidence.paths(
+          frontMatter, source: parts.rawFrontmatter, format: parts.format ?? .yaml,
+        )
         guard case .object(var object) = try JSONValue(any: dynamicValue) else {
           throw YAMLConversionError.notAMapping
         }
@@ -226,6 +231,7 @@ package enum MarkdownRecordAnalyzer {
     }
 
     return AnalyzedMarkdownRecord(
+      nativeTemporalPaths: nativeTemporalPaths,
       record: record,
       body: parts.body,
       hasFrontmatter: parts.hasFrontmatter,

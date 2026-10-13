@@ -1,0 +1,15 @@
+{
+  "$id": "https://dandylyons.github.io/md-utils/schemas/mdtype/2/semantic-formats.json",
+  "definitionVersion": "2",
+  "assertionProfile": "md-utils; generic JSON Schema validators may treat format as annotation",
+  "formats": {
+    "Date": { "default": "ISO8601", "rawFormats": ["ISO8601"] },
+    "LocalTime": { "default": "ISO8601", "rawFormats": ["ISO8601"] },
+    "DateTime": { "default": "RFC3339", "rawFormats": ["RFC3339"] },
+    "UUID": { "default": "RFC9562", "rawFormats": ["RFC9562"] },
+    "Wikilink": { "default": "Obsidian", "rawFormats": ["Obsidian"] }
+  },
+  "reasonIdentifiers": ["native-kind", "syntax", "trailing-input", "calendar-range", "precision", "uuid-layout"],
+  "supportedSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "unsupportedKeywords": ["$dynamicRef", "$recursiveRef", "unevaluatedProperties", "unevaluatedItems", "prefixItems", "minContains", "maxContains", "dependencies", "additionalItems"]
+}

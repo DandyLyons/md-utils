@@ -59,6 +59,12 @@ public struct MarkdownDiagnostic: Codable, Equatable, Sendable {
   public var location: String
   public var message: String
   public var fixIts: [MarkdownFixIt]
+  /// Additional semantic provenance, absent for legacy diagnostics.
+  public var schemaLocation: String?
+  public var definitionSource: String?
+  public var format: String?
+  public var reason: String?
+  public var causes: [MarkdownDiagnostic]?
 
   public init(
     code: String,

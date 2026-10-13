@@ -3,6 +3,7 @@ import Foundation
 /// The supported version of the md-utils Markdown type-definition schema.
 public enum MarkdownTypeSchemaVersion {
   public static let current = "1"
+  public static let supported: Set<String> = ["1", "2"]
 }
 
 /// A stable, case-sensitive Markdown type name.
@@ -30,13 +31,16 @@ public enum MarkdownJSONSchemaSource: Equatable, Sendable {
 public struct MarkdownFrontmatterDefinition: Equatable, Sendable {
   public var presence: MarkdownFrontmatterPresence?
   public var schemas: [MarkdownJSONSchemaSource]
+  public var recommendedSchemas: [MarkdownJSONSchemaSource]
 
   public init(
     presence: MarkdownFrontmatterPresence? = nil,
-    schemas: [MarkdownJSONSchemaSource] = []
+    schemas: [MarkdownJSONSchemaSource] = [],
+    recommendedSchemas: [MarkdownJSONSchemaSource] = [],
   ) {
     self.presence = presence
     self.schemas = schemas
+    self.recommendedSchemas = recommendedSchemas
   }
 
   /// The explicit or inferred presence behavior.

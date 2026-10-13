@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - Sources/md-utils/Resources/*_md-utils.schema.json
+      - Sources/md-utils/Resources/2_md-utils-type.schema.json
+      - Sources/md-utils/Resources/2_semantic-formats.json
       - site/schemas/**
       - scripts/validate-schema-publication.py
       - scripts/check-schema-immutability.py
@@ -13,6 +15,8 @@ on:
       - main
     paths:
       - Sources/md-utils/Resources/*_md-utils.schema.json
+      - Sources/md-utils/Resources/2_md-utils-type.schema.json
+      - Sources/md-utils/Resources/2_semantic-formats.json
       - site/schemas/**
       - scripts/validate-schema-publication.py
       - scripts/check-schema-immutability.py

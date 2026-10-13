@@ -8,6 +8,14 @@ description: >-
 
 The `md-utils` CLI provides structured operations on Markdown files. Add `--help` to any command for full options.
 
+Explicit mdtype v2 definitions support semantic `type: string` / `format` contracts:
+`Date`, `LocalTime`, `DateTime`, `UUID`, and whole-value `Wikilink`. Quote temporal
+frontmatter values. `frontmatter.recommendedSchemas` produces advisories; invalid
+declarations still fail loading. Existing `types check` and `rules validate` assert
+these formats, including nullable branches and array items. New definitions still
+default to v1. No scalar inference, normalization, destination resolution or UUID
+identity allocation occurs during assessment.
+
 ## Commands at a Glance
 
 | Command | Purpose |

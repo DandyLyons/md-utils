@@ -521,7 +521,7 @@ public struct MarkdownRuleChecker: Sendable {
       guard record.supportsMarkdownStructure else {
         return unsupportedMarkdownStructure(requirement.id)
       }
-      let links = WikilinkScanner.scan(record.body)
+      let links = WikilinkScanner.scan(record.body, context: .legacy)
       matched = target.map { expected in links.contains { $0.target == expected } }
         ?? (links.isEmpty == false)
       unavailableMessage = nil

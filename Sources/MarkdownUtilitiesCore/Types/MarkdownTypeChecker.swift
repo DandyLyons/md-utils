@@ -142,34 +142,60 @@ public struct MarkdownTypeChecker: Sendable {
       )]
       diagnostics.append(contentsOf: assessSchemas(
         record.userFrontmatter ?? [:],
-        definition: definition
+        definition: definition,
+        nativeTemporalPaths: record.nativeTemporalPaths,
       ))
       return diagnostics
     }
 
-    return assessSchemas(record.userFrontmatter ?? [:], definition: definition)
+    return assessSchemas(record.userFrontmatter ?? [:], definition: definition, nativeTemporalPaths: record.nativeTemporalPaths)
   }
 
   private func assessSchemas(
     _ frontmatter: [String: JSONValue],
-    definition: MarkdownTypeDefinition
+    definition: MarkdownTypeDefinition,
+    nativeTemporalPaths: Set<String>,
   ) -> [MarkdownDiagnostic] {
     var diagnostics: [MarkdownDiagnostic] = []
-    for (index, schemaValue) in registry.resolvedSchemas(for: definition.name).enumerated() {
-      guard let schema = schemaValue.foundationValue as? [String: Any] else { continue }
+    let required = registry.resolvedSchemas(for: definition.name)
+    let checks = required + registry.resolvedRecommendedSchemas(for: definition.name)
+    let instance = JSONValue.object(frontmatter)
+    for (index, schemaValue) in checks.enumerated() {
+      let severity: MarkdownDiagnosticSeverity = index < required.count ? .error : .advisory
+      let checkID = index < required.count
+        ? "frontmatter.schema[\(index)]" : "frontmatter.recommendedSchemas[\(index - required.count)]"
       do {
+        let evaluated = definition.typeSchemaVersion == "2"
+          ? try SemanticSchemaAdapter.specialize(schemaValue, instance: instance) : schemaValue
+        guard let schema = evaluated.foundationValue as? [String: Any] else { continue }
         let result = try JSONSchema.validate(
-          JSONValue.object(frontmatter).foundationValue,
+          definition.typeSchemaVersion == "2"
+            ? NativeTemporalEvidence.instance(instance, paths: nativeTemporalPaths) : instance.foundationValue,
           schema: schema
         )
         guard result.valid == false else { continue }
+        var hasSemanticDiagnostics = false
+        if definition.typeSchemaVersion == "2" {
+          let semantic = try SemanticSchemaDiagnostics(
+            root: schemaValue, instance: instance, nativePaths: nativeTemporalPaths,
+            severity: severity, constraint: checkID, source: definition.source,
+          ).explain()
+          diagnostics.append(contentsOf: semantic)
+          // Engine diagnostics remain for shape failures. Semantic assertions have
+          // their own stable codes rather than exposing generated enum details.
+          hasSemanticDiagnostics = semantic.isEmpty == false
+        }
         for error in result.errors ?? [] {
+          if hasSemanticDiagnostics,
+            ["enum", "anyOf", "oneOf", "allOf"].contains(error.keywordLocation.path.split(separator: "/").last.map(String.init) ?? "") {
+            continue
+          }
           let missingKey = missingRequiredKey(from: error.description)
           diagnostics.append(MarkdownDiagnostic(
             code: missingKey == nil ? "frontmatter.schema.invalid" : "frontmatter.schema.required-property",
-            severity: .error,
+            severity: severity,
             domain: .frontmatter,
-            constraintID: "frontmatter.schema[\(index)]",
+            constraintID: checkID,
             location: displayPath(error.instanceLocation.path),
             message: error.description,
             fixIts: fixItsForMissingKey(
@@ -177,7 +203,7 @@ public struct MarkdownTypeChecker: Sendable {
               instancePointer: error.instanceLocation.path,
               schema: schemaValue,
               schemaIndex: index,
-              severity: .error
+              severity: severity
             )
           ))
         }
@@ -186,7 +212,7 @@ public struct MarkdownTypeChecker: Sendable {
           code: "frontmatter.schema.engine-error",
           severity: .error,
           domain: .frontmatter,
-          constraintID: "frontmatter.schema[\(index)]",
+          constraintID: checkID,
           location: "frontmatter",
           message: error.localizedDescription
         ))
