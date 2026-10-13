@@ -56,6 +56,12 @@ Types are structural and non-exclusive. Rules and types remain distinct domain m
 
 The normative mdtype v1 design is documented in [RFC 0001](rfcs/0001-mdtype.md).
 
+[RFC 0003](rfcs/0003-semantic-string-formats.md) specifies future mdtype v2 semantic
+string assertions. [RFC 0004](rfcs/0004-document-relationships.md) specifies future
+mdtype v3 named relationships and explicitly versioned mdrule collection policies,
+including recursive conformance, coverage, and indexed dependency correctness.
+These specifications do not enable runtime support or change authoring defaults.
+
 ### fm-var Foundation
 
 Core's `FMVar/` feature area defines the portable [RFC 001 Rev 3](https://github.com/DandyLyons/fm-var-tag/blob/18604853843d6edf22aba927c98697f5c956a0f3/PROPOSAL.md) vocabulary for `<fm-var>`,
