@@ -250,6 +250,8 @@ public struct MarkdownRuleCheck: Equatable, Sendable {
 ///
 /// See <doc:MarkdownRules> for semantics and <doc:CompilingMarkdownRules> for execution.
 public struct MarkdownRuleDefinition: Equatable, Sendable {
+  public var ruleSchemaVersion: String?
+  public var relationshipPolicies: [MarkdownRelationshipPolicy]
   public var name: String
   public var applicability: MarkdownRuleApplicability
   /// RFC 0002 selection expression. When present, replaces flat applicability.
@@ -280,8 +282,12 @@ public struct MarkdownRuleDefinition: Equatable, Sendable {
     source: String? = nil,
     matchExpression: MarkdownRuleMatchExpression? = nil,
     typeExpression: MarkdownRuleTypeExpression? = nil,
-    typeBindings: [String: MarkdownTypeName] = [:]
+    typeBindings: [String: MarkdownTypeName] = [:],
+    ruleSchemaVersion: String? = nil,
+    relationshipPolicies: [MarkdownRelationshipPolicy] = [],
   ) {
+    self.ruleSchemaVersion = ruleSchemaVersion
+    self.relationshipPolicies = relationshipPolicies
     self.name = name
     self.applicability = applicability
     self.matchExpression = matchExpression
@@ -323,7 +329,7 @@ public enum MarkdownRuleAssessmentStatus: String, Codable, Equatable, Sendable {
 /// Structured result of matching and checking one compiled rule against one record.
 ///
 /// See <doc:CompilingMarkdownRules> for status meanings.
-public struct MarkdownRuleAssessment: Equatable, Sendable {
+public struct MarkdownRuleAssessment: Codable, Equatable, Sendable {
   public var ruleName: String
   public var status: MarkdownRuleAssessmentStatus
   public var evidence: [MarkdownRulePredicateEvidence]

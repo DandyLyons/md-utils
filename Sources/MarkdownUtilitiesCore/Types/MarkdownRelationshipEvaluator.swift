@@ -15,6 +15,24 @@ public struct MarkdownRelationshipEvaluator: Sendable {
     roots: [(MarkdownRecord, MarkdownTypeName)],
     collection: MarkdownRelationshipCollection? = nil,
   ) async throws -> MarkdownRelationshipEvaluation {
+    try await evaluate(roots: roots, collection: collection, extractionRelations: nil)
+  }
+
+  /// Shares selection, whole-value parsing and resolution with type assessment, without
+  /// imposing declaring/target type conformance or expanding recursive dependencies.
+  package func extract(
+    roots: [(MarkdownRecord, MarkdownTypeName)],
+    collection: MarkdownRelationshipCollection,
+    relations: [MarkdownTypeName: Set<String>],
+  ) async throws -> MarkdownRelationshipEvaluation {
+    try await evaluate(roots: roots, collection: collection, extractionRelations: relations)
+  }
+
+  private func evaluate(
+    roots: [(MarkdownRecord, MarkdownTypeName)],
+    collection: MarkdownRelationshipCollection?,
+    extractionRelations: [MarkdownTypeName: Set<String>]?,
+  ) async throws -> MarkdownRelationshipEvaluation {
     try Task.checkCancellation()
     guard limits.records > 0, limits.bytes > 0, limits.occurrences > 0, limits.candidates > 0,
       limits.definitions > 0, limits.nodes > 0, limits.edges > 0, limits.diagnostics > 0 else {
@@ -117,8 +135,11 @@ public struct MarkdownRelationshipEvaluator: Sendable {
           contentKind: node.record.context.path.map { .rulesKind(forFileName: $0.rawValue) } ?? .markdown)
         analysis[recordKey] = analyzed
       }
-      let local = try MarkdownTypeChecker(registry: registry).assessLocal(analyzed, as: node.type)
-      node.local = local.outcome
+      if extractionRelations == nil {
+        let local = try MarkdownTypeChecker(registry: registry).assessLocal(analyzed, as: node.type)
+        node.local = local.outcome
+        for cause in local.diagnostics { appendDiagnostic(cause, to: &node.diagnostics) }
+      }
       // Representation availability is independent of a type having any constraints.
       if let fileExtension = analyzed.unavailableFrontmatterExtension {
         node.local = .all([node.local, .unavailable])
@@ -128,8 +149,8 @@ public struct MarkdownRelationshipEvaluator: Sendable {
         node.local = .all([node.local, .unavailable])
         appendDiagnostic(diagnostic("context.unavailable", "Source is not the supplied snapshot revision"), to: &node.diagnostics)
       }
-      for cause in local.diagnostics { appendDiagnostic(cause, to: &node.diagnostics) }
       for name in definition.relationships.keys.sorted() {
+        if let extractionRelations, extractionRelations[node.type]?.contains(name) != true { continue }
         guard let relation = definition.relationships[name],
           let targetType = registry.typeResourceBindings[relation.target] else { continue }
         // Only caller-selected roots expand advisories; their targets expand required checks only.
@@ -250,7 +271,9 @@ public struct MarkdownRelationshipEvaluator: Sendable {
                   if !destinations.insert(identity).inserted && relation.forbidDuplicates {
                     failure("target.duplicate", "Repeated destination identity: \(identity)")
                   }
-                  if let target {
+                  if extractionRelations != nil {
+                    // A resolved assertion remains a graph edge even without target conformance.
+                  } else if let target {
                     if edges < limits.edges, let targetID = add(target, targetType) {
                       edges += 1
                       occurrence.dependency = targetID

@@ -40,7 +40,7 @@ public struct MarkdownRuleFileStore {
     let types = projectRoot + ".md-utils/types"
     try requireContained(types, under: projectRoot)
     var result: [String: MarkdownTypeName] = [:]
-    for reference in rule.types.references where result[reference] == nil {
+    for reference in rule.types.references + rule.relationshipPolicies.flatMap({ $0.relations.map(\.type) }) where result[reference] == nil {
       let path = types + reference
       do {
         try requireContained(path, under: types)

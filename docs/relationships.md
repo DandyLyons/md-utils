@@ -169,7 +169,9 @@ and wikilink-only artifacts remain unchanged, as do v1 authoring defaults. Older
 readers reject the capability instead of silently ignoring assertions. Schema
 shape validation does not perform cross-document assessment.
 
-Collection policies (#178), repairs (#179), persisted dependency invalidation
+Collection policies (#178) are implemented through explicit mdrule v1; see
+[relationship policies](relationship-policies.md) for scopes, cycle witness flags,
+return checks and JSON/YAML output. Repairs (#179), persisted dependency invalidation
 (#180), publication activation and the broader compatibility matrix (#184) remain
 separate work. See [the agreed design](relationship-design.md) and
 [RFC 0004](rfcs/0004-document-relationships.md).

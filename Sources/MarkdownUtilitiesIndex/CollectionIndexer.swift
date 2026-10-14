@@ -6,7 +6,7 @@ import SystemPackage
 /// Stable SHA-256 fingerprints for content and evaluator cache provenance.
 public enum IndexFingerprint {
     /// Bump when extraction or evaluator semantics change, independently of cache format changes.
-    public static let runtimeVersion = "collection-extraction-evaluation-5"
+    public static let runtimeVersion = "collection-extraction-evaluation-6"
 
     /// Returns the lowercase hexadecimal SHA-256 digest of the exact supplied bytes.
     public static func hash(_ data: Data) -> String {

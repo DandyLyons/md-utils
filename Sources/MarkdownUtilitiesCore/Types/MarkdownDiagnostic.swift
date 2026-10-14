@@ -86,7 +86,7 @@ public struct MarkdownDiagnostic: Codable, Equatable, Sendable {
 }
 
 /// The result of assessing one record against one Markdown type.
-public struct MarkdownTypeAssessment: Equatable, Sendable {
+public struct MarkdownTypeAssessment: Codable, Equatable, Sendable {
   public var type: MarkdownTypeName
   public var version: String
   public var diagnostics: [MarkdownDiagnostic]

@@ -141,7 +141,7 @@ This project is on a `0.x.x` release and is **not yet API stable**. The API and 
 - **File Metadata** — Read file metadata including standard and extended attributes (xattr)
 - **Wikilink Parsing & Resolution** — Parse Obsidian-flavored wikilinks, resolve against a vault directory, detect broken/ambiguous links, find backlinks
 - **Markdown Types** — Assess records against non-exclusive structural contracts spanning frontmatter, body, and context; see [RFC 0001](docs/rfcs/0001-mdtype.md)
-  - Explicit mdtype v2 supports [semantic string formats](docs/semantic-string-formats.md) and [named frontmatter relationships](docs/relationships.md). `rel out|in|both` provides JSON/YAML evidence with separate self-links. Collection policies remain future work in [RFC 0004](docs/rfcs/0004-document-relationships.md).
+  - Explicit mdtype v2 supports [semantic string formats](docs/semantic-string-formats.md) and [named frontmatter relationships](docs/relationships.md). `rel out|in|both` provides JSON/YAML evidence with separate self-links. Explicit mdrule v1 adds [collection relationship policies](docs/relationship-policies.md) through `rules validate`, including bounded cycle witnesses, reciprocity and directional inverses.
 - **fm-var Foundation** — Parse RFC 001 Rev 3 elements, resolve and project YAML sources, evaluate RFC 9535 JSONPath, propose atomic scalar cache edits with split fallbacks and literal escaping, and enforce bounded local-file host policy through the Swift libraries
 - **OKF v0.1 Draft Tooling** — Initialize, validate, report on, doctor, and batch-update Open Knowledge Format bundles
 

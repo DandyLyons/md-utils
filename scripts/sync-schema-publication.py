@@ -29,7 +29,7 @@ def main() -> None:
         version, name = match.group("version"), match.group("name")
         if name not in {"md-utils", "mdrule"}:
             continue
-        destinations = [site / version / f"{name}.schema.json"]
+        destinations = [site / "mdrule/1/mdrule.schema.json"] if (version, name) == ("1", "mdrule") else [site / version / f"{name}.schema.json"]
         if name == "md-utils" and version in {"0.1.0", "0.2.0"}:
             destinations.append(site / version / f"md-utils-{version}.schema.json")
         expected.update(destinations)

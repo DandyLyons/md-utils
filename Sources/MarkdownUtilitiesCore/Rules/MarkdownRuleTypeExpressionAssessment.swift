@@ -1,7 +1,7 @@
 import Foundation
 
 /// An evaluated type-expression branch with original diagnostics and resource provenance.
-public struct MarkdownRuleTypeExpressionAssessment: Equatable, Sendable {
+public struct MarkdownRuleTypeExpressionAssessment: Codable, Equatable, Sendable {
   public let location: String
   public let reference: String?
   public let status: MarkdownRuleEvidenceStatus

@@ -62,7 +62,8 @@ public struct MarkdownRuleChecker: Sendable {
   /// Assesses parsed state shared by package subsystems.
   package func assess(
     _ record: AnalyzedMarkdownRecord,
-    against rule: CompiledMarkdownRule
+    against rule: CompiledMarkdownRule,
+    collectionPoliciesHandled: Bool = false,
   ) throws -> MarkdownRuleAssessment {
     let applicability = try assessApplicability(record, rule: rule.definition)
     if applicability.unavailable {
@@ -83,6 +84,11 @@ public struct MarkdownRuleChecker: Sendable {
     }
 
     var diagnostics: [MarkdownDiagnostic] = []
+    if !collectionPoliciesHandled && rule.definition.relationshipPolicies.contains(where: { !$0.isNoOp }) {
+      let required = rule.definition.relationshipPolicies.contains { !$0.isNoOp && $0.severity == .error }
+      diagnostics.append(.init(code: "relationship.context.unavailable", severity: required ? .error : .advisory, domain: .record,
+        location: "relationshipPolicies", message: "Collection policies require MarkdownRuleCollectionEvaluator; a per-record assessment cannot certify them"))
+    }
     var typeAssessments: [String: MarkdownTypeAssessment] = [:]
     var skippedChecks = 0
     for check in rule.definition.checks {
@@ -221,7 +227,7 @@ public struct MarkdownRuleChecker: Sendable {
     rule.analysisRequirements
   }
 
-  private func assessApplicability(
+  package func assessApplicability(
     _ record: AnalyzedMarkdownRecord,
     rule: MarkdownRuleDefinition,
     outcomeBased: Bool = false

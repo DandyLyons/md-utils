@@ -79,6 +79,8 @@ public struct MarkdownRuleFile: Equatable, Sendable {
   public let schemaReference: String?
   public let source: String
   public var creation: MarkdownRuleCreation? = nil
+  public var ruleSchemaVersion: String? = nil
+  public var relationshipPolicies: [MarkdownRelationshipPolicy] = []
 
   public static func decode(_ content: String, source: String) throws -> Self {
     do {
@@ -86,7 +88,12 @@ public struct MarkdownRuleFile: Equatable, Sendable {
       guard case .object(let object) = value else {
         throw MarkdownRuleFileError(source: source, location: "$", message: "Expected one rule object")
       }
-      let unknown = Set(object.keys).subtracting(["$schema", "name", "match", "types", "creation"])
+      if let version = object["md-utils-rule-schema"], version != .string("1") {
+        throw MarkdownRuleFileError(source: source, location: "md-utils-rule-schema", message: "Unsupported rule schema version")
+      }
+      let versioned = object["md-utils-rule-schema"] == .string("1")
+      let allowed: Set<String> = ["$schema", "name", "match", "types", "creation"]
+      let unknown = Set(object.keys).subtracting(versioned ? allowed.union(["md-utils-rule-schema", "relationshipPolicies"]) : allowed)
       guard unknown.isEmpty else {
         throw MarkdownRuleFileError(source: source, location: "$", message: "Unknown fields: \(unknown.sorted().joined(separator: ", "))")
       }
@@ -103,7 +110,9 @@ public struct MarkdownRuleFile: Equatable, Sendable {
       if let match = object["match"] { _ = try MarkdownRuleMatchExpression.decode(match, source: source) }
       return Self(name: name, match: object["match"],
         types: try .decode(rawTypes, source: source), schemaReference: object["$schema"]?.stringValue,
-        source: source, creation: try object["creation"].map { try MarkdownRuleCreation.decode($0, source: source) })
+        source: source, creation: try object["creation"].map { try MarkdownRuleCreation.decode($0, source: source) },
+        ruleSchemaVersion: versioned ? "1" : nil,
+        relationshipPolicies: try object["relationshipPolicies"].map { try MarkdownRelationshipPolicy.decode($0, source: source) } ?? [])
     } catch let error as MarkdownRuleFileError {
       throw error
     } catch {
@@ -113,6 +122,8 @@ public struct MarkdownRuleFile: Equatable, Sendable {
 
   public func encoded() throws -> String {
     var object: [String: Any] = ["name": name, "types": types.jsonValue.foundationValue]
+    if let ruleSchemaVersion { object["md-utils-rule-schema"] = ruleSchemaVersion }
+    if !relationshipPolicies.isEmpty { object["relationshipPolicies"] = relationshipPolicies.map { $0.jsonValue.foundationValue } }
     if let match { object["match"] = match.foundationValue }
     if let schemaReference { object["$schema"] = schemaReference }
     if let creation { object["creation"] = creation.jsonValue.foundationValue }

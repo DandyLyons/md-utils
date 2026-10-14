@@ -20,6 +20,8 @@ public struct MarkdownRelationshipLimits: Sendable {
   public var nodes = 100_000
   public var edges = 100_000
   public var diagnostics = 10_000
+  public var policies = 1_000
+  public var policySteps = 5_000_000
   public init() {}
 }
 

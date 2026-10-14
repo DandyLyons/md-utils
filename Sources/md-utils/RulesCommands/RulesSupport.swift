@@ -1311,18 +1311,18 @@ enum RuleFileScanner {
 /// Describes one validation issue for a file.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
-struct RuleValidationErrorDetail: Sendable {
+struct RuleValidationErrorDetail: Codable, Sendable {
   var path: String
   var message: String
 }
 /// Records the validation status for one file and one rule.
 ///
 /// See <doc:RulesValidationCommands> for workflow details.
-struct RuleValidationResult: Sendable {
+struct RuleValidationResult: Codable, Sendable {
   /// Indicates whether a file-rule validation passed, failed, or was skipped.
   ///
   /// See <doc:RulesValidationCommands> for workflow details.
-  enum Status: Sendable {
+  enum Status: String, Codable, Sendable {
     case ok
     case error
     case skipped
@@ -1392,6 +1392,7 @@ struct RuleValidationSummary {
   var indexReport: IndexUpdateReport? = nil
   var indexedOnly = false
   var uncoveredRules: [String] = []
+  var collectionAssessment: MarkdownRuleCollectionAssessment? = nil
 
   var errors: Int {
     results.reduce(0) { count, result in
@@ -1412,7 +1413,7 @@ struct RuleValidationSummary {
   }
 
   var hasFailures: Bool {
-    results.contains { $0.status == .error }
+    results.contains { $0.status == .error } || collectionAssessment.map { $0.outcome != .pass } == true
   }
 }
 /// Runs project rules validation and returns a structured summary.

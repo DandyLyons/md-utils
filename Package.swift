@@ -262,6 +262,7 @@ let package = Package(
         .process("Resources/0.2.0_md-utils.schema.json"),
         .process("Resources/0.3.0_md-utils.schema.json"),
         .process("Resources/0.3.0_mdrule.schema.json"),
+        .process("Resources/1_mdrule.schema.json"),
         .process("Resources/1_md-utils-type.schema.json"),
         .process("Resources/2_md-utils-type.schema.json"),
         .process("Resources/2-capabilities_md-utils-type.schema.json"),

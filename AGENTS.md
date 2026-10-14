@@ -11,6 +11,10 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **WASM verification deferred**: The installed Swift 6.4 compiler cannot import modules from the installed Swift 6.3.1 WASI SDK. Skip WASM builds and smoke checks during ordinary development, including Core changes, until preparation for a real release begins. See the verification policy below.
+
+- **Collection relationship policies (#178)**: Explicit independent mdrule v1 adds cycles, self-links, reciprocity and directional inverse policies with selected/reachable scopes. Portable bounded collection evaluation retains pass/fail/unavailable, policy origins, boundary edges and conflict witnesses. `rules validate --json|--yaml` exposes evidence; mutually exclusive `--cycle-witness-per-component` (default) and `--cycle-witness-first` control cycle reporting. Policies are recomputed, not cached; evaluator fingerprint v6 invalidates older per-record evidence. Existing schemas/defaults remain unchanged. See `docs/relationship-policies.md`; tests: `swift test --filter 'MarkdownRelationshipPolicyTests|RelationshipPolicyCommandsTests'`. Repairs and persistent reuse remain #179/#180.
+
 - **Relationship review regressions (#177)**: Unsupported target representations remain unavailable independently of type constraints; candidate truncation retains proven ambiguity; propagated diagnostics retain property/declaration provenance. Rule routing inspects selected type dependencies, and type-hint verification shares collection-aware assessment. Permanent regression suites: `swift test --filter 'MarkdownRelationshipRegressionTests|RelationshipRegressionCommandsTests'`.
 
 - **Named relationships (#177)**: Explicit mdtype v2 `document-relationships` compiles literal selectors and target resource bindings. Portable bounded three-way recursive assessment and native/index snapshot adapters power `relationships` (`rel`) `outgoing` (`out`), `incoming` (`in`), and `both`, JSON/YAML output, separate self-links, and type/rule validation. User-authored assertions do not establish domain truth. Indexed-only retains limited coverage; cross-document assessments are recomputed pending #180. See `docs/relationships.md` and `docs/relationship-design.md`; tests: `swift test --filter 'MarkdownRelationshipTests|RelationshipCommandsTests'`. Defaults and existing immutable schemas remain unchanged.
@@ -111,6 +115,23 @@ swift run md-utils <command>
 ```
 
 Linux Docker builds and validation run in CI only.
+
+### WASM verification policy
+
+Skip WASM builds and smoke checks until we begin preparing for a real release,
+including when changing `MarkdownUtilitiesCore` or its dependencies. This overrides
+the routine WASM verification requirements in `docs/development-workflow.md` and
+other project documentation. Continue normal native builds and tests.
+
+The installed Swift 6.4 compiler cannot import the Swift 6.3.1 modules supplied by
+the installed `swift-6.3.1-RELEASE_wasm` SDK. Do not repeatedly retry this known
+toolchain/SDK mismatch or install replacement tooling as part of ordinary work.
+Record WASM verification as deferred, not passed.
+
+When preparation for a real release begins, revisit the blocker, use an exactly
+matching Swift toolchain and WASI SDK, and run the WASM build and smoke checks
+before claiming verified WASM support. Any tooling installation still requires
+the user's explicit permission.
 
 > [!Note] 
 > If no `.build/` directory exists, run `swift build` first to create. Do not use the `.build/` directory from another worktree or branch. 

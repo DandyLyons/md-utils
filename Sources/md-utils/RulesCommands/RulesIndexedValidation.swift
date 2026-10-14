@@ -16,6 +16,7 @@ extension RulesValidatorRunner {
     noIndex: Bool = false,
     indexedOnly: Bool = false,
     verifyHashes: Bool = false,
+    cycleWitnessMode: MarkdownCycleWitnessMode = .perComponent,
     warning: (String) -> Void = { FileHandle.standardError.write(Data(($0 + "\n").utf8)) },
   ) async throws -> RuleValidationSummary {
     try Task.checkCancellation()
@@ -28,10 +29,11 @@ extension RulesValidatorRunner {
     if config.standaloneProject?.types.definitions.contains(where: { !$0.relationships.isEmpty }) == true {
       let registry = try config.compiledRuleRegistry(root: resolvedRoot)
       let selectedTypes = Set(rules.flatMap { registry.rule(named: $0.name)?.definition.referencedTypes ?? [] })
-      if selectedTypes.contains(where: { registry.typeRegistry?.definition(named: $0)?.relationships.isEmpty == false }) {
+      if rules.contains(where: { registry.rule(named: $0.name)?.definition.relationshipPolicies.isEmpty == false })
+        || selectedTypes.contains(where: { registry.typeRegistry?.definition(named: $0)?.relationships.isEmpty == false }) {
         return try await validateRelationships(config: config, configPath: configPath, ruleName: ruleName, root: resolvedRoot,
           noIndex: noIndex, indexedOnly: indexedOnly, verifyHashes: verifyHashes,
-          includeNonMarkdown: includeNonMarkdown, warning: warning)
+          includeNonMarkdown: includeNonMarkdown, cycleWitnessMode: cycleWitnessMode, warning: warning)
       }
     }
     var uncoveredRules: [String] = []

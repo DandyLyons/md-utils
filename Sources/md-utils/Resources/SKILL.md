@@ -37,6 +37,16 @@ Existing indexes refresh automatically; `--no-index` bypasses them and
 Limited coverage cannot establish absence or unique basename resolution.
 Relationship assessments are recomputed pending dependency-aware caching.
 
+Standalone rules may opt into independent `md-utils-rule-schema: "1"` and
+`relationshipPolicies`: explicit cycles, selfLinks, reciprocity, or directional
+inverse checks over named type-resource relations, with selected/reachable scope.
+`rules validate --json|--yaml` reports collection evidence. Cycle reporting defaults
+to `--cycle-witness-per-component`; opt into `--cycle-witness-first` for early
+cycle-search termination. The flags are mutually exclusive. Required failure or
+unavailability exits nonzero; advisories remain visible without failing validation.
+Policies never infer truth or write return assertions. Legacy rules omit the
+discriminator and reject policy fields; authoring defaults remain unchanged.
+
 ## Commands at a Glance
 
 | Command | Purpose |

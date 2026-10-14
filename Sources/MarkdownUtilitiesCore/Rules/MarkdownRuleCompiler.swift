@@ -130,6 +130,34 @@ public struct MarkdownRuleCompiler: Sendable {
     for (index, definition) in definitions.enumerated() {
       let location = "rules[\(index)]"
       var ruleDiagnostics: [MarkdownRuleCompilationDiagnostic] = []
+      do {
+        guard definition.ruleSchemaVersion == nil || definition.ruleSchemaVersion == "1",
+          definition.relationshipPolicies.isEmpty || definition.ruleSchemaVersion == "1" else {
+          throw MarkdownRelationshipDefinition.invalid("Policies require explicit md-utils-rule-schema: 1")
+        }
+        let decodedPolicies = try MarkdownRelationshipPolicy.decode(.array(definition.relationshipPolicies.map(\.jsonValue)), source: definition.source ?? location)
+        guard decodedPolicies == definition.relationshipPolicies else {
+          throw MarkdownRelationshipDefinition.invalid("Cycle severity must agree with its mode")
+        }
+        for policy in definition.relationshipPolicies {
+          var bound: Set<MarkdownPolicyRelation> = []
+          for ref in policy.relations {
+            guard let type = definition.typeBindings[ref.type],
+              typeRegistry?.definition(named: type)?.relationships[ref.name] != nil else {
+              throw MarkdownRelationshipDefinition.invalid("Unknown policy relation \(ref.type):\(ref.name) in \(policy.id)")
+            }
+            let inserted = bound.insert(.init(type: type.rawValue, name: ref.name)).inserted
+            if !inserted {
+              switch policy.kind {
+              case .cycles, .selfLinks: throw MarkdownRelationshipDefinition.invalid("Duplicate bound relation in \(policy.id)")
+              default: break
+              }
+            }
+          }
+        }
+      } catch {
+        ruleDiagnostics.append(diagnostic(.invalidOperand, location + ".relationshipPolicies", error.localizedDescription))
+      }
       let selectionLeaves = definition.matchExpression?.leaves ?? [definition.applicability]
       if let expression = definition.typeExpression {
         do {

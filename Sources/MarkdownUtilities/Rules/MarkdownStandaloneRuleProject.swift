@@ -51,7 +51,8 @@ public struct MarkdownStandaloneRuleProject {
     definitions = try files.map { file in
       MarkdownRuleDefinition(name: file.name, source: file.source,
         matchExpression: try file.decodedMatch(), typeExpression: file.types,
-        typeBindings: try store.typeBindings(for: file, registry: registry))
+        typeBindings: try store.typeBindings(for: file, registry: registry),
+        ruleSchemaVersion: file.ruleSchemaVersion, relationshipPolicies: file.relationshipPolicies)
     }
   }
 

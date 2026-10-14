@@ -65,6 +65,22 @@ consumers. This foundation is a Core API capability: legacy 0.1.0 and 0.2.0 conf
 formats do not encode type-conformance checks. Config 0.3.0 uses recursive `types`
 expressions and exact filename bindings through the shared native project loader.
 
+## Collection relationship policies
+
+Explicit `ruleSchemaVersion: "1"` enables ``MarkdownRuleDefinition/relationshipPolicies``.
+Policies bind type resources through `typeBindings` independently of `typeExpression`.
+Compile the full registry, then use ``MarkdownRuleCollectionEvaluator`` with a
+host-supplied ``MarkdownRelationshipCollection``. It evaluates selected/reachable
+scopes, cycles, self-links, reciprocity, and directional inverses without I/O or edits.
+``MarkdownRuleCollectionAssessment`` retains separate record and policy outcomes,
+coverage, boundary edges, declaration origins, and occurrence-indexed witnesses.
+
+``MarkdownCycleWitnessMode/perComponent`` is the default;
+``MarkdownCycleWitnessMode/first`` stops each cycle search after its first witness.
+Both preserve witnessed failures under incomplete coverage and refuse unwarranted
+success. Single-record assessment reports unavailable required collection checks.
+The native CLI recomputes graph assessments rather than persisting them in the index.
+
 ## Recursive selection
 
 `MarkdownRuleMatchExpression` parses and evaluates the RFC 0002 `allOf`, `anyOf`,

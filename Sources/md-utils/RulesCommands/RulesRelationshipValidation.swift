@@ -8,7 +8,8 @@ import PathKit
 extension RulesValidatorRunner {
   /// Reuses indexed source evidence but never cached cross-document assessments.
   static func validateRelationships(config: MdUtilsConfig, configPath: Path, ruleName: String?, root: Path,
-    noIndex: Bool, indexedOnly: Bool, verifyHashes: Bool, includeNonMarkdown: Bool, warning: (String) -> Void,
+    noIndex: Bool, indexedOnly: Bool, verifyHashes: Bool, includeNonMarkdown: Bool,
+    cycleWitnessMode: MarkdownCycleWitnessMode = .perComponent, warning: (String) -> Void,
   ) async throws -> RuleValidationSummary {
     let registry = try config.compiledRuleRegistry(root: root)
     var checker = MarkdownRuleChecker(registry: registry)
@@ -28,6 +29,21 @@ extension RulesValidatorRunner {
     let collection = try await MarkdownRelationshipNativeCollection.load(root: root, noIndex: noIndex,
       indexedOnly: indexedOnly, verifyHashes: verifyHashes, includeNonMarkdown: includeNonMarkdown,
       requestedScopes: scopes, configPath: configPath, warning: warning)
+    if names.contains(where: { registry.rule(named: $0)?.definition.relationshipPolicies.isEmpty == false }) {
+      let assessment = try await MarkdownRuleCollectionEvaluator(registry: registry, cycleWitnessMode: cycleWitnessMode)
+        .evaluate(collection: collection, ruleNames: names)
+      let results = assessment.rules.flatMap { rule in
+        rule.records.filter { $0.membership != .notMatched }.map { record in
+          RuleValidationResult(ruleName: rule.rule, schemaPath: "", filePath: record.path,
+            status: record.outcome == .pass ? .ok : .error,
+            errors: (record.assessment.applicabilityDiagnostics + record.assessment.diagnostics).map {
+              .init(path: $0.location, message: validationMessage(code: $0.code, message: $0.message))
+            })
+        }
+      }
+      return .init(results: results, totalFiles: collection.records.count, indexedOnly: indexedOnly,
+        uncoveredRules: uncovered, collectionAssessment: assessment)
+    }
     var limitations = collection.limitations
     var resolved: [String: [MarkdownTypeName: MarkdownTypeAssessment]] = [:]
     if let types = registry.typeRegistry {

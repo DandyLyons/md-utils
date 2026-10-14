@@ -90,6 +90,13 @@ def main() -> None:
         if args.check_published and fetch_json(expected_id) != load_json(public):
             fail(f"published schema differs from local schema: {expected_id}")
 
+    policy_schema = repo_root / "site/schemas/mdrule/1/mdrule.schema.json"
+    policy_id = "https://dandylyons.github.io/md-utils/schemas/mdrule/1/mdrule.schema.json"
+    if load_json(policy_schema).get("$id") != policy_id:
+        fail(f"schema $id must be {policy_id}")
+    if args.check_published and fetch_json(policy_id) != load_json(policy_schema):
+        fail(f"published schema differs from local schema: {policy_id}")
+
     schema = load_json(bundled)
     if schema.get("$id") != VERSIONED_SCHEMA_URL:
         fail(f"schema $id must be {VERSIONED_SCHEMA_URL}")
