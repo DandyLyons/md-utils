@@ -3,6 +3,11 @@
 Approved 2026-10-13. Implements RFCs 0003/0004 and epic #169 using the
 #170 resolver, #173 whole-value parser, and #175 occurrence provenance.
 
+Future direction: [Claims-first document graph](claims-first-document-graph.md)
+records the 2026-10-14 decision to separate observable claims from optional
+conformance requirements. The design below still documents current behavior;
+the follow-on work requires explicit compatibility and migration decisions.
+
 ## Meaning and contracts
 
 Users define domain meaning and truth. md-utils verifies stored assertions and
