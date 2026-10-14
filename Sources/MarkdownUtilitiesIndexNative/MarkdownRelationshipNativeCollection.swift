@@ -98,6 +98,14 @@ public enum MarkdownRelationshipNativeCollection {
   private static func direct(root: URL, limits: MarkdownRelationshipLimits, includeNonMarkdown: Bool) async throws -> MarkdownRelationshipCollection {
     let lease = try await CollectionWriterLease.acquire(root: root)
     defer { withExtendedLifetime(lease) {} }
+    return try await readOnly(root: root, limits: limits, includeNonMarkdown: includeNonMarkdown)
+  }
+
+  /// Authoritative bounded discovery without creating locks or touching an index.
+  /// Callers applying edits already own the writer lease; previews own no lease.
+  public static func readOnly(root: URL, limits: MarkdownRelationshipLimits = .init(),
+    includeNonMarkdown: Bool = false,
+  ) async throws -> MarkdownRelationshipCollection {
     let paths = try discover(root: root, maximum: limits.candidates)
     var records: [String: MarkdownRecord] = [:]
     var limitations: [String] = []

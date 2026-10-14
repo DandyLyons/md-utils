@@ -510,6 +510,10 @@ enum TypesRenderer {
       return ["kind": "requestFrontmatterValue", "path": path]
     case .appendHeading(let text, let level):
       return ["kind": "appendHeading", "text": text, "level": level]
+    case .setFrontmatterOccurrence(let path, let value):
+      return ["kind": "setFrontmatterOccurrence", "path": path.map { $0.jsonValue.foundationValue }, "value": value.foundationValue]
+    case .removeFrontmatterOccurrence(let path):
+      return ["kind": "removeFrontmatterOccurrence", "path": path.map { $0.jsonValue.foundationValue }]
     }
   }
 

@@ -17,8 +17,9 @@ struct RulesCommandsTests {
     let config = CLIEntry.RulesCommands.configuration
 
     #expect(config.commandName == "rules")
-    #expect(config.subcommands.count == 9)
-    #expect(config.subcommands[8] is CLIEntry.RulesCommands.New.Type)
+    #expect(config.subcommands.count == 10)
+    #expect(config.subcommands[8] is CLIEntry.RulesCommands.Fix.Type)
+    #expect(config.subcommands[9] is CLIEntry.RulesCommands.New.Type)
     #expect(config.subcommands[0] is CLIEntry.RulesCommands.Add.Type)
     #expect(config.subcommands[1] is CLIEntry.RulesCommands.Interactive.Type)
     #expect(config.subcommands[2] is CLIEntry.RulesCommands.Remove.Type)

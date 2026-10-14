@@ -283,6 +283,8 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     guard lease.root == root else { throw RecordStoreError.unavailable }
     for url in try journalFiles() {
       var receipt = try readReceipt(url)
+      // CLI Fix-It drafts own their evidence-aware recovery and publication.
+      if receipt.fixItDraftID != nil { continue }
       if receipt.sourcePath != nil, receipt.destinationCommitted == true,
         receipt.state != .completed && receipt.state != .abandoned {
         do { _ = try await finishTransfer(receipt, lease: lease) }
@@ -568,32 +570,14 @@ extension IndexedMarkdownRepository: MarkdownMutationService {
     set(value, path: path.dropFirst(), in: &nested); object[first] = .object(nested)
   }
 
-  private func journalDirectory() throws -> URL {
-    let directory = root.appendingPathComponent(".md-utils/mutations/", isDirectory: true)
-    guard directory.resolvingSymlinksInPath().path == directory.standardizedFileURL.path else { throw RecordStoreError.unavailable }
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
-      attributes: [.posixPermissions: 0o700])
-    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
-    // Persist the journal directory's entry before a source commit can depend on it.
-    try NativeMutationFiles.syncDirectory(directory.deletingLastPathComponent())
-    try NativeMutationFiles.syncDirectory(root)
-    return directory
-  }
   private func receiptURL(_ id: String) -> URL { root.appendingPathComponent(".md-utils/mutations/\(id).json") }
   private func journalFiles() throws -> [URL] {
-    try FileManager.default.contentsOfDirectory(at: journalDirectory(), includingPropertiesForKeys: nil).filter { $0.pathExtension == "json" }
+    try NativeMutationJournal(root: root).files()
   }
   private func readReceipt(_ url: URL) throws -> MarkdownMutationReceipt {
-    let handle = try FileHandle(forReadingFrom: url); defer { try? handle.close() }
-    let data = try handle.read(upToCount: 64 * 1024 * 1024 + 1) ?? Data()
-    guard data.count <= 64 * 1024 * 1024 else { throw RecordStoreError.unavailable }
-    return try JSONDecoder().decode(MarkdownMutationReceipt.self, from: data)
+    try NativeMutationJournal(root: root).read(url)
   }
   private func writeReceipt(_ receipt: MarkdownMutationReceipt) throws {
-    let directory = try journalDirectory()
-    let url = receiptURL(receipt.id)
-    try JSONEncoder().encode(receipt).write(to: url, options: .atomic)
-    let handle = try FileHandle(forWritingTo: url); try handle.synchronize(); try handle.close()
-    try NativeMutationFiles.syncDirectory(directory)
+    try NativeMutationJournal(root: root).write(receipt)
   }
 }

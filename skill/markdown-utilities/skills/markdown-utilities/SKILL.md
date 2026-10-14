@@ -47,6 +47,23 @@ unavailability exits nonzero; advisories remain visible without failing validati
 Policies never infer truth or write return assertions. Legacy rules omit the
 discriminator and reject policy fields; authoring defaults remain unchanged.
 
+`rules fix [rule]` previews shared Fix-Its by default, including exact source changes
+and before/after assessment. Use `--select 1,4,5` (or repeated `--select`) to preview
+a combined selection. Only `--apply` persists changes; noninteractive numbered
+application also requires the printed `--review` token. Tokens bind proposals to
+supporting files, definitions, candidate namespace and scope; stale evidence requires
+fresh review. Relationship assertions require explicit selection, never `--yes`
+alone. `--yes` selects automatic schema fixes only; known defaults still require
+selection. Advisory repairs additionally need `--include-recommendations`.
+Unavailable/ambiguous evidence and conflicting edits block application. Metadata
+may be reserialized under shared codec guarantees; unrelated values and body bytes
+are preserved. Application uses shared drafts/receipts and sequential coordinated
+writes, not cross-file atomicity. On failure, inspect `index draft show`, resolve
+indeterminate attempts with `index draft resolve`, and resume `index apply` with
+every batch draft ID (including completed members); confirmed commits are not
+rewritten. No server configuration is needed for Fix-It drafts. Remaining required
+failures exit nonzero. Relationship assessments remain uncached pending #180.
+
 ## Commands at a Glance
 
 | Command | Purpose |

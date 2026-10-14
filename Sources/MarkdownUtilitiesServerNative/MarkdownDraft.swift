@@ -54,6 +54,8 @@ public struct MarkdownDraft: Codable, Sendable {
   public internal(set) var failureCode: String?
   /// Last apply conflict or failure explanation.
   public internal(set) var failureMessage: String?
+  /// Optional evidence-bound CLI intent. Absent on legacy/server resource drafts.
+  public internal(set) var fixItContext: MarkdownFixItDraftContext?
 
   init(path: MarkdownRecordPath, resource: String, baseline: MarkdownRecordRevision,
     uuid: String?, uuidPath: [String]?, epoch: String?, fingerprint: String,
@@ -68,6 +70,20 @@ public struct MarkdownDraft: Codable, Sendable {
   func request() throws -> MarkdownMutationRequest {
     try MarkdownMutationRequest(operation: operation, data: JSONEncoder().encode(payload))
   }
+}
+
+/// Extends the shared durable draft envelope; no parallel repair store is used.
+public struct MarkdownFixItDraftContext: Codable, Sendable {
+  public let version: Int
+  public let batch: String
+  public let draftIDs: [String]
+  public let configPath: String
+  public let rules: [String]?
+  public let evidence: MarkdownFixItReviewEvidence
+  public let contexts: [String: MarkdownRecordContext]
+  public let edits: [MarkdownFixIt]
+  public let originalContent: String
+  public let expectedRevisions: [String: MarkdownRecordRevision]
 }
 
 /// One bounded preview or execution result; concrete source is present only during planning.

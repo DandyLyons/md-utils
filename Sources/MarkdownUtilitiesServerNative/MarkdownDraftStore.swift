@@ -1,5 +1,6 @@
 import Foundation
 import MarkdownUtilitiesCore
+import MarkdownUtilitiesIndex
 import MarkdownUtilitiesServer
 
 /// Atomic JSON draft persistence; all mutations require the collection writer lease.
@@ -39,6 +40,16 @@ struct MarkdownDraftStore: Sendable {
       throw MarkdownMutationError(422, "draft.invalid", "Unsupported or inconsistent draft envelope.")
     }
     _ = try draft.request()
+    if let context = draft.fixItContext {
+      guard context.version == 1, draft.resource == "__rules_fix__", context.draftIDs.contains(draft.id),
+        context.draftIDs.count <= 1_000, context.expectedRevisions[draft.path.rawValue] != nil,
+        context.evidence.records[draft.path.rawValue] == draft.baseline,
+        IndexFingerprint.hash(Data(context.originalContent.utf8)) == draft.baseline.rawValue,
+        context.evidence.configuration == draft.configurationFingerprint,
+        UUID(uuidString: context.batch)?.uuidString.lowercased() == context.batch else {
+        throw MarkdownMutationError(422, "draft.invalid", "Unsupported or inconsistent Fix-It draft context.")
+      }
+    }
     if draft.attemptID != nil && draft.resolvedPath == nil {
       throw MarkdownMutationError(422, "draft.invalid", "Submitted drafts require a bound source path.")
     }
@@ -97,6 +108,17 @@ struct MarkdownDraftStore: Sendable {
   func discard(_ draft: MarkdownDraft) throws {
     guard draft.attemptID == nil || draft.state == .completed else {
       throw MarkdownMutationError(409, "draft.recovery-required", "Resolve the submitted attempt before discarding this draft.")
+    }
+    if let context = draft.fixItContext {
+      let members = try context.draftIDs.compactMap { id -> MarkdownDraft? in
+        guard FileManager.default.fileExists(atPath: try url(id).path) else { return nil }
+        return try load(id)
+      }
+      let unresolvedAttempt = members.contains { $0.attemptID != nil && $0.state != .completed }
+      guard !unresolvedAttempt, draft.state != .completed || members.allSatisfy({ $0.state == .completed }) else {
+        throw MarkdownMutationError(409, "draft.batch-incomplete", "Resolve submitted attempts, then complete or discard unsubmitted batch members before discarding completed recovery evidence.")
+      }
+      if let attempt = draft.attemptID { try pin(attempt, retain: false) }
     }
     try FileManager.default.removeItem(at: url(draft.id))
     try NativeMutationFiles.syncDirectory(directory)

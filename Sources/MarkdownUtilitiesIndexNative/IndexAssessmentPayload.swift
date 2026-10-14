@@ -139,6 +139,10 @@ struct IndexTypePayload: Codable {
                         "path": .array(path.map(JSONValue.string))])
                 case .appendHeading(let text, let level):
                     return .object(["kind": .string("appendHeading"), "text": .string(text), "level": .integer(level)])
+                case .setFrontmatterOccurrence(let path, let value):
+                    return .object(["kind": .string("setFrontmatterOccurrence"), "path": .array(path.map(\.jsonValue)), "value": value])
+                case .removeFrontmatterOccurrence(let path):
+                    return .object(["kind": .string("removeFrontmatterOccurrence"), "path": .array(path.map(\.jsonValue))])
                 }
             }
         }

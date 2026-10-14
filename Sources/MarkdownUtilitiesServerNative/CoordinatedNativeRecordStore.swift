@@ -29,6 +29,13 @@ struct CoordinatedNativeRecordStore: RecordStore {
       content: nil, expected: expectedRevision)
   }
   private func persist(_ record: MarkdownRecord, revision: MarkdownRecordRevision?) throws -> MarkdownRecord {
+    try Self.persist(record, revision: revision, root: root, lease: lease)
+  }
+
+  /// Shared leased persistence for validated REST proposals and CLI Fix-It drafts.
+  static func persist(_ record: MarkdownRecord, revision: MarkdownRecordRevision?, root: URL,
+    lease: CollectionWriterLease,
+  ) throws -> MarkdownRecord {
     guard lease.root == root else { throw RecordStoreError.unavailable }
     guard let identity = record.identity else { throw RecordStoreError.invalidRecord(.missingIdentity) }
     if let supplied = record.revision { throw RecordStoreError.invalidRecord(.callerSuppliedRevision(supplied)) }

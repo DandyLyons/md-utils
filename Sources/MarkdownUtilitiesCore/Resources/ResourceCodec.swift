@@ -183,16 +183,22 @@ public struct MarkdownResourceCodec: ResourceCodec {
       body = requestedBody ?? original.body
     }
 
+    return ResourceMutationProposal(content: try Self.encodeMetadata(metadata, body: body, record: source.record), source: source)
+  }
+
+  /// Shared loss-checked encoding for resource edits and typed Fix-It occurrences.
+  package static func encodeMetadata(_ metadata: FrontMatter, body: String, record: MarkdownRecord) throws -> String {
+    let original = try Self.document(record.content)
     let metadataChanged = Self.normalized(metadata) != Self.normalized(original.frontMatter)
     let content: String
     if !metadataChanged {
       // UTF-8 slicing avoids changing normalization, CRLF body bytes, or comments.
-      let prefixCount = source.record.content.utf8.count - original.body.utf8.count
-      content = String(decoding: source.record.content.utf8.prefix(prefixCount), as: UTF8.self) + body
+      let prefixCount = record.content.utf8.count - original.body.utf8.count
+      content = String(decoding: record.content.utf8.prefix(prefixCount), as: UTF8.self) + body
     } else {
       let format = original.frontMatterFormat ?? .yaml
       if original.frontMatterFormat == .yaml {
-        var input = source.record.content[...]
+        var input = record.content[...]
         let raw = try FrontMatterParser().parse(&input).rawFrontMatter
         if let node = try Yams.compose(yaml: raw) { try Self.validateYAML(node) }
       }
@@ -213,7 +219,7 @@ public struct MarkdownResourceCodec: ResourceCodec {
           verified.frontMatterFormat == (metadataChanged ? original.frontMatterFormat ?? .yaml : original.frontMatterFormat) else {
       throw ResourceCodecError("round-trip", "Encoding changed metadata values or document boundaries.")
     }
-    return ResourceMutationProposal(content: content, source: source)
+    return content
   }
 
   /// Validates client-supplied creation fields; protected values belong to the host.
@@ -292,7 +298,7 @@ public struct MarkdownResourceCodec: ResourceCodec {
     if let sequence = node.sequence { for value in sequence { try validateYAML(value) } }
   }
 
-  private static func convert(_ value: JSONValue) throws -> FrontMatterValue {
+  package static func convert(_ value: JSONValue) throws -> FrontMatterValue {
     switch value {
     case .null: return .null
     case .boolean(let value): return .boolean(value)

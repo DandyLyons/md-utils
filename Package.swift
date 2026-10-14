@@ -87,7 +87,7 @@ let package = Package(
     ]),
     .target(name: "MarkdownUtilitiesServerNative", dependencies: [
       .product(name: "SystemPackage", package: "swift-system"),
-      "MarkdownUtilitiesServer", "MarkdownUtilitiesIndexNative", "MarkdownUtilitiesIndex", "MarkdownUtilitiesTemplates",
+      "MarkdownUtilitiesServer", "MarkdownUtilities", "MarkdownUtilitiesIndexNative", "MarkdownUtilitiesIndex", "MarkdownUtilitiesTemplates",
       .product(name: "GRDB", package: "GRDB.swift"),
       .product(name: "PathKit", package: "PathKit"),
     ]),

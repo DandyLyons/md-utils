@@ -27,6 +27,8 @@ public enum MarkdownRecordEdit: Codable, Equatable, Sendable {
   case ensureFrontmatter
   case setFrontmatterValue(path: [String], value: JSONValue)
   case requestFrontmatterValue(path: [String])
+  case setFrontmatterOccurrence(path: [WikilinkPropertyComponent], value: JSONValue)
+  case removeFrontmatterOccurrence(path: [WikilinkPropertyComponent])
   case appendHeading(text: String, level: Int)
 }
 

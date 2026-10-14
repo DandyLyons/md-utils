@@ -6,9 +6,16 @@ public struct WikilinkTextOccurrence: Equatable, Sendable, Codable {
 }
 
 /// A literal property key or array index; punctuation in keys has no path syntax.
-public enum WikilinkPropertyComponent: Equatable, Sendable, Codable {
+public enum WikilinkPropertyComponent: Hashable, Sendable, Codable {
   case key(String)
   case index(Int)
+
+  public var jsonValue: JSONValue {
+    switch self {
+    case .key(let key): .object(["key": .string(key)])
+    case .index(let index): .object(["index": .integer(index)])
+    }
+  }
 }
 
 /// Identifies both the origin and the coordinate space of an occurrence.

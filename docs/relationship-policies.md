@@ -121,14 +121,15 @@ advisory even on an empty graph. Across rules, observed overlapping edges provid
 concrete witnesses. Diagnostics retain both policy origins; they never override the
 original severities. Only rules included in the request participate. Absence of a
 conflict advisory does not prove compatibility, and arbitrary matcher overlap is
-not decided. No repairs are generated.
+not decided. Validation does not apply repairs; use the explicit Fix-It workflow below.
 
 Existing indexes refresh automatically; `--no-index` uses source files.
 `--indexed-only` refreshes recorded candidates without discovery or fallback and
 cannot certify global consistency. `--verify-hashes` detects stat-preserving edits.
 Policy assessments are recomputed per request. Evaluator fingerprint v6 invalidates
 older per-record evidence; persistent cross-document reuse remains disabled pending
-#180. Drafts and durable receipts are unchanged.
+#180. Fix-Its extend the existing drafts and durable receipts without storing
+relationship assessments in the disposable index.
 
 ## Portable API, bounds, and compatibility
 
@@ -146,12 +147,131 @@ policy diagnostics and conflict diagnostics share a separate 10,000-item budget.
 All limits are configurable through Core. A 1,000-record cycle is covered by the
 permanent regression suite; limits are safety bounds rather than throughput guarantees.
 
+## Review and apply Fix-Its (#179)
+
+`rules fix` previews by default. Selecting fixes also only previews; `--apply` is
+the explicit opt-in to persistence. No server resource configuration is required.
+
+```bash
+md-utils rules fix people
+md-utils rules fix people --select 1,4,5
+md-utils rules fix people --select 1,4 --select 5
+md-utils rules fix people --select 1,4,5 --review '<printed-token>' --apply
+md-utils rules fix people --include-recommendations --json
+md-utils rules fix people --yes
+md-utils rules fix people --yes --apply
+```
+
+Use `--config ./vault/.md-utils/md-utils.json --project-root ./vault/` for another
+project. Printed commands retain these actual paths and recommendation opt-in.
+`--json` includes the review token, numbered proposals, decoded property changes,
+source before/after, candidate or combined assessments, blockers, and write reports.
+Text shows `ERROR`/`WARNING`, rule/policy, exact source properties/links, proposed
+changes and complete commands. It describes declared technical constraints, never
+domain truth. A reciprocal policy is distinct from a cycle policy.
+
+Numbered noninteractive application requires the token printed by the preview.
+Any changed proposal, supporting record, definition, candidate namespace or scope
+invalidates that token, including a newly added duplicate filename. Tokens are
+computed without saving a review. Interactive `--apply` may show the current review,
+collect numbers, and request final confirmation. Noninteractive `--apply` with no
+selection fails. `--yes --apply` selects only deterministic automatic fixes emitted
+by shared schema diagnostics; known defaults and relationship assertions still
+require explicit numbered selection. Missing unknown values are reported as
+blocked, not fabricated. Advisory repairs additionally need
+`--include-recommendations`; explanatory-only Fix-Its cannot be applied.
+
+Proven missing reciprocal/inverse links can add a scalar property or append to a
+declared array. Existing scalar assertions are explicit replacement alternatives;
+removing the originating assertion is another alternative. Array capacity and all
+other loaded constraints are reassessed. Nested selectors use actual literal keys
+and array indices; the planner does not invent object rows for missing array
+branches. Cycle/self-link diagnostics offer explicit occurrence removals. Removing
+one cycle witness does not claim that every cycle is repaired. Missing, ambiguous,
+malformed, or incomplete evidence never authorizes an inferred return assertion.
+
+Link spelling is checked against the destination declaration and resolved back to
+the intended source. Bare-name ambiguity, exact path semantics, extension policies
+and source-relative bases match ordinary link resolution. Unrelated links are not
+normalized. Unsupported/contradictory declarations yield blockers, not guessed edits.
+
+Default previews assess candidates separately; `--select` assesses their combined
+effects. Mutually exclusive alternatives and overlapping edits are rejected.
+Preview and application also preflight intermediate states in path order: a batch that needs
+a temporarily invalid intermediate state is blocked. Every previously passing
+loaded required type/rule is preserved; new required failures in already-failing
+types are also blocked. Remaining required failures/unavailability produce a
+nonzero exit status even when selected file changes completed.
+
+Previews do not create locks, refresh/create an index, stage drafts, recover
+mutations, or write receipts. Typed edits share the resource codec's round-trip
+checks: unrelated native metadata values and body bytes are preserved, but changed
+frontmatter may be reserialized, including comments, quoting and key order. Exact
+source previews expose this. No-op edits preserve bytes and do not stage writes.
+
+Application holds the shared writer lease, stages evidence-bound drafts outside
+SQLite, and rechecks all supporting evidence before each atomic per-file write.
+It updates expected revisions only from matching confirmed receipts. Native source
+context is retained where possible; receipts record the observed post-write context
+so filesystem timestamp rounding does not masquerade as an external edit. Loaded
+server identity/protection constraints are respected when server configuration exists.
+Existing indexes and server publications are refreshed after confirmed writes.
+Failure stops later writes and reports completed, publication-pending,
+recovery-required and unattempted drafts. Files are not rolled back and multiple
+files are never claimed to commit atomically. External editors can still race
+final filesystem checks; managed writer leases do not lock arbitrary applications.
+
+Use `index draft show`, `index draft resolve`, and `index apply` to inspect and
+recover the printed draft IDs. Resume an entire Fix-It batch, including its
+completed IDs; confirmed commits are not rewritten. See [pending edits and
+recovery](index-apply.md). No new repair store or receipt format family is introduced.
+
+### Portable review API
+
+`MarkdownFixItReview` in Core wraps existing `MarkdownFixIt` values with record
+paths, diagnostic origins, and optional mutually exclusive alternative groups.
+Producers supply a deterministic proposal order; it becomes the displayed
+one-based numbering. Explicit selection is separate from automatic selection and
+advisory opt-in. Explanatory suggestions cannot be selected. Overlapping property
+edits and mutually exclusive alternatives fail selection rather than being merged.
+Literal dotted keys remain distinct from nested key paths. Typed occurrence setters
+and removals extend `MarkdownRecordEdit`; array removals use descending original
+indices so one removal never retargets another selected occurrence.
+
+The host must provide content revisions for edited and supporting records plus
+fingerprints of loaded definitions/configuration, resolution candidates and their
+completeness, requested rules, membership, policy scopes, and coverage. These are
+host assertions, not evidence discovered or verified by Core. A snapshot generation
+or file timestamp alone is insufficient. Native hosts must hash authoritative
+source content and rediscover candidate sets when reconstructing a review.
+
+`MarkdownFixItReviewToken` in the native library hashes canonical review data with
+SHA-256, using the existing Swift Crypto dependency. The token includes ordered
+proposals as well as evidence. Its `select` method verifies the token against a
+fresh review before interpreting short numbers, so changed or reordered proposals
+cannot reuse an earlier numbered selection. Selection does not authorize writes,
+establish conformance, or replace final revision checks. Tokens are not stored and
+are not cryptographic proof that the caller supplied complete evidence.
+
+The portable review APIs perform no filesystem/index/draft operations. Evidence is
+bounded to 10,000 records and proposals, 100,000 edits, 128 property-path components,
+and 64 MiB of encoded review data. Relationship planning emits at most 1,000
+proposals, and all-type reassessment is bounded to 100,000 roots. Native batches
+retain at most 64 MiB of draft envelopes and use the shared 8 MiB per-file mutation
+limit. Large selections may require smaller batches. Persistent assessment reuse
+remains disabled; discovery/reassessment is intentionally conservative. Existing
+`types fix` CLI behavior is unchanged.
+
+Tests: `swift test --filter 'MarkdownFixItReview|MarkdownRelationshipFixTests|MarkdownRuleFixTests|RulesFixCommandsTests|MarkdownDraftTests|MarkdownMutationTests|ResourceCodecTests'`.
+
+## Schema and verification
+
 Canonical schema: `Sources/md-utils/Resources/1_mdrule.schema.json`. Public copy:
 `site/schemas/mdrule/1/mdrule.schema.json`. These are publication inputs, not a claim
 of live deployment. Existing immutable schemas and latest/default aliases remain
 unchanged. JSON Schema checks shape; the md-utils compiler checks bindings and the
 evaluator checks graphs. Interactive policy authoring, new server endpoints,
-reviewable repairs (#179), and persistent assessment reuse (#180) remain separate.
+and persistent assessment reuse (#180) remain separate from policy evaluation.
 
 Tests: `swift test --filter 'MarkdownRelationshipPolicyTests|RelationshipPolicyCommandsTests'`.
 Linux validation runs in CI only. WASM verification requires an exactly matching

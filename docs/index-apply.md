@@ -163,6 +163,43 @@ apply never blindly resubmits it. Submitted unresolved drafts cannot be discarde
 Recovery may publish index changes but does not reapply the patch. See
 [native mutation recovery](rest-mutations.md).
 
+## Relationship Fix-It batches
+
+`rules fix` uses these same drafts, writer leases, atomic per-file writes and
+receipts. Its previews are read-only by default; only `rules fix --apply` stages
+and submits intent. Fix-It drafts carry an optional versioned `fixItContext` with
+the chosen shared edits, original content, supporting source/configuration/scope
+evidence, expected revisions, and all batch draft IDs. They do not require a server
+resource configuration. Older resource-only readers cannot apply the reserved
+Fix-It resource as an ordinary configured server resource.
+
+```sh
+md-utils rules fix people --select 1,4 --review '<printed-token>' --apply
+md-utils index draft show '<draft-id>' --project-root ./vault/
+md-utils index apply '<first-draft-id>' '<second-draft-id>' --dry-run --project-root ./vault/
+md-utils index draft resolve '<uncertain-draft-id>' --decision confirmCommitted --project-root ./vault/
+md-utils index apply '<first-draft-id>' '<second-draft-id>' --project-root ./vault/
+```
+
+Resume with **all IDs in `fixItContext.draftIDs`**, including completed drafts.
+Apply Fix-It batches separately from ordinary resource drafts. Confirmed completed
+files are not rewritten; their receipts advance the remaining batch's expected
+evidence. Receipt pins are retained until completed drafts are discarded. Discard
+rejects removal of evidence needed by unresolved attempts. Complete the batch or
+resolve its submitted attempts and discard its unsubmitted members before discarding
+completed members. Changed
+supporting files, definitions, candidate paths or scope require new review, not an
+automatic rebase. Fix-Its deliberately do not follow moves because changed paths
+can change relationship resolution. Original content is evidence, not an automatic
+restore request. Unsubmitted incomplete staging can be discarded and reviewed again.
+
+`confirmNotCommitted` requires unchanged baseline bytes and no confirmed commit;
+`confirmCommitted` requires proposed bytes. Mere byte equality after an interrupted
+write does not authorize automatic replay. Publication-pending drafts retry refresh
+without rewriting Markdown. Recovery reassesses actual collection constraints and
+reports remaining diagnostics. Index rebuilds leave these drafts and receipts
+outside the disposable cache. See [relationship Fix-Its](relationship-policies.md).
+
 ## Validation
 
 ```sh

@@ -103,6 +103,12 @@ public struct MarkdownDraftService: Sendable {
   public func preview(_ id: String) async throws -> MarkdownDraftReport {
     let draft = try store.load(id)
     if draft.state == .completed { return MarkdownDraftReport(draft) }
+    if let context = draft.fixItContext {
+      do {
+        return try await MarkdownRuleFixService(projectRoot: root.path, configPath: context.configPath, rules: context.rules).previewDraft(draft)
+      } catch is CancellationError { throw CancellationError() }
+      catch { return failure(draft, error: error) }
+    }
     let context = try MarkdownDraftPlanning(root: root, configurationFile: configurationFile)
     if draft.attemptID != nil { return try attemptReport(draft, context: context) }
     do { return try await context.preview(draft) }
@@ -139,6 +145,15 @@ public struct MarkdownDraftService: Sendable {
     guard !selected.isEmpty else { return true }
     let lease = try await CollectionWriterLease.acquire(root: root)
     defer { withExtendedLifetime(lease) {} }
+    let fixDrafts = try selected.map(store.load).filter { $0.fixItContext != nil }
+    if let context = fixDrafts.first?.fixItContext {
+      guard fixDrafts.count == selected.count else {
+        throw MarkdownMutationError(409, "draft.selection", "Apply Fix-It batches separately from resource drafts using explicit draft IDs.")
+      }
+      var service = MarkdownRuleFixService(projectRoot: root.path, configPath: context.configPath, rules: context.rules)
+      service.mutationCheckpoint = mutationCheckpoint
+      return try await service.resume(ids: selected, lease: lease, report: report)
+    }
     let repository = try IndexedMarkdownRepository(projectRoot: root.path, configurationFile: configurationFile)
     await repository.setMutationCheckpoint(mutationCheckpoint)
     try await repository.recoverMutations(lease: lease)
@@ -245,6 +260,10 @@ public struct MarkdownDraftService: Sendable {
     let lease = try await CollectionWriterLease.acquire(root: root)
     defer { withExtendedLifetime(lease) {} }
     var draft = try store.load(id)
+    if let context = draft.fixItContext {
+      return try await MarkdownRuleFixService(projectRoot: root.path, configPath: context.configPath, rules: context.rules)
+        .resolve(draft, decision: decision, lease: lease)
+    }
     guard let attempt = draft.attemptID, let path = draft.resolvedPath else {
       throw MarkdownMutationError(409, "draft.no-attempt", "This draft has no submitted attempt to resolve.")
     }

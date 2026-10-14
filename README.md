@@ -333,6 +333,11 @@ cd /path/to/project/
 md-utils rules validate
 ```
 
+Review proposed frontmatter repairs with `md-utils rules fix people`. This is
+read-only by default. Select fixes with `--select 1,4,5`; copy the printed
+`--review` token and add `--apply` to write them. Relationship assertions always
+require explicit selection. See [Fix-It examples and recovery](docs/relationship-policies.md#review-and-apply-fix-its-179).
+
 Paths in `rules[].match.paths` and the default `schemaDirectory` are interpreted relative to that same working directory. If you run md-utils from a subdirectory, it will look for `.md-utils/md-utils.json` in that subdirectory. Existing `0.1.0` configs using `schemaRules` still load as legacy configs.
 
 Default layout:

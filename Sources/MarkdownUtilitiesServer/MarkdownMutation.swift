@@ -141,6 +141,10 @@ public struct MarkdownMutationReceipt: Codable, Sendable {
   /// Whether an operator confirmed the outcome rather than the coordinator alone.
   /// A missing value preserves the default coordinator origin for older receipts.
   public var provenanceOperatorConfirmed: Bool?
+  /// Explicit CLI Fix-It intent; recovered through the shared draft service.
+  public var fixItDraftID: String?
+  /// Observed post-write context used by evidence-bound CLI draft recovery.
+  public var fixItCommittedContext: MarkdownRecordContext?
   /// The collection-relative source of a copy or move, separate from the destination path.
   public var sourcePath: MarkdownRecordPath?
   /// Whether a move's destination was durably confirmed before source removal.
