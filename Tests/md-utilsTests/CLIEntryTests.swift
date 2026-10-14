@@ -17,7 +17,7 @@ struct CLIEntryTests {
     #expect(config.version == CLIEntry.buildVersion)
     #expect(config.version.isEmpty == false)
     #expect(config.version != "development")
-    #expect(config.subcommands.count == 22)
+    #expect(config.subcommands.count == 23)
 
     // Verify the subcommands are registered (in order as listed in CLIEntry)
     #expect(config.subcommands[0] is CLIEntry.AgentCommands.Type)
@@ -36,11 +36,12 @@ struct CLIEntryTests {
     #expect(config.subcommands[13] is CLIEntry.Lines.Type)
     #expect(config.subcommands[14] is CLIEntry.OKFCommands.Type)
     #expect(config.subcommands[15] is CLIEntry.RulesCommands.Type)
-    #expect(config.subcommands[16] is CLIEntry.SectionCommands.Type)
-    #expect(config.subcommands[17] is Slug.Type)
-    #expect(config.subcommands[18] is CLIEntry.TemplateCommands.Type)
-    #expect(config.subcommands[19] is CLIEntry.TypesCommands.Type)
-    #expect(config.subcommands[20] is CLIEntry.Copy.Type)
-    #expect(config.subcommands[21] is CLIEntry.Move.Type)
+    #expect(config.subcommands[16] is CLIEntry.Relationships.Type)
+    #expect(config.subcommands[17] is CLIEntry.SectionCommands.Type)
+    #expect(config.subcommands[18] is Slug.Type)
+    #expect(config.subcommands[19] is CLIEntry.TemplateCommands.Type)
+    #expect(config.subcommands[20] is CLIEntry.TypesCommands.Type)
+    #expect(config.subcommands[21] is CLIEntry.Copy.Type)
+    #expect(config.subcommands[22] is CLIEntry.Move.Type)
   }
 }

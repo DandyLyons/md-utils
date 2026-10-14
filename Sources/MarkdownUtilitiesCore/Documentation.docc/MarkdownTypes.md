@@ -9,6 +9,14 @@ Authoring defaults remain v1. See ``MarkdownSemanticScalar`` and ``Wikilink/pars
 
 Assess complete Markdown records against reusable structural contracts.
 
+Named mdtype v2 `relationships` require `document-relationships`. Literal selectors
+choose whole-value wikilinks and bind explicit target type resources. Use
+``MarkdownRelationshipEvaluator`` with a host-supplied ``MarkdownRelationshipCollection``
+for bounded recursive assessment and ``MarkdownRelationshipQuery`` for directional
+evidence. Required outcomes are pass, fail, or unavailable; cycles are permitted.
+Missing context never becomes an unresolved destination. User-authored constraints
+describe stored assertions and do not prove domain truth. Core performs no I/O.
+
 ## Records and Conformance
 
 A `MarkdownRecord` contains canonical Markdown text and optional identity, revision, and external context. A `MarkdownDocument` is the parsed content view produced from valid text. Type assessment accepts the record so invalid YAML or TOML can be returned as a structured diagnostic instead of preventing the resource from being represented.
@@ -74,6 +82,10 @@ title: Dune
 ```
 
 Hints are optimizations and diagnostics, not proof. `verifyTypeHints(in:)` assesses each claim and reports it as confirmed, rejected, unknown, or unavailable at the requested version. Hosts can also provide hints through `MarkdownRecordContext` when the canonical text is stored elsewhere.
+
+Use `verifyTypeHints(in:collection:)` to supply destination evidence for relationship-bearing
+types. Optional absent relationships still pass without collection context; present
+relationships retain unavailable outcomes when the required evidence is missing.
 
 ## Diagnostics and Fix-Its
 

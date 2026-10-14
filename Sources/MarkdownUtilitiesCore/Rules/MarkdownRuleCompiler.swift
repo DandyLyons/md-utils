@@ -292,13 +292,7 @@ public struct MarkdownRuleCompiler: Sendable {
       }
     }
 
-    let enforcedTypes = definition.checks.compactMap { check -> MarkdownTypeName? in
-      guard case .typeConformance(let name) = check.predicate else { return nil }
-      return name
-    }
-    let expressionTypes = definition.typeExpression?.references.compactMap { definition.typeBindings[$0] } ?? []
-    let typeNames = Set(selectionLeaves.flatMap { $0.anyTypes + $0.allTypes } + enforcedTypes + expressionTypes)
-    for typeName in typeNames {
+    for typeName in definition.referencedTypes {
       guard let type = typeRegistry?.definition(named: typeName) else { continue }
       let constraints = type.body.requirements + type.body.recommendations
         + type.context.requirements + type.context.recommendations

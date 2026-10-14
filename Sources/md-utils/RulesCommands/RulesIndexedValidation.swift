@@ -25,6 +25,15 @@ extension RulesValidatorRunner {
     let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
     let resolvedRoot = config.standaloneProject?.projectRoot ?? projectRoot ?? root
     var rules = try selectedRules(config: config, ruleName: ruleName)
+    if config.standaloneProject?.types.definitions.contains(where: { !$0.relationships.isEmpty }) == true {
+      let registry = try config.compiledRuleRegistry(root: resolvedRoot)
+      let selectedTypes = Set(rules.flatMap { registry.rule(named: $0.name)?.definition.referencedTypes ?? [] })
+      if selectedTypes.contains(where: { registry.typeRegistry?.definition(named: $0)?.relationships.isEmpty == false }) {
+        return try await validateRelationships(config: config, configPath: configPath, ruleName: ruleName, root: resolvedRoot,
+          noIndex: noIndex, indexedOnly: indexedOnly, verifyHashes: verifyHashes,
+          includeNonMarkdown: includeNonMarkdown, warning: warning)
+      }
+    }
     var uncoveredRules: [String] = []
     let canonicalRoot = URL(fileURLWithPath: resolvedRoot.absolute().normalize().string).resolvingSymlinksInPath()
     let databasePath = canonicalRoot.appendingPathComponent(".md-utils/index.sqlite").path

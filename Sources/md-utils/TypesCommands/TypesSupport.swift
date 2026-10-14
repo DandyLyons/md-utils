@@ -2,6 +2,7 @@ import ArgumentParser
 import Foundation
 import MarkdownUtilities
 import MarkdownUtilitiesCore
+import MarkdownUtilitiesIndexNative
 import PathKit
 import Yams
 
@@ -85,7 +86,7 @@ enum TypesProject {
     guard MarkdownTypeSchemaVersion.supported.contains(version) else {
       throw ValidationError("Unsupported mdtype schema version \(version); choose 1 or 2")
     }
-    let resourceVersion = version == "2" ? "2-capabilities" : version
+    let resourceVersion = version == "2" ? "2-relationships" : version
     guard let url = Bundle.module.url(forResource: "\(resourceVersion)_md-utils-type.schema", withExtension: "json") else {
       throw ValidationError("Bundled md-utils type-definition schema is missing")
     }
@@ -178,9 +179,12 @@ enum TypesRunner {
   ) async throws -> [TypeFileAssessment] {
     let registry = try registry ?? TypesProject.load(root: root)
     let checker = MarkdownTypeChecker(registry: registry)
+    let collection = registry.definition(named: typeName)?.relationships.isEmpty == false
+      ? try await MarkdownRelationshipNativeCollection.load(root: root) : nil
     return try await files.asyncMap { file in
-      let record = try MarkdownRecordFileAdapter.read(file, projectRoot: root)
-      let assessment = try await checker.assess(record, as: typeName)
+      let path = relativePath(from: root, to: file)
+      let record = try collection?.records[path] ?? MarkdownRecordFileAdapter.read(file, projectRoot: root)
+      let assessment = try await checker.assess(record, as: MarkdownTypeName(rawValue: typeName), collection: collection)
       return TypeFileAssessment(file: file, assessment: assessment)
     }
   }
@@ -205,9 +209,23 @@ enum TypesRunner {
   ) async throws -> [(Path, [MarkdownTypeHintAssessment])] {
     let registry = try registry ?? TypesProject.load(root: root)
     let checker = MarkdownTypeChecker(registry: registry)
+    // Materialize at most one bounded collection, and only for hints that need it.
+    // asyncMap is sequential; unrelated records need not be retained together.
+    var collection: MarkdownRelationshipCollection?
     return try await files.asyncMap { file in
-      let record = try MarkdownRecordFileAdapter.read(file, projectRoot: root)
-      return (file, await checker.verifyTypeHints(in: record))
+      try Task.checkCancellation()
+      let path = relativePath(from: root, to: file)
+      var record = try collection?.records[path] ?? MarkdownRecordFileAdapter.read(file, projectRoot: root)
+      if collection == nil {
+        let analyzed = await MarkdownRecordAnalyzer.analyze(record)
+        if analyzed.allTypeHints.contains(where: { registry.definition(named: $0.name)?.relationships.isEmpty == false }) {
+          collection = try await MarkdownRelationshipNativeCollection.load(root: root)
+          record = collection?.records[path] ?? record
+        }
+      }
+      let hints = await checker.verifyTypeHints(in: record, collection: collection)
+      try Task.checkCancellation()
+      return (file, hints)
     }
   }
 }
@@ -388,6 +406,7 @@ enum TypesRenderer {
     ]
     if let creation = definition.creation { object["creation"] = creation.jsonValue.foundationValue }
     if definition.requires.isEmpty == false { object["requires"] = definition.requires }
+    if !definition.relationships.isEmpty { object["relationships"] = definition.relationships.mapValues { $0.jsonValue.foundationValue } }
     return object
   }
 
@@ -395,6 +414,7 @@ enum TypesRenderer {
     var object: [String: Any] = [
       "type": ["name": assessment.type.rawValue, "version": assessment.version],
       "conforms": assessment.conforms,
+      "outcome": assessment.outcome.rawValue,
       "diagnostics": assessment.diagnostics.map(diagnosticObject),
     ]
     if let path { object["path"] = path }

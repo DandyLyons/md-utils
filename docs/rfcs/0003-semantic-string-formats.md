@@ -1,6 +1,6 @@
 # RFC 0003: Declared Semantic String Formats
 
-- Status: Scalars and lexical wikilink constraints implemented through #173/#174/#176; RFC 0004 relationship runtime remains pending
+- Status: Scalars and lexical wikilink constraints implemented through #173/#174/#176; named relationship runtime implemented in #177, collection policies and cached dependency validation remain pending
 - Date: 2026-10-12
 - Tracking: [#171](https://github.com/DandyLyons/md-utils/issues/171), [#169](https://github.com/DandyLyons/md-utils/issues/169)
 - Version coordination: [#135](https://github.com/DandyLyons/md-utils/issues/135), [#184](https://github.com/DandyLyons/md-utils/issues/184)

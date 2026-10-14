@@ -156,9 +156,12 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
   public var body: MarkdownConstraintGroup
   public var context: MarkdownConstraintGroup
   public var source: String?
+  /// Host-supplied revision of the definition resource, distinct from its authored version.
+  public var resourceRevision: String?
   public var creation: MarkdownCreationTemplate?
   /// Explicit capabilities required by this definition and its loaded schema graph.
   public var requires: [String]
+  public var relationships: [String: MarkdownRelationshipDefinition]
 
   public init(
     typeSchemaVersion: String = MarkdownTypeSchemaVersion.current,
@@ -168,8 +171,10 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
     body: MarkdownConstraintGroup = MarkdownConstraintGroup(),
     context: MarkdownConstraintGroup = MarkdownConstraintGroup(),
     source: String? = nil,
+    resourceRevision: String? = nil,
     creation: MarkdownCreationTemplate? = nil,
     requires: [String] = [],
+    relationships: [String: MarkdownRelationshipDefinition] = [:],
   ) {
     self.typeSchemaVersion = typeSchemaVersion
     self.name = name
@@ -178,8 +183,10 @@ public struct MarkdownTypeDefinition: Equatable, Sendable {
     self.body = body
     self.context = context
     self.source = source
+    self.resourceRevision = resourceRevision
     self.creation = creation
     self.requires = requires
+    self.relationships = relationships
   }
 }
 

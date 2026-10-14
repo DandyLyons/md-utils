@@ -45,7 +45,7 @@ extension MarkdownRuleChecker {
       guard let name = bindings[reference], let types = registry.typeRegistry else {
         throw MarkdownTypeCheckerError.unknownType(reference)
       }
-      let assessment = try MarkdownTypeChecker(registry: types).assess(record, as: name)
+      let assessment = try relationshipAssessments[name] ?? MarkdownTypeChecker(registry: types).assess(record, as: name)
       let evaluationError = assessment.diagnostics.contains {
         $0.severity == .error && (
           record.parseDiagnostics.contains($0)
@@ -56,7 +56,9 @@ extension MarkdownRuleChecker {
         )
       }
       return .init(location: location, reference: reference,
-        status: evaluationError ? .unavailable : (assessment.conforms ? .matched : .notMatched),
+        status: relationshipAssessments[name] != nil
+          ? (assessment.outcome == .unavailable ? .unavailable : (assessment.conforms ? .matched : .notMatched))
+          : (evaluationError ? .unavailable : (assessment.conforms ? .matched : .notMatched)),
         assessment: assessment, children: [])
     }
     let operands: [MarkdownRuleTypeExpression]

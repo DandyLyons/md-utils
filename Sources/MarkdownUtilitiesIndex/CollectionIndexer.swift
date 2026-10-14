@@ -6,7 +6,7 @@ import SystemPackage
 /// Stable SHA-256 fingerprints for content and evaluator cache provenance.
 public enum IndexFingerprint {
     /// Bump when extraction or evaluator semantics change, independently of cache format changes.
-    public static let runtimeVersion = "collection-extraction-evaluation-4"
+    public static let runtimeVersion = "collection-extraction-evaluation-5"
 
     /// Returns the lowercase hexadecimal SHA-256 digest of the exact supplied bytes.
     public static func hash(_ data: Data) -> String {
@@ -44,6 +44,9 @@ public struct IndexUpdateReport: Sendable {
     public var errors: [String] = []
     /// Additional failures persisted in SQLite after the report's 100-message limit.
     public var omittedErrorCount = 0
+    /// Discovery, read, or parse failures, excluding assessment-only unavailability.
+    /// Consumers that recompute assessments can still reuse valid source evidence.
+    public var sourceErrorCount = 0
 
     /// Creates an empty report before refresh work begins.
     public init() {}
@@ -252,6 +255,7 @@ public struct CollectionIndexer: Sendable {
                 let message = "\(scope.path): \(error)"
                 scopeErrors[scope.id] = message
                 report.recordError(message)
+                report.sourceErrorCount += 1
             }
         }
         var after: String?
@@ -348,6 +352,7 @@ public struct CollectionIndexer: Sendable {
                         report.evaluated += 1
                         if evaluation.parseState != "ok" || evaluation.assessment.status == "evaluation-error" {
                             report.recordError("\(path): \(evaluation.assessment.status) (\(evaluation.parseState))")
+                            if evaluation.parseState != "ok" { report.sourceErrorCount += 1 }
                         }
                     }
                     if let scope = scopesToEvaluate.first, let evaluation = evaluations[scope.id] {
@@ -361,6 +366,7 @@ public struct CollectionIndexer: Sendable {
                     throw error
                 } catch {
                     report.recordError("\(path): \(error)")
+                    report.sourceErrorCount += 1
                     let diagnostic = IndexDiagnostic(category: "evaluation", severity: "error", code: "index.read-or-evaluate",
                         location: path, message: String(describing: error))
                     let evaluation = IndexEvaluation(metadata: "{}", body: "", parseState: "error",

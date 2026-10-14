@@ -1,6 +1,6 @@
 # RFC 0004: Named Document Relationships and Collection Policies
 
-- Status: Relationship contract specified; provenance delivered in #175; lexical constraints delivered in #176; relationship runtime pending #177–#180
+- Status: Provenance delivered in #175; lexical constraints in #176; named relationship runtime in #177; collection policies, repairs and persisted dependency invalidation pending #178–#180
 - Date: 2026-10-12
 - Tracking: [#172](https://github.com/DandyLyons/md-utils/issues/172), [#169](https://github.com/DandyLyons/md-utils/issues/169)
 - Depends on: [RFC 0003](0003-semantic-string-formats.md), implemented through #173/#174
@@ -8,6 +8,12 @@
 - Reserved definition versions: unified mdtype `"2"`; explicit mdrule `"1"`
 
 ## Purpose and implementation boundary
+
+The #177 implementation is documented in [named relationships](../relationships.md).
+It implements declaration/query/required-conformance evaluation and reuses indexed
+source evidence without caching cross-document assessments. The remaining policy,
+repair and invalidation sections describe subsequent work. Publication/default
+activation remains independent of runtime implementation.
 
 Specify explicitly named frontmatter relationships and collection consistency
 policies. A type can require that `authors` contains whole wikilinks to documents

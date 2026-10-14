@@ -91,6 +91,8 @@ package enum MarkdownRecordContentKind: Sendable {
 /// allowing sibling targets to guarantee that one snapshot build parses each record once.
 package struct AnalyzedMarkdownRecord: Sendable {
   package var nativeTemporalPaths: Set<String> = []
+  /// Full literal mapping for declared selectors; schema checks retain the user-only projection.
+  package var relationshipFrontmatter: [String: JSONValue]? = nil
   package var record: MarkdownRecord
   package var body: String
   package var hasFrontmatter: Bool
@@ -202,6 +204,7 @@ package enum MarkdownRecordAnalyzer {
     }
 
     var userFrontmatter: [String: JSONValue]?
+    var relationshipFrontmatter: [String: JSONValue]?
     var nativeTemporalPaths: Set<String> = []
     var hints: [MarkdownTypeHint] = []
     var diagnostics = parts.diagnostics
@@ -219,6 +222,7 @@ package enum MarkdownRecordAnalyzer {
         guard case .object(var object) = try JSONValue(any: dynamicValue) else {
           throw YAMLConversionError.notAMapping
         }
+        relationshipFrontmatter = object
         if let systemMetadata = object.removeValue(forKey: "$md-utils") {
           let parsed = parseTypeHints(systemMetadata)
           hints = parsed.hints
@@ -232,6 +236,7 @@ package enum MarkdownRecordAnalyzer {
 
     return AnalyzedMarkdownRecord(
       nativeTemporalPaths: nativeTemporalPaths,
+      relationshipFrontmatter: relationshipFrontmatter,
       record: record,
       body: parts.body,
       hasFrontmatter: parts.hasFrontmatter,

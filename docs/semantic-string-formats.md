@@ -135,16 +135,17 @@ Aliases, fragments, embeds and original text are preserved. These checks neither
 resolve targets nor rewrite links; conversion enhancements belong to #185.
 
 The capability gate applies to all loaded references and advisory schemas. Unknown
-or unsupported capabilities fail, including `document-relationships` until that
-runtime lands. Old scalar-only readers reject the new top-level `requires` field.
+or unsupported capabilities fail. `document-relationships` enables the separately
+declared [named relationship runtime](relationships.md). Old scalar-only readers
+reject the new top-level `requires` field.
 Diagnostics use `frontmatter.format.invalid` with `wikilink-style` and
 `wikilink-extension` reasons and exact instance/schema locations. Indexed evaluation
-uses runtime fingerprint v4 and includes capabilities in definition fingerprints.
+uses runtime fingerprint v5 and includes capabilities in definition fingerprints.
 
 `types schema --schema-version 2` exports the capability-bearing schema with the
-new publication target `schemas/mdtype/2/wikilink-constraints/mdtype.schema.json`.
-Original v2 schema/registry artifacts remain unchanged; publication and complete
-relationship-v2 activation remain separate. Shape schemas do not replace runtime
+new publication target `schemas/mdtype/2/document-relationships/mdtype.schema.json`.
+Original v2 schema/registry and wikilink-only artifacts remain unchanged; publication
+activation remains separate. Shape schemas do not replace runtime
 validation of embedded policy declarations and capability gates.
 
 The pinned JSONSchema.swift engine has no public custom-format hook. The adapter

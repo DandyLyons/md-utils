@@ -48,10 +48,12 @@ public struct ResolvedMarkdownTypeFrontmatterSchema: Codable, Equatable, Sendabl
 public struct MarkdownTypeRegistry: Sendable {
   private var definitionsByName: [MarkdownTypeName: MarkdownTypeDefinition]
   private var schemasByName: [MarkdownTypeName: [JSONValue]]
+  public let typeResourceBindings: [String: MarkdownTypeName]
 
   public init(
     definitions: [MarkdownTypeDefinition],
-    schemaProvider: (any MarkdownSchemaResourceProvider)? = nil
+    schemaProvider: (any MarkdownSchemaResourceProvider)? = nil,
+    typeResourceBindings: [String: MarkdownTypeName] = [:],
   ) throws {
     var definitionsByName: [MarkdownTypeName: MarkdownTypeDefinition] = [:]
     var schemasByName: [MarkdownTypeName: [JSONValue]] = [:]
@@ -118,13 +120,28 @@ public struct MarkdownTypeRegistry: Sendable {
 
     self.definitionsByName = definitionsByName
     self.schemasByName = schemasByName
+    self.typeResourceBindings = typeResourceBindings
+    for definition in definitions {
+      guard definition.relationships.isEmpty || definition.requires.contains("document-relationships") else {
+        throw MarkdownTypeDefinitionError.invalidField("relationship.definition.capability: relationships requires document-relationships")
+      }
+      for (name, relation) in definition.relationships {
+        guard !name.isEmpty, name == name.trimmingCharacters(in: .whitespacesAndNewlines) else {
+          throw MarkdownRelationshipDefinition.invalid("relationship names must be nonempty without surrounding whitespace")
+        }
+        try relation.validate()
+        guard let target = typeResourceBindings[relation.target], definitionsByName[target] != nil else {
+          throw MarkdownRelationshipDefinition.invalid("unbound target type resource: \(relation.target)")
+        }
+      }
+    }
   }
 
   /// Reject unsupported capabilities for decoded and programmatically constructed definitions.
   static func checkCapabilities(_ names: [String], version: String) throws {
     guard (version == "2" || names.isEmpty), Set(names).count == names.count,
-      Set(names).isSubset(of: ["wikilink-constraints"]) else {
-      throw MarkdownTypeDefinitionError.invalidField("type.format.capability: unsupported or duplicate requires capability; supported in mdtype v2: wikilink-constraints")
+      Set(names).isSubset(of: ["wikilink-constraints", "document-relationships"]) else {
+      throw MarkdownTypeDefinitionError.invalidField("type.format.capability: unsupported or duplicate requires capability; supported in mdtype v2: wikilink-constraints, document-relationships")
     }
   }
 

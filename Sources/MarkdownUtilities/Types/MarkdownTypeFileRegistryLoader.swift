@@ -1,4 +1,5 @@
 import Foundation
+import Crypto
 import MarkdownUtilitiesCore
 import PathKit
 import Yams
@@ -24,16 +25,33 @@ public enum MarkdownTypeFileRegistryLoader {
     }
 
     let files = try definitionFiles(in: directory)
+    let canonicalDirectory = URL(fileURLWithPath: directory.string).resolvingSymlinksInPath().path + "/"
+    let canonicalRoot = URL(fileURLWithPath: root.string).resolvingSymlinksInPath().path + "/"
+    guard canonicalDirectory.hasPrefix(canonicalRoot) else {
+      throw MarkdownTypeFileLoaderError.schemaOutsideProject(directory.string)
+    }
     let definitions = try files.map { file in
+      guard URL(fileURLWithPath: file.string).resolvingSymlinksInPath().path.hasPrefix(canonicalDirectory) else {
+        throw MarkdownTypeFileLoaderError.schemaOutsideProject(file.string)
+      }
       let format = try definitionFormat(for: file)
-      return try MarkdownTypeDefinitionDecoder.decode(
-        file.read(.utf8),
+      let content = try file.read(.utf8)
+      var definition = try MarkdownTypeDefinitionDecoder.decode(
+        content,
         format: format,
         source: file.absolute().string
       )
+      definition.resourceRevision = SHA256.hash(data: Data(content.utf8)).map { byte in
+        let hex = String(byte, radix: 16)
+        return byte < 16 ? "0" + hex : hex
+      }.joined()
+      return definition
     }
     let provider = FileMarkdownSchemaResourceProvider(projectRoot: root)
-    return try MarkdownTypeRegistry(definitions: definitions, schemaProvider: provider)
+    let bindings = Dictionary(uniqueKeysWithValues: zip(files, definitions).map { file, definition in
+      (String(file.string.dropFirst(directory.string.count + 1)), definition.name)
+    })
+    return try MarkdownTypeRegistry(definitions: definitions, schemaProvider: provider, typeResourceBindings: bindings)
   }
 
   public static func definitionFiles(projectRoot: Path) throws -> [Path] {

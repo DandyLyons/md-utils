@@ -4,6 +4,7 @@ import JSONSchema
 /// Matches and checks records using one compiled rule registry.
 public struct MarkdownRuleChecker: Sendable {
   public let registry: MarkdownRuleRegistry
+  package var relationshipAssessments: [MarkdownTypeName: MarkdownTypeAssessment] = [:]
 
   public init(registry: MarkdownRuleRegistry) {
     self.registry = registry
@@ -12,17 +13,19 @@ public struct MarkdownRuleChecker: Sendable {
   /// Assesses a record against the compiled rule with the supplied name.
   public func assess(
     _ record: MarkdownRecord,
-    ruleNamed name: String
+    ruleNamed name: String,
+    collection: MarkdownRelationshipCollection? = nil,
   ) async throws -> MarkdownRuleAssessment {
     guard let rule = registry.rule(named: name) else {
       throw MarkdownRuleCheckerError.unknownRule(name)
     }
-    return try assess(
+    return try await assess(
       await MarkdownRecordAnalyzer.analyze(
         record,
         requirements: analysisRequirements(for: rule)
       ),
-      against: rule
+      against: rule,
+      collection: collection,
     )
   }
 
@@ -32,6 +35,28 @@ public struct MarkdownRuleChecker: Sendable {
     toRuleNamed name: String
   ) async throws -> Bool {
     try await assess(record, ruleNamed: name).status != .notApplicable
+  }
+
+  /// Assesses parsed state shared by package subsystems.
+  package func assess(_ record: AnalyzedMarkdownRecord, against rule: CompiledMarkdownRule,
+    collection: MarkdownRelationshipCollection?,
+  ) async throws -> MarkdownRuleAssessment {
+    var checker = self
+    if let types = registry.typeRegistry {
+      let definitions = types.definitions.filter { rule.definition.referencedTypes.contains($0.name) && !$0.relationships.isEmpty }
+      if !definitions.isEmpty {
+        let evaluation = try await MarkdownRelationshipEvaluator(registry: types).evaluate(
+          roots: definitions.map { (record.record, $0.name) }, collection: collection)
+        let source = record.record.context.path?.rawValue ?? record.record.identity?.rawValue ?? "<source>"
+        for definition in definitions {
+          if let node = evaluation.assessment(source: source, type: definition.name.rawValue) {
+            checker.relationshipAssessments[definition.name] = .init(type: definition.name, version: definition.version,
+              diagnostics: node.diagnostics, outcome: node.outcome)
+          }
+        }
+      }
+    }
+    return try checker.assess(record, against: rule)
   }
 
   /// Assesses parsed state shared by package subsystems.
@@ -66,7 +91,7 @@ public struct MarkdownRuleChecker: Sendable {
         guard let types = registry.typeRegistry else {
           throw MarkdownTypeCheckerError.unknownType(name.rawValue)
         }
-        let assessment = try MarkdownTypeChecker(registry: types).assess(record, as: name)
+        let assessment = try relationshipAssessments[name] ?? MarkdownTypeChecker(registry: types).assess(record, as: name)
         typeAssessments[check.id] = assessment
         diagnostics.append(contentsOf: assessment.diagnostics)
       case .frontmatterSchema(_, let presence):
@@ -158,6 +183,8 @@ public struct MarkdownRuleChecker: Sendable {
     }
     if let expressionAssessment { diagnostics.append(contentsOf: expressionAssessment.diagnostics) }
     let hasErrors = diagnostics.contains { $0.severity == .error }
+      || typeAssessments.values.contains { !$0.conforms }
+      || (expressionAssessment.map { $0.status != .matched } ?? false)
     let status: MarkdownRuleAssessmentStatus
     if hasErrors {
       status = .failed
@@ -296,25 +323,41 @@ public struct MarkdownRuleChecker: Sendable {
         ))
         return (matches, unavailable, evidence, diagnostics)
       }
-      let assessments = MarkdownTypeChecker(registry: typeRegistry).assessAll(record)
+      let assessments = MarkdownTypeChecker(registry: typeRegistry).assessAll(record).map { relationshipAssessments[$0.type] ?? $0 }
       let conforming = Set(assessments.filter(\.conforms).map(\.type))
+      func state(_ name: MarkdownTypeName) -> MarkdownRuleEvidenceStatus {
+        if typeRegistry.definition(named: name)?.relationships.isEmpty == false,
+          assessments.first(where: { $0.type == name })?.outcome == .unavailable { return .unavailable }
+        return conforming.contains(name) ? .matched : .notMatched
+      }
+      func retainUnavailable(_ status: MarkdownRuleEvidenceStatus, _ location: String) {
+        if status == .unavailable {
+          unavailable = true
+          diagnostics.append(.init(code: "rule.applicability.type-unavailable", severity: .error, domain: .context,
+            location: location, message: "Required relationship type evidence is unavailable"))
+        }
+      }
       if rule.applicability.anyTypes.isEmpty == false {
-        let anyMatches = rule.applicability.anyTypes.contains(where: conforming.contains)
-        if anyMatches == false { matches = false }
+        let status = MarkdownRuleMatchComposition.any(rule.applicability.anyTypes.map(state))
+        retainUnavailable(status, "anyTypes")
+        let anyMatches = status == .matched
+        if status == .notMatched { matches = false }
         evidence.append(MarkdownRulePredicateEvidence(
           id: "anyTypes",
-          status: anyMatches ? .matched : .notMatched,
+          status: status,
           message: anyMatches
             ? "record conforms to a selected Markdown type"
             : "record does not conform to any selected Markdown type"
         ))
       }
       if rule.applicability.allTypes.isEmpty == false {
+        let status = MarkdownRuleMatchComposition.all(rule.applicability.allTypes.map(state))
+        retainUnavailable(status, "allTypes")
         let missing = rule.applicability.allTypes.filter { conforming.contains($0) == false }
-        if missing.isEmpty == false { matches = false }
+        if status == .notMatched { matches = false }
         evidence.append(MarkdownRulePredicateEvidence(
           id: "allTypes",
-          status: missing.isEmpty ? .matched : .notMatched,
+          status: status,
           message: missing.isEmpty
             ? "record conforms to all selected Markdown types"
             : "record does not conform to required type(s): \(missing.map(\.rawValue).joined(separator: ", "))"

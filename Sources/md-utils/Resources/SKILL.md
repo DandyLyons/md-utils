@@ -21,8 +21,21 @@ For mdtype v2 wikilink spelling checks, declare top-level
 `format: Wikilink`: `styles` accepts an unordered array of `name`, `vault-path`,
 `relative-path`, `self-anchor`; `markdownExtension` accepts `require`, `omit`,
 `either`. A root-level bare name is not strict vault-path style. These checks never
-rewrite or resolve links. `document-relationships` remains unsupported. Existing
+rewrite or resolve links. Existing
 `links convert` behavior is unchanged; contract-aware conversion is separate work.
+
+For named frontmatter assertions, declare `requires: [document-relationships]`
+and a top-level `relationships` mapping. Each name has a literal-key/array `select`
+and `target: {type: person.mdtype.yaml}` relative to `.md-utils/types/`.
+`md-utils rel out|in|both Note.md --type Person --root ./vault/ --json` queries
+declared occurrences; `--yaml` is also supported. Long spellings are
+`relationships outgoing|incoming|both`. Self-links have their own section.
+Queries preserve malformed values, candidates, coverage and pass/fail/unavailable
+outcomes. Users own domain meaning and truth; validation checks authored structure.
+Existing indexes refresh automatically; `--no-index` bypasses them and
+`--indexed-only` refreshes only recorded candidates without discovery or fallback.
+Limited coverage cannot establish absence or unique basename resolution.
+Relationship assessments are recomputed pending dependency-aware caching.
 
 ## Commands at a Glance
 

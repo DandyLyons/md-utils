@@ -8,11 +8,12 @@ struct IndexDefinitionPayload: Encodable {
     var definition: MarkdownTypeDefinition
     private enum CodingKeys: String, CodingKey {
         case schema = "md-utils-type-schema"
-        case name, version, frontmatter, body, context, requires
+        case name, version, frontmatter, body, context, requires, relationships
     }
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(definition.typeSchemaVersion, forKey: .schema)
+        if !definition.relationships.isEmpty { try container.encode(definition.relationships.mapValues(\.jsonValue), forKey: .relationships) }
         try container.encode(definition.name.rawValue, forKey: .name)
         try container.encode(definition.version, forKey: .version)
         if definition.requires.isEmpty == false {
@@ -74,12 +75,14 @@ struct IndexTypePayload: Codable {
     }
     var type: Identity
     var conforms: Bool
+    var outcome: MarkdownAssessmentOutcome
     var diagnostics: [Diagnostic]
     var path: String?
 
     init(_ assessment: MarkdownTypeAssessment, path: String? = nil) {
         type = Identity(name: assessment.type.rawValue, version: assessment.version)
         conforms = assessment.conforms
+        outcome = assessment.outcome
         diagnostics = assessment.diagnostics.map(Diagnostic.init)
         self.path = path
     }

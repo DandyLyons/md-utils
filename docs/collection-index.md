@@ -52,6 +52,12 @@ the existing evaluator diagnostics. Binary/non-UTF-8 files report read failures.
 
 ## Automatic Rule Validation
 
+Named relationship queries also use the existing index refresh, writer lease,
+and generation checks. They recompute cross-document assessments from verified
+records until #180 supplies persisted dependency invalidation. See
+[relationship index semantics](relationships.md#existing-index-behavior), including
+the limited coverage of `--indexed-only` and the need to materialize source text.
+
 `md-utils rules validate` and `md-utils rules validate books` automatically use
 an existing `<project-root>/.md-utils/index.sqlite`. Missing rule scopes are
 registered with the requested non-Markdown inclusion setting. Only the requested

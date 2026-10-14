@@ -81,6 +81,7 @@ let package = Package(
     ]),
     .target(name: "MarkdownUtilitiesIndexNative", dependencies: [
       "MarkdownUtilitiesIndex", "MarkdownUtilities", "MarkdownUtilitiesCore",
+      .product(name: "SystemPackage", package: "swift-system"),
       .product(name: "JMESPath", package: "jmespath.swift"),
       .product(name: "PathKit", package: "PathKit"),
     ]),
@@ -153,6 +154,7 @@ let package = Package(
       name: "MarkdownUtilities",
       dependencies: [
         "MarkdownUtilitiesCore",
+        .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "PathKit", package: "PathKit"),
         .product(name: "Parsing", package: "swift-parsing"),
         "Yams",
@@ -263,6 +265,7 @@ let package = Package(
         .process("Resources/1_md-utils-type.schema.json"),
         .process("Resources/2_md-utils-type.schema.json"),
         .process("Resources/2-capabilities_md-utils-type.schema.json"),
+        .process("Resources/2-relationships_md-utils-type.schema.json"),
         .process("Resources/2_semantic-formats.json"),
         .process("Resources/OKF-concept.schema.json"),
       ]

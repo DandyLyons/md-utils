@@ -90,19 +90,27 @@ public struct MarkdownTypeAssessment: Equatable, Sendable {
   public var type: MarkdownTypeName
   public var version: String
   public var diagnostics: [MarkdownDiagnostic]
+  public var outcome: MarkdownAssessmentOutcome
 
   public init(
     type: MarkdownTypeName,
     version: String,
-    diagnostics: [MarkdownDiagnostic]
+    diagnostics: [MarkdownDiagnostic],
+    outcome: MarkdownAssessmentOutcome? = nil,
   ) {
     self.type = type
     self.version = version
     self.diagnostics = diagnostics
+    self.outcome = outcome ?? .all(diagnostics.filter { $0.severity == .error }.map { diagnostic in
+      diagnostic.code.hasSuffix(".engine-error") || diagnostic.code.hasSuffix(".unavailable")
+        || diagnostic.code.hasSuffix("syntax-unavailable")
+        || diagnostic.code == "record.frontmatter.invalid-yaml" || diagnostic.code == "record.frontmatter.invalid-toml"
+        || diagnostic.code == "record.markdown-structure.unsupported" ? .unavailable : .fail
+    })
   }
 
   public var conforms: Bool {
-    diagnostics.contains(where: { $0.severity == .error }) == false
+    outcome == .pass
   }
 
   public var errors: [MarkdownDiagnostic] {

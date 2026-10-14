@@ -11,45 +11,83 @@ public struct MarkdownTypeChecker: Sendable {
 
   public func assess(
     _ record: MarkdownRecord,
-    as type: MarkdownTypeName
+    as type: MarkdownTypeName,
+    collection: MarkdownRelationshipCollection? = nil,
   ) async throws -> MarkdownTypeAssessment {
+    if registry.definition(named: type)?.relationships.isEmpty == false {
+      let result = try await MarkdownRelationshipEvaluator(registry: registry).evaluate(roots: [(record, type)], collection: collection)
+      guard let assessment = result.assessment(source: record.context.path?.rawValue ?? record.identity?.rawValue ?? "<source>", type: type.rawValue),
+        let definition = registry.definition(named: type) else { throw MarkdownTypeCheckerError.unknownType(type.rawValue) }
+      return .init(type: type, version: definition.version, diagnostics: assessment.diagnostics, outcome: assessment.outcome)
+    }
     let analyzed = await MarkdownRecordAnalyzer.analyze(record)
     return try assess(analyzed, as: type)
   }
 
   public func assess(
     _ record: MarkdownRecord,
-    as type: String
+    as type: String,
+    collection: MarkdownRelationshipCollection? = nil,
   ) async throws -> MarkdownTypeAssessment {
-    try await assess(record, as: MarkdownTypeName(rawValue: type))
+    try await assess(record, as: MarkdownTypeName(rawValue: type), collection: collection)
   }
 
   public func assessAll(_ record: MarkdownRecord) async -> [MarkdownTypeAssessment] {
     let analyzed = await MarkdownRecordAnalyzer.analyze(record)
-    return assessAll(analyzed)
+    var results: [MarkdownTypeAssessment] = []
+    for definition in registry.definitions {
+      if definition.relationships.isEmpty { results.append(assess(analyzed, as: definition)) }
+      else {
+        do { results.append(try await assess(record, as: definition.name)) }
+        catch {
+          results.append(.init(type: definition.name, version: definition.version,
+            diagnostics: [.init(code: "relationship.evaluator.failure", severity: .error, domain: .record,
+              location: "relationships", message: String(describing: error))], outcome: .unavailable))
+        }
+      }
+    }
+    return results
   }
 
   public func conformingTypes(for record: MarkdownRecord) async -> Set<MarkdownTypeName> {
     Set(await assessAll(record).filter(\.conforms).map(\.type))
   }
 
-  public func verifyTypeHints(in record: MarkdownRecord) async -> [MarkdownTypeHintAssessment] {
+  public func verifyTypeHints(in record: MarkdownRecord,
+    collection: MarkdownRelationshipCollection? = nil,
+  ) async -> [MarkdownTypeHintAssessment] {
     let analyzed = await MarkdownRecordAnalyzer.analyze(record)
-    return analyzed.allTypeHints.map { hint in
+    var results: [MarkdownTypeHintAssessment] = []
+    for hint in analyzed.allTypeHints {
+      if Task.isCancelled { return [] }
       let name = MarkdownTypeName(rawValue: hint.name)
       guard let definition = registry.definition(named: name) else {
-        return MarkdownTypeHintAssessment(hint: hint, status: .unknownType)
+        results.append(.init(hint: hint, status: .unknownType))
+        continue
       }
       if let requestedVersion = hint.version, requestedVersion != definition.version {
-        return MarkdownTypeHintAssessment(hint: hint, status: .unavailableVersion)
+        results.append(.init(hint: hint, status: .unavailableVersion))
+        continue
       }
-      let assessment = assess(analyzed, as: definition)
-      return MarkdownTypeHintAssessment(
+      let assessment: MarkdownTypeAssessment
+      if definition.relationships.isEmpty {
+        assessment = assess(analyzed, as: definition)
+      } else {
+        do { assessment = try await assess(record, as: name, collection: collection) }
+        catch is CancellationError { return [] }
+        catch {
+          assessment = .init(type: name, version: definition.version,
+            diagnostics: [.init(code: "relationship.evaluator.failure", severity: .error, domain: .record,
+              location: "relationships", message: String(describing: error))], outcome: .unavailable)
+        }
+      }
+      results.append(MarkdownTypeHintAssessment(
         hint: hint,
         status: assessment.conforms ? .confirmed : .rejected,
-        assessment: assessment
-      )
+        assessment: assessment,
+      ))
     }
+    return Task.isCancelled ? [] : results
   }
 
   /// Assesses already analyzed content without repeating Markdown or YAML parsing.
@@ -64,13 +102,20 @@ public struct MarkdownTypeChecker: Sendable {
   }
 
   /// Assesses already analyzed content against every definition in registry order.
+  package func assessLocal(_ record: AnalyzedMarkdownRecord, as type: MarkdownTypeName) throws -> MarkdownTypeAssessment {
+    guard let definition = registry.definition(named: type) else { throw MarkdownTypeCheckerError.unknownType(type.rawValue) }
+    return assess(record, as: definition, includeRelationships: false)
+  }
+
+  /// Assesses already analyzed content against every definition in registry order.
   package func assessAll(_ record: AnalyzedMarkdownRecord) -> [MarkdownTypeAssessment] {
     registry.definitions.map { assess(record, as: $0) }
   }
 
   private func assess(
     _ record: AnalyzedMarkdownRecord,
-    as definition: MarkdownTypeDefinition
+    as definition: MarkdownTypeDefinition,
+    includeRelationships: Bool = true,
   ) -> MarkdownTypeAssessment {
     var diagnostics = record.parseDiagnostics
     diagnostics.append(contentsOf: assessFrontmatter(record, definition: definition))
@@ -98,6 +143,11 @@ public struct MarkdownTypeChecker: Sendable {
       domain: .context,
       record: record
     ))
+    if includeRelationships && !definition.relationships.isEmpty {
+      diagnostics.append(.init(code: "relationship.context.unavailable",
+        severity: definition.relationships.values.contains { $0.severity == .error } ? .error : .advisory, domain: .context,
+        location: "relationships", message: "Relationship assessment requires the collection-aware evaluator"))
+    }
     return MarkdownTypeAssessment(
       type: definition.name,
       version: definition.version,

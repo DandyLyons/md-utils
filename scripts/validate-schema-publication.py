@@ -82,7 +82,7 @@ def main() -> None:
         if args.check_published and fetch_json(expected_id) != load_json(public):
             fail(f"published schema differs from local schema: {expected_id}")
 
-    for filename in ["mdtype.schema.json", "semantic-formats.json", "wikilink-constraints/mdtype.schema.json"]:
+    for filename in ["mdtype.schema.json", "semantic-formats.json", "wikilink-constraints/mdtype.schema.json", "document-relationships/mdtype.schema.json"]:
         public = repo_root / "site/schemas/mdtype/2" / filename
         expected_id = f"https://dandylyons.github.io/md-utils/schemas/mdtype/2/{filename}"
         if load_json(public).get("$id") != expected_id:

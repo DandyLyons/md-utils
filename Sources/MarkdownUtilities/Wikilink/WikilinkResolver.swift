@@ -6,7 +6,6 @@
 import Foundation
 import MarkdownUtilitiesCore
 import PathKit
-import Parsing
 
 /// The result of resolving a wikilink target to a file on disk.
 public enum WikilinkResolution: @unchecked Sendable, Equatable {
@@ -41,11 +40,8 @@ public struct WikilinkResolver: @unchecked Sendable {
   /// Markdown files discovered under root (absolute paths).
   public let markdownFiles: [Path]
 
-  /// Index mapping lowercased file stems to their absolute paths.
-  private let stemIndex: [String: [Path]]
-
-  /// Exact snapshot membership also prevents traversal outside the collection.
-  private let exactPaths: Set<Path>
+  /// Shared portable lookup semantics over this native discovery snapshot.
+  private let collectionResolver: CollectionWikilinkResolver
 
   /// Markdown extensions considered for no-extension targets.
   private static let markdownExtensions: Set<String> = ["md", "markdown"]
@@ -67,20 +63,19 @@ public struct WikilinkResolver: @unchecked Sendable {
 
     var discovered: [Path] = []
     var mdFiles: [Path] = []
-    var index: [String: [Path]] = [:]
 
     try WikilinkResolver.collectFiles(
       in: normalizedRoot,
       root: normalizedRoot,
       discovered: &discovered,
       mdFiles: &mdFiles,
-      index: &index
     )
 
     self.allFiles = discovered
-    self.exactPaths = Set(discovered)
     self.markdownFiles = mdFiles
-    self.stemIndex = index
+    let prefix = normalizedRoot.string.hasSuffix("/") ? normalizedRoot.string : normalizedRoot.string + "/"
+    self.collectionResolver = CollectionWikilinkResolver(
+      paths: Set(discovered.map { String($0.string.dropFirst(prefix.count)) }), namespaceComplete: true)
   }
 
   /// Resolves a wikilink to a file path.
@@ -100,70 +95,19 @@ public struct WikilinkResolver: @unchecked Sendable {
   ///   - sourceFile: The file containing the wikilink (used for relative resolution).
   /// - Returns: The resolution result.
   public func resolve(target: String, from sourceFile: Path) -> WikilinkResolution {
-    // Empty target (self-referencing anchor like [[#heading]]) resolves to source file
-    if target.isEmpty {
-      return .resolved(sourceFile.absolute())
+    let prefix = root.string.hasSuffix("/") ? root.string : root.string + "/"
+    let source = sourceFile.absolute().string
+    guard source.hasPrefix(prefix) else { return .unresolved }
+    let result = collectionResolver.resolve(target: target, from: String(source.dropFirst(prefix.count)))
+    switch result.status {
+    case .resolved:
+      guard let destination = result.destination else { return .unresolved }
+      return .resolved(root + Path(destination))
+    case .ambiguous: return .ambiguous(result.candidates.map { root + Path($0) })
+    case .unresolved, .unavailable: return .unresolved
     }
-
-    let hasExtension = Path(target).extension != nil
-    let targetPath = Path(target)
-
-    // Parse explicit relative prefixes before PathKit normalizes away `./`.
-    if target.contains("/") {
-      var input = target[...]
-      let relativePrefix = OneOf { "./"; "../" }
-      let isSourceRelative = (try? relativePrefix.parse(&input)) != nil
-      let base = isSourceRelative ? sourceFile.absolute().parent() : root
-      return tryResolveExact(base + targetPath, hasExtension: hasExtension) ?? .unresolved
-    }
-
-    // Bare names retain collection-wide matching, including ambiguity.
-    let stem = targetPath.lastComponentWithoutExtension.lowercased()
-    if let candidates = stemIndex[stem] {
-      let filtered: [Path]
-      if hasExtension {
-        // Explicit extension: match exactly
-        let targetExt = Path(target).extension ?? ""
-        filtered = candidates.filter { ($0.extension ?? "") == targetExt }
-      } else {
-        // No extension: only match markdown files
-        filtered = candidates.filter { ext in
-          guard let fileExt = ext.extension else { return false }
-          return Self.markdownExtensions.contains(fileExt)
-        }
-      }
-
-      if filtered.count == 1 {
-        return .resolved(filtered[0])
-      } else if filtered.count > 1 {
-        return .ambiguous(filtered.sorted { $0.string < $1.string })
-      }
-    }
-
-    return .unresolved
   }
   // MARK: - Private Helpers
-
-  /// Tries to resolve a path, appending markdown extensions if needed.
-  private func tryResolveExact(_ path: Path, hasExtension: Bool) -> WikilinkResolution? {
-    if hasExtension {
-      let normalized = path.absolute()
-      if exactPaths.contains(normalized) {
-        return .resolved(normalized)
-      }
-    } else {
-      // Both Markdown extensions can exist; do not arbitrarily select one.
-      var matches: [Path] = []
-      for ext in Self.markdownExtensions.sorted() {
-        let withExt = Path(path.string + ".\(ext)")
-        let normalized = withExt.absolute()
-        if exactPaths.contains(normalized) { matches.append(normalized) }
-      }
-      if matches.count > 1 { return .ambiguous(matches) }
-      if let match = matches.first { return .resolved(match) }
-    }
-    return nil
-  }
 
   /// Recursively collects files from a directory, skipping hidden files.
   private static func collectFiles(
@@ -171,7 +115,6 @@ public struct WikilinkResolver: @unchecked Sendable {
     root: Path,
     discovered: inout [Path],
     mdFiles: inout [Path],
-    index: inout [String: [Path]]
   ) throws {
     let children = try directory.children()
     for child in children.sorted(by: { $0.string < $1.string }) {
@@ -188,14 +131,10 @@ public struct WikilinkResolver: @unchecked Sendable {
           root: root,
           discovered: &discovered,
           mdFiles: &mdFiles,
-          index: &index
         )
       } else if child.isFile {
         let absolute = child.absolute()
         discovered.append(absolute)
-
-        let stem = child.lastComponentWithoutExtension.lowercased()
-        index[stem, default: []].append(absolute)
 
         if let ext = child.extension, markdownExtensions.contains(ext) {
           mdFiles.append(absolute)

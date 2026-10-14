@@ -2,6 +2,15 @@
 
 Create, inspect, assess, identify, verify, and repair typed Markdown records.
 
+`types check` assesses named mdtype v2 relationships with the project's collection
+context. Use `relationships` (alias `rel`) to query declaration-scoped occurrences:
+`outgoing` (`out`), `incoming` (`in`), or `both`, with explicit `--root ./vault/`,
+`--type`, optional `--relation`, and `--json` or `--yaml`. Self-links have a separate
+section. Existing indexes refresh automatically; `--no-index`, `--indexed-only`
+and `--verify-hashes` follow existing freshness conventions. Indexed-only coverage
+cannot prove incoming absence or basename uniqueness. Domain truth remains the
+user's responsibility; validation checks explicit structural assertions.
+
 ## Create instances
 
 `types new --type Book --value ./dune.json --filename-data '$.title' ./Books/`

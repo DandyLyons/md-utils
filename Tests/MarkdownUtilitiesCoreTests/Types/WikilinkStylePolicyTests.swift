@@ -118,7 +118,7 @@ struct WikilinkStylePolicyTests {
       #expect(throws: MarkdownTypeDefinitionError.self) { try WikilinkStylePolicy(policy, path: "#") }
     }
     #expect(throws: MarkdownTypeDefinitionError.self) { try SemanticSchemaAdapter.check(schema(["name"])) }
-    for names in [["document-relationships"], ["unknown"], ["wikilink-constraints", "wikilink-constraints"]] {
+    for names in [["unknown"], ["wikilink-constraints", "wikilink-constraints"]] {
       #expect(throws: MarkdownTypeDefinitionError.self) { try MarkdownTypeRegistry.checkCapabilities(names, version: "2") }
     }
     let decoded = try MarkdownTypeDefinitionDecoder.decode("""

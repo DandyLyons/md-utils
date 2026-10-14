@@ -6,6 +6,12 @@ The proposed native and Cloudflare server architecture, WebAssembly target split
 
 ## Library Layers
 
+Named relationship selection, portable wikilink resolution, bounded recursive
+conformance, and query evidence live in Core. `MarkdownUtilitiesIndexNative`
+supplies native/index-backed collection snapshots; CLI queries and validation
+share those semantics. Domain meaning remains user-defined. See
+[named relationships](relationships.md).
+
 `MarkdownUtilitiesCore` owns content-only parsing and transformations. It accepts strings, document models, and explicit context; it does not scan the filesystem or inspect host metadata. The target is supported on Apple platforms and Linux.
 
 `MarkdownUtilities` depends on Core and adds filesystem-backed wikilink resolution, CSV path metadata, and file metadata including extended attributes. `MarkdownUtilitiesServer` also depends only on Core, defines storage-neutral canonical-record persistence, and compiles explicit server resources into transport-neutral endpoint plans. Consumers import the products explicitly according to the APIs each source file uses.

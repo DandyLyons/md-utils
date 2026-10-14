@@ -258,6 +258,17 @@ public struct MarkdownRuleDefinition: Equatable, Sendable {
   public var typeExpression: MarkdownRuleTypeExpression?
   /// Exact resource references mapped by the host to declared type identities.
   public var typeBindings: [String: MarkdownTypeName]
+
+  /// Types consulted by source selection or conformance, excluding unrelated registry entries.
+  package var referencedTypes: Set<MarkdownTypeName> {
+    let leaves = matchExpression?.leaves ?? [applicability]
+    let enforced = checks.compactMap { check -> MarkdownTypeName? in
+      guard case .typeConformance(let name) = check.predicate else { return nil }
+      return name
+    }
+    let expressionTypes = typeExpression?.references.compactMap { typeBindings[$0] } ?? []
+    return Set(leaves.flatMap { $0.anyTypes + $0.allTypes } + enforced + expressionTypes)
+  }
   public var checks: [MarkdownRuleCheck]
   /// Optional source used to resolve relative JSON Schema references.
   public var source: String?

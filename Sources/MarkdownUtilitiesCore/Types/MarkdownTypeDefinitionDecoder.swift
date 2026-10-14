@@ -16,9 +16,24 @@ public enum MarkdownTypeDefinitionDecoder {
     source: String? = nil
   ) throws -> MarkdownTypeDefinition {
     let object = try rootObject(content, format: format)
+    // Inspect authored mapping entries before dictionary conversion can erase duplicate names.
+    // JSON is a YAML subset; TOML's parser already rejects duplicate table/key declarations.
+    if object["relationships"] != nil && format != .toml,
+      let root = try Yams.compose(yaml: content)?.mapping {
+      let envelopes = root.filter { $0.key.string == "relationships" }
+      guard envelopes.count == 1 else { throw MarkdownRelationshipDefinition.invalid("duplicate relationships envelope") }
+      if let mapping = envelopes.first?.value.mapping {
+        var names: Set<String> = []
+        for (name, _) in mapping {
+          guard let name = name.string, names.insert(name).inserted else {
+            throw MarkdownRelationshipDefinition.invalid("duplicate or non-string relationship name")
+          }
+        }
+      }
+    }
     try validateKeys(
       object,
-      allowed: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context", "creation", "requires"],
+      allowed: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context", "creation", "requires", "relationships"],
       required: ["md-utils-type-schema", "name", "version", "frontmatter", "body", "context"],
       context: "type definition"
     )
@@ -38,6 +53,9 @@ public enum MarkdownTypeDefinitionDecoder {
       capabilities = names
     }
     try MarkdownTypeRegistry.checkCapabilities(capabilities, version: schemaVersion)
+    if object["relationships"] != nil && !capabilities.contains("document-relationships") {
+      throw MarkdownTypeDefinitionError.invalidField("relationship.definition.capability: relationships requires document-relationships")
+    }
     let recommended = frontmatterObject?.removeValue(forKey: "recommendedSchemas")
     guard recommended == nil || schemaVersion == "2" else {
       throw MarkdownTypeDefinitionError.invalidField("recommendedSchemas requires mdtype v2")
@@ -59,6 +77,7 @@ public enum MarkdownTypeDefinitionDecoder {
       source: source,
       creation: try object["creation"].map { try MarkdownCreationTemplate.decode(JSONValue(any: $0)) },
       requires: capabilities,
+      relationships: try object["relationships"].map { try MarkdownRelationshipDefinition.decode(JSONValue(any: $0)) } ?? [:],
     )
   }
 

@@ -147,7 +147,7 @@ struct TypesCommandsTests {
     #expect(command.schemaVersion == "2")
     let content = try TypesProject.schemaContent(version: command.schemaVersion)
     let object = try #require(JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any])
-    #expect(object["$id"] as? String == "https://dandylyons.github.io/md-utils/schemas/mdtype/2/wikilink-constraints/mdtype.schema.json")
+    #expect(object["$id"] as? String == "https://dandylyons.github.io/md-utils/schemas/mdtype/2/document-relationships/mdtype.schema.json")
     #expect(try TypesProject.schemaContent() != content)
   }
 
