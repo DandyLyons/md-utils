@@ -1,0 +1,60 @@
+{
+  "files": 10000,
+  "corpus": "/Users/daniellyons/Developer/MySwiftPackages/md-utils_Project/md-utils/tmp/relationship-cache-af830a15-c474-4bc7-8cf9-109e44df919a/",
+  "binary": "/Users/daniellyons/Developer/MySwiftPackages/md-utils_Project/md-utils/.build/out/Products/Debug/md-utils",
+  "results": [
+    {
+      "scenario": "direct",
+      "seconds": 13.624623167008394,
+      "exit_status": 0,
+      "peak_rss_bytes": 362414080,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "cold",
+      "seconds": 44.63125183299417,
+      "exit_status": 0,
+      "peak_rss_bytes": 369082368,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged",
+      "seconds": 41.01177491698763,
+      "exit_status": 0,
+      "peak_rss_bytes": 378683392,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "target_edit",
+      "seconds": 53.62285970899393,
+      "exit_status": 1,
+      "peak_rss_bytes": 370081792,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged_failure",
+      "seconds": 41.683816959004616,
+      "exit_status": 1,
+      "peak_rss_bytes": 378880000,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "namespace_change",
+      "seconds": 67.08735175000038,
+      "exit_status": 1,
+      "peak_rss_bytes": 372146176,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged_ambiguity",
+      "seconds": 42.20361491700169,
+      "exit_status": 1,
+      "peak_rss_bytes": 434012160,
+      "reused_manifest": true
+    }
+  ],
+  "retained_payload_bytes": 32403779,
+  "largest_chunk_bytes": 262144,
+  "staging_rows_after": 0,
+  "database_bytes": 83902464
+}

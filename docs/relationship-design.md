@@ -61,8 +61,8 @@ files or falls back, and reports limited coverage. It may read known source file
 fall back; cancellation never triggers fallback. Use existing writer leases and
 generation checks. Resolution coverage must not shrink to selected sources.
 
-Reuse indexed source evidence, but recompute relationship assessments per request.
-Persisted cross-document result reuse stays disabled until #180. Policies are
+Reuse indexed source evidence and verified relationship assessments through the
+[#180 cache](relationship-cache.md), with conservative whole-collection invalidation. Policies are
 implemented by #178 in [relationship policies](relationship-policies.md); repairs
 belong to #179. Preserve durable drafts/receipts and immutable schemas;
 do not advance authoring defaults. Add a separately named capability schema.

@@ -51,21 +51,25 @@ struct RelationshipOptions: ParsableArguments {
   }
 
   func run(_ direction: MarkdownRelationshipDirection) async throws {
-    let registry = try MarkdownTypeFileRegistryLoader.load(projectRoot: Path(root))
-    guard let definition = registry.definition(named: type) else { throw ValidationError("Unknown declaring type: \(type)") }
-    if let relation, definition.relationships[relation] == nil { throw ValidationError("Unknown relationship: \(type).\(relation)") }
+    // Reject invalid contract selection before any automatic index refresh.
+    let initialRegistry = try MarkdownTypeFileRegistryLoader.load(projectRoot: Path(root))
+    guard let initialDefinition = initialRegistry.definition(named: type) else { throw ValidationError("Unknown declaring type: \(type)") }
+    if let relation, initialDefinition.relationships[relation] == nil { throw ValidationError("Unknown relationship: \(type).\(relation)") }
     var limits = MarkdownRelationshipLimits()
     limits.records = maxRecords
     limits.occurrences = maxOccurrences
-    let collection = try await MarkdownRelationshipNativeCollection.load(root: Path(root), noIndex: noIndex,
-      indexedOnly: indexedOnly, verifyHashes: verifyHashes, limits: limits,
+    let session = try await MarkdownRelationshipAssessmentSession.load(root: Path(root), noIndex: noIndex,
+      indexedOnly: indexedOnly, verifyHashes: verifyHashes, limits: limits, includeRules: false,
       warning: { FileHandle.standardError.write(Data(($0 + "\n").utf8)) })
+    let collection = session.collection
+    guard let definition = session.project.types.definition(named: type) else { throw ValidationError("Unknown declaring type: \(type)") }
+    if let relation, definition.relationships[relation] == nil { throw ValidationError("Unknown relationship: \(type).\(relation)") }
     let path = try MarkdownRecordPath(file).rawValue
     guard collection.resolver.paths.contains(path) else { throw ValidationError("Document is outside available collection evidence: \(path)") }
     let sources = direction == .outgoing ? [path] : collection.records.keys.sorted()
-    let roots = sources.compactMap { source in collection.records[source].map { ($0, definition.name) } }
+    let roots = sources.filter { collection.records[$0] != nil }.map { ($0, definition.name) }
     guard direction != .outgoing || !roots.isEmpty else { throw ValidationError("Source record is unavailable: \(path)") }
-    let evaluation = try await MarkdownRelationshipEvaluator(registry: registry, limits: limits).evaluate(roots: roots, collection: collection)
+    let evaluation = try await session.relationships(roots: roots).value
     let result = MarkdownRelationshipQuery(evaluation: evaluation, source: path, direction: direction, type: type,
       relationship: relation, identity: collection.records[path]?.identity)
     if yaml { print(try YAMLEncoder().encode(result)) }

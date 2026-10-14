@@ -45,9 +45,9 @@ public struct MarkdownCollectionRuleAssessment: Codable, Sendable {
   public var policies: [MarkdownPolicyAssessment]
 }
 
-/// Portable evidence; no collection policy result is persisted by the index.
+/// Portable evidence; native hosts may persist it with a verified dependency certificate.
 public struct MarkdownRuleCollectionAssessment: Codable, Sendable {
-  public var evaluatorProfile = "relationship-policies-1"
+  public var evaluatorProfile = MarkdownRuleCollectionEvaluator.profile
   public var collection: String
   public var generation: String
   public var rules: [MarkdownCollectionRuleAssessment]

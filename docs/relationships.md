@@ -144,8 +144,8 @@ registered rule scopes, and unregistered rules are listed when validating all.
 
 The index accelerates candidate/freshness work and reuses unchanged extraction.
 Raw records are still materialized and revision-verified for full structural
-assessment. Relationship results are recomputed per invocation; cross-document
-assessment caching remains disabled pending #180. There is no promise of constant
+assessment. Relationship results may be reused after verifying a whole-collection
+dependency certificate; see [relationship cache](relationship-cache.md). There is no promise of constant
 time warm queries or index-only operation without source reads. Drafts and receipts
 remain outside disposable relationship evidence.
 
@@ -171,7 +171,7 @@ shape validation does not perform cross-document assessment.
 
 Collection policies (#178) are implemented through explicit mdrule v1; see
 [relationship policies](relationship-policies.md) for scopes, cycle witness flags,
-return checks and JSON/YAML output. Repairs (#179), persisted dependency invalidation
-(#180), publication activation and the broader compatibility matrix (#184) remain
-separate work. See [the agreed design](relationship-design.md) and
+return checks and JSON/YAML output. Repairs (#179) and persisted dependency invalidation
+(#180) are implemented separately. Publication activation and the broader compatibility
+matrix (#184) remain separate work. See [the agreed design](relationship-design.md) and
 [RFC 0004](rfcs/0004-document-relationships.md).

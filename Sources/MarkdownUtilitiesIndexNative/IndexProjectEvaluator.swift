@@ -27,12 +27,14 @@ public struct IndexProjectEvaluator: Sendable {
     }
 
     /// Loads definitions and compiles the existing runtime before any candidate is assessed.
-    public init(root: Path, configPath: Path) throws {
+    public init(root: Path, configPath: Path, includeRules: Bool = true) throws {
         types = (root + MarkdownTypeFileRegistryLoader.relativeTypesDirectory).exists
             ? try MarkdownTypeFileRegistryLoader.load(projectRoot: root) : try MarkdownTypeRegistry(definitions: [])
         var standalone: MarkdownStandaloneRuleProject?
-        if configPath.exists {
+        var components = [configPath.string]
+        if includeRules && configPath.exists {
             let data = try Data(contentsOf: URL(fileURLWithPath: configPath.string))
+            components.append(String(decoding: data, as: UTF8.self))
             let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             if object?["configVersion"] as? String == "0.3.0" {
                 let project = try MarkdownStandaloneRuleProject(configPath: configPath, projectRoot: root, typeRegistry: types)
@@ -54,14 +56,28 @@ public struct IndexProjectEvaluator: Sendable {
                     queryProvider: IndexJMESPathProvider()).compile(definitions)
             }
         } else { rules = nil }
-        var components = [configPath.string]
-        if configPath.exists { components.append(try configPath.read(.utf8)) }
         if let project = standalone {
-            for file in project.files { components.append(try Path(file.source).read(.utf8)) }
+            for file in project.files {
+                // Bind the fingerprint to the actually compiled rule, even if its file
+                // changes between decoding and the subsequent authored-byte observation.
+                components.append(file.source)
+                components.append(try Self.json(JSONValue.object([
+                    "name": .string(file.name), "match": file.match ?? .null,
+                    "types": file.types.jsonValue, "schema": file.schemaReference.map(JSONValue.string) ?? .null,
+                    "creation": file.creation?.jsonValue ?? .null,
+                    "version": file.ruleSchemaVersion.map(JSONValue.string) ?? .null,
+                    "policies": .array(file.relationshipPolicies.map(\.jsonValue)),
+                ])))
+                components.append(try Path(file.source).read(.utf8))
+            }
         }
         // Resolved schemas include transitive resources, including resources outside .md-utils/.
         for registry in [types, rules?.typeRegistry].compactMap({ $0 }) {
+            components.append(try Self.json(registry.typeResourceBindings.mapValues(\.rawValue)))
+            components.append(try Self.json(registry.schemaResourceSources.sorted()))
             for definition in registry.definitions {
+                components.append(definition.source ?? "")
+                components.append(definition.resourceRevision ?? "")
                 components.append(try Self.json(IndexDefinitionPayload(definition: definition)))
                 if let resolved = registry.resolvedFrontmatterSchema(for: definition.name) {
                     let encoder = JSONEncoder()
@@ -72,8 +88,10 @@ public struct IndexProjectEvaluator: Sendable {
         }
         if let rules {
             for definition in rules.definitions {
+                components.append(try Self.json(definition.typeBindings.mapValues(\.rawValue)))
                 if let rule = rules.rule(named: definition.name) {
                     components.append(try Self.json(rule.resolvedSchemas))
+                    components.append(try Self.json(rule.schemaResourceSources.sorted()))
                 }
             }
         }

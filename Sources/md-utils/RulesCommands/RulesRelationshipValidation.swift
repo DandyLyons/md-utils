@@ -6,13 +6,12 @@ import MarkdownUtilitiesIndex
 import PathKit
 
 extension RulesValidatorRunner {
-  /// Reuses indexed source evidence but never cached cross-document assessments.
+  /// Reuses cross-document evidence only through the verified native assessment session.
   static func validateRelationships(config: MdUtilsConfig, configPath: Path, ruleName: String?, root: Path,
     noIndex: Bool, indexedOnly: Bool, verifyHashes: Bool, includeNonMarkdown: Bool,
     cycleWitnessMode: MarkdownCycleWitnessMode = .perComponent, warning: (String) -> Void,
   ) async throws -> RuleValidationSummary {
-    let registry = try config.compiledRuleRegistry(root: root)
-    var checker = MarkdownRuleChecker(registry: registry)
+    _ = try config.compiledRuleRegistry(root: root)
     var names = ruleName.map { [$0] } ?? config.schemaRules.map(\.name)
     var uncovered: [String] = []
     if indexedOnly {
@@ -26,12 +25,14 @@ extension RulesValidatorRunner {
     }
     var scopes = names.map { IndexScope(kind: .rule, name: $0, includeNonMarkdown: includeNonMarkdown) }
     if !indexedOnly { scopes.append(.init(includeNonMarkdown: includeNonMarkdown)) }
-    let collection = try await MarkdownRelationshipNativeCollection.load(root: root, noIndex: noIndex,
+    let session = try await MarkdownRelationshipAssessmentSession.load(root: root, configPath: configPath, noIndex: noIndex,
       indexedOnly: indexedOnly, verifyHashes: verifyHashes, includeNonMarkdown: includeNonMarkdown,
-      requestedScopes: scopes, configPath: configPath, warning: warning)
+      requestedScopes: scopes, warning: warning)
+    let collection = session.collection
+    guard let registry = session.project.rules else { throw IndexProjectError("Rule registry is unavailable") }
+    var checker = MarkdownRuleChecker(registry: registry)
     if names.contains(where: { registry.rule(named: $0)?.definition.relationshipPolicies.isEmpty == false }) {
-      let assessment = try await MarkdownRuleCollectionEvaluator(registry: registry, cycleWitnessMode: cycleWitnessMode)
-        .evaluate(collection: collection, ruleNames: names)
+      let assessment = try await session.policies(ruleNames: names, cycleWitnessMode: cycleWitnessMode).value
       let results = assessment.rules.flatMap { rule in
         rule.records.filter { $0.membership != .notMatched }.map { record in
           RuleValidationResult(ruleName: rule.rule, schemaPath: "", filePath: record.path,
@@ -50,9 +51,9 @@ extension RulesValidatorRunner {
       let selectedTypes = Set(names.flatMap { registry.rule(named: $0)?.definition.referencedTypes ?? [] })
       let definitions = types.definitions.filter { selectedTypes.contains($0.name) && !$0.relationships.isEmpty }
       let roots = collection.records.keys.sorted().flatMap { path in
-        definitions.compactMap { definition in collection.records[path].map { ($0, definition.name) } }
+        definitions.map { definition in (path, definition.name) }
       }
-      let evaluation = try await MarkdownRelationshipEvaluator(registry: types).evaluate(roots: roots, collection: collection)
+      let evaluation = try await session.relationships(roots: roots).value
       limitations = evaluation.limitations
       for node in evaluation.assessments {
         guard let definition = types.definition(named: node.type) else { continue }

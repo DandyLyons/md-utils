@@ -118,8 +118,8 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
   }
 
   func refresh(lease: CollectionWriterLease) async throws {
-    try checkConfiguration()
     do {
+      try checkConfiguration()
       let indexer = try CollectionIndexer(database: database, root: root)
       let report = try await indexer.updateMany(adding: IndexScope(), writerLease: lease, fingerprint: evaluator.fingerprint,
         verifyHashes: true, evaluate: evaluator.evaluate)
@@ -131,6 +131,9 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
       refreshFailure = false
     } catch {
       refreshFailure = true
+      // A source mutation may already be durable. Supersede all assessment readers
+      // even when refresh failed before it could start a staged generation.
+      try? database.invalidate(message: "Native refresh failed: \(error)")
       throw error
     }
   }

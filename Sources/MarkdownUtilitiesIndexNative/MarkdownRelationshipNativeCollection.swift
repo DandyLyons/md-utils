@@ -7,7 +7,7 @@ import PathKit
 import SystemPackage
 
 /// Native snapshot construction using the existing index refresh/publication contract.
-/// Relationship results are deliberately not persisted; #180 owns their invalidation.
+/// Assessment sessions may reuse results only after verifying this snapshot's certificate.
 public enum MarkdownRelationshipNativeCollection {
   public static func load(
     root: Path, noIndex: Bool = false, indexedOnly: Bool = false, verifyHashes: Bool = false,
@@ -34,8 +34,8 @@ public enum MarkdownRelationshipNativeCollection {
         let report = try await indexer.updateMany(refreshing: scopes, indexedOnly: indexedOnly,
           writerLease: lease, fingerprint: evaluator.fingerprint, verifyHashes: verifyHashes,
           evaluate: evaluator.evaluate)
-        // Cached relationship assessments intentionally lack collection context until #180.
-        // Their unavailability does not invalidate successfully refreshed source evidence.
+        // Source-local assessments lack collection context. Their unavailability does
+        // not invalidate source evidence; the assessment session owns cross-document reuse.
         if !indexedOnly && report.sourceErrorCount > 0 {
           throw IndexProjectError(report.errors.first ?? "Index refresh failed")
         }
@@ -142,6 +142,35 @@ public enum MarkdownRelationshipNativeCollection {
       catch {
         records.removeValue(forKey: path)
         limitations.append("\(path): \(error.localizedDescription)")
+      }
+    }
+  }
+
+  /// Rechecks the authoritative evidence without refreshing the index or discovering in
+  /// indexed-only mode. Callers hold the writer lease; external edits remain detectable,
+  /// but this is not a filesystem transaction.
+  package static func verifyCurrent(_ collection: MarkdownRelationshipCollection,
+    indexedOnly: Bool, limits: MarkdownRelationshipLimits,
+  ) throws {
+    let root = URL(fileURLWithPath: collection.identity)
+    for path in collection.records.keys.sorted() {
+      try Task.checkCancellation()
+      guard try read(path: path, root: root, maximum: limits.bytes) == collection.records[path] else {
+        throw IndexProjectError("Relationship source changed during assessment: \(path)")
+      }
+    }
+    if !indexedOnly {
+      guard try discover(root: root, maximum: limits.candidates) == collection.resolver.paths else {
+        throw IndexProjectError("Relationship candidate namespace changed during assessment")
+      }
+    } else {
+      // Known attachment candidates also affect explicit resolution. Never discover siblings.
+      for path in collection.resolver.paths where collection.records[path] == nil {
+        let file = root.appendingPathComponent(path)
+        guard file.resolvingSymlinksInPath() == file,
+              try Stat(FilePath(file.path), followTargetSymlink: false).type == .regular else {
+          throw IndexProjectError("Recorded relationship candidate changed: \(path)")
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 # RFC 0004: Named Document Relationships and Collection Policies
 
-- Status: Provenance delivered in #175; lexical constraints in #176; named relationship runtime in #177; collection policies in #178; repairs and persisted dependency invalidation pending #179–#180
+- Status: Provenance delivered in #175; lexical constraints in #176; named relationship runtime in #177; collection policies in #178; repairs in #179; verified persisted assessment reuse in #180
 - Date: 2026-10-12
 - Tracking: [#172](https://github.com/DandyLyons/md-utils/issues/172), [#169](https://github.com/DandyLyons/md-utils/issues/169)
 - Depends on: [RFC 0003](0003-semantic-string-formats.md), implemented through #173/#174
@@ -10,10 +10,10 @@
 ## Purpose and implementation boundary
 
 The #177 implementation is documented in [named relationships](../relationships.md).
-It implements declaration/query/required-conformance evaluation and reuses indexed
-source evidence without caching cross-document assessments. Collection policies
+It implements declaration/query/required-conformance evaluation. Native assessment
+reuse now follows the [#180 cache contract](../relationship-cache.md). Collection policies
 are implemented by #178; see [relationship policies](../relationship-policies.md).
-The repair and invalidation sections describe subsequent work. Publication/default
+The repair and invalidation sections define the #179/#180 contracts. Publication/default
 activation remains independent of runtime implementation.
 
 Specify explicitly named frontmatter relationships and collection consistency

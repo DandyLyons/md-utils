@@ -3,6 +3,7 @@ import Hummingbird
 import HummingbirdTesting
 import MarkdownUtilitiesCore
 import MarkdownUtilitiesIndex
+import MarkdownUtilitiesIndexNative
 import MarkdownUtilitiesServer
 @testable import MarkdownUtilitiesServerNative
 import PathKit
@@ -10,6 +11,38 @@ import Testing
 
 @Suite("Native resource mutations")
 struct MarkdownMutationTests {
+  @Test(arguments: [false, true])
+  func relationshipCacheFollowsCommittedMutationAndRecovery(interrupted: Bool) async throws {
+    let root = try fixture()
+    defer { try? root.delete() }
+    try (root + ".md-utils/types/").mkpath()
+    try (root + ".md-utils/types/book.mdtype.json").write("""
+      {"md-utils-type-schema":"1","name":"Book","version":"1",
+       "frontmatter":{},"body":{"requirements":[],"recommendations":[]},"context":{"requirements":[],"recommendations":[]}}
+      """)
+    let repository = try IndexedMarkdownRepository(projectRoot: root.string)
+    let created = try await create(repository)
+    let roots: [(String, MarkdownTypeName)] = [(created.path.rawValue, .init(rawValue: "Book"))]
+    _ = try await MarkdownRelationshipAssessmentSession.load(root: root).relationships(roots: roots)
+    let old = try await MarkdownRelationshipAssessmentSession.load(root: root)
+    #expect(try await old.relationships(roots: roots).cacheHit)
+    if interrupted {
+      await repository.setMutationCheckpoint { if $0 == .committed { throw CancellationError() } }
+    }
+    let changed = try await repository.mutate(resource: "books", identity: nil, path: created.path,
+      request: request(.patch, #"{"frontmatter":{"set":{"title":"Changed"}}}"#),
+      revision: created.revision, idempotencyKey: nil)
+    #expect(changed.state == (interrupted ? .committed : .completed))
+    await #expect(throws: (any Error).self) { try await old.relationships(roots: roots) }
+    let fresh = try await MarkdownRelationshipAssessmentSession.load(root: root).relationships(roots: roots)
+    #expect(fresh.cacheHit == false)
+    #expect(fresh.value.assessments.first?.sourceRevision?.rawValue == changed.revision?.rawValue)
+    let restarted = try IndexedMarkdownRepository(projectRoot: root.string)
+    try await restarted.recoverMutations()
+    #expect(try await restarted.operation(resource: "books", id: changed.id).state == .completed)
+    #expect(try await MarkdownRelationshipAssessmentSession.load(root: root).relationships(roots: roots).cacheHit)
+  }
+
   private func fixture(template: String = "{{ 'Book' | h1 }}\n{{ data.text | bold }}") throws -> Path {
     let root = Path("tmp/mutations/\(UUID().uuidString)/").absolute()
     try (root + ".md-utils/server/").mkpath()

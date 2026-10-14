@@ -126,10 +126,10 @@ not decided. Validation does not apply repairs; use the explicit Fix-It workflow
 Existing indexes refresh automatically; `--no-index` uses source files.
 `--indexed-only` refreshes recorded candidates without discovery or fallback and
 cannot certify global consistency. `--verify-hashes` detects stat-preserving edits.
-Policy assessments are recomputed per request. Evaluator fingerprint v6 invalidates
-older per-record evidence; persistent cross-document reuse remains disabled pending
-#180. Fix-Its extend the existing drafts and durable receipts without storing
-relationship assessments in the disposable index.
+Policy assessments can reuse persisted evidence after whole-collection verification;
+see [relationship cache](relationship-cache.md). Evaluator fingerprint v6 continues
+to identify per-record semantics; cache format 9 adds separate relationship storage.
+Fix-Its retain authoritative review checks, drafts and durable receipts outside SQLite.
 
 ## Portable API, bounds, and compatibility
 
@@ -270,8 +270,8 @@ Canonical schema: `Sources/md-utils/Resources/1_mdrule.schema.json`. Public copy
 `site/schemas/mdrule/1/mdrule.schema.json`. These are publication inputs, not a claim
 of live deployment. Existing immutable schemas and latest/default aliases remain
 unchanged. JSON Schema checks shape; the md-utils compiler checks bindings and the
-evaluator checks graphs. Interactive policy authoring, new server endpoints,
-and persistent assessment reuse (#180) remain separate from policy evaluation.
+evaluator checks graphs. Interactive policy authoring and new server endpoints
+remain separate from policy evaluation. Verified assessment reuse is implemented by #180.
 
 Tests: `swift test --filter 'MarkdownRelationshipPolicyTests|RelationshipPolicyCommandsTests'`.
 Linux validation runs in CI only. WASM verification requires an exactly matching

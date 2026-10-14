@@ -1,0 +1,74 @@
+{
+  "files": 1000,
+  "corpus": "/Users/daniellyons/Developer/MySwiftPackages/md-utils_Project/md-utils/tmp/relationship-cache-8a2112a1-eb14-4906-b273-ee4fa0677565/",
+  "binary": "/Users/daniellyons/Developer/MySwiftPackages/md-utils_Project/md-utils/.build/out/Products/Debug/md-utils",
+  "results": [
+    {
+      "scenario": "direct",
+      "seconds": 1.3207989590009674,
+      "exit_status": 0,
+      "peak_rss_bytes": 65748992,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "cold",
+      "seconds": 3.8229985409998335,
+      "exit_status": 0,
+      "peak_rss_bytes": 74219520,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged",
+      "seconds": 3.13171825002064,
+      "exit_status": 0,
+      "peak_rss_bytes": 73859072,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "unchanged",
+      "seconds": 3.131595082988497,
+      "exit_status": 0,
+      "peak_rss_bytes": 73875456,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "unchanged",
+      "seconds": 3.1089050410082564,
+      "exit_status": 0,
+      "peak_rss_bytes": 74563584,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "target_edit",
+      "seconds": 3.9178869590105023,
+      "exit_status": 1,
+      "peak_rss_bytes": 74596352,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged_failure",
+      "seconds": 3.1353603749885224,
+      "exit_status": 1,
+      "peak_rss_bytes": 73891840,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "namespace_change",
+      "seconds": 3.917004666000139,
+      "exit_status": 1,
+      "peak_rss_bytes": 74727424,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged_ambiguity",
+      "seconds": 3.1499198749952484,
+      "exit_status": 1,
+      "peak_rss_bytes": 75071488,
+      "reused_manifest": true
+    }
+  ],
+  "retained_payload_bytes": 3252778,
+  "largest_chunk_bytes": 262144,
+  "staging_rows_after": 0,
+  "database_bytes": 8601600
+}

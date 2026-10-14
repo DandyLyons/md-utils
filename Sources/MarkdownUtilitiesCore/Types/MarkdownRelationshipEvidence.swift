@@ -11,7 +11,7 @@ public enum MarkdownAssessmentOutcome: String, Codable, Equatable, Sendable {
 }
 
 /// Explicit finite limits for one relationship assessment, including graph discovery.
-public struct MarkdownRelationshipLimits: Sendable {
+public struct MarkdownRelationshipLimits: Codable, Sendable {
   public var records = 10_000
   public var bytes = 64 * 1_024 * 1_024
   public var occurrences = 100_000
@@ -93,7 +93,7 @@ public struct MarkdownRelationshipNodeAssessment: Codable, Sendable {
 
 /// Complete evidence for one bounded evaluation, never an assertion of domain truth.
 public struct MarkdownRelationshipEvaluation: Codable, Sendable {
-  public var evaluatorProfile: String = "document-relationships-1"
+  public var evaluatorProfile: String = MarkdownRelationshipEvaluator.profile
   public var collection: String?
   public var generation: String?
   public var sourcesComplete: Bool

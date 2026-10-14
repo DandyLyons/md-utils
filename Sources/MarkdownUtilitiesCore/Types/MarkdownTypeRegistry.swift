@@ -49,6 +49,8 @@ public struct MarkdownTypeRegistry: Sendable {
   private var definitionsByName: [MarkdownTypeName: MarkdownTypeDefinition]
   private var schemasByName: [MarkdownTypeName: [JSONValue]]
   public let typeResourceBindings: [String: MarkdownTypeName]
+  /// Canonical top-level schema bindings, including v1 schemas without an authored $id.
+  package let schemaResourceSources: Set<String>
 
   public init(
     definitions: [MarkdownTypeDefinition],
@@ -57,6 +59,7 @@ public struct MarkdownTypeRegistry: Sendable {
   ) throws {
     var definitionsByName: [MarkdownTypeName: MarkdownTypeDefinition] = [:]
     var schemasByName: [MarkdownTypeName: [JSONValue]] = [:]
+    var schemaResourceSources: Set<String> = []
 
     for definition in definitions {
       try Self.checkCapabilities(definition.requires, version: definition.typeSchemaVersion)
@@ -101,6 +104,7 @@ public struct MarkdownTypeRegistry: Sendable {
             reference: reference,
             relativeTo: definition.source
           )
+          schemaResourceSources.insert(resource.source)
           return try compiler.compile(resource.schema, source: resource.source)
         }
       }
@@ -121,6 +125,7 @@ public struct MarkdownTypeRegistry: Sendable {
     self.definitionsByName = definitionsByName
     self.schemasByName = schemasByName
     self.typeResourceBindings = typeResourceBindings
+    self.schemaResourceSources = schemaResourceSources
     for definition in definitions {
       guard definition.relationships.isEmpty || definition.requires.contains("document-relationships") else {
         throw MarkdownTypeDefinitionError.invalidField("relationship.definition.capability: relationships requires document-relationships")

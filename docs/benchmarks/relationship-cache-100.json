@@ -1,0 +1,74 @@
+{
+  "files": 100,
+  "corpus": "/Users/daniellyons/Developer/MySwiftPackages/md-utils_Project/md-utils/tmp/relationship-cache-d9e773e4-411a-4293-8d26-c1dcc8f16c6f/",
+  "binary": "/Users/daniellyons/Developer/MySwiftPackages/md-utils_Project/md-utils/.build/out/Products/Debug/md-utils",
+  "results": [
+    {
+      "scenario": "direct",
+      "seconds": 0.2302480420039501,
+      "exit_status": 0,
+      "peak_rss_bytes": 28459008,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "cold",
+      "seconds": 0.4195063330116682,
+      "exit_status": 0,
+      "peak_rss_bytes": 31473664,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged",
+      "seconds": 0.3394443750148639,
+      "exit_status": 0,
+      "peak_rss_bytes": 30834688,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "unchanged",
+      "seconds": 0.33787600000505336,
+      "exit_status": 0,
+      "peak_rss_bytes": 30785536,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "unchanged",
+      "seconds": 0.33911137498216704,
+      "exit_status": 0,
+      "peak_rss_bytes": 30720000,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "target_edit",
+      "seconds": 0.41820158300106414,
+      "exit_status": 1,
+      "peak_rss_bytes": 31571968,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged_failure",
+      "seconds": 0.3361500419850927,
+      "exit_status": 1,
+      "peak_rss_bytes": 30916608,
+      "reused_manifest": true
+    },
+    {
+      "scenario": "namespace_change",
+      "seconds": 0.41252099999110214,
+      "exit_status": 1,
+      "peak_rss_bytes": 31604736,
+      "reused_manifest": false
+    },
+    {
+      "scenario": "unchanged_ambiguity",
+      "seconds": 0.33589100002427585,
+      "exit_status": 1,
+      "peak_rss_bytes": 30965760,
+      "reused_manifest": true
+    }
+  ],
+  "retained_payload_bytes": 337677,
+  "largest_chunk_bytes": 262144,
+  "staging_rows_after": 0,
+  "database_bytes": 1052672
+}

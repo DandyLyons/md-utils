@@ -57,17 +57,20 @@ public struct CompiledMarkdownRule: Sendable {
   public let requiredCapabilities: Set<MarkdownRuleRuntimeCapability>
   package let analysisRequirements: MarkdownRecordAnalysisRequirements
   package let resolvedSchemas: [String: JSONValue]
+  package let schemaResourceSources: Set<String>
 
   package init(
     definition: MarkdownRuleDefinition,
     requiredCapabilities: Set<MarkdownRuleRuntimeCapability>,
     analysisRequirements: MarkdownRecordAnalysisRequirements,
-    resolvedSchemas: [String: JSONValue]
+    resolvedSchemas: [String: JSONValue],
+    schemaResourceSources: Set<String> = [],
   ) {
     self.definition = definition
     self.requiredCapabilities = requiredCapabilities
     self.analysisRequirements = analysisRequirements
     self.resolvedSchemas = resolvedSchemas
+    self.schemaResourceSources = schemaResourceSources
   }
 }
 
@@ -251,6 +254,7 @@ public struct MarkdownRuleCompiler: Sendable {
       }
 
       var resolvedSchemas: [String: JSONValue] = [:]
+      var schemaResourceSources: Set<String> = []
       let schemaChecks = definition.checks.filter { check in
         if case .frontmatterSchema = check.predicate { return true }
         return false
@@ -273,6 +277,7 @@ public struct MarkdownRuleCompiler: Sendable {
             schemaProvider: schemaProvider
           )
           let schemas = registry.resolvedSchemas(for: syntheticName)
+          schemaResourceSources = registry.schemaResourceSources
           for (check, schema) in zip(schemaChecks, schemas) {
             resolvedSchemas[check.id] = schema
           }
@@ -291,7 +296,8 @@ public struct MarkdownRuleCompiler: Sendable {
           definition: definition,
           requiredCapabilities: requiredCapabilities,
           analysisRequirements: analysisRequirements(for: definition),
-          resolvedSchemas: resolvedSchemas
+          resolvedSchemas: resolvedSchemas,
+          schemaResourceSources: schemaResourceSources,
         ))
       }
     }

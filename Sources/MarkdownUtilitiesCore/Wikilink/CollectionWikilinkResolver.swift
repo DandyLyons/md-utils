@@ -13,6 +13,8 @@ public struct CollectionWikilinkResolution: Codable, Equatable, Sendable {
 
 /// Pure resolution over confined collection-relative paths supplied by a host.
 public struct CollectionWikilinkResolver: Sendable {
+  /// Bump when candidate matching semantics change, invalidating native certificates.
+  public static let profile = "collection-wikilink-resolution-1"
   public let paths: Set<String>
   public let namespaceComplete: Bool
   /// Paths for which the host has independently certified presence or absence.

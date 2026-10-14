@@ -45,6 +45,17 @@ private struct RelationshipFixture {
 
 @Suite("Relationship CLI and index integration")
 struct RelationshipCommandsTests {
+  @Test func typeOnlyQueryDoesNotCompileUnrelatedMalformedRules() throws {
+    let fixture = try RelationshipFixture()
+    defer { fixture.remove() }
+    try (fixture.root + ".md-utils/rules/people.mdrule.json").write("invalid rule JSON")
+    let result = try CLIProcessTestHelper.run(["rel", "out", "A.md", "--type", "Person",
+      "--root", fixture.root.string, "--no-index", "--json"])
+    #expect(result.status == 0)
+    let evidence = try JSONDecoder().decode(MarkdownRelationshipQuery.self, from: Data(result.standardOutput.utf8))
+    #expect(evidence.outgoing.count == 1)
+  }
+
   @Test func `aliases parse and output flags conflict`() throws {
     let args = ["A.md", "--type", "Person", "--root", "./vault/"]
     #expect(try CLIEntry.parseAsRoot(["rel", "out"] + args + ["--yaml"]) is CLIEntry.Relationships.Outgoing)

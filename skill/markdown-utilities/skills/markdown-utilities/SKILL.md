@@ -35,7 +35,9 @@ outcomes. Users own domain meaning and truth; validation checks authored structu
 Existing indexes refresh automatically; `--no-index` bypasses them and
 `--indexed-only` refreshes only recorded candidates without discovery or fallback.
 Limited coverage cannot establish absence or unique basename resolution.
-Relationship assessments are recomputed pending dependency-aware caching.
+Relationship assessments may be reused after whole-collection freshness verification;
+source reads remain required. Limited coverage never becomes complete on a cache hit.
+Older indexes require `index update --rebuild` for cache format 9.
 
 Standalone rules may opt into independent `md-utils-rule-schema: "1"` and
 `relationshipPolicies`: explicit cycles, selfLinks, reciprocity, or directional
@@ -62,7 +64,7 @@ writes, not cross-file atomicity. On failure, inspect `index draft show`, resolv
 indeterminate attempts with `index draft resolve`, and resume `index apply` with
 every batch draft ID (including completed members); confirmed commits are not
 rewritten. No server configuration is needed for Fix-It drafts. Remaining required
-failures exit nonzero. Relationship assessments remain uncached pending #180.
+failures exit nonzero. Cached assessments never replace final Fix-It review/revision checks.
 
 ## Commands at a Glance
 

@@ -3,6 +3,8 @@ import Foundation
 /// Evaluates user-authored structural assertions over a bounded host snapshot.
 /// No filesystem, database, network access or inference of domain truth occurs here.
 public struct MarkdownRelationshipEvaluator: Sendable {
+  /// Bump when relationship evaluation semantics change, invalidating native certificates.
+  public static let profile = "document-relationships-1"
   public let registry: MarkdownTypeRegistry
   public var limits: MarkdownRelationshipLimits
 

@@ -2,6 +2,8 @@ import Foundation
 
 /// Collection policies are independent of structural type conformance. Hosts supply all I/O.
 public struct MarkdownRuleCollectionEvaluator: Sendable {
+  /// Bump when policy evaluation semantics change, invalidating native certificates.
+  public static let profile = "relationship-policies-1"
   public var registry: MarkdownRuleRegistry
   public var limits: MarkdownRelationshipLimits
   public var cycleWitnessMode: MarkdownCycleWitnessMode

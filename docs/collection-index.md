@@ -53,8 +53,8 @@ the existing evaluator diagnostics. Binary/non-UTF-8 files report read failures.
 ## Automatic Rule Validation
 
 Named relationship queries also use the existing index refresh, writer lease,
-and generation checks. They recompute cross-document assessments from verified
-records until #180 supplies persisted dependency invalidation. See
+and generation checks. They reuse cross-document assessments only after verifying
+a whole-collection dependency certificate; see [relationship cache](relationship-cache.md). See
 [relationship index semantics](relationships.md#existing-index-behavior), including
 the limited coverage of `--indexed-only` and the need to materialize source text.
 
@@ -357,6 +357,7 @@ refresh times, and every saved scope's state and error.
 | `documents_fts` | Optional external-content FTS5 index over `documents.body` |
 | `current_documents` | Current selected `path` and ordinary JSON `metadata`, plus `body` only in FTS mode |
 | `index_metadata` | Root, config path, update generation, extraction/evaluator version |
+| `relationship_cache`, `relationship_chunks` | Bounded cross-document evidence, reusable only after native certificate verification |
 | `refresh_*` | Bounded disk-backed staging for an in-progress generation |
 
 Raw tables may contain unavailable records after failures. Use
