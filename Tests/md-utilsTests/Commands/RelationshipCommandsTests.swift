@@ -162,13 +162,14 @@ struct RelationshipCommandsTests {
     #expect(validation.standardOutput.contains("relationship.value.invalid"))
   }
 
-  @Test func `unusable index warns and falls back without contaminating structured output`() throws {
+  @Test func `outgoing bypasses an unusable index without contaminating structured output`() throws {
     let fixture = try RelationshipFixture()
     defer { fixture.remove() }
     try (fixture.root + ".md-utils/index.sqlite").write("not a database")
     let result = try CLIProcessTestHelper.run(["rel", "out", "A.md", "--type", "Person", "--root", fixture.root.string, "--json"])
     #expect(result.status == 0)
-    #expect(result.standardError.contains("reading source files directly"))
+    #expect(result.standardError.isEmpty)
+    #expect(try (fixture.root + ".md-utils/index.sqlite").read() == "not a database")
     let decoded = try JSONDecoder().decode(MarkdownCollectionQueryResult.self, from: Data(result.standardOutput.utf8))
     #expect(decoded.relationships.contains { $0.object == "B.md" })
   }

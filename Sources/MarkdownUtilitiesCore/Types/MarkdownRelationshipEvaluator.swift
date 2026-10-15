@@ -147,7 +147,7 @@ public struct MarkdownRelationshipEvaluator: Sendable {
         node.local = .all([node.local, .unavailable])
         appendDiagnostic(diagnostic("context.unavailable", "Unsupported document representation: \(fileExtension)"), to: &node.diagnostics)
       }
-      if let collection, collection.records[node.source] != node.record {
+      if let collection, try await collection.record(at: node.source) != node.record {
         node.local = .all([node.local, .unavailable])
         appendDiagnostic(diagnostic("context.unavailable", "Source is not the supplied snapshot revision"), to: &node.diagnostics)
       }
@@ -250,7 +250,8 @@ public struct MarkdownRelationshipEvaluator: Sendable {
             if relation.forbidEmbeds && link.isEmbed { failure("embed.forbidden", "Embeds are forbidden") }
             if relation.forbidAnchors && link.anchor != nil { failure("anchor.forbidden", "Anchors are forbidden") }
             if let collection {
-              var resolution = collection.resolver.resolve(target: link.target, from: node.source)
+              var resolution = try await collection.resolve(link.target, from: node.source)
+                ?? collection.resolver.resolve(target: link.target, from: node.source)
               if resolution.candidates.count > limits.candidates - candidateCount {
                 resolution.candidates = Array(resolution.candidates.prefix(max(0, limits.candidates - candidateCount)))
                 // A bounded candidate listing cannot erase an already witnessed ambiguity.
@@ -266,7 +267,7 @@ public struct MarkdownRelationshipEvaluator: Sendable {
               case .unavailable: failure("context.unavailable", "Candidate namespace is incomplete", .unavailable)
               case .resolved:
                 if let destination = resolution.destination {
-                  let target = collection.records[destination]
+                  let target = try await collection.record(at: destination)
                   let identity = target?.identity?.rawValue ?? destination
                   occurrence.targetIdentity = .init(rawValue: identity)
                   occurrence.targetRevision = target?.revision

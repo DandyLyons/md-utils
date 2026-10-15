@@ -33,6 +33,23 @@ public final class SQLiteIndexDatabase: Sendable {
         try self.init(path: path, probe: Self.checkCapabilities)
     }
 
+    /// Opens an existing snapshot without migrations, capability writes, or creation.
+    public init(readOnlyPath path: String) throws {
+        var configuration = Configuration()
+        configuration.readonly = true
+        databaseQueue = try DatabaseQueue(path: path, configuration: configuration)
+    }
+
+    /// Checks only persisted publication metadata, never saved configuration files.
+    package static func publishedGeneration(in db: Database) throws -> Int {
+        guard try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='format'") == cacheFormat,
+              let generation = try Int.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='published_generation'"),
+              generation > 0 else {
+            throw SQLiteIndexError(message: "No compatible published index snapshot. Run index update explicitly.")
+        }
+        return generation
+    }
+
     internal init(path: String, probe: () throws -> Void) throws {
         try probe()
         do {

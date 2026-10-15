@@ -511,8 +511,13 @@ proof of relationship freshness. Reuse existing bounded staging and generation-c
 publication; failed refreshes cannot advertise stale assessments as current. Direct
 and indexed results must agree for equivalent records, coverage, profiles, and budgets.
 
-Indexed-only results retain limited coverage and cannot certify global consistency
-without the necessary independent coverage evidence. Rebuild discards derived graph
+Index-only (`--index-only`, alias `--indexed-only`) MUST base findings exclusively
+on published SQLite evidence. It MUST NOT read raw documents/definitions, stat or
+hash sources, discover, refresh, write the index, or fall back. This same contract
+applies to rule validation. Results identify the snapshot; unavailable indexed
+evidence remains unavailable rather than triggering filesystem work. This corrects
+the earlier known-candidates-refresh interpretation. Snapshot findings cannot
+certify current filesystem consistency. Rebuild discards derived graph
 data and reassesses from documents while preserving durable drafts and receipts.
 Mutation-triggered refresh, failure recovery, and stat-preserving changes follow
 existing revision/hash verification contracts. Cached relationship validation MUST

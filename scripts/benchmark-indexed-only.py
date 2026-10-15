@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Compare unchanged discovery validation with indexed-only validation across broad scopes.
+"""Compare live validation with SQLite-only stored findings across broad scopes.
 
 Creates a disposable corpus under the project's tmp/ directory, registers broad
-rule scopes, warms both validation modes, and reports median elapsed time. Build
+rule scopes, warms live validation and snapshot reads, and reports median elapsed time. Build
 the desired CLI first and pass --binary to compare debug and release builds.
 """
 import argparse

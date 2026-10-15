@@ -51,7 +51,7 @@ struct RelationshipOptions: ParsableArguments {
   @Flag(name: .long, help: "Emit one JSON document at the selected detail level") var json = false
   @Flag(name: .long, help: "Emit one YAML document at the selected detail level") var yaml = false
   @Flag(name: .long, help: "Bypass the existing index") var noIndex = false
-  @Flag(name: [.long, .customLong("index-only")], help: "Refresh recorded candidates only; no discovery/fallback; incomplete queries exit 1") var indexedOnly = false
+  @Flag(name: [.long, .customLong("index-only")], help: "Use only the published SQLite snapshot; no raw-file reads, refresh, or fallback") var indexedOnly = false
   @Flag(name: .long, help: "Hash known indexed files to detect stat-preserving changes") var verifyHashes = false
   @Option(name: .long, help: "Maximum records assessed") var maxRecords = 10_000
   @Option(name: .long, help: "Maximum link occurrences per extraction phase") var maxOccurrences = 100_000
@@ -59,6 +59,7 @@ struct RelationshipOptions: ParsableArguments {
   mutating func validate() throws {
     guard !(json && yaml) else { throw ValidationError("--json and --yaml are mutually exclusive") }
     guard !(noIndex && indexedOnly) else { throw ValidationError("--no-index and --indexed-only are mutually exclusive") }
+    guard !(verifyHashes && indexedOnly) else { throw ValidationError("--index-only and --verify-hashes are mutually exclusive") }
     guard maxRecords > 0, maxOccurrences > 0 else { throw ValidationError("Limits must be positive") }
     guard MarkdownQueryDetail(rawValue: detail) != nil else { throw ValidationError("--detail requires summary, explain, or evidence") }
     guard selectMode == nil || MarkdownSelectionMode(rawValue: selectMode ?? "") != nil else { throw ValidationError("--select-mode requires union or intersection") }
@@ -100,7 +101,8 @@ struct RelationshipOptions: ParsableArguments {
     func path(_ value: String) throws -> String {
       guard !value.contains("\0") else { throw ValidationError("Document paths cannot contain NUL") }
       let normalized = try MarkdownRecordPath(value).rawValue
-      guard ["md", "markdown"].contains(Path(normalized).extension?.lowercased() ?? ""), !(Path(root) + normalized).isDirectory else {
+      guard ["md", "markdown"].contains(Path(normalized).extension?.lowercased() ?? ""),
+        indexedOnly || !(Path(root) + normalized).isDirectory else {
         throw ValidationError("Select Markdown files only; use --select-folder for directories: \(value)")
       }
       return normalized

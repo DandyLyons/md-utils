@@ -19,7 +19,7 @@ extension CLIEntry.RulesCommands {
       commandName: "validate",
       abstract: "Validate files against configured rules",
       discussion: RulesNonMarkdownHelp.appending(
-        to: "Uses and refreshes an existing project index automatically, falling back to source files if the index is unavailable. --indexed-only requires registered scopes and checks only recorded candidates without discovery or fallback; success has limited coverage. Ordinary validation/index refresh discovers new files. Project scans remain Markdown-only unless non-Markdown files are explicitly included."
+        to: "Ordinary validation refreshes an existing index and may fall back to source files. --index-only (alias --indexed-only) instead returns only published SQLite findings: no raw-file/configuration reads, source checks, refresh or fallback. Findings describe the snapshot, not today's files. Project scans remain Markdown-only unless non-Markdown files are explicitly included."
       )
     )
 
@@ -33,7 +33,7 @@ extension CLIEntry.RulesCommands {
     var includeNonMD = false
     @Flag(name: .long, help: "Validate source files directly without using the project index")
     var noIndex = false
-    @Flag(name: .long, help: "Validate only recorded candidates in registered rule scopes; require an index and never discover new files or fall back")
+    @Flag(name: [.long, .customLong("index-only")], help: "Return stored rule findings from the published SQLite snapshot; no raw-file reads, refresh, or fallback")
     var indexedOnly = false
     @Flag(name: .long, help: "Hash every indexed candidate to detect edits preserving size and modification time")
     var verifyHashes = false
@@ -45,6 +45,9 @@ extension CLIEntry.RulesCommands {
     @Flag(name: .long, help: "Emit structured YAML validation evidence") var yaml = false
     @OptionGroup var project: RuleProjectOptions
     mutating func validate() throws {
+      guard !indexedOnly || (!verifyHashes && !noIndex) else {
+        throw ValidationError("--index-only cannot be combined with --verify-hashes or --no-index")
+      }
       guard !(cycleWitnessFirst && cycleWitnessPerComponent) else {
         throw ValidationError("--cycle-witness-first and --cycle-witness-per-component are mutually exclusive")
       }
@@ -74,7 +77,7 @@ extension CLIEntry.RulesCommands {
           print(String(decoding: try encoder.encode(output), as: UTF8.self))
         }
       } else { print(RuleValidationSummaryFormatter.render(summary, ruleName: ruleName, includeOk: includeOk)) }
-      timer.writeStatus("Validated \(summary.matchedFiles) file(s)")
+      timer.writeStatus(summary.indexedOnly ? "Read indexed findings for \(summary.matchedFiles) file(s)" : "Validated \(summary.matchedFiles) file(s)")
       if summary.hasFailures {
         throw ExitCode.failure
       }
@@ -98,7 +101,7 @@ enum RuleValidationSummaryFormatter {
       return renderCollection(collection, summary: summary, includeOk: includeOk)
     }
     if summary.indexedOnly {
-      lines.append("Limited coverage: only recorded candidates were validated. New files were not discovered.")
+      lines.append("Index snapshot generation \(summary.indexReport?.generation ?? 0): stored rule findings only; raw files were not read or refreshed.")
       if !summary.uncoveredRules.isEmpty {
         lines.append("Configured rules not covered: \(summary.uncoveredRules.sorted().joined(separator: ", ")).")
       }
@@ -201,6 +204,7 @@ struct RuleValidationOutput: Encodable {
   var results: [RuleValidationResult]
   var totalFiles: Int
   var indexedOnly: Bool
+  var snapshotGeneration: Int?
   var uncoveredRules: [String]
   var hasFailures: Bool
   var collectionAssessment: MarkdownRuleCollectionAssessment?
@@ -209,6 +213,7 @@ struct RuleValidationOutput: Encodable {
     results = summary.results
     totalFiles = summary.totalFiles
     indexedOnly = summary.indexedOnly
+    snapshotGeneration = summary.indexedOnly ? summary.indexReport?.generation : nil
     uncoveredRules = summary.uncoveredRules
     hasFailures = summary.hasFailures
     collectionAssessment = summary.collectionAssessment

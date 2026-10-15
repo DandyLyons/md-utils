@@ -174,29 +174,41 @@ locked by the collection writer lease.
 
 ## Existing index behavior
 
-Ordinary queries use and incrementally refresh an existing compatible project index.
+Outgoing queries normally use source-directed reads instead of refreshing the
+index. Explicit file selections (including intersections bounded by a supplied
+file set) read only candidate sources and named target dependencies. Exact Markdown
+destinations and path-qualified wikilinks use direct existence checks. Bare
+wikilinks lazily discover a filename namespace without reading unrelated contents.
+Consumed source revisions and destination evidence are verified before returning.
+Folder/content selectors may require broader discovery or source assessment.
+
+Incoming and bidirectional queries use and incrementally refresh an existing compatible project index.
 They register a root directory scope when necessary for collection-wide source
 evidence. Without an index they read source files directly. Index failures warn
 and fall back; cancellation aborts. Hidden entries and symlinks are outside the
 native collection universe, following existing discovery behavior.
 
 - `--no-index` bypasses the index.
-- `--indexed-only` (alias `--index-only`) requires registered scopes, refreshes recorded candidates, and
-  never discovers new files or falls back. It may read known source files. Results
-  state `New files were not discovered.` and retain limited coverage.
+- `--index-only` (alias `--indexed-only`) reads exclusively from a published SQLite
+  snapshot. No raw source/definition reads, stats, refresh, writes or fallback.
+  Missing indexed evidence is reported; results identify the snapshot generation.
 - `--verify-hashes` refreshes stat-preserving edits to known indexed files.
 
-Indexed-only basename results with zero/one known candidates remain unavailable;
-this mode cannot prove global uniqueness or absence of incoming links. Source
-read failures are retained as limitations, never silently converted into empty data.
-For relationship-aware `rules validate`, named indexed-only rules require their
-registered rule scopes, and unregistered rules are listed when validating all.
+For ordinary outgoing queries, `--no-index` uses the same source-directed path;
+source contents are always revision-verified, independently of `--verify-hashes`.
+Explicit snapshot-only mode is separate from live verification for every direction
+and rejects `--verify-hashes`. See [snapshot-only queries](index-only-queries.md).
+
+Snapshot basename resolution describes recorded candidates, not today's filesystem.
+Absent bodies and named applicability evidence prevent a complete relationship
+answer; they never trigger raw-file access. Rule validation returns persisted
+findings for indexed scopes without loading current rule/schema configuration.
 
 The index accelerates candidate/freshness work and reuses unchanged extraction.
 Raw records are still materialized and revision-verified for full structural
 assessment. Relationship results may be reused after verifying a whole-collection
 dependency certificate; see [relationship cache](relationship-cache.md). There is no promise of constant
-time warm queries or index-only operation without source reads. Drafts and receipts
+time live queries. Snapshot-only queries never perform source reads. Drafts and receipts
 remain outside disposable relationship evidence.
 
 ## Limits and compatibility

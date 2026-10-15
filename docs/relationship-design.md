@@ -62,8 +62,9 @@ explicit and never proves absence. Ordering is deterministic.
 
 Follow rules validation: automatically refresh/use an existing compatible index;
 without one read sources directly. `--no-index` bypasses it. `--indexed-only`
-requires registered coverage, refreshes known candidates, never discovers new
-files or falls back, and reports limited coverage. It may read known source files.
+is an alias of `--index-only`: it reads only published SQLite evidence, without
+raw source/definition reads, refresh, source stats or fallback. Findings describe
+the recorded snapshot; missing evidence is reported explicitly.
 `--verify-hashes` detects stat-preserving changes. Ordinary index errors warn and
 fall back; cancellation never triggers fallback. Use existing writer leases and
 generation checks. Resolution coverage must not shrink to selected sources.

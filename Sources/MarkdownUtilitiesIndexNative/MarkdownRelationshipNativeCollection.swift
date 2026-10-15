@@ -189,7 +189,7 @@ public enum MarkdownRelationshipNativeCollection {
     return result.paths
   }
 
-  private static func discoverBounded(root: URL, maximum: Int) throws -> (paths: Set<String>, complete: Bool) {
+  static func discoverBounded(root: URL, maximum: Int) throws -> (paths: Set<String>, complete: Bool) {
     let cursor = try IndexSourceCursor(directory: root, includeNonMarkdown: true)
     var paths: Set<String> = []
     while let file = try cursor.next() {
@@ -205,7 +205,7 @@ public enum MarkdownRelationshipNativeCollection {
   }
 
   /// Bounded no-follow reads preserve raw text/native kinds and verify a stable read baseline.
-  private static func read(path: String, root: URL, maximum: Int) throws -> MarkdownRecord {
+  static func read(path: String, root: URL, maximum: Int) throws -> MarkdownRecord {
     _ = try MarkdownRecordPath(path)
     let file = root.appendingPathComponent(path)
     guard maximum > 0, file.resolvingSymlinksInPath() == file else { throw IndexProjectError("Unavailable or over-budget source") }

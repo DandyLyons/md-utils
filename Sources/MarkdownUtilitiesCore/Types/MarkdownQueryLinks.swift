@@ -29,11 +29,14 @@ package enum MarkdownQueryLinks {
       if let value = document.frontMatter[key] { walk(value, path: [.key(key)]) }
     }
     strings.append((document.body, nil))
+    let bodyOffset = record.content.utf8.count - document.body.utf8.count
     for (text, property) in strings {
       try Task.checkCancellation()
+      // Both supported local-link syntaxes require an opening bracket. Plain
+      // metadata values do not need an AST or a wikilink scanner invocation.
+      guard text.contains("[") else { continue }
       let firstResult = results.count
       let textBytes = Array(text.utf8)
-      let bodyOffset = record.content.utf8.count - document.body.utf8.count
       func location(_ range: Range<Int>?) -> MarkdownQueryLocation {
         .init(region: property == nil ? "body" : "frontmatter", propertyPath: property,
           line: nil,
@@ -80,7 +83,7 @@ package enum MarkdownQueryLinks {
           !match.link.target.contains(":"),
           !suppressed.contains(where: { $0.overlaps(match.utf8Range) }),
           isMarkdownTarget(match.link.target, allowExtensionless: true) else { continue }
-        let resolution = collection.resolver.resolve(target: match.link.target, from: source)
+        guard let resolution = try await collection.resolve(match.link.target, from: source) else { continue }
         guard resolution.destination != source else { continue }
         append(match.link.rawValue, syntax: "wikilink", range: match.utf8Range, resolution: resolution)
         if let last = results.indices.last, results[last].location.decodedUTF8Range == match.utf8Range {
@@ -89,7 +92,7 @@ package enum MarkdownQueryLinks {
       }
       for (destination, span) in markdownLinks {
         try Task.checkCancellation()
-        guard let resolution = resolveMarkdown(destination, source: source, resolver: collection.resolver),
+        guard let resolution = try await collection.resolve(destination, from: source, markdown: true),
           resolution.destination != source else { continue }
         let raw = span.map { String(decoding: textBytes[$0], as: UTF8.self) } ?? destination
         append(raw, syntax: "markdown", range: span, resolution: resolution)
@@ -126,6 +129,14 @@ package enum MarkdownQueryLinks {
   package static func resolveMarkdown(_ destination: String, source: String,
     resolver: CollectionWikilinkResolver,
   ) -> CollectionWikilinkResolution? {
+    guard let (path, supported) = markdownPath(destination, source: source) else { return nil }
+    let complete = resolver.namespaceComplete || resolver.completeExactPaths.contains(path)
+    let found = supported && resolver.paths.contains(path) && isMarkdownTarget(path, allowExtensionless: false)
+    return .init(status: !supported ? .unavailable : (!complete ? .unavailable : (found ? .resolved : .unresolved)),
+      candidates: found ? [path] : [], namespaceComplete: supported && complete, query: destination)
+  }
+
+  package static func markdownPath(_ destination: String, source: String) -> (path: String, supported: Bool)? {
     var input = destination[...]
     guard let prefix = try? Prefix<Substring> { $0 != "#" && $0 != "?" }.parse(&input) else { return nil }
     let encoded = String(prefix)
@@ -141,10 +152,7 @@ package enum MarkdownQueryLinks {
       } else { components.append(String(part)) }
     }
     let path = components.joined(separator: "/")
-    let complete = resolver.namespaceComplete || resolver.completeExactPaths.contains(path)
-    let found = supported && resolver.paths.contains(path) && isMarkdownTarget(path, allowExtensionless: false)
-    return .init(status: !supported ? .unavailable : (!complete ? .unavailable : (found ? .resolved : .unresolved)),
-      candidates: found ? [path] : [], namespaceComplete: supported && complete, query: destination)
+    return (path, supported)
   }
 }
 

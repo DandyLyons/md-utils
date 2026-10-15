@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import GRDB
 import MarkdownUtilitiesCore
 import MarkdownUtilitiesIndex
 import MarkdownUtilitiesIndexNative
@@ -46,6 +47,171 @@ private struct QueryFixture {
 }
 
 struct CollectionRelationshipQueryTests {
+  @Test func `index only retains compatible stored named evidence without definitions`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.definitions()
+    try fixture.write("book.md", "---\ntitle: Book\nauthor: '[[alice]]'\n---\n")
+    try fixture.write("alice.md", "---\nname: Alice\n---\n")
+    let database = try SQLiteIndexDatabase(path: (fixture.root + ".md-utils/index.sqlite").string)
+    try database.prepareCollection(root: URL(fileURLWithPath: fixture.root.string).resolvingSymlinksInPath().path)
+    let request = MarkdownCollectionQueryRequest(direction: .both, selectors: [.files(["book.md"])], detail: .evidence)
+    let live = try await MarkdownCollectionQuerySession.run(request, root: fixture.root)
+    #expect(live.result.relationships.contains { $0.predicate == "Book:author" })
+    try (fixture.root + "book.md").delete()
+    try (fixture.root + "alice.md").delete()
+    try (fixture.root + ".md-utils/types/").delete()
+    try (fixture.root + ".md-utils/rules/").delete()
+    try (fixture.root + ".md-utils/md-utils.json").delete()
+    let snapshot = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, indexedOnly: true)
+    #expect(snapshot.result.relationships == live.result.relationships)
+    #expect(snapshot.result.links.isEmpty)
+    #expect(snapshot.complete == false)
+    let empty = try await MarkdownCollectionQuerySession.run(.init(direction: .both, selectors: [.files([])]),
+      root: fixture.root, indexedOnly: true)
+    #expect(empty.complete)
+    #expect(empty.result.selected.isEmpty)
+    try await DatabaseQueue(path: (fixture.root + ".md-utils/index.sqlite").string).write { db in
+      try db.execute(sql: "UPDATE relationship_cache SET generation=0")
+    }
+    let older = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, indexedOnly: true)
+    #expect(older.result.relationships.isEmpty)
+  }
+
+  @Test func `index only discovers body links when bodies were explicitly indexed`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.definitions()
+    var settings = IndexConfiguration(); settings.bodyMode = .fts
+    try settings.save(root: fixture.root.string)
+    try fixture.write("a.md", "[B](b.md)\n")
+    try fixture.write("b.md", "# B\n")
+    let database = try SQLiteIndexDatabase(path: (fixture.root + ".md-utils/index.sqlite").string)
+    try database.prepareCollection(root: URL(fileURLWithPath: fixture.root.string).resolvingSymlinksInPath().path)
+    let request = MarkdownCollectionQueryRequest(direction: .both, selectors: [.files(["b.md"])], detail: .evidence)
+    _ = try await MarkdownCollectionQuerySession.run(request, root: fixture.root)
+    try (fixture.root + "a.md").delete()
+    try (fixture.root + "b.md").delete()
+    try (fixture.root + ".md-utils/md-utils.indexconfig.json").delete()
+    let snapshot = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, indexedOnly: true)
+    #expect(snapshot.result.links.contains { $0.subject == "a.md" && $0.object == "b.md" })
+    #expect(snapshot.result.coverage?.sources == "complete")
+  }
+
+  @Test(arguments: ["--index-only", "--indexed-only"])
+  func `index only relationships survive removal of all source and definition files`(flag: String) async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.definitions()
+    try fixture.write("a.md", "---\nreference: '[[b]]'\n---\nBody not indexed\n")
+    try fixture.write("b.md", "# B\n")
+    let dbPath = fixture.root + ".md-utils/index.sqlite"
+    let database = try SQLiteIndexDatabase(path: dbPath.string)
+    try database.prepareCollection(root: URL(fileURLWithPath: fixture.root.string).resolvingSymlinksInPath().path)
+    _ = try await MarkdownCollectionQuerySession.run(.init(direction: .both, selectors: [.files(["b.md"])]), root: fixture.root)
+    try (fixture.root + "a.md").delete()
+    try (fixture.root + "b.md").delete()
+    // Snapshot lookup must not even reject a now-directory based on a raw stat.
+    try (fixture.root + "b.md").mkpath()
+    try (fixture.root + ".md-utils/md-utils.json").delete()
+    try (fixture.root + ".md-utils/types/").delete()
+    try (fixture.root + ".md-utils/rules/").delete()
+    try (fixture.root + ".md-utils/md-utils.indexconfig.json").delete()
+    let url = URL(fileURLWithPath: dbPath.string)
+    let before = try Data(contentsOf: url)
+    let modified = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    let command = try CLIProcessTestHelper.run(["rel", "both", "b.md", "--root", fixture.root.string,
+      flag, "--json", "--detail", "evidence"])
+    #expect(command.status == 1)
+    try #require(command.standardOutput.isEmpty == false, "\(command.standardError)")
+    let result = try JSONDecoder().decode(MarkdownCollectionQueryResult.self, from: Data(command.standardOutput.utf8))
+    #expect(result.links.contains { $0.subject == "a.md" && $0.object == "b.md" })
+    #expect(result.coverage?.limitations.contains { $0.contains("Body link evidence is not stored") } == true)
+    #expect(result.occurrences?.allSatisfy { $0.location.sourceUTF8Range == nil } == true)
+    #expect(result.generation != nil)
+    #expect(try Data(contentsOf: url) == before)
+    #expect(try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
+  }
+
+  @Test func `outgoing loads only selected sources and required targets`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.definitions()
+    try fixture.write("books/a.md", "---\ntitle: Book\nauthor: '[[people/alice]]'\n---\n[Other](../unrelated.md)\n")
+    try fixture.write("people/alice.md", "---\nname: Alice\n---\n")
+    // An ordinary destination needs existence evidence, not readable contents.
+    try Data([0xff, 0xfe]).write(to: URL(fileURLWithPath: (fixture.root + "unrelated.md").string))
+    for index in 0..<30 { try fixture.write("noise/\(index).md", String(repeating: "noise\n", count: 500)) }
+    var limits = MarkdownRelationshipLimits()
+    limits.records = 2
+    limits.bytes = 1024
+    // A whole-vault discovery would exhaust this budget on the noise files.
+    // Exact destinations need only the two suffix probes and one Markdown path.
+    limits.candidates = 3
+    let request = MarkdownCollectionQueryRequest(direction: .outgoing, selectors: [.files(["books/a.md"])], detail: .evidence)
+    let query = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, limits: limits)
+    #expect(query.complete)
+    #expect(query.result.selected == ["books/a.md"])
+    #expect(query.result.relationships.first?.object == "people/alice.md")
+    #expect(query.result.links.first?.object == "unrelated.md")
+    #expect(Set(query.result.assessments?.map(\.source) ?? []) == ["books/a.md", "people/alice.md"])
+  }
+
+  @Test func `outgoing namespace still detects bare name ambiguity without loading candidates`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.write("source.md", "[[Target]]")
+    try fixture.write("a/Target.md", "A")
+    try fixture.write("b/Target.md", "B")
+    var limits = MarkdownRelationshipLimits(); limits.records = 1
+    let query = try await MarkdownCollectionQuerySession.run(.init(direction: .outgoing,
+      selectors: [.files(["source.md"])], detail: .evidence), root: fixture.root, limits: limits)
+    #expect(query.complete)
+    #expect(query.result.occurrences?.first?.resolution?.status == .ambiguous)
+  }
+
+  @Test func `outgoing bare namespace exhaustion remains incomplete`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.write("source.md", "[[Target]]")
+    try fixture.write("a/Target.md", "A")
+    try fixture.write("b/Target.md", "B")
+    var limits = MarkdownRelationshipLimits(); limits.candidates = 1
+    let query = try await MarkdownCollectionQuerySession.run(.init(direction: .outgoing,
+      selectors: [.files(["source.md"])], detail: .explain), root: fixture.root, limits: limits)
+    #expect(query.complete == false)
+    #expect(query.result.coverage?.candidates == "incomplete")
+  }
+
+  @Test func `path intersections and exclusions prune before reading content`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.write("selected.md", "---\ntags: [keep]\n---\n")
+    try fixture.write("excluded.md", String(repeating: "large", count: 1000))
+    var limits = MarkdownRelationshipLimits(); limits.records = 1; limits.bytes = 128
+    let query = try await MarkdownCollectionQuerySession.run(.init(direction: .outgoing,
+      selectors: [.files(["selected.md", "excluded.md"]), .tag("keep")],
+      exclusions: [.files(["excluded.md"])], mode: .intersection), root: fixture.root, limits: limits)
+    #expect(query.complete)
+    #expect(query.result.selected == ["selected.md"])
+  }
+
+  @Test func `missing explicit sources remain unknown in content intersections`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    let query = try await MarkdownCollectionQuerySession.run(.init(direction: .outgoing,
+      selectors: [.files(["missing.md"]), .tag("keep")], mode: .intersection,
+      detail: .explain), root: fixture.root)
+    #expect(query.complete == false)
+    #expect(query.result.coverage?.selection == "incomplete")
+  }
+
+  @Test func `direct outgoing probes preserve hidden and symlink exclusions`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.write(".hidden/target.md", "Hidden")
+    try fixture.write("target.md", "Visible")
+    try FileManager.default.createSymbolicLink(atPath: (fixture.root + "alias.md").string,
+      withDestinationPath: (fixture.root + "target.md").string)
+    try fixture.write("source.md", "[hidden](.hidden/target.md) [alias](alias.md)")
+    let query = try await MarkdownCollectionQuerySession.run(.init(direction: .outgoing,
+      selectors: [.files(["source.md"])], detail: .evidence), root: fixture.root)
+    #expect(query.complete)
+    #expect(query.result.links.isEmpty)
+    #expect(query.result.occurrences?.allSatisfy { $0.resolution?.status == .unresolved } == true)
+  }
+
   @Test func `ordinary links need no definitions and incoming sources are root wide`() async throws {
     let fixture = try QueryFixture(); defer { fixture.remove() }
     try fixture.write("selected/a.md", "# A\n")

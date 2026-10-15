@@ -53,10 +53,12 @@ Complete queries exit 0 even for broken/nonconforming assertions; incomplete que
 exit 1 with available results. Ordinary links need no declarations; embeds/images,
 attachments, external URLs and same-document anchors remain outside ordinary discovery.
 Existing indexes refresh automatically; `--no-index` bypasses them and
-`--indexed-only` (alias `--index-only`) refreshes only recorded candidates without discovery or fallback.
-Limited coverage cannot establish absence or unique basename resolution.
-Relationship assessments may be reused after whole-collection freshness verification;
-source reads remain required. Limited coverage never becomes complete on a cache hit.
+`--index-only` (alias `--indexed-only`) means SQLite-only on both relationships and
+rule validation: no raw source/configuration/schema reads, source stats, refresh,
+index writes or fallback. It rejects `--verify-hashes` and `--no-index`. Findings
+describe the published generation. Missing stored bodies, selector facts or named
+interpretations remain explicitly unavailable; raw files never fill those gaps.
+Ordinary live queries may reuse assessments after filesystem freshness verification.
 Older indexes require `index update --rebuild` for cache format 9.
 
 Standalone rules may opt into independent `md-utils-rule-schema: "1"` and

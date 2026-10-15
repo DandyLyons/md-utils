@@ -60,6 +60,33 @@ private struct RulesIndexFixture {
 }
 
 struct RulesIndexedValidationTests {
+  @Test(arguments: ["--index-only", "--indexed-only"])
+  func `snapshot validation needs only SQLite and never writes or refreshes`(flag: String) async throws {
+    let fixture = try RulesIndexFixture(); defer { fixture.remove() }
+    try fixture.write("notes/one.md", "---\ntitle: One\n---\n")
+    _ = try fixture.database()
+    _ = try await fixture.validate()
+    try (fixture.root + "notes/").delete()
+    try fixture.config.delete()
+    try (fixture.root + ".md-utils/types/").delete()
+    try (fixture.root + ".md-utils/rules/").delete()
+    try (fixture.root + ".md-utils/schemas/").delete()
+    try (fixture.root + ".md-utils/md-utils.indexconfig.json").delete()
+    // A failed later refresh must not force a retry or hide the last publication.
+    try await DatabaseQueue(path: fixture.databasePath.string).write { db in
+      try db.execute(sql: "UPDATE scopes SET state='updating'; UPDATE index_metadata SET value=CAST(value AS INTEGER)+1 WHERE key='generation'")
+    }
+    let url = URL(fileURLWithPath: fixture.databasePath.string)
+    let before = try Data(contentsOf: url)
+    let modified = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    let result = try CLIProcessTestHelper.run(["rules", "validate", "books", flag,
+      "--project-root", fixture.root.string, "--json"])
+    #expect(result.status == 0)
+    #expect(result.standardOutput.contains("notes/one.md"))
+    #expect(result.standardOutput.contains("snapshotGeneration"))
+    #expect(try Data(contentsOf: url) == before)
+    #expect(try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
+  }
   @Test func wikilinkPoliciesRefreshAndMatchDirectValidation() async throws {
     let fixture = try RulesIndexFixture()
     defer { fixture.remove() }
@@ -111,7 +138,7 @@ struct RulesIndexedValidationTests {
     #expect(try await fixture.validate(noIndex: true).hasFailures == false)
   }
 
-  @Test func `indexed only omits new paths reuses candidates and retains limited freshness`() async throws {
+  @Test func `index only returns stored findings without changing source or index freshness`() async throws {
     let fixture = try RulesIndexFixture()
     defer { fixture.remove() }
     try fixture.write("notes/one.md", "---\ntitle: One\n---\n")
@@ -121,15 +148,15 @@ struct RulesIndexedValidationTests {
     let unchanged = try await fixture.validate(indexedOnly: true)
     #expect(unchanged.totalFiles == 1)
     #expect(try #require(unchanged.indexReport).cached == 1)
-    #expect(RuleValidationSummaryFormatter.render(unchanged).contains("New files were not discovered."))
-    #expect(try fixture.database().freshness().scopes.first?.state == "limited")
+    #expect(RuleValidationSummaryFormatter.render(unchanged).contains("raw files were not read or refreshed"))
+    #expect(try fixture.database().freshness().scopes.first?.state == "complete")
     let repeated = try await fixture.validate(indexedOnly: true)
     #expect(try #require(repeated.indexReport).hashed == 0)
     try fixture.write("notes/one.md", "---\nother: Changed\n---\n")
-    #expect(try await fixture.validate(indexedOnly: true).hasFailures)
+    #expect(try await fixture.validate(indexedOnly: true).hasFailures == false)
     try (fixture.root + "notes/one.md").move(fixture.root + "notes/renamed.md")
     let deleted = try await fixture.validate(indexedOnly: true)
-    #expect(deleted.hasFailures)
+    #expect(deleted.hasFailures == false)
     #expect(deleted.results.map(\.filePath) == ["notes/one.md"])
     #expect(try await fixture.validate().totalFiles == 2)
   }
@@ -148,15 +175,15 @@ struct RulesIndexedValidationTests {
     }
     try fixture.write(".md-utils/rules/also.mdrule.json", "{\"name\":\"also\",\"types\":\"book.mdtype.json\"}")
     let all = try await fixture.validate(rule: nil, indexedOnly: true)
-    #expect(all.uncoveredRules == ["also"])
-    #expect(try #require(all.indexReport).evaluated == 1)
+    #expect(all.uncoveredRules.isEmpty)
+    #expect(try #require(all.indexReport).evaluated == 0)
     try Data([0xff]).write(to: URL(fileURLWithPath: (fixture.root + "notes/one.md").string))
     let unreadable = try await fixture.validate(indexedOnly: true)
-    #expect(unreadable.hasFailures)
+    #expect(unreadable.hasFailures == false)
     #expect(unreadable.indexReport != nil)
   }
 
-  @Test func `indexed only rejects symlink replaced known candidates`() async throws {
+  @Test func `index only never follows or validates replacement symlinks`() async throws {
     let fixture = try RulesIndexFixture()
     defer { fixture.remove() }
     try fixture.write("notes/one.md", "---\ntitle: One\n---\n")
@@ -166,11 +193,11 @@ struct RulesIndexedValidationTests {
     try FileManager.default.createSymbolicLink(atPath: URL(fileURLWithPath: (fixture.root + "notes/").string).path,
       withDestinationPath: (fixture.root + "moved/").string)
     let result = try await fixture.validate(indexedOnly: true)
-    #expect(result.hasFailures)
-    #expect(result.results.first?.errors.first?.message.contains("symlink") == true)
+    #expect(result.hasFailures == false)
+    #expect(result.results.first?.errors.isEmpty == true)
   }
 
-  @Test func `indexed only verifies hashes and rechecks prior nonmembers after definitions change`() async throws {
+  @Test func `index only rejects hash verification and ignores changed definitions`() async throws {
     let fixture = try RulesIndexFixture()
     defer { fixture.remove() }
     let file = fixture.root + "notes/one.md"
@@ -185,13 +212,13 @@ struct RulesIndexedValidationTests {
     try file.write("---\nother: One\n---\n")
     try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: file.string)
     #expect(try await fixture.validate(indexedOnly: true).hasFailures == false)
-    #expect(try await fixture.validate(verifyHashes: true, indexedOnly: true).hasFailures)
+    await #expect(throws: (any Error).self) { try await fixture.validate(verifyHashes: true, indexedOnly: true) }
     try fixture.write(".md-utils/rules/books.mdrule.json", "{\"name\":\"books\",\"match\":{\"paths\":[\"elsewhere/**\"]},\"types\":\"book.mdtype.json\"}")
-    #expect(try await fixture.validate(indexedOnly: true).results.isEmpty)
+    #expect(try await fixture.validate(indexedOnly: true).results.count == 1)
     try fixture.write(".md-utils/rules/books.mdrule.json", "{\"name\":\"books\",\"types\":\"book.mdtype.json\"}")
     let broader = try await fixture.validate(indexedOnly: true)
     #expect(broader.totalFiles == 1)
-    #expect(broader.hasFailures)
+    #expect(broader.hasFailures == false)
   }
   @Test func `positive rule paths avoid irrelevant trees and missing prefixes prune old members`() async throws {
     let fixture = try RulesIndexFixture()
@@ -276,7 +303,7 @@ struct RulesIndexedValidationTests {
     #expect(fallback.indexReport == nil)
     #expect(warnings.first?.contains("--rebuild") == true)
     #expect(try IndexConfiguration.load(root: fixture.root.string) == settings)
-    await #expect(throws: (any Error).self) { try await fixture.validate(indexedOnly: true) }
+    #expect(try await fixture.validate(indexedOnly: true).hasFailures == false)
     try await DatabaseQueue(path: fixture.databasePath.string).write { db in
       try db.execute(sql: "UPDATE index_metadata SET value='incompatible' WHERE key='format'")
     }
@@ -328,7 +355,7 @@ struct RulesIndexedValidationTests {
     #expect(command.noIndex)
     #expect(command.verifyHashes)
     let limited = try #require(CLIEntry.parseAsRoot([
-      "rules", "validate", "books", "--indexed-only", "--verify-hashes",
+      "rules", "validate", "books", "--indexed-only",
     ]) as? CLIEntry.RulesCommands.Validate)
     #expect(limited.indexedOnly)
   }

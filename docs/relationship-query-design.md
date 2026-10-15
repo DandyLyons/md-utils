@@ -155,10 +155,15 @@ result remains self-contained at the chosen detail level.
 
 ## Execution and verification
 
-Reuse rule applicability infrastructure, bounded portable evaluation and #180's
-verified assessment session. Fresh indexed records alone do not authorize cached
-assessment reuse. Preserve indexed-only limited coverage and no fallback; add
-`--index-only` as an alias. Complete queries exit 0, including definite broken
+Reuse rule applicability infrastructure and bounded portable evaluation. Ordinary
+outgoing queries use scoped, lazily loaded evidence; ordinary incoming and bidirectional
+queries use #180's verified assessment session. `--index-only`/`--indexed-only`
+instead reads only the published SQLite snapshot, without raw source/definition
+reads, stats, refresh, writes or fallback. This is the same contract as rule
+validation, correcting the earlier refresh-known-candidates misunderstanding.
+Snapshot-only graph payload reuse requires matching persisted generation/epoch;
+missing body, selector or interpretation evidence is explicitly incomplete.
+See [snapshot-only queries](index-only-queries.md). Complete queries exit 0, including definite broken
 links and conformance failures. Incomplete queries exit 1 with available results.
 Invalid invocation/configuration fails under existing CLI conventions.
 
@@ -231,12 +236,30 @@ Ordinary Markdown extraction uses the existing MarkdownSyntax AST (including
 reference links); wikilinks and list delimiters use Parsing-based infrastructure.
 Code/image/HTML regions are excluded from ordinary discovery.
 
-The first implementation materializes a bounded root snapshot and assesses
-registered types across it for automatic applicability. Cost grows with documents,
-definitions, rule matching and recursive dependencies; narrow selected folders do
-not imply narrow incoming discovery. Explicit type queries without rule selectors
-do not compile unrelated rules. Query projections and ordinary-link extraction
-are not persistently cached. Existing certified named assessments can be reused.
+Outgoing execution plans a conservative source set before loading contents.
+Supplied file sets bound intersections; path exclusions prune reads. Selected
+sources are assessed against relevant loaded definitions, and target documents
+are memoized and loaded only as recursive named assessment reaches them. Ordinary
+links require destination existence, not target contents. Exact destinations use
+direct confined probes; bare names lazily acquire a bounded filename namespace.
+Verification rereads consumed records and checks used exact destinations or the
+discovered namespace, including negative lookups. The path does not refresh or
+write the index, and does not reuse whole-collection cache certificates.
+
+Ordinary incoming/bidirectional queries retain the bounded root
+snapshot and certified assessment path. Narrow selected folders do not imply
+narrow incoming discovery. Content-based selectors can require broader source
+reads. Explicit type queries without rule selectors do not compile unrelated
+rules. Query projections and ordinary-link extraction are not persistently cached.
+Document parsing for tag/JMESPath selectors is skipped when neither is requested;
+rule ordering is computed once per query.
+
+Reproduce scaling checks with `python3 scripts/benchmark-relationship-outgoing.py`.
+On a local debug build, five-run median subprocess times were approximately
+0.034 s with no unrelated files and 0.033 s with 1,000 unrelated 34 KiB documents
+for an exact destination. Bare-name lookup increased from 0.034 s to 0.204 s,
+reflecting filename discovery/verification. These synthetic results are not a
+measurement of a user's vault, and timing thresholds are not unit-test assertions.
 
 File-list inputs are limited to 8 MiB aggregate UTF-8 bytes and 100,000 entries
 before deduplication. Query limits reuse `MarkdownRelationshipLimits`: 10,000

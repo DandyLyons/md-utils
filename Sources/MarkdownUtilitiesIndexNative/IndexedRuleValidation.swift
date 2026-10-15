@@ -19,11 +19,14 @@ public struct IndexedRuleValidation: Sendable {
     public var report: IndexUpdateReport
 
     /// Registers and refreshes only the requested project-wide rule scopes.
-    /// Unavailable cached data throws. With `indexedOnly`, refreshes only recorded
-    /// candidates and reports read failures as assessments; callers must not fall
-    /// back to discovery and must explicitly report limited coverage.
+    /// Unavailable cached data throws. With `indexedOnly`, returns stored published
+    /// findings without loading project definitions or refreshing any candidates.
     public static func validate(database: SQLiteIndexDatabase, root: Path, configPath: Path,
         ruleNames: [String], includeNonMarkdown: Bool, verifyHashes: Bool, indexedOnly: Bool = false) async throws -> Self {
+        if indexedOnly {
+            guard !verifyHashes else { throw IndexProjectError("--index-only cannot be combined with --verify-hashes.") }
+            return try published(database: database, ruleNames: ruleNames, includeNonMarkdown: includeNonMarkdown)
+        }
         let evaluator = try IndexProjectEvaluator(root: root, configPath: configPath)
         let scopes = ruleNames.map { IndexScope(kind: .rule, name: $0, includeNonMarkdown: includeNonMarkdown) }
         for scope in scopes { try evaluator.validate(scope) }
@@ -44,6 +47,48 @@ public struct IndexedRuleValidation: Sendable {
             throw IndexProjectError(report.errors.first ?? "Index refresh failed.")
         }
         return try snapshot(database: database, scopes: scopes, fingerprint: evaluator.fingerprint, report: report, indexedOnly: indexedOnly)
+    }
+
+    /// Returns stored findings from one read transaction, including the last
+    /// publication when a newer refresh failed. Current files/definitions are irrelevant.
+    public static func published(database: SQLiteIndexDatabase, ruleNames: [String],
+        includeNonMarkdown: Bool = false) throws -> Self {
+        try database.serverRead { db in
+            let generation = try SQLiteIndexDatabase.publishedGeneration(in: db)
+            let scopeRows = try Row.fetchAll(db, sql: "SELECT id,definition FROM scopes ORDER BY id")
+            var scopes: [IndexScope] = []
+            for row in scopeRows {
+                let text: String = row["definition"]
+                let scope = try JSONDecoder().decode(IndexScope.self, from: Data(text.utf8))
+                if scope.kind == .rule && scope.includeNonMarkdown == includeNonMarkdown
+                    && (ruleNames.isEmpty || ruleNames.contains(scope.name)) { scopes.append(scope) }
+            }
+            for name in ruleNames where !scopes.contains(where: { $0.name == name }) {
+                throw IndexProjectError("Rule scope is not present in the index snapshot: \(name)")
+            }
+            guard !scopes.isEmpty else { throw IndexProjectError("No requested rule scopes in the index snapshot.") }
+            var results: [IndexedRuleValidationResult] = []
+            var paths: Set<String> = []
+            for scope in scopes {
+                let cursor = try Row.fetchCursor(db, sql: "SELECT path,status FROM assessments WHERE scope_id=? ORDER BY path", arguments: [scope.id])
+                while let row = try cursor.next() {
+                    try Task.checkCancellation()
+                    let path: String = row["path"]
+                    paths.insert(path)
+                    let raw: String = row["status"]
+                    guard raw != MarkdownRuleAssessmentStatus.notApplicable.rawValue else { continue }
+                    let diagnostics = try Row.fetchAll(db, sql: "SELECT category,severity,code,location,message FROM diagnostics WHERE scope_id=? AND path=? ORDER BY rowid", arguments: [scope.id, path]).map {
+                        IndexDiagnostic(category: $0["category"], severity: $0["severity"], code: $0["code"], location: $0["location"], message: $0["message"])
+                    }
+                    results.append(.init(ruleName: scope.name, path: path,
+                        status: MarkdownRuleAssessmentStatus(rawValue: raw) ?? .failed, diagnostics: diagnostics))
+                }
+            }
+            var report = IndexUpdateReport()
+            report.generation = generation
+            report.cached = paths.count
+            return Self(results: results, totalFiles: paths.count, report: report)
+        }
     }
 
     /// Checks freshness and reads assessments and diagnostics in one serialized snapshot.

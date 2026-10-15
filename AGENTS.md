@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Outgoing query performance (#188)**: Ordinary outgoing queries plan source sets before reading contents, bypass whole-collection index refresh/cache verification, lazily load named target dependencies, and verify only consumed records and resolution evidence. Exact destinations use confined existence probes; bare names lazily discover filenames. Ordinary incoming/both retain the certified collection path; index-only instead reads SQLite snapshots without filesystem verification. Regression tests use strict budgets and unreadable unrelated contents; benchmark: `python3 scripts/benchmark-relationship-outgoing.py`. See `docs/relationship-query-design.md`.
+
 - **Scoped relationship queries (#188, implemented 2026-10-15)**:
   `--detail summary|explain|evidence` applies equally to text, JSON and YAML;
   summary defaults to declared triples/ordinary links with brief concern hints.
@@ -64,7 +66,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 - **Instance creation**: `types new` and `rules new` use mdtype Knap creation declarations. Document mode is default with upstream object-variable semantics; explicit body mode serializes frontmatter separately. Input defaults precede JSONPath filename selection and validation; type/rule nonconformance is advisory. Destinations must exist and atomic hard-link publication never overwrites. See `docs/instance-creation.md`; tests: `swift test --filter 'CreationTemplateTests|InstanceCreationTests|TemplateTests'`.
 
-- **Indexed-only rule validation**: `rules validate --indexed-only` checks only registered rule scopes' recorded candidates, including nonmembers, without directory discovery or fallback. Changed definitions/files reevaluate; unavailable paths remain failed candidates until ordinary discovery. Scopes retain `limited` coverage separately from global freshness. `--verify-hashes` detects stat-preserving changes. See `docs/collection-index.md`; tests: `swift test --filter RulesIndexedValidationTests`; benchmark: `scripts/benchmark-indexed-only.py`.
+- **SQLite-only findings (corrected #165/#188)**: `--index-only` and `--indexed-only` are identical on relationship queries and rule validation. Read only published SQLite evidence; never load raw documents/configuration/schemas, stat sources, refresh, acquire writer leases, write the index or fall back. Reject `--verify-hashes`/`--no-index`. Rule output identifies its snapshot; missing relationship/body/selector evidence stays unavailable. Earlier known-candidate-refresh wording was a misunderstanding. See `docs/index-only-queries.md`; tests: `swift test --filter 'RulesIndexedValidationTests|CollectionRelationshipQueryTests'`.
 
 - **Frontmatter string serialization and explicit null**: YAML serialization uses Yams' string representer to preserve empty strings and text resembling null, booleans, or numbers. `fm set --value ''` survives CLI write/read and string-schema validation in YAML and TOML; unrelated YAML null values and note bodies are preserved. `fm set --null` explicitly assigns null, requires exactly one of `--value`/`--null`, and rejects TOML unless explicitly converted to YAML. Tests: `swift test --filter 'SetStringRoundTripTests|SetTests'`.
 

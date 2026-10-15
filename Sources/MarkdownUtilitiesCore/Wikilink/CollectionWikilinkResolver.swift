@@ -41,21 +41,10 @@ public struct CollectionWikilinkResolver: Sendable {
     var complete = namespaceComplete
     var query = "name:" + target
     if target.contains("/") {
-      var input = target[...]
-      let relative = (try? OneOf { "./"; "../" }.parse(&input)) != nil
-      var components = relative ? source.split(separator: "/").dropLast().map(String.init) : []
-      var confined = !target.hasPrefix("/")
-      for component in target.split(separator: "/") {
-        if component == "." { continue }
-        if component == ".." {
-          if components.isEmpty { confined = false } else { components.removeLast() }
-        } else { components.append(String(component)) }
-      }
-      let path = components.joined(separator: "/")
-      let exact = ext.isEmpty ? [path + ".md", path + ".markdown"] : [path]
-      query = "path:" + path
-      complete = namespaceComplete || Set(exact).isSubset(of: completeExactPaths)
-      if confined { candidates = exact.filter(paths.contains) }
+      let lookup = Self.pathLookup(target: target, from: source)
+      query = "path:" + lookup.path
+      complete = namespaceComplete || lookup.exact.isSubset(of: completeExactPaths)
+      if lookup.confined { candidates = Array(lookup.exact.filter(paths.contains)) }
     } else {
       let stem = Self.stem(name).lowercased()
       candidates = (stems[stem] ?? []).filter { path in
@@ -67,6 +56,31 @@ public struct CollectionWikilinkResolver: Sendable {
     }
     return .init(status: candidates.count > 1 ? .ambiguous : (!complete ? .unavailable : (candidates.isEmpty ? .unresolved : .resolved)),
       candidates: candidates.sorted(), namespaceComplete: complete, query: query)
+  }
+
+  /// Exact lookup keys for path-qualified targets. A nil result requires the
+  /// basename namespace; an empty set is a path that cannot resolve in the root.
+  package static func exactCandidatePaths(target: String, from source: String) -> Set<String>? {
+    guard !target.isEmpty else { return [source] }
+    guard target.contains("/") else { return nil }
+    let lookup = pathLookup(target: target, from: source)
+    return lookup.confined ? lookup.exact : []
+  }
+
+  private static func pathLookup(target: String, from source: String) -> (path: String, exact: Set<String>, confined: Bool) {
+    var input = target[...]
+    let relative = (try? OneOf { "./"; "../" }.parse(&input)) != nil
+    var components = relative ? source.split(separator: "/").dropLast().map(String.init) : []
+    var confined = !target.hasPrefix("/")
+    for component in target.split(separator: "/") {
+      if component == "." { continue }
+      if component == ".." {
+        if components.isEmpty { confined = false } else { components.removeLast() }
+      } else { components.append(String(component)) }
+    }
+    let path = components.joined(separator: "/")
+    let ext = suffix(String(target.split(separator: "/").last ?? ""))
+    return (path, ext.isEmpty ? [path + ".md", path + ".markdown"] : [path], confined)
   }
 
   private static func suffix(_ name: String) -> String {

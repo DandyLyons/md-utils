@@ -124,8 +124,10 @@ conflict advisory does not prove compatibility, and arbitrary matcher overlap is
 not decided. Validation does not apply repairs; use the explicit Fix-It workflow below.
 
 Existing indexes refresh automatically; `--no-index` uses source files.
-`--indexed-only` refreshes recorded candidates without discovery or fallback and
-cannot certify global consistency. `--verify-hashes` detects stat-preserving edits.
+`--index-only`/`--indexed-only` returns only published SQLite findings without raw
+files, refresh or fallback; absent policy evidence cannot certify consistency.
+`--verify-hashes` detects stat-preserving edits in ordinary mode and is incompatible
+with snapshot-only mode. See [snapshot-only queries](index-only-queries.md).
 Policy assessments can reuse persisted evidence after whole-collection verification;
 see [relationship cache](relationship-cache.md). Evaluator fingerprint v6 continues
 to identify per-record semantics; cache format 9 adds separate relationship storage.

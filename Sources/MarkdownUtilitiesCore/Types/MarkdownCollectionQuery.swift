@@ -4,6 +4,13 @@ import Foundation
 public enum MarkdownQueryDetail: String, Codable, Sendable { case summary, explain, evidence }
 public enum MarkdownSelectionMode: String, Codable, Sendable { case union, intersection }
 
+/// Persisted membership facts; absent entries mean unavailable, not nonmembership.
+package struct MarkdownIndexedQueryEvidence: Sendable {
+  package init() {}
+  package var types: [String: [String: MarkdownAssessmentOutcome]] = [:]
+  package var rules: [String: [String: MarkdownAssessmentOutcome]] = [:]
+}
+
 /// Simple sets, not a second query language. Hosts validate names before discovery.
 public enum MarkdownDocumentSelector: Sendable {
   case files(Set<String>), folder(String), type(String), requiredType(String)
@@ -11,6 +18,43 @@ public enum MarkdownDocumentSelector: Sendable {
 }
 
 public struct MarkdownCollectionQueryRequest: Sendable {
+  package var suppliedSourceBound: Set<String>? {
+    let sets = selectors.compactMap { selector -> Set<String>? in
+      if case .files(let paths) = selector { return paths }
+      return nil
+    }
+    guard let first = sets.first else { return nil }
+    if mode == .intersection { return sets.dropFirst().reduce(first) { $0.intersection($1) } }
+    guard sets.count == selectors.count else { return nil }
+    return sets.reduce(into: Set<String>()) { $0.formUnion($1) }
+  }
+  /// A conservative source set computed without parsing document contents.
+  /// Content-dependent selectors keep candidates until their actual assessment.
+  package func candidateSources(in paths: Set<String>) -> Set<String> {
+    var markdown = paths.filter { ["md", "markdown"].contains(URL(fileURLWithPath: $0).pathExtension.lowercased()) }
+    for selector in selectors {
+      if case .files(let supplied) = selector { markdown.formUnion(supplied) }
+    }
+    func candidates(_ selector: MarkdownDocumentSelector) -> Set<String> {
+      switch selector {
+      case .files(let files): return files
+      case .folder(let folder): return markdown.filter { folder.isEmpty || $0.hasPrefix(folder) }
+      default: return markdown
+      }
+    }
+    var result = mode == .intersection ? (selectors.first.map(candidates) ?? []) : []
+    for selector in selectors {
+      if mode == .intersection { result.formIntersection(candidates(selector)) }
+      else { result.formUnion(candidates(selector)) }
+    }
+    for exclusion in exclusions {
+      switch exclusion {
+      case .files, .folder: result.subtract(candidates(exclusion))
+      default: break
+      }
+    }
+    return result
+  }
   public var direction: MarkdownRelationshipDirection
   public var selectors: [MarkdownDocumentSelector]
   public var exclusions: [MarkdownDocumentSelector]

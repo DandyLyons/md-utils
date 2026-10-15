@@ -14,6 +14,14 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
     evaluation: MarkdownRelationshipEvaluation,
     queryProvider: (any MarkdownRuleQueryCapabilityProvider)? = nil,
   ) async throws -> (result: MarkdownCollectionQueryResult, complete: Bool) {
+    try await evaluate(request, collection: collection, evaluation: evaluation, queryProvider: queryProvider, indexed: nil)
+  }
+
+  package func evaluate(_ request: MarkdownCollectionQueryRequest, collection: MarkdownRelationshipCollection,
+    evaluation: MarkdownRelationshipEvaluation,
+    queryProvider: (any MarkdownRuleQueryCapabilityProvider)? = nil,
+    indexed: MarkdownIndexedQueryEvidence?,
+  ) async throws -> (result: MarkdownCollectionQueryResult, complete: Bool) {
     var coverage = MarkdownQueryCoverage()
     coverage.sources = collection.sourcesComplete ? "complete" : "incomplete"
     coverage.candidates = collection.resolver.namespaceComplete ? "complete" : "incomplete"
@@ -26,6 +34,10 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
     let assessments = Dictionary(grouping: evaluation.assessments, by: \.source)
     var skipped: Set<String> = []
     var work = 0
+    let needsDocument = (request.selectors + request.exclusions).contains {
+      switch $0 { case .tag, .jmespath: true; default: false }
+    }
+    let orderedRules = rules?.definitions.sorted { $0.name < $1.name } ?? []
     func outcome(_ path: String, _ name: String) -> MarkdownAssessmentOutcome {
       assessments[path]?.first(where: { $0.type == name })?.outcome ?? .unavailable
     }
@@ -37,10 +49,25 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
     }
     for path in collection.records.keys.sorted() {
       try Task.checkCancellation()
+      if indexed != nil {
+        // Reuse only interpretation facts actually supported by the stored graph.
+        // Requirement/hint discovery needs additional persisted evidence and is
+        // deliberately reported as incomplete below, never reconstructed from files.
+        for node in assessments[path] ?? [] {
+          if !request.types.isEmpty {
+            if request.types.contains(node.type) {
+              bindings[path, default: [:]][node.type] = [.init(kind: "explicit", verification: node.outcome)]
+            }
+          } else if node.outcome == .pass {
+            bindings[path, default: [:]][node.type] = [.init(kind: "conformance", verification: .pass)]
+          }
+        }
+        continue
+      }
       guard let record = collection.records[path] else { continue }
       let analysis = await MarkdownRecordAnalyzer.analyze(record)
       analyzed[path] = analysis
-      documents[path] = try? MarkdownDocument(content: record.content)
+      if needsDocument { documents[path] = try? MarkdownDocument(content: record.content) }
       if let rules {
         var checker = MarkdownRuleChecker(registry: rules)
         for node in assessments[path] ?? [] {
@@ -48,7 +75,7 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
           checker.relationshipAssessments[definition.name] = .init(type: definition.name,
             version: definition.version, diagnostics: node.diagnostics, outcome: node.outcome)
         }
-        for rule in rules.definitions.sorted(by: { $0.name < $1.name }) {
+        for rule in orderedRules {
           work += 1
           guard work <= limits.policySteps else {
             memberships[path, default: [:]][rule.name] = .unknown
@@ -103,6 +130,21 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
     func select(_ selector: MarkdownDocumentSelector, path: String) throws -> Membership {
       work += 1
       guard work <= limits.policySteps else { return .unknown }
+      if let indexed {
+        let stored: MarkdownAssessmentOutcome?
+        switch selector {
+        case .type(let name): stored = indexed.types[path]?[name] ?? .unavailable
+        case .rule(let name): stored = indexed.rules[path]?[name] ?? .unavailable
+        case .requiredType, .tag, .jmespath:
+          // Historical metadata lacks authored format and compiled requirement
+          // bindings. Never infer these from reconstructed JSON frontmatter.
+          stored = .unavailable
+        default: stored = nil
+        }
+        if let stored {
+          switch stored { case .pass: return .yes; case .fail: return .no; case .unavailable: return .unknown }
+        }
+      }
       switch selector {
       case .files(let paths): return paths.contains(path) ? .yes : .no
       case .folder(let folder): return folder.isEmpty || path.hasPrefix(folder) ? .yes : .no
@@ -149,10 +191,7 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
         }
       }
     }
-    var universe = collection.resolver.paths.filter(Self.isMarkdown)
-    for selector in request.selectors {
-      if case .files(let paths) = selector { universe.formUnion(paths) }
-    }
+    let universe = request.candidateSources(in: collection.resolver.paths)
     var selected: [String] = []
     for path in universe.sorted() {
       try Task.checkCancellation()
@@ -175,6 +214,10 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
       coverage.selection = "incomplete"
     }
     let sourcePaths = selected.isEmpty ? [] : (request.direction == .outgoing ? selected : collection.records.keys.sorted())
+    if indexed != nil && !selected.isEmpty {
+      coverage.interpretations = "incomplete"
+      coverage.limitations.append("Complete named applicability/relationship query evidence is unavailable in this snapshot. No raw definitions were loaded.")
+    }
     let sourceSet = Set(sourcePaths)
     for path in sourcePaths {
       if request.types.isEmpty {
@@ -201,6 +244,14 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
       do {
         let scanned = try await MarkdownQueryLinks.scan(record, collection: collection, maximum: max(0, limits.occurrences - occurrences.count))
         occurrences += scanned.occurrences
+        if indexed != nil {
+          // Reconstructed frontmatter is not a raw source revision. Body text,
+          // when stored, retains decoded offsets but not original file offsets.
+          for index in (occurrences.count - scanned.occurrences.count)..<occurrences.count {
+            occurrences[index].location.sourceUTF8Range = nil
+            occurrences[index].location.line = nil
+          }
+        }
         if scanned.truncated {
           coverage.sources = "incomplete"
           coverage.limitations.append("Ordinary link occurrence budget exhausted.")
@@ -313,6 +364,7 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
         triples.append(.init(subject: assertion.source, predicate: predicate, object: target, occurrenceCount: 1))
       } else { unresolved += 1 }
       if assertion.outcome == .fail { failed += 1 }
+      if assertion.resolution?.namespaceComplete == false { coverage.candidates = "incomplete" }
       if assertion.outcome == .unavailable || assertion.targetOutcome == .unavailable
         || assertion.diagnostics.contains(where: incompleteDiagnostic) { coverage.interpretations = "incomplete" }
       explanations.append(.init(source: assertion.source, predicate: predicate,
@@ -328,7 +380,9 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
       if let target = occurrence.resolution?.destination {
         links.append(.init(subject: occurrence.source, predicate: "link", object: target, occurrenceCount: 1))
       } else { unresolved += 1 }
-      if occurrence.resolution?.status == .unavailable { coverage.candidates = "incomplete" }
+      if occurrence.resolution?.status == .unavailable || occurrence.resolution?.namespaceComplete == false {
+        coverage.candidates = "incomplete"
+      }
     }
     if selectedNodes.contains(where: { $0.diagnostics.contains(where: { $0.severity == .error }) }) { failed += 1 }
     if evaluation.diagnosticsTruncated {

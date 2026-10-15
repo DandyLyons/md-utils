@@ -23,6 +23,28 @@ extension RulesValidatorRunner {
     guard !indexedOnly || !noIndex else {
       throw ValidationError("--indexed-only cannot be combined with --no-index.")
     }
+    if indexedOnly {
+      guard !verifyHashes else { throw ValidationError("--index-only cannot be combined with --verify-hashes.") }
+      let inferredRoot = configPath.isAbsolute && configPath.parent().lastComponent == ".md-utils"
+        ? configPath.parent().parent() : root
+      let snapshotRoot = (projectRoot ?? inferredRoot).absolute().normalize()
+      let database = try SQLiteIndexDatabase(readOnlyPath: (snapshotRoot + ".md-utils/index.sqlite").string)
+      let snapshot = try IndexedRuleValidation.published(database: database,
+        ruleNames: ruleName.map { [$0] } ?? [], includeNonMarkdown: includeNonMarkdown)
+      let results = snapshot.results.map { result in
+        let status: RuleValidationResult.Status = switch result.status {
+        case .passed: .ok
+        case .skipped: .skipped
+        case .failed, .notApplicable: .error
+        }
+        return RuleValidationResult(ruleName: result.ruleName, schemaPath: "", filePath: result.path,
+          status: status, errors: result.diagnostics.map {
+            RuleValidationErrorDetail(path: $0.location, message: validationMessage(code: $0.code, message: $0.message))
+          })
+      }
+      return RuleValidationSummary(results: results, totalFiles: snapshot.totalFiles,
+        indexReport: snapshot.report, indexedOnly: true)
+    }
     let config = try MdUtilsConfig.load(from: configPath, projectRoot: projectRoot)
     let resolvedRoot = config.standaloneProject?.projectRoot ?? projectRoot ?? root
     var rules = try selectedRules(config: config, ruleName: ruleName)

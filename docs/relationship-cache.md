@@ -2,6 +2,12 @@
 
 Named relationship queries and relationship-aware rule validation can reuse
 persisted evidence in an existing native index. Files remain authoritative.
+
+Ordinary outgoing CLI queries use source-directed reads and lazy target loading
+instead of this whole-collection cache path. Ordinary incoming/bidirectional
+queries retain the certification behavior described here. Index-only queries
+read stored facts without filesystem certification; see [snapshot-only queries](index-only-queries.md). See
+[query execution costs](relationship-query-design.md#implementation-and-costs).
 Core evaluators remain database-independent and retain the existing mdtype v2
 and mdrule v1 semantics. This does not implement the future claims-first model.
 
@@ -64,7 +70,7 @@ older disposable indexes require `index update --rebuild`.
 - `--no-index` evaluates directly without cache reads or writes.
 - Ordinary indexed operation retains source refresh and authoritative revision
   verification. A hit avoids graph evaluation, not source reads or discovery.
-- `--indexed-only` never discovers new paths or falls back. Stable limited evidence
+- Live internal recorded-candidate refresh never discovers new paths or falls back. Stable limited evidence
   has a separate certificate; a hit cannot certify global consistency, absence,
   or unique basename resolution. Known exact-path evidence retains its meaning.
 - `--verify-hashes` retains its existing stat-preserving-edit refresh behavior.

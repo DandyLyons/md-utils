@@ -33,6 +33,19 @@ public struct MarkdownRelationshipCollection: Sendable {
   public let resolver: CollectionWikilinkResolver
   public let sourcesComplete: Bool
   public let limitations: [String]
+  package var loadRecord: (@Sendable (String) async throws -> MarkdownRecord?)? = nil
+  package var resolveLink: (@Sendable (String, String, Bool) async throws -> CollectionWikilinkResolution?)? = nil
+
+  package func resolve(_ target: String, from source: String, markdown: Bool = false) async throws -> CollectionWikilinkResolution? {
+    if let resolveLink { return try await resolveLink(target, source, markdown) }
+    return markdown ? MarkdownQueryLinks.resolveMarkdown(target, source: source, resolver: resolver)
+      : resolver.resolve(target: target, from: source)
+  }
+
+  package func record(at path: String) async throws -> MarkdownRecord? {
+    if let record = records[path] { return record }
+    return try await loadRecord?(path)
+  }
 
   public init(identity: String, generation: String, records: [String: MarkdownRecord],
     paths: Set<String>, sourcesComplete: Bool, candidatesComplete: Bool,

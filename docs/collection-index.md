@@ -80,41 +80,39 @@ evaluation. Definitions and transitive schema changes invalidate assessments.
 Use `rules validate --verify-hashes` to detect edits preserving size and mtime,
 or `rules validate --no-index` to bypass the index entirely.
 
-For explicit validation without file discovery, use:
+For validation findings based exclusively on the published SQLite snapshot, use:
 
 ```bash
 md-utils rules validate books --indexed-only
 md-utils rules validate --indexed-only
-md-utils rules validate books --indexed-only --verify-hashes
+md-utils rules validate books --index-only
 ```
 
-`--indexed-only` requires an existing compatible index and registered rule scopes
-with the requested non-Markdown inclusion setting. A named missing scope fails.
-Without a name, only registered configured rule scopes are checked, and output
-lists configured rules not covered. It rejects `--no-index` and never falls back
-to a source scan. Only recorded candidates are checked, including prior
-nonmembers. Changed definitions reevaluate those candidates even when selectors
-broaden. New files and rename destinations remain undiscovered until ordinary
-validation or index refresh. Deleted, unreadable, and symlink-replaced candidates
-remain recorded as failures with membership removed, so repeated checks cannot
-silently forget them. Ordinary discovery removes obsolete paths.
+`--index-only` and `--indexed-only` are exact aliases, shared with relationships.
+They open an existing compatible database read-only and return persisted findings
+from one published snapshot. They never load raw source/configuration/schema
+files, inspect source timestamps, discover files, acquire a writer lease, refresh,
+or fall back. Both reject `--no-index` and `--verify-hashes`. Without a rule name,
+return indexed rule scopes with the requested non-Markdown setting; current raw
+configuration cannot add uncovered rules to this result. A missing scope fails.
 
-Output always states `New files were not discovered.` Success applies only to
-recorded candidates. Scopes receive a `limited` coverage state; assessments can
-be reused by subsequent checks, but this state does not establish global
-freshness or expose globally current document views. Default size/mtime checks
-can miss stat-preserving edits; `--verify-hashes` checks known candidates' content.
-Writer coordination, generation checks, cancellation, and overlapping-scope
-invalidation apply as for ordinary refresh.
+Output identifies the snapshot generation. Success describes stored findings,
+not current filesystem validity. Edits, deletions, renames and definition changes
+remain invisible until an explicit ordinary refresh. Failed/in-progress newer
+refresh attempts do not hide the last published assessment rows. Index-only reads
+do not change scope states or generations. Missing evidence remains unavailable.
+The former known-candidates refresh interpretation was a specification mistake,
+not the intended meaning of this flag. See [snapshot-only queries](index-only-queries.md).
 
-Run the repeatable multi-scope comparison with:
+Run the repeatable multi-scope comparison (live validation versus stored findings) with:
 
 ```bash
 python3 scripts/benchmark-indexed-only.py --binary .build/release/md-utils --files 10000 --scopes 5 --runs 5
 ```
 
 The script retains its corpus under `tmp/` and reports individual samples and
-medians. A macOS ARM64 debug smoke measurement on 2026-10-09, with 1,000 files,
+medians. Historical measurements below used the superseded known-candidate-refresh
+implementation, not today's SQLite-only reader. A macOS ARM64 debug smoke measurement on 2026-10-09, with 1,000 files,
 five broad rule scopes, and three measured runs per mode, took a median 1.064 s
 with unchanged discovery and 0.586 s with indexed-only validation (about 45%
 less elapsed time). This small debug measurement is not a release scale claim.
@@ -123,9 +121,10 @@ An absent index is never created by validation. A direct scan of more than 1,000
 files emits indexing guidance to stderr, including commands for the requested
 rules and project options. `--no-index` suppresses this advisory.
 
-An unusable index or failed refresh emits a stderr warning and falls back to
+In ordinary validation, an unusable index or failed refresh emits a stderr warning and falls back to
 authoritative source validation. The fallback determines the final exit status;
-source/configuration failures remain failures. Stale assessments are never used.
+source/configuration failures remain failures. Live validation does not use stale assessments;
+explicit index-only queries intentionally describe stored snapshot findings instead.
 Cancellation stops validation rather than triggering fallback.
 
 Selective refresh preserves other scopes, but marks them incomplete if their

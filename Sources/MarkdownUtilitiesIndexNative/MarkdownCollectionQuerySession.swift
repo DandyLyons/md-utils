@@ -8,6 +8,12 @@ public enum MarkdownCollectionQuerySession {
     noIndex: Bool = false, indexedOnly: Bool = false, verifyHashes: Bool = false,
     limits: MarkdownRelationshipLimits = .init(), warning: (String) -> Void = { _ in },
   ) async throws -> (result: MarkdownCollectionQueryResult, complete: Bool) {
+    if indexedOnly {
+      guard !noIndex, !verifyHashes else {
+        throw IndexProjectError("--index-only cannot be combined with --no-index or --verify-hashes.")
+      }
+      return try await indexedSnapshot(request, root: root, limits: limits)
+    }
     let root = Path(URL(fileURLWithPath: root.absolute().string).resolvingSymlinksInPath().path)
     guard root.isDirectory else { throw IndexProjectError("Collection root is not a directory: \(root.string)") }
     let includeRules = request.types.isEmpty || (request.selectors + request.exclusions).contains {
@@ -41,6 +47,10 @@ public enum MarkdownCollectionQuerySession {
         .evaluate(roots: [], collection: empty)
       return try await MarkdownCollectionQueryEvaluator(types: project.types, rules: project.rules, limits: limits)
         .evaluate(request, collection: empty, evaluation: evaluation, queryProvider: provider)
+    }
+    if request.direction == .outgoing && !indexedOnly {
+      return try await outgoing(request, root: root, project: project, provider: provider,
+        includeRules: includeRules, limits: limits)
     }
     let session = try await MarkdownRelationshipAssessmentSession.load(root: root, noIndex: noIndex,
       indexedOnly: indexedOnly, verifyHashes: verifyHashes, limits: limits, includeRules: includeRules, warning: warning)

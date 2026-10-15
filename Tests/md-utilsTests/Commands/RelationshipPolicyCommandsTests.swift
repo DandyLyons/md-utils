@@ -38,7 +38,7 @@ struct RelationshipPolicyCommandsTests {
   private func validate(_ root: Path, noIndex: Bool, indexedOnly: Bool = false) async throws -> RuleValidationSummary {
     try await RulesValidatorRunner.validate(ruleName: "people", root: root,
       configPath: root + ".md-utils/md-utils.json", projectRoot: root, noIndex: noIndex,
-      indexedOnly: indexedOnly, verifyHashes: true)
+      indexedOnly: indexedOnly, verifyHashes: !indexedOnly)
   }
 
   @Test func directAndIndexedAgreeAndPolicyChangesAreRecomputed() async throws {
@@ -69,7 +69,7 @@ struct RelationshipPolicyCommandsTests {
     #expect(try await validate(root, noIndex: false).hasFailures == false)
     let limited = try await validate(root, noIndex: false, indexedOnly: true)
     #expect(limited.hasFailures)
-    #expect(limited.collectionAssessment?.outcome == .unavailable)
+    #expect(limited.results.contains { $0.status == .error })
   }
 
   @Test func cliWitnessFlagsAndFormats() throws {
