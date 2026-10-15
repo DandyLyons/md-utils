@@ -11,6 +11,24 @@ package struct MarkdownIndexedQueryEvidence: Sendable {
   package var rules: [String: [String: MarkdownAssessmentOutcome]] = [:]
 }
 
+/// Publication-time facts, independent of query direction and presentation detail.
+/// Raw body text is deliberately not part of this projection.
+package struct MarkdownPreparedQueryDocument: Codable, Sendable {
+  package var bindings: [String: [MarkdownQueryApplicability]] = [:]
+  package var rules: [String: MarkdownAssessmentOutcome] = [:]
+  package var requiredTypes: [String: MarkdownAssessmentOutcome] = [:]
+  package var typeOutcomes: [String: MarkdownAssessmentOutcome] = [:]
+  package var limitations: [String] = []
+  package var linkLimitations: [String] = []
+  package var parseFailed = false
+  package var tags: [String] = []
+  package var occurrences: [MarkdownQueryOccurrence] = []
+  package var nodes: [MarkdownRelationshipNodeAssessment] = []
+  package var assertions: [MarkdownRelationshipOccurrence] = []
+  package var revision: MarkdownRecordRevision?
+  package init() {}
+}
+
 /// Simple sets, not a second query language. Hosts validate names before discovery.
 public enum MarkdownDocumentSelector: Sendable {
   case files(Set<String>), folder(String), type(String), requiredType(String)

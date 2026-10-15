@@ -56,8 +56,11 @@ Existing indexes refresh automatically; `--no-index` bypasses them and
 `--index-only` (alias `--indexed-only`) means SQLite-only on both relationships and
 rule validation: no raw source/configuration/schema reads, source stats, refresh,
 index writes or fallback. It rejects `--verify-hashes` and `--no-index`. Findings
-describe the published generation. Missing stored bodies, selector facts or named
-interpretations remain explicitly unavailable; raw files never fill those gaps.
+describe the published generation. Explicit `index update` publishes ordinary
+body/frontmatter links, named relationship evidence and reverse edges even in
+metadata-only mode. Missing or older-generation projections remain explicitly
+incomplete; raw files never fill those gaps. Snapshot JMESPath selection remains
+unavailable because its envelope needs full body text.
 Ordinary live queries may reuse assessments after filesystem freshness verification.
 Older indexes require `index update --rebuild` for cache format 9.
 

@@ -47,6 +47,113 @@ private struct QueryFixture {
 }
 
 struct CollectionRelationshipQueryTests {
+  @Test func `unrelated uncertain links do not poison an outgoing snapshot query`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.write(".md-utils/md-utils.json", "{\"configVersion\":\"0.3.0\"}")
+    try fixture.write("a.md", "[Unsupported](/publication/b.md)\n")
+    try fixture.write("b.md", "No outgoing links.\n")
+    let database = try SQLiteIndexDatabase(path: (fixture.root + ".md-utils/index.sqlite").string)
+    let rootURL = URL(fileURLWithPath: fixture.root.string).resolvingSymlinksInPath()
+    let lease = try await CollectionWriterLease.acquire(root: rootURL)
+    let project = try IndexProjectEvaluator(root: fixture.root, configPath: fixture.root + ".md-utils/md-utils.json")
+    let indexer = try CollectionIndexer(database: database, root: rootURL)
+    _ = try await indexer.updateMany(adding: IndexScope(), writerLease: lease, fingerprint: project.fingerprint, evaluate: project.evaluate)
+    try await IndexedRelationshipPublication.publish(database: database, root: fixture.root, project: project, writerLease: lease)
+    let outgoing = try await MarkdownCollectionQuerySession.run(.init(direction: .outgoing,
+      selectors: [.files(["b.md"])], detail: .explain), root: fixture.root, indexedOnly: true)
+    #expect(outgoing.complete)
+    #expect(outgoing.result.links.isEmpty)
+    let incoming = try await MarkdownCollectionQuerySession.run(.init(direction: .incoming,
+      selectors: [.files(["b.md"])], detail: .explain), root: fixture.root, indexedOnly: true)
+    #expect(incoming.complete == false)
+    #expect(incoming.result.coverage?.limitations.contains { $0.contains("/publication/b.md") } == true)
+  }
+
+  @Test func `published links and named evidence survive removal of every raw source`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.definitions()
+    try fixture.write("books/book.md", "---\ntitle: Book\nauthor: '[[alice]]'\n---\n[Alice](../alice.md)\n")
+    try fixture.write("alice.md", "---\nname: Alice\n---\n")
+    try fixture.write("reference.md", "[[books/book]]\n")
+    for index in 0..<12 { try fixture.write("unrelated/\(index).md", "No links.\n") }
+    let database = try SQLiteIndexDatabase(path: (fixture.root + ".md-utils/index.sqlite").string)
+    let rootURL = URL(fileURLWithPath: fixture.root.string).resolvingSymlinksInPath()
+    let lease = try await CollectionWriterLease.acquire(root: rootURL)
+    let project = try IndexProjectEvaluator(root: fixture.root, configPath: fixture.root + ".md-utils/md-utils.json")
+    let indexer = try CollectionIndexer(database: database, root: rootURL)
+    _ = try await indexer.updateMany(adding: IndexScope(), writerLease: lease,
+      fingerprint: project.fingerprint, evaluate: project.evaluate)
+    _ = try await indexer.updateMany(adding: IndexScope(kind: .type, name: "Person"), writerLease: lease,
+      fingerprint: project.fingerprint, evaluate: project.evaluate)
+    try await IndexedRelationshipPublication.publish(database: database, root: fixture.root, project: project, writerLease: lease)
+    let bodyCount = try database.serverRead { db in try Int.fetchOne(db, sql: "SELECT count(*) FROM documents WHERE body IS NOT NULL") }
+    #expect(bodyCount == 0)
+    let request = MarkdownCollectionQueryRequest(direction: .both, selectors: [.files(["books/book.md"])], detail: .evidence)
+    var limits = MarkdownRelationshipLimits(); limits.records = 3
+    let before = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, indexedOnly: true, limits: limits)
+    #expect(before.complete)
+    #expect(before.result.relationships.contains { $0.predicate == "Book:author" && $0.object == "alice.md" })
+    #expect(before.result.links.contains { $0.subject == "reference.md" && $0.object == "books/book.md" })
+    #expect(before.result.links.contains { $0.subject == "books/book.md" && $0.object == "alice.md" })
+    #expect(before.result.occurrences?.contains { $0.location.region == "body" && $0.location.sourceUTF8Range != nil } == true)
+    for path in ["books/", "alice.md", "reference.md", "unrelated/", ".md-utils/types/", ".md-utils/rules/", ".md-utils/md-utils.json", ".md-utils/md-utils.indexconfig.json"] {
+      if (fixture.root + path).exists { try (fixture.root + path).delete() }
+    }
+    let indexPath = fixture.root + ".md-utils/index.sqlite"
+    let original = try Data(contentsOf: URL(fileURLWithPath: indexPath.string))
+    let after = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, indexedOnly: true, limits: limits)
+    #expect(after.complete)
+    #expect(after.result.links == before.result.links)
+    #expect(after.result.relationships == before.result.relationships)
+    #expect(try Data(contentsOf: URL(fileURLWithPath: indexPath.string)) == original)
+    let required = try await MarkdownCollectionQuerySession.run(.init(direction: .outgoing,
+      selectors: [.requiredType("Book")], detail: .explain), root: fixture.root, indexedOnly: true)
+    #expect(required.result.selected == ["books/book.md"])
+    #expect(required.complete)
+    let person = try await MarkdownCollectionQuerySession.run(.init(direction: .outgoing,
+      selectors: [.type("Person")], detail: .summary), root: fixture.root, indexedOnly: true)
+    #expect(person.result.selected == ["alice.md"])
+    #expect(person.complete)
+    for detail in [MarkdownQueryDetail.summary, .explain, .evidence] {
+      var detailed = request; detailed.detail = detail; detailed.types = ["Book"]; detailed.relation = "author"
+      let result = try await MarkdownCollectionQuerySession.run(detailed, root: fixture.root, indexedOnly: true)
+      #expect(result.complete)
+      #expect(result.result.links == before.result.links)
+      #expect(result.result.relationships == before.result.relationships)
+      let json = try JSONDecoder().decode(MarkdownCollectionQueryResult.self, from: JSONEncoder().encode(result.result))
+      let yaml = try YAMLDecoder().decode(MarkdownCollectionQueryResult.self, from: YAMLEncoder().encode(result.result))
+      #expect(json.relationships == yaml.relationships)
+      #expect(json.detail == detail)
+    }
+  }
+
+  @Test func `explicit refresh replaces reverse edges and an unpublished generation cannot reuse them`() async throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    try fixture.write(".md-utils/md-utils.json", "{\"configVersion\":\"0.3.0\"}")
+    try fixture.write("a.md", "[[b]]\n")
+    try fixture.write("b.md", "B\n")
+    let database = try SQLiteIndexDatabase(path: (fixture.root + ".md-utils/index.sqlite").string)
+    let rootURL = URL(fileURLWithPath: fixture.root.string).resolvingSymlinksInPath()
+    let lease = try await CollectionWriterLease.acquire(root: rootURL)
+    let project = try IndexProjectEvaluator(root: fixture.root, configPath: fixture.root + ".md-utils/md-utils.json")
+    let indexer = try CollectionIndexer(database: database, root: rootURL)
+    _ = try await indexer.updateMany(adding: IndexScope(), writerLease: lease, fingerprint: project.fingerprint, evaluate: project.evaluate)
+    try await IndexedRelationshipPublication.publish(database: database, root: fixture.root, project: project, writerLease: lease)
+    let request = MarkdownCollectionQueryRequest(direction: .incoming, selectors: [.files(["b.md"])], detail: .evidence)
+    let first = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, indexedOnly: true)
+    #expect(first.complete)
+    #expect(first.result.links.count == 1)
+    try fixture.write("a.md", "No links now.\n")
+    _ = try await indexer.updateMany(writerLease: lease, fingerprint: project.fingerprint, verifyHashes: true, evaluate: project.evaluate)
+    let unpublished = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, indexedOnly: true)
+    #expect(unpublished.complete == false)
+    #expect(unpublished.result.links.isEmpty)
+    try await IndexedRelationshipPublication.publish(database: database, root: fixture.root, project: project, writerLease: lease)
+    let second = try await MarkdownCollectionQuerySession.run(request, root: fixture.root, indexedOnly: true)
+    #expect(second.complete)
+    #expect(second.result.links.isEmpty)
+  }
+
   @Test func `index only retains compatible stored named evidence without definitions`() async throws {
     let fixture = try QueryFixture(); defer { fixture.remove() }
     try fixture.definitions()

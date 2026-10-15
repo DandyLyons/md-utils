@@ -3,6 +3,12 @@
 Files remain authoritative. The SQLite database is a disposable cache of parsed
 text and selection assessments, not a backup or a way to restore a folder.
 
+Explicit CLI refresh also publishes a generation-bound relationship projection:
+ordinary body/frontmatter links, named assertions and applicability, and indexed
+reverse edges. This works in metadata-only mode without storing full bodies or
+enabling FTS. See [SQLite-only findings](index-only-queries.md) for publication
+budgets, selector support, and the read-only query contract.
+
 The native server reuses this cache and evaluation library. Its bounded read
 projections and explicit resource configuration are described in
 [indexed server reads](indexed-server-reads.md). Indexing a rule/type never exposes

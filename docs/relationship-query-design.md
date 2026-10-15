@@ -250,7 +250,13 @@ Ordinary incoming/bidirectional queries retain the bounded root
 snapshot and certified assessment path. Narrow selected folders do not imply
 narrow incoming discovery. Content-based selectors can require broader source
 reads. Explicit type queries without rule selectors do not compile unrelated
-rules. Query projections and ordinary-link extraction are not persistently cached.
+rules. Explicit CLI indexing also publishes normalized ordinary-link and named
+relationship evidence with SQL reverse edges for snapshot-only reads. This
+generation-bound projection is separate from the live certified assessment cache;
+see [snapshot-only publication](index-only-queries.md).
+The [relevance planning contract](relationship-query-relevance.md) defines which
+declarations and assessment dependencies can be pruned, and distinguishes current
+snapshot source pruning from further live-query planning work.
 Document parsing for tag/JMESPath selectors is skipped when neither is requested;
 rule ordering is computed once per query.
 

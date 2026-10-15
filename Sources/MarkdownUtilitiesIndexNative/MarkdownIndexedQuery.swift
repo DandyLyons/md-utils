@@ -12,6 +12,9 @@ extension MarkdownCollectionQuerySession {
   ) async throws -> (result: MarkdownCollectionQueryResult, complete: Bool) {
     let root = root.absolute().normalize()
     let database = try SQLiteIndexDatabase(readOnlyPath: (root + ".md-utils/index.sqlite").string)
+    if let projected = try await projectedSnapshot(request, database: database, root: root, limits: limits) {
+      return projected
+    }
     let snapshot = try database.serverRead { db in
       let generation = try SQLiteIndexDatabase.publishedGeneration(in: db)
       let identity = try String.fetchOne(db, sql: "SELECT value FROM index_metadata WHERE key='root'") ?? root.string

@@ -21,6 +21,9 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
     evaluation: MarkdownRelationshipEvaluation,
     queryProvider: (any MarkdownRuleQueryCapabilityProvider)? = nil,
     indexed: MarkdownIndexedQueryEvidence?,
+    prepared: [String: MarkdownPreparedQueryDocument]? = nil,
+    capture: (([String: MarkdownPreparedQueryDocument]) -> Void)? = nil,
+    cachedTypes: [String: [String: MarkdownAssessmentOutcome]] = [:],
   ) async throws -> (result: MarkdownCollectionQueryResult, complete: Bool) {
     var coverage = MarkdownQueryCoverage()
     coverage.sources = collection.sourcesComplete ? "complete" : "incomplete"
@@ -35,9 +38,22 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
     var skipped: Set<String> = []
     var work = 0
     let needsDocument = (request.selectors + request.exclusions).contains {
-      switch $0 { case .tag, .jmespath: true; default: false }
+      switch $0 { case .tag, .jmespath: true; default: capture != nil }
     }
     let orderedRules = rules?.definitions.sorted { $0.name < $1.name } ?? []
+    var requirementRules: [String: Set<String>] = [:]
+    for rule in orderedRules {
+      for reference in rule.typeExpression?.unconditionalQueryReferences ?? [] {
+        if let name = rule.typeBindings[reference]?.rawValue {
+          requirementRules[name, default: []].insert(rule.name)
+        }
+      }
+      for check in rule.checks where check.severity == .error {
+        if case .typeConformance(let name) = check.predicate {
+          requirementRules[name.rawValue, default: []].insert(rule.name)
+        }
+      }
+    }
     func outcome(_ path: String, _ name: String) -> MarkdownAssessmentOutcome {
       assessments[path]?.first(where: { $0.type == name })?.outcome ?? .unavailable
     }
@@ -49,6 +65,17 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
     }
     for path in collection.records.keys.sorted() {
       try Task.checkCancellation()
+      if let fact = prepared?[path] {
+        bindings[path] = fact.bindings
+        memberships[path] = fact.rules.mapValues { $0 == .pass ? .yes : ($0 == .fail ? .no : .unknown) }
+        hintLimitations[path] = fact.limitations
+        if !request.types.isEmpty {
+          bindings[path] = Dictionary(uniqueKeysWithValues: request.types.map {
+            ($0, [.init(kind: "explicit", verification: outcome(path, $0))])
+          })
+        }
+        continue
+      }
       if indexed != nil {
         // Reuse only interpretation facts actually supported by the stored graph.
         // Requirement/hint discovery needs additional persisted evidence and is
@@ -130,6 +157,21 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
     func select(_ selector: MarkdownDocumentSelector, path: String) throws -> Membership {
       work += 1
       guard work <= limits.policySteps else { return .unknown }
+      if let prepared {
+        switch selector {
+        case .type(let name):
+          let value = prepared[path]?.typeOutcomes[name] ?? .unavailable
+          return value == .pass ? .yes : (value == .fail ? .no : .unknown)
+        case .requiredType(let name):
+          guard let value = prepared[path]?.requiredTypes[name] else { return .unknown }
+          return value == .pass ? .yes : (value == .fail ? .no : .unknown)
+        case .tag(let tag):
+          guard let fact = prepared[path], !fact.parseFailed else { return .unknown }
+          return fact.tags.contains(tag) ? .yes : .no
+        case .jmespath: return .unknown // Full bodies are optional index data, not link evidence.
+        default: break
+        }
+      }
       if let indexed {
         let stored: MarkdownAssessmentOutcome?
         switch selector {
@@ -155,18 +197,10 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
         if bindings[path]?[name]?.contains(where: { $0.kind == "ruleRequirement" }) == true { return .yes }
         // Explicit overrides must not affect selection by rule requirements.
         var possible = false
-        for rule in rules?.definitions ?? [] {
-          let refs = rule.typeExpression?.unconditionalQueryReferences ?? []
-          let requires = refs.contains { rule.typeBindings[$0]?.rawValue == name }
-            || rule.checks.contains { check in
-              if case .typeConformance(let type) = check.predicate { return check.severity == .error && type.rawValue == name }
-              return false
-            }
-          if requires {
-            let membership = memberships[path]?[rule.name] ?? .unknown
-            if membership == .yes { return .yes }
-            possible = possible || membership == .unknown
-          }
+        for rule in requirementRules[name] ?? [] {
+          let membership = memberships[path]?[rule] ?? .unknown
+          if membership == .yes { return .yes }
+          possible = possible || membership == .unknown
         }
         return possible ? .unknown : .no
       case .tag(let tag):
@@ -214,33 +248,47 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
       coverage.selection = "incomplete"
     }
     let sourcePaths = selected.isEmpty ? [] : (request.direction == .outgoing ? selected : collection.records.keys.sorted())
-    if indexed != nil && !selected.isEmpty {
+    if indexed != nil && prepared == nil && !selected.isEmpty {
       coverage.interpretations = "incomplete"
       coverage.limitations.append("Complete named applicability/relationship query evidence is unavailable in this snapshot. No raw definitions were loaded.")
     }
     let sourceSet = Set(sourcePaths)
     for path in sourcePaths {
+      if let limitations = prepared?[path]?.linkLimitations, !limitations.isEmpty {
+        coverage.sources = "incomplete"
+        coverage.limitations += limitations.map { "\(path): \($0)" }
+      }
       if request.types.isEmpty {
         if let limitations = hintLimitations[path], !limitations.isEmpty {
           coverage.interpretations = "incomplete"
           coverage.limitations += limitations
         }
-        if types.definitions.contains(where: { outcome(path, $0.name.rawValue) == .unavailable })
+        if types.definitions.contains(where: { !$0.relationships.isEmpty && outcome(path, $0.name.rawValue) == .unavailable })
           || memberships[path]?.values.contains(.unknown) == true {
           coverage.interpretations = "incomplete"
           coverage.limitations.append("\(path): named applicability is incomplete")
         }
       }
-      if analyzed[path]?.parseDiagnostics.isEmpty == false {
+      if analyzed[path]?.parseDiagnostics.isEmpty == false || prepared?[path]?.parseFailed == true {
         coverage.interpretations = "incomplete"
         coverage.sources = "incomplete"
         coverage.limitations.append("\(path): document metadata could not be fully analyzed")
       }
     }
     var occurrences: [MarkdownQueryOccurrence] = []
+    var extractionLimitations: [String: [String]] = [:]
     for path in sourcePaths {
       guard let record = collection.records[path] else { continue }
       try Task.checkCancellation()
+      if let fact = prepared?[path] {
+        let remaining = max(0, limits.occurrences - occurrences.count)
+        occurrences += fact.occurrences.prefix(remaining)
+        if fact.occurrences.count > remaining {
+          coverage.sources = "incomplete"
+          coverage.limitations.append("Ordinary link occurrence budget exhausted.")
+        }
+        continue
+      }
       do {
         let scanned = try await MarkdownQueryLinks.scan(record, collection: collection, maximum: max(0, limits.occurrences - occurrences.count))
         occurrences += scanned.occurrences
@@ -255,13 +303,55 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
         if scanned.truncated {
           coverage.sources = "incomplete"
           coverage.limitations.append("Ordinary link occurrence budget exhausted.")
+          for omitted in sourcePaths.drop(while: { $0 != path }) {
+            extractionLimitations[omitted, default: []].append("Ordinary link occurrence budget exhausted.")
+          }
           break
         }
       } catch is CancellationError { throw CancellationError() }
       catch {
         coverage.sources = "incomplete"
         coverage.limitations.append("\(path): link extraction failed: \(error.localizedDescription)")
+        extractionLimitations[path, default: []].append("Link extraction failed: \(error.localizedDescription)")
       }
+    }
+    if let capture {
+      let linksBySource = Dictionary(grouping: occurrences, by: \.source)
+      let assertionsBySource = Dictionary(grouping: evaluation.occurrences, by: \.source)
+      var facts: [String: MarkdownPreparedQueryDocument] = [:]
+      for path in collection.records.keys.sorted() {
+        var fact = MarkdownPreparedQueryDocument()
+        fact.bindings = bindings[path] ?? [:]
+        fact.rules = (memberships[path] ?? [:]).mapValues { $0 == .yes ? .pass : ($0 == .no ? .fail : .unavailable) }
+        for definition in types.definitions {
+          let name = definition.name.rawValue
+          if let node = assessments[path]?.first(where: { $0.type == name }) {
+            fact.typeOutcomes[name] = node.outcome
+          } else if !definition.relationships.isEmpty {
+            fact.typeOutcomes[name] = .unavailable
+          } else if let cached = cachedTypes[path]?[name] {
+            fact.typeOutcomes[name] = cached
+          }
+          let value = try select(.requiredType(definition.name.rawValue), path: path)
+          fact.requiredTypes[definition.name.rawValue] = value == .yes ? .pass : (value == .no ? .fail : .unavailable)
+        }
+        fact.limitations = hintLimitations[path] ?? []
+        fact.linkLimitations = extractionLimitations[path] ?? []
+        if types.definitions.contains(where: { !$0.relationships.isEmpty && outcome(path, $0.name.rawValue) == .unavailable }) {
+          fact.limitations.append("Named applicability is incomplete.")
+        }
+        fact.parseFailed = analyzed[path]?.parseDiagnostics.isEmpty == false
+        if documents[path]?.frontMatterFormat == .yaml,
+          case .array(let tags) = documents[path]?.frontMatter["tags"] {
+          fact.tags = tags.compactMap { if case .string(let tag) = $0 { return tag }; return nil }
+        }
+        fact.occurrences = linksBySource[path] ?? []
+        fact.nodes = assessments[path] ?? []
+        fact.assertions = assertionsBySource[path] ?? []
+        fact.revision = collection.records[path]?.revision
+        facts[path] = fact
+      }
+      capture(facts)
     }
     var interpretations: [MarkdownQueryInterpretation] = []
     var interpretedAssertions: [String: MarkdownRelationshipOccurrence] = [:]
@@ -382,6 +472,9 @@ public struct MarkdownCollectionQueryEvaluator: Sendable {
       } else { unresolved += 1 }
       if occurrence.resolution?.status == .unavailable || occurrence.resolution?.namespaceComplete == false {
         coverage.candidates = "incomplete"
+        if let resolution = occurrence.resolution {
+          coverage.limitations.append("\(occurrence.source): destination cannot be fully resolved: \(resolution.query)")
+        }
       }
     }
     if selectedNodes.contains(where: { $0.diagnostics.contains(where: { $0.severity == .error }) }) { failed += 1 }

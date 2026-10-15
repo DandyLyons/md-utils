@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Indexed relationship projection (#188)**: Explicit CLI indexing publishes normalized body/frontmatter occurrences, named assertions, applicability, selector facts and SQL reverse edges without enabling FTS or retaining full bodies. Publication is staged, generation/epoch/profile-bound, and atomic; single-file snapshot queries decode only relevant sources. JMESPath selectors still require unavailable full-body envelope evidence. Publication skips unrelated type validation; type selectors need stored type evidence. Tests: `swift test --filter 'CollectionRelationshipQueryTests|IndexCommandsTests|RulesIndexedValidationTests'`; see `docs/index-only-queries.md` and the planning contract/status in `docs/relationship-query-relevance.md`.
+
 - **Outgoing query performance (#188)**: Ordinary outgoing queries plan source sets before reading contents, bypass whole-collection index refresh/cache verification, lazily load named target dependencies, and verify only consumed records and resolution evidence. Exact destinations use confined existence probes; bare names lazily discover filenames. Ordinary incoming/both retain the certified collection path; index-only instead reads SQLite snapshots without filesystem verification. Regression tests use strict budgets and unreadable unrelated contents; benchmark: `python3 scripts/benchmark-relationship-outgoing.py`. See `docs/relationship-query-design.md`.
 
 - **Scoped relationship queries (#188, implemented 2026-10-15)**:

@@ -355,8 +355,14 @@ struct IndexOptions: ParsableArguments {
         var refreshScopes = try database.scopes()
         if let scope, !refreshScopes.contains(scope) { refreshScopes.append(scope) }
         let directories = Dictionary(uniqueKeysWithValues: refreshScopes.map { ($0.id, evaluator.discoveryDirectories(for: $0)) })
-        let report = try await indexer.updateMany(adding: scope, discoveryDirectories: directories, writerLease: writerLease, fingerprint: evaluator.fingerprint,
+        let publicationLease: CollectionWriterLease
+        if let writerLease { publicationLease = writerLease }
+        else { publicationLease = try await CollectionWriterLease.acquire(root: canonicalRoot) }
+        defer { withExtendedLifetime(publicationLease) {} }
+        let report = try await indexer.updateMany(adding: scope, discoveryDirectories: directories, writerLease: publicationLease, fingerprint: evaluator.fingerprint,
             rebuild: rebuild, verifyHashes: verifyHashes, evaluate: evaluator.evaluate)
+        try await IndexedRelationshipPublication.publish(database: database, root: root,
+            project: evaluator, writerLease: publicationLease)
         if !quiet {
             print("Index: \(report.evaluated) evaluated, \(report.cached) cached, \(report.hashed) hashed; \(try database.selectedCount()) current documents.")
         }
