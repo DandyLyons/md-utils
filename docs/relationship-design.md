@@ -1,5 +1,10 @@
 # Named relationship implementation design (#177)
 
+Approved #188 query expansion and progressive disclosure are specified in
+[Scoped relationship queries](relationship-query-design.md). That implemented
+contract supersedes this document's original CLI output design;
+the evaluator semantics below remain applicable.
+
 Approved 2026-10-13. Implements RFCs 0003/0004 and epic #169 using the
 #170 resolver, #173 whole-value parser, and #175 occurrence provenance.
 
@@ -44,10 +49,12 @@ cancellation aborts publication. Resource defaults require representative tests.
 the collection independently of source selection. `--type` and optional
 `--relation` select declaring contracts, including for incoming queries.
 
-Text, mutually exclusive `--json` and `--yaml` expose the same evidence. Results
+Text, mutually exclusive `--json` and `--yaml` support `--detail summary|explain|evidence`.
+Summary is the default; full provenance is available at evidence detail. Results
 have separate outgoing, incoming and selfLinks sections. Self-links occur once
 in their own section, classified by established document identity. Queries retain
-failed assertions and return successfully when evidence was obtained; validation
+failed assertions and return successfully when query coverage is complete; incomplete
+queries exit 1 with available results. Validation
 returns nonzero for required failure/unavailable. Incomplete query evidence is
 explicit and never proves absence. Ordering is deterministic.
 

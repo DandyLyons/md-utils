@@ -176,7 +176,7 @@ public struct IndexProjectEvaluator: Sendable {
 }
 
 /// Serialized native bridge for the non-Sendable JMESPath implementation.
-private final class IndexJMESPathProvider:
+final class IndexJMESPathProvider:
   MarkdownRuleQueryCapabilityProvider,
   @unchecked Sendable
 {

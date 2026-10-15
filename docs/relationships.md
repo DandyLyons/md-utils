@@ -1,5 +1,9 @@
 # Named frontmatter relationships
 
+The [#188 query contract](relationship-query-design.md) supports collection
+selection, ordinary links and `--detail summary|explain|evidence` for text, JSON
+and YAML. Named declarations retain the structural semantics described below.
+
 Relationships are user-authored assertions stored as ordinary frontmatter values
 and whole-value wikilinks. Users define their domain meaning and truth. md-utils
 checks explicit structural contracts: selection, syntax, counts, resolution, and
@@ -66,14 +70,20 @@ md-utils rel in People/Bob.md --type Article --relation authors --root ./vault/ 
 md-utils rel both Articles/example.md --type Article --root ./vault/ --yaml
 ```
 
-The document argument is collection-relative. `--root` is required and defines
-both the collection and the project containing definitions. `--type` always names
-the declaring contract, including for incoming queries. Omitting `--relation`
-queries all its declared relations. Source selection does not narrow resolution.
-Queries do not filter out assertions merely because their source type fails.
+Document arguments are collection-relative and may select multiple files. `--root`
+is required. `--type` overrides automatic named applicability with explicit declaring
+contracts, including for incoming queries. `--relation` requires `--type` and filters
+named results without hiding ordinary links or relabeling filtered named occurrences.
+Without an override, conforming types, matching-rule requirements and explicit hints
+supply declarations, preserving failed required/hinted assertions. Source selection
+does not narrow incoming discovery or resolution.
 
-Text is the default; `--json` and `--yaml` are mutually exclusive and preserve the
-same evidence. Results separate `outgoing`, `incoming`, and `selfLinks`. A confirmed
+Text is the default; `--json` and `--yaml` are mutually exclusive. All formats default
+to `--detail summary`: declared triples and ordinary links, with short concern hints.
+`--detail explain` adds applicability, diagnostics and coverage; `--detail evidence`
+adds normalized occurrence/interpretation tables and full provenance. Incomplete
+results never automatically increase verbosity. Evidence separates requested
+`outgoing`, `incoming`, and `selfLinks` references. A confirmed
 self-link appears once in `selfLinks`, including when an anchor points to its source.
 Aliases and fragments do not create separate graph vertices. Ambiguous candidates
 are never confirmed incoming edges. Outgoing results retain malformed assertions.
@@ -86,12 +96,52 @@ selected native temporal values retain their original kind evidence.
 Decoded UTF-8 ranges refer to scalar text; unavailable raw-file ranges are not
 invented. Node dependency IDs provide finite explanations even for cycles.
 
-Queries return successfully when they produce evidence, including failed assertions
-and explicitly incomplete results. Invalid options/configuration or inability to
+Complete queries exit 0, including broken links and failed assertions. Incomplete
+queries return available results and exit 1, including indexed-only coverage.
+Invalid options/configuration or inability to
 construct the requested query fails the command. `types check` and `rules validate`
 return nonzero when required conformance fails or is unavailable.
 `types verify` uses the same collection-aware evaluation for declared type hints;
 an absent optional relationship can pass without destination evidence.
+
+## Select a collection
+
+```bash
+md-utils rel in --select-folder books/ --root ./vault/
+md-utils rel both --select-type Book --select-tag swift --select-mode intersection --root ./vault/ --json
+md-utils rel both --select-rule Published --exclude-folder archive/ --root ./vault/ --detail explain
+md-utils rel out --select-required-type Book --root ./vault/ --yaml --detail evidence
+md-utils rel both --files-from selected-files.txt --root ./vault/
+md-utils rel both --files-from0 selected-files.paths0 --root ./vault/
+```
+
+Folders recurse. Types mean structural conformance; rules mean applicability,
+including failed checks. Required types mean unconditional positive obligations,
+including obligations shared by every alternative, never negative references.
+Tags are exact case-sensitive YAML `tags` array members. JMESPath receives `path`,
+`frontmatterFormat` (`yaml` or `none`), `frontmatter` (empty object when absent),
+and `body`; TOML is intentionally skipped by this selector with explicit notices.
+Evaluation failures are unknown membership, not definite nonmatches.
+
+Multiple selectors require `--select-mode union|intersection`. Repeated positional
+paths and all file lists form one supplied set. Repeatable `--exclude-file`,
+`--exclude-folder`, `--exclude-type`, `--exclude-rule` and `--exclude-tag` subtract
+after combination. No selector is an error; `--select-folder .` selects the root.
+
+List files use strict UTF-8 with LF (`--files-from`) or NUL (`--files-from0`)
+separators. `-` consumes stdin once. Entries are root-relative; the list file itself
+is working-directory-relative and may live outside the root. Preserve whitespace,
+ignore empty entries, perform no expansion/unquoting, and reject absolute document
+paths, root escapes, directories and non-Markdown entries. Empty lists select zero
+documents successfully. Malformed/unreadable lists fail preflight; missing/unreadable
+selected documents produce incomplete results. BOM handling remains deferred to #189.
+
+Ordinary links need no definitions and include body/frontmatter Markdown and
+wikilinks between Markdown files. Markdown paths are source-relative, percent-decoded
+once, and exact (no extension guessing). Leading `/` is unsupported without a
+publishing-root contract. Fragments are retained without renderer-specific anchor
+validation. Ordinary embeds/images, attachments, external URLs and same-document
+anchors are deferred; existing named capabilities remain supported.
 
 ## Coverage and recursion
 
@@ -131,7 +181,7 @@ and fall back; cancellation aborts. Hidden entries and symlinks are outside the
 native collection universe, following existing discovery behavior.
 
 - `--no-index` bypasses the index.
-- `--indexed-only` requires registered scopes, refreshes recorded candidates, and
+- `--indexed-only` (alias `--index-only`) requires registered scopes, refreshes recorded candidates, and
   never discovers new files or falls back. It may read known source files. Results
   state `New files were not discovered.` and retain limited coverage.
 - `--verify-hashes` refreshes stat-preserving edits to known indexed files.

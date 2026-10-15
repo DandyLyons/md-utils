@@ -52,8 +52,8 @@ struct RelationshipCommandsTests {
     let result = try CLIProcessTestHelper.run(["rel", "out", "A.md", "--type", "Person",
       "--root", fixture.root.string, "--no-index", "--json"])
     #expect(result.status == 0)
-    let evidence = try JSONDecoder().decode(MarkdownRelationshipQuery.self, from: Data(result.standardOutput.utf8))
-    #expect(evidence.outgoing.count == 1)
+    let evidence = try JSONDecoder().decode(MarkdownCollectionQueryResult.self, from: Data(result.standardOutput.utf8))
+    #expect(evidence.relationships.filter { $0.subject != $0.object }.count == 1)
   }
 
   @Test func `aliases parse and output flags conflict`() throws {
@@ -146,17 +146,17 @@ struct RelationshipCommandsTests {
     let fixture = try RelationshipFixture()
     defer { fixture.remove() }
     try (fixture.root + "A.md").write("---\nname: A\nrelated: ['See [[B]]', '[[#Self]]']\n---\n")
-    let args = ["rel", "both", "A.md", "--type", "Person", "--root", fixture.root.string, "--no-index"]
+    let args = ["rel", "both", "A.md", "--type", "Person", "--root", fixture.root.string, "--no-index", "--detail", "evidence"]
     let yaml = try CLIProcessTestHelper.run(args + ["--yaml"])
     #expect(yaml.status == 0)
     #expect(yaml.standardError.isEmpty)
-    let decoded = try YAMLDecoder().decode(MarkdownRelationshipQuery.self, from: yaml.standardOutput)
-    #expect(decoded.outgoing.count == 1)
-    #expect(decoded.outgoing[0].outcome == .fail)
-    #expect(decoded.selfLinks.count == 1)
+    let decoded = try YAMLDecoder().decode(MarkdownCollectionQueryResult.self, from: yaml.standardOutput)
+    #expect(decoded.files?.first?.named.outgoing?.count == 1)
+    #expect(decoded.namedRelationships?.contains { $0.assertion.outcome == .fail } == true)
+    #expect(decoded.files?.first?.named.selfLinks.count == 1)
     let json = try CLIProcessTestHelper.run(args + ["--json"])
     #expect(json.status == 0)
-    #expect(try JSONDecoder().decode(MarkdownRelationshipQuery.self, from: Data(json.standardOutput.utf8)).outgoing == decoded.outgoing)
+    #expect(try JSONDecoder().decode(MarkdownCollectionQueryResult.self, from: Data(json.standardOutput.utf8)).relationships == decoded.relationships)
     let validation = try CLIProcessTestHelper.run(["types", "check", "Person", (fixture.root + "A.md").string, "--root", fixture.root.string, "--format", "json"])
     #expect(validation.status != 0)
     #expect(validation.standardOutput.contains("relationship.value.invalid"))
@@ -169,8 +169,8 @@ struct RelationshipCommandsTests {
     let result = try CLIProcessTestHelper.run(["rel", "out", "A.md", "--type", "Person", "--root", fixture.root.string, "--json"])
     #expect(result.status == 0)
     #expect(result.standardError.contains("reading source files directly"))
-    let decoded = try JSONDecoder().decode(MarkdownRelationshipQuery.self, from: Data(result.standardOutput.utf8))
-    #expect(decoded.outgoing[0].outcome == .pass)
+    let decoded = try JSONDecoder().decode(MarkdownCollectionQueryResult.self, from: Data(result.standardOutput.utf8))
+    #expect(decoded.relationships.contains { $0.object == "B.md" })
   }
 
   @Test func `indexed only can certify a known exact path without a namespace scan`() async throws {

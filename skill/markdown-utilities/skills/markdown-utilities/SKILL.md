@@ -28,12 +28,32 @@ For named frontmatter assertions, declare `requires: [document-relationships]`
 and a top-level `relationships` mapping. Each name has a literal-key/array `select`
 and `target: {type: person.mdtype.yaml}` relative to `.md-utils/types/`.
 `md-utils rel out|in|both Note.md --type Person --root ./vault/ --json` queries
-declared occurrences; `--yaml` is also supported. Long spellings are
+declared relationships and ordinary links; `--yaml` is also supported. Long spellings are
 `relationships outgoing|incoming|both`. Self-links have their own section.
-Queries preserve malformed values, candidates, coverage and pass/fail/unavailable
-outcomes. Users own domain meaning and truth; validation checks authored structure.
+All formats default to `--detail summary`: declared triples/ordinary links and brief
+concern hints. Use `--detail explain` for applicability and findings, or
+`--detail evidence` for malformed values, candidates, provenance and assessment graphs.
+Detail never changes evaluation or exit status; incomplete results stay concise
+unless higher detail is requested. Users own domain meaning and truth.
+Omit `--type` for automatic declarations from conforming types, applicable rules
+and hints. `--type` is a declaring-contract override; `--relation` requires it and
+filters named results while ordinary links remain visible.
+Select multiple positional Markdown paths, recursive `--select-folder`, structural
+`--select-type`, unconditional `--select-required-type`, applicability `--select-rule`,
+exact YAML `--select-tag` or `--select-jmespath`. JMESPath receives path,
+frontmatterFormat, frontmatter and body; TOML selector skips are reported.
+Multiple selectors require `--select-mode union|intersection`; repeated
+`--exclude-file|--exclude-folder|--exclude-type|--exclude-rule|--exclude-tag` subtract
+afterward. Incoming sources are searched throughout the explicit root.
+`--files-from` accepts UTF-8 LF-separated root-relative paths; `--files-from0`
+accepts NUL-separated paths. Either accepts `-` for stdin once. All lists and
+positional paths form one deduplicated selector. No selection is an error; use
+`--select-folder .` for the collection. Empty supplied lists succeed with zero results.
+Complete queries exit 0 even for broken/nonconforming assertions; incomplete queries
+exit 1 with available results. Ordinary links need no declarations; embeds/images,
+attachments, external URLs and same-document anchors remain outside ordinary discovery.
 Existing indexes refresh automatically; `--no-index` bypasses them and
-`--indexed-only` refreshes only recorded candidates without discovery or fallback.
+`--indexed-only` (alias `--index-only`) refreshes only recorded candidates without discovery or fallback.
 Limited coverage cannot establish absence or unique basename resolution.
 Relationship assessments may be reused after whole-collection freshness verification;
 source reads remain required. Limited coverage never becomes complete on a cache hit.

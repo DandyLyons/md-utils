@@ -133,6 +133,11 @@ deterministic terminal environment and captures both output streams.
 - Frontmatter parser tests must follow the package's LF-only delimiter policy;
   include CRLF cases as explicit non-recognition tests rather than silently
   introducing a second newline contract.
+- LF is the only supported newline format for Markdown document processing.
+  CRLF and mixed-line-ending documents are unsupported; do not silently normalize
+  them or claim reliable parsing. Operations promising byte preservation must
+  still preserve untouched bytes. CRLF preservation tests establish byte fidelity,
+  not supported Markdown parsing or uniform rejection by existing commands.
 
 ## Test Files
 

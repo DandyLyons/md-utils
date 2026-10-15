@@ -39,9 +39,12 @@ public enum WikilinkScanner {
   /// Scans with zero-based, half-open UTF-8 ranges relative to the supplied text.
   /// The ranges include embed prefixes and delimiters. They are not file offsets
   /// when the supplied text is a decoded frontmatter scalar or a document body.
+  /// `maximumResults` bounds retained matches; callers needing a truncation
+  /// indicator can request one sentinel match beyond their own output limit.
   public static func scanOccurrences(
     _ text: String,
     context: WikilinkParsingContext = .standard,
+    maximumResults: Int? = nil,
   ) -> [WikilinkTextOccurrence] {
     var results: [WikilinkTextOccurrence] = []
     let parser = WikilinkParser(context: context)
@@ -49,6 +52,7 @@ public enum WikilinkScanner {
     var consumedBytes = 0
 
     while let bracketRange = remaining.range(of: "[[") {
+      if let maximumResults, results.count >= maximumResults { break }
       // Check for `!` embed prefix immediately before `[[`
       var parseStart = bracketRange.lowerBound
       if parseStart > remaining.startIndex {

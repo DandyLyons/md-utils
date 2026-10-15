@@ -110,8 +110,11 @@ HTTP PATCH media type or wire format.
   Metadata edits involving merge keys, custom tags, or non-string keys are unsupported.
   Malformed/duplicate mappings fail parsing. No lossless YAML editing claim is made.
 - Canonical LF delimiter lines are required. CRLF delimiter blocks, BOM-prefixed
-  blocks, malformed closing lines, and non-Markdown paths are rejected. Body text can
-  retain CRLF. Comment-wrapped non-Markdown sources are outside this version.
+  blocks, malformed closing lines, and non-Markdown paths are rejected. Existing
+  CRLF body bytes may be retained for byte preservation; this is not supported
+  Markdown parsing. LF is the only supported newline format for Markdown document
+  processing; CRLF and mixed-line-ending documents are unsupported and must not
+  be silently normalized. Comment-wrapped non-Markdown sources are outside this version.
 - The codec reparses its output and compares the intended metadata, format, and exact
   body bytes. Unrepresentable changes fail rather than silently changing values or
   interpreting requested body text as new frontmatter.

@@ -1,5 +1,10 @@
 # RFC 0004: Named Document Relationships and Collection Policies
 
+CLI query presentation extension: the approved [#188 query design](../relationship-query-design.md)
+defines summary, explain and evidence detail levels for text, JSON and YAML.
+The full provenance contract below remains available at evidence detail; lower
+detail levels summarize it without changing evaluation, uncertainty or exit status.
+
 - Status: Provenance delivered in #175; lexical constraints in #176; named relationship runtime in #177; collection policies in #178; repairs in #179; verified persisted assessment reuse in #180
 - Date: 2026-10-12
 - Tracking: [#172](https://github.com/DandyLyons/md-utils/issues/172), [#169](https://github.com/DandyLyons/md-utils/issues/169)

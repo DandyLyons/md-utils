@@ -11,6 +11,15 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Scoped relationship queries (#188, implemented 2026-10-15)**:
+  `--detail summary|explain|evidence` applies equally to text, JSON and YAML;
+  summary defaults to declared triples/ordinary links with brief concern hints.
+  Detail never changes evaluation or exit status. Selection/applicability decisions
+  and input contracts are in `docs/relationship-query-design.md`. Core owns
+  selection/applicability and normalized evidence; native sessions reuse #180.
+  File lists use LF/NUL with strict UTF-8; BOM policy remains deferred to #189.
+  Tests: `swift test --filter 'CollectionRelationshipQueryTests|RelationshipCommandsTests|RelationshipCacheTests'`.
+
 - **Verified relationship cache (#180)**: Native relationship queries and rule validation reuse whole-collection-certified evidence across unchanged refresh generations. Certificates cover source/context revisions, candidate namespaces (including negative/ambiguous lookups), definitions/bindings, scopes, coverage, profiles and budgets. Cache format 9 uses bounded SQLite staging, atomic publication, epoch/generation checks, four-request/64 MiB retention, and 256 KiB chunks. Limited coverage stays limited; transient failures and exhaustion are uncached. Rebuild preserves external drafts/receipts. See `docs/relationship-cache.md` and `docs/relationship-cache-benchmarks.md`; tests: `swift test --filter 'RelationshipCache|RelationshipPolicyCommands|RelationshipRegressionCommands|RelationshipCommands|MarkdownMutationTests|MarkdownDraftTests'`.
 
 - **Claims-first graph direction (2026-10-14)**: Human-readable files remain authoritative; types/rules are optional structure and inconsistent claims remain queryable with provenance. Query scope determines the graph view; semantic definitions must be separable from conformance requirements. See `docs/claims-first-document-graph.md` for agreed principles, open decisions, and the proposed RDF-inspired Core/SQLite projection architecture. This is future design, not implemented behavior or an approved backend selection; existing #169 contracts require explicit compatibility work before changes.
@@ -155,6 +164,41 @@ Force unwrapping optionals with `!` is absolutely prohibited. Use safe alternati
 - `try #require()` in tests
 - Nil coalescing (`??`)
 - Optional chaining (`?.`)
+
+## Text Encoding
+
+- UTF-8 is the only supported text encoding. Reject invalid UTF-8 with a
+  user-visible error; do not guess legacy encodings or silently replace invalid
+  bytes while decoding authoritative input.
+- Encoding validity and BOM handling are separate. Follow the specific input
+  contract rather than adding a blanket BOM rule: fm-var sources explicitly
+  accept one leading UTF-8 BOM, while canonical Markdown frontmatter mutation
+  envelopes reject BOM-prefixed blocks.
+- Existing references: `docs/collection-index.md` (non-UTF-8 read failures),
+  `Sources/MarkdownUtilitiesCore/Documentation.docc/ResolvingFMVarSources.md`
+  (strict UTF-8 and BOM handling), and `docs/resource-mutations.md`.
+
+## Line Endings and CRLF
+
+- **LF is the only supported newline format for Markdown document processing.
+  CRLF and mixed-line-ending documents are unsupported; do not silently normalize
+  them or claim reliable parsing. Operations promising byte preservation must
+  still preserve untouched bytes.**
+- Unsupported input does not imply that every existing command detects or rejects
+  it. This support policy is not a claim of uniform runtime enforcement.
+- Follow the existing LF-only **frontmatter delimiter** policy. Do not normalize
+  CRLF delimiter blocks to LF to make them recognizable. Frontmatter parser tests
+  must explicitly verify CRLF delimiter non-recognition; mutation codecs reject
+  unsupported delimiter forms rather than silently repairing them.
+- Preserving existing CRLF body bytes is a preservation safeguard, not a guarantee
+  of supported body parsing. Standalone YAML decoding follows its supported YAML
+  line endings. Preserve all original bytes on semantic no-ops.
+- New line-oriented inputs (for example file lists) need their own documented
+  delimiter contract. Do not infer it from the frontmatter rule or introduce
+  global newline normalization. Include relevant LF/CRLF regression cases.
+- Authoritative guidance: `docs/testing-standards.md` (Regression Tests),
+  `docs/resource-mutations.md` (byte preservation and canonical LF delimiters),
+  and `FMVarMarkdownYAMLExtractor`'s documented standalone-YAML distinction.
 
 ## Path Conventions
 

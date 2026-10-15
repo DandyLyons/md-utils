@@ -50,15 +50,18 @@ public enum MarkdownRelationshipNativeCollection {
             """, arguments: StatementArguments(scopes.map(\.id)))
           var result: [(String, String, Double, String)] = []
           while let row = try cursor.next() {
-            guard result.count < limits.records else { throw IndexProjectError("relationship.limit.exceeded: indexed record budget") }
+            // Retain one sentinel row so the caller can report a bounded partial
+            // snapshot instead of discarding every available result.
+            guard result.count <= limits.records else { break }
             result.append((row["path"], row["hash"], row["mtime"], row["state"]))
           }
           return result
         }
         var records: [String: MarkdownRecord] = [:]
         var limitations = indexedOnly ? ["New files were not discovered. Coverage is limited to recorded candidates."] : []
+        if baselines.count > limits.records { limitations.append("relationship.limit.exceeded: indexed record budget") }
         var bytes = 0
-        for (path, hash, _, state) in baselines {
+        for (path, hash, _, state) in baselines.prefix(limits.records) {
           try Task.checkCancellation()
           guard state == "ok", isMarkdown(path) || includeNonMarkdown else {
             if state != "ok" { limitations.append("Unavailable recorded candidate: \(path)") }
@@ -73,13 +76,17 @@ public enum MarkdownRelationshipNativeCollection {
           catch { limitations.append("\(path): \(error.localizedDescription)") }
         }
         // Basename coverage includes attachments. Indexed-only never performs this discovery.
-        let paths = indexedOnly ? Set(baselines.filter { $0.3 == "ok" }.map(\.0)) : try discover(root: url, maximum: limits.candidates)
+        let discovery = indexedOnly
+          ? (paths: Set(baselines.prefix(limits.records).filter { $0.3 == "ok" }.map(\.0)), complete: false)
+          : try discoverBounded(root: url, maximum: limits.candidates)
+        let paths = discovery.paths
+        if !indexedOnly && !discovery.complete { limitations.append("relationship.limit.exceeded: candidate discovery budget") }
         try verify(records: &records, root: url, maximum: limits.bytes, limitations: &limitations)
         if !indexedOnly && Set(paths.filter { isMarkdown($0) || includeNonMarkdown }) != Set(records.keys) {
           limitations.append("Source coverage has unavailable or changed records")
         }
-        let namespaceStable = indexedOnly ? false : try paths == discover(root: url, maximum: limits.candidates)
-        if !indexedOnly && !namespaceStable { limitations.append("Candidate namespace changed during snapshot construction") }
+        let namespaceStable = indexedOnly || !discovery.complete ? false : try paths == discover(root: url, maximum: limits.candidates)
+        if !indexedOnly && discovery.complete && !namespaceStable { limitations.append("Candidate namespace changed during snapshot construction") }
         let generation = try database.freshness().generation
         guard generation == report.generation else { throw IndexProjectError("Index generation changed during materialization") }
         let retainedPaths = indexedOnly ? paths.filter { !isMarkdown($0) || records[$0] != nil } : paths
@@ -106,9 +113,10 @@ public enum MarkdownRelationshipNativeCollection {
   public static func readOnly(root: URL, limits: MarkdownRelationshipLimits = .init(),
     includeNonMarkdown: Bool = false,
   ) async throws -> MarkdownRelationshipCollection {
-    let paths = try discover(root: root, maximum: limits.candidates)
+    let discovery = try discoverBounded(root: root, maximum: limits.candidates)
+    let paths = discovery.paths
     var records: [String: MarkdownRecord] = [:]
-    var limitations: [String] = []
+    var limitations: [String] = discovery.complete ? [] : ["relationship.limit.exceeded: candidate discovery budget"]
     var bytes = 0
     for path in paths.sorted() where isMarkdown(path) || includeNonMarkdown {
       try Task.checkCancellation()
@@ -125,8 +133,8 @@ public enum MarkdownRelationshipNativeCollection {
     }
     let generation = IndexFingerprint.combined(records.keys.sorted().map { $0 + (records[$0]?.revision?.rawValue ?? "") } + paths.sorted())
     try verify(records: &records, root: root, maximum: limits.bytes, limitations: &limitations)
-    let namespaceStable = try paths == discover(root: root, maximum: limits.candidates)
-    if !namespaceStable { limitations.append("Candidate namespace changed during snapshot construction") }
+    let namespaceStable = discovery.complete ? try paths == discover(root: root, maximum: limits.candidates) : false
+    if discovery.complete && !namespaceStable { limitations.append("Candidate namespace changed during snapshot construction") }
     return .init(identity: root.path, generation: generation, records: records, paths: paths,
       sourcesComplete: limitations.isEmpty, candidatesComplete: namespaceStable, limitations: limitations)
   }
@@ -176,13 +184,20 @@ public enum MarkdownRelationshipNativeCollection {
   }
 
   private static func discover(root: URL, maximum: Int) throws -> Set<String> {
+    let result = try discoverBounded(root: root, maximum: maximum)
+    guard result.complete else { throw IndexProjectError("relationship.limit.exceeded: candidate discovery budget") }
+    return result.paths
+  }
+
+  private static func discoverBounded(root: URL, maximum: Int) throws -> (paths: Set<String>, complete: Bool) {
     let cursor = try IndexSourceCursor(directory: root, includeNonMarkdown: true)
     var paths: Set<String> = []
     while let file = try cursor.next() {
-      guard paths.count < maximum else { throw IndexProjectError("relationship.limit.exceeded: candidate discovery budget") }
+      try Task.checkCancellation()
+      guard paths.count < maximum else { return (paths, false) }
       paths.insert(String(file.path.dropFirst(root.path.count + 1)))
     }
-    return paths
+    return (paths, true)
   }
 
   private static func isMarkdown(_ path: String) -> Bool {

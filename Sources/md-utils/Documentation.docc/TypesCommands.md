@@ -5,8 +5,14 @@ Create, inspect, assess, identify, verify, and repair typed Markdown records.
 `types check` assesses named mdtype v2 relationships with the project's collection
 context. Use `relationships` (alias `rel`) to query declaration-scoped occurrences:
 `outgoing` (`out`), `incoming` (`in`), or `both`, with explicit `--root ./vault/`,
-`--type`, optional `--relation`, and `--json` or `--yaml`. Self-links have a separate
-section. Existing indexes refresh automatically; `--no-index`, `--indexed-only`
+optional declaring-contract override `--type`, `--relation` (requiring `--type`),
+and `--json` or `--yaml`. All formats use `--detail summary|explain|evidence`, defaulting
+to concise triples and ordinary links. Files, folders, structural types, rule
+applicability, YAML tags, JMESPath and LF/NUL file lists can select documents.
+Multiple selectors require explicit union/intersection. Incoming discovery remains
+root-wide. Complete queries exit 0; incomplete queries exit 1 with available results.
+Self-links have a separate
+section. Existing indexes refresh automatically; `--no-index`, `--indexed-only` (`--index-only`)
 and `--verify-hashes` follow existing freshness conventions. Indexed-only coverage
 cannot prove incoming absence or basename uniqueness. Domain truth remains the
 user's responsibility; validation checks explicit structural assertions.
