@@ -699,6 +699,9 @@ The native server is built and tested on Linux in Docker in CI.
 
 ## Architecture
 
+See [the concept stack](CONCEPT_STACK.md) for how schemas, types, and rules
+interoperate, and the proposed standards layer above them.
+
 - **Swift 6.3** or later
 - **MarkdownUtilitiesCore** for portable content operations on Apple platforms, Linux, and WebAssembly
 - **MarkdownUtilities** for native filesystem and metadata integrations
