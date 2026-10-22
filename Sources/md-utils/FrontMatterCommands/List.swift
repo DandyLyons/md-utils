@@ -22,8 +22,6 @@ extension CLIEntry.FrontMatterCommands {
 
         When processing multiple files, each file's keys are prefixed with the filename.
         Keys are listed one per line in alphabetical order.
-        Currently stops at the first file with no keys. Use fm dump for a
-        complete collection inventory.
         """),
       aliases: ["ls"]
     )
@@ -62,7 +60,7 @@ extension CLIEntry.FrontMatterCommands {
           // Print keys
           if keys.isEmpty {
             print("  (no frontmatter keys)")
-            return
+            continue
           }
           if files.count > 1 {
             // Multiple files: prefix with filename

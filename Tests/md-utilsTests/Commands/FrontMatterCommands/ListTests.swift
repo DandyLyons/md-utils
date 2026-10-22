@@ -204,7 +204,61 @@ struct ListTests {
     try await command.run()
   }
 
+  @Test(arguments: [
+    "# No frontmatter\n",
+    "---\n{}\n---\nBody\n",
+    "+++\n+++\nBody\n",
+  ], [false, true])
+  func `fm list continues to populated files after keyless files`(
+    keylessContent: String,
+    directoryInput: Bool,
+  ) throws {
+    let directory = try createBatchWorkspace()
+    defer { try? directory.delete() }
+    let keyless = directory + "a-keyless.md"
+    let populated = directory + "b-populated.md"
+    try keyless.write(keylessContent)
+    try populated.write("---\ntitle: Later file\nauthor: Jane\n---\nBody\n")
+
+    // Capture stdout to prove later files are visited, for both explicit lists
+    // and directory expansion; a successful exit alone misses the original bug.
+    let inputs = directoryInput ? [directory.string] : [keyless.string, populated.string]
+    let result = try CLIProcessTestHelper.run(["fm", "list"] + inputs)
+    #expect(result.status == 0)
+    #expect(result.standardOutput.contains("(no frontmatter keys)"))
+    #expect(result.standardOutput.contains("\(populated.string):\n  author\n  title\n"))
+  }
+
+  @Test
+  func `fm list retains earlier failures when a later file has no keys`() throws {
+    let directory = try createBatchWorkspace()
+    defer { try? directory.delete() }
+    let invalid = directory + "a-invalid.md"
+    let keyless = directory + "b-keyless.md"
+    let populated = directory + "c-populated.md"
+    try invalid.write("---\ntags: [\n---\nBody\n")
+    try keyless.write("# No frontmatter\n")
+    try populated.write("---\ntitle: Later file\n---\nBody\n")
+
+    // A keyless file must neither suppress accumulated errors nor prevent
+    // remaining valid files from producing their keys.
+    let result = try CLIProcessTestHelper.run([
+      "fm", "list", invalid.string, keyless.string, populated.string,
+    ])
+    #expect(result.status == 1)
+    #expect(result.standardError.contains(invalid.string))
+    #expect(result.standardOutput.contains("\(populated.string):\n  title\n"))
+  }
+
   // MARK: - Test Helpers
+
+  /// Keep new batch regression fixtures isolated beneath the package's tmp/ directory.
+  private func createBatchWorkspace() throws -> Path {
+    let root = Path(#filePath).parent().parent().parent().parent().parent()
+    let directory = root + "tmp/fm-list-\(UUID().uuidString)"
+    try directory.mkpath()
+    return directory
+  }
 
   /// Create a temporary markdown file with the given content
   private func createTempFile(content: String, name: String) throws -> Path {

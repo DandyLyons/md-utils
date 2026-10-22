@@ -88,8 +88,9 @@ Directory and explicit file-list invocations output an object whose
 nonempty mappings, absent blocks, and complete blocks with empty mappings.
 
 `fm has` prints `true`/`false` and succeeds for a missing key; read/parse errors
-fail. `fm list` currently stops at the first file with no keys; use `fm dump`
-for a complete collection inventory. `fm rename` uses `--key` and `--new-key`;
+fail. `fm list` continues through files without keys and retains failures from
+earlier files. Use `fm dump` for a categorized collection inventory.
+`fm rename` uses `--key` and `--new-key`;
 `fm touch` uses plural `--keys`. Frontmatter mutation commands write directly;
 `fm sort-keys` does not take `--in-place`.
 

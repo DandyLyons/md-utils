@@ -238,8 +238,9 @@ no matches fail. Missing/non-array keys are skipped even with `--invert`.
 `fm has` prints true/false and succeeds for missing keys; never use its exit code
 as a presence predicate. `fm set --value` always stores a string, not a boolean
 or array. `fm dump --format raw` reserializes the source format; it does not
-preserve original bytes or comments. Use `fm dump` for full collection inventory;
-`fm list` currently stops at the first file without keys.
+preserve original bytes or comments. Use `fm dump` for categorized collection
+inventory. `fm list` continues through files without keys and retains failures
+from earlier files.
 
 ```bash
 md-utils fm set --key author --value "Jane Doe" posts/

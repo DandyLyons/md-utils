@@ -227,9 +227,10 @@ skill synchronization coverage.
 - Preserve existing search behavior: no matches yield empty stdout even with
   structured formats; per-file JMESPath evaluation errors are skipped. Search
   scans hidden descendants and does not accept shared traversal flags.
-- Preserve existing `fm list` early return on keyless files and aggregate
-  multi-target backlink matches. Help now describes these limits; changing their
-  behavior requires separate work. Query backlinks one target at a time.
+- Preserve aggregate multi-target backlink matches. Help describes this limit;
+  changing the behavior requires separate work. Query backlinks one target at
+  a time. The keyless-file `fm list` limit recorded during the audit was fixed
+  in the subsequent follow-up below.
 - `types add` has a local `--version <version>` option and also inherits a
   generated `--version` flag line. The discussion explains the local contract
   version and points to root `md-utils --version` for CLI version. Removing this
@@ -240,3 +241,25 @@ skill synchronization coverage.
 - This is help/usage verification, not a new exhaustive behavioral or security
   audit of every existing command. Unrelated runtime defects and new features
   remain outside issue #187's scope.
+
+## Follow-up: keyless files in fm list
+
+The subsequent `fm list` fix changes the keyless-file branch from returning out
+of the command to continuing its loop. Files after absent or empty frontmatter
+now produce their keys, and errors from earlier files still cause a failing exit
+status after all inputs are processed. The existing keyless-file output is
+preserved. CLI help no longer lists the obsolete limitation; DocC and both skill
+copies describe the corrected behavior.
+
+New regressions cover absent frontmatter, empty YAML and empty TOML before a
+populated file, with both explicit file lists and directory inputs. Another
+regression covers an invalid file followed by a keyless and a populated file.
+All seven cases failed against the original command, demonstrating both omitted
+output and the suppressed error exit status.
+
+Verification: `swift test --disable-automatic-resolution --filter
+'ListTests|CLIHelpTests|AgentCommandsTests|NonMDFrontmatterCLISemanticsTests'`
+passed **49 tests in 4 suites** after the fix. Viewed and verified the built
+executable's `fm list --help` and parent `fm --help`. Canonical/bundled skill
+comparison and `git diff --check` passed; `Package.resolved` remains unchanged.
+Linux validation remains CI-only and local WASM checks remain deferred.
