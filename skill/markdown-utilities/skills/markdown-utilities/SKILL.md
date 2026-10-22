@@ -21,8 +21,8 @@ For mdtype v2 wikilink spelling checks, declare top-level
 `format: Wikilink`: `styles` accepts an unordered array of `name`, `vault-path`,
 `relative-path`, `self-anchor`; `markdownExtension` accepts `require`, `omit`,
 `either`. A root-level bare name is not strict vault-path style. These checks never
-rewrite or resolve links. Existing
-`links convert` behavior is unchanged; contract-aware conversion is separate work.
+rewrite or resolve links. Explicit `links convert --type Name` can preview or
+apply contract-aware frontmatter repairs; validation itself remains read-only.
 
 For named frontmatter assertions, declare `requires: [document-relationships]`
 and a top-level `relationships` mapping. Each name has a literal-key/array `select`
@@ -121,6 +121,18 @@ with `--scope all|body|frontmatter`; repeated `--key` requires frontmatter scope
 are skipped. Writes check revisions, preserve no-ops, and stop at the first file
 failure with partial-completion reporting. Metadata edits may reformat frontmatter.
 Markdown-link output and server conversion are not supported by this command.
+
+Alternatively, `links convert files/ --root vault/ --type Name` repairs declared
+whole-value frontmatter wikilinks, including nested keys/arrays. It replaces `--to`;
+body/all scope is invalid. `--key` optionally filters literal top-level subtrees.
+`--prefer-style name|vault-path|relative-path|self-anchor` and extension include/omit
+only disambiguate contract-permitted repairs; auto supplies no extension preference.
+Conforming values remain unchanged. Recommended schemas need
+`--include-recommendations`. Ambiguous branch intent/output, missing destinations,
+or unrepresentable requirements stay unresolved and cause nonzero exit status.
+JSON separates occurrence outcomes from whole-type assessment. Preview uses bounded
+read-only collection evidence; application preserves passing required conformance
+and rechecks definitions, sources and candidates before revision-checked writes.
 
 Wikilink paths containing `/` resolve only from the vault root unless prefixed
 with `./` or `../` for source-relative resolution. Missing paths never fall back

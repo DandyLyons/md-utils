@@ -1,13 +1,15 @@
 import ArgumentParser
 import Foundation
 import MarkdownUtilities
+import MarkdownUtilitiesCore
+import MarkdownUtilitiesIndexNative
 import PathKit
 
 extension CLIEntry {
   struct ConvertLinks: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "convert",
-      abstract: "Convert wikilink targets between wiki-path and wiki-link styles",
+      abstract: "Convert wikilink targets to a style or loaded type's constraints",
       discussion: """
         Preview by default; --in-place explicitly writes changes. --root is required.
         wiki-path emits collection-root-relative paths with extensions; wiki-link
@@ -15,9 +17,14 @@ extension CLIEntry {
         non-Markdown extensions are always retained. Missing, ambiguous,
         or destination-changing conversions are skipped with diagnostics.
         Self-heading links are preserved. Body scanning includes literal wikilinks
-        in code. Frontmatter selection processes strings and arrays, not objects.
+        in code. --to frontmatter selection processes strings and arrays, not objects.
         Metadata edits preserve values but may reformat YAML/TOML and remove comments.
+        Alternatively, --type selects declared whole-value frontmatter wikilinks,
+        including nested objects/arrays. Preferences only disambiguate permitted
+        repairs; conforming values stay unchanged. Unresolved repairs exit nonzero.
+        Contract preview reads bounded collection evidence without refreshing an index.
         Example: md-utils links convert --to wiki-path notes/ --root vault/
+        Example: md-utils links convert notes/ --root vault/ --type Article --prefer-style relative-path
         """,
     )
 
@@ -25,12 +32,18 @@ extension CLIEntry {
     @Option(name: .long, help: "Required collection root directory (vault/)", transform: { Path($0) })
     var root: Path
     @Option(name: .long, help: "Target style: wiki-path or wiki-link")
-    var to: String
-    @Option(name: .long, help: "Markdown extensions: auto (include for wiki-path, omit for wiki-link), include, omit; other extensions are always retained")
+    var to: String?
+    @Option(name: .long, help: "Loaded mdtype v2 name; mutually exclusive with --to; selects declared frontmatter values")
+    var type: String?
+    @Option(name: .long, help: "Contract repair preference: name, vault-path, relative-path, self-anchor")
+    var preferStyle: String?
+    @Flag(name: .long, help: "Include recommended schemas in contract repairs")
+    var includeRecommendations = false
+    @Option(name: .long, help: "Markdown extensions: auto (style default, or no preference with --type), include, omit; never overrides a contract")
     var markdownExtension = "auto"
     @Option(name: .long, help: "Occurrences to select: all, body, frontmatter")
-    var scope = "all"
-    @Option(name: .long, help: "Literal top-level key; repeatable, requires --scope frontmatter")
+    var scope: String?
+    @Option(name: .long, help: "Literal top-level key/subtree; repeatable, requires --scope frontmatter with --to")
     var key: [String] = []
     @Flag(name: .long, help: "Write changes instead of only previewing them")
     var inPlace = false
@@ -38,14 +51,24 @@ extension CLIEntry {
     var json = false
 
     mutating func run() async throws {
-      guard let style = WikilinkTargetStyle(rawValue: to) else {
-        throw ValidationError("--to must be wiki-path or wiki-link")
-      }
-      guard let selection = WikilinkConversionScope(rawValue: scope) else {
-        throw ValidationError("--scope must be all, body, or frontmatter")
-      }
+      guard (type == nil) != (to == nil) else { throw ValidationError("Specify exactly one of --to or --type") }
       guard let extensionPolicy = WikilinkMarkdownExtension(rawValue: markdownExtension) else {
         throw ValidationError("--markdown-extension must be auto, include, or omit")
+      }
+      if let type {
+        guard scope == nil || scope == "frontmatter" else { throw ValidationError("--type selects frontmatter; --scope must be frontmatter if supplied") }
+        guard preferStyle.map({ ["name", "vault-path", "relative-path", "self-anchor"].contains($0) }) ?? true else {
+          throw ValidationError("--prefer-style must be name, vault-path, relative-path, or self-anchor")
+        }
+        try await runContract(type: type)
+        return
+      }
+      guard preferStyle == nil && !includeRecommendations else { throw ValidationError("--prefer-style and --include-recommendations require --type") }
+      guard let to, let style = WikilinkTargetStyle(rawValue: to) else {
+        throw ValidationError("--to must be wiki-path or wiki-link")
+      }
+      guard let selection = WikilinkConversionScope(rawValue: scope ?? "all") else {
+        throw ValidationError("--scope must be all, body, or frontmatter")
       }
       guard key.isEmpty || selection == .frontmatter else {
         throw ValidationError("--key requires --scope frontmatter")
@@ -109,7 +132,71 @@ extension CLIEntry {
       }
       if stopped { throw ExitCode.failure }
     }
+
+    private func runContract(type: String) async throws {
+      let files = try options.resolvedPaths(skipSymlinks: true)
+      guard !files.isEmpty else { throw ValidationError("No Markdown files found") }
+      let preferences = WikilinkContractPreferences(style: preferStyle,
+        markdownExtension: markdownExtension == "auto" ? nil : markdownExtension,
+        keys: key, includeRecommendations: includeRecommendations)
+      var reports: [ContractConversionFileReport] = []
+      var stopped = false
+      var cancelled = false
+      for file in files {
+        if stopped {
+          reports.append(.init(file: file.string, status: "unprocessed", changes: [], assessment: nil, error: nil))
+          continue
+        }
+        do {
+          try Task.checkCancellation()
+          let result = try await WikilinkContractConversionSession.run(file: file, root: root, type: type,
+            preferences: preferences, apply: inPlace)
+          var changes = result.plan.changes
+          if result.applied {
+            for index in changes.indices where changes[index].status == "would-change" { changes[index].status = "changed" }
+          }
+          reports.append(.init(file: file.string,
+            status: result.plan.hasChanges ? (result.applied ? "changed" : "would-change") : (result.plan.unresolved ? "unresolved" : "unchanged"),
+            changes: changes, assessment: result.assessment, error: nil))
+        } catch {
+          reports.append(.init(file: file.string, status: "failed", changes: [], assessment: nil, error: error.localizedDescription))
+          stopped = true
+          cancelled = error is CancellationError
+        }
+      }
+      if json {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        print(String(decoding: try encoder.encode(reports), as: UTF8.self))
+      } else {
+        for report in reports {
+          print("\(report.file): \(report.status)")
+          for change in report.changes {
+            let path = change.path.map { component in
+              switch component { case .key(let key): "[\(key)]"; case .index(let index): "[\(index)]" }
+            }.joined()
+            print("  frontmatter\(path): \(change.status)\(change.replacement.map { " → " + $0 } ?? "")\(change.reason.map { ": " + $0 } ?? "")")
+          }
+          if let assessment = report.assessment {
+            print("  Whole type \(type): \(assessment.outcome.rawValue)")
+            for diagnostic in assessment.diagnostics { print("    \(diagnostic.location): \(diagnostic.message)") }
+          }
+          if let error = report.error { print("  \(error)") }
+        }
+        if !inPlace { print("Preview only. Use --in-place to write changes.") }
+      }
+      if cancelled { throw CancellationError() }
+      if stopped || reports.contains(where: { $0.changes.contains { $0.status == "unresolved" } }) { throw ExitCode.failure }
+    }
   }
+}
+
+private struct ContractConversionFileReport: Encodable {
+  let file: String
+  let status: String
+  let changes: [WikilinkContractChange]
+  let assessment: MarkdownTypeAssessment?
+  let error: String?
 }
 
 private struct LinkConversionFileReport: Encodable {

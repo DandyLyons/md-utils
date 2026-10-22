@@ -1,7 +1,8 @@
 # Wikilink target conversion
 
 `links convert` rewrites existing wikilinks between collection-root-relative path
-style (`wiki-path`) and unique name style (`wiki-link`). It does not convert to
+style (`wiki-path`) and unique name style (`wiki-link`), or repairs declared
+frontmatter wikilinks toward a loaded mdtype v2 contract with `--type`. It does not convert to
 ordinary Markdown links or expose server endpoints (follow-ups #182 and #183).
 
 ```bash
@@ -20,14 +21,14 @@ md-utils links convert --to wiki-path vault/notes/ --root vault/ \
   --scope frontmatter --key related --key references --json
 ```
 
-`--root` and `--to` are required. Input paths follow the ordinary CLI file-selection
+`--root` and exactly one of `--to` or `--type` are required. Input paths follow the ordinary CLI file-selection
 rules (relative to the working directory, recursive by default); `--root` does
 not rebase input paths. Inputs must be inside the collection. Direct symlink inputs and
 symlink ancestors are rejected; directory discovery skips symlinks before recursion.
 Resolution excludes hidden files and symlinks.
 Existing global selection flags, including `--no-recursive`, apply.
 
-`--scope all|body|frontmatter` defaults to `all`. Repeatable `--key` requires
+In `--to` mode, `--scope all|body|frontmatter` defaults to `all`. Repeatable `--key` requires
 `--scope frontmatter`; absent keys are ignored. Selected frontmatter strings and
 arrays (including nested arrays) are traversed; object values are not traversed.
 Body scanning follows the existing wikilink scanner, including literal wikilinks
@@ -98,4 +99,86 @@ a persisted plan: a later `--in-place` invocation replans against current files.
 Uncoordinated external edits can still race the final check and replacement, or
 change link targets after resolution; this command does not lock other editors.
 
-Tests: `swift test --filter 'Wikilink|ConvertLinksTests'`.
+## Contract-aware conversion (#185)
+
+```bash
+# Preview declarations from the loaded Article type; paths remain working-directory-relative.
+md-utils links convert vault/notes/ --root vault/ --type Article
+
+# Resolve output ambiguity without overriding the contract.
+md-utils links convert vault/notes/ --root vault/ --type Article \
+  --prefer-style relative-path --markdown-extension omit --json
+
+# Apply only the selected literal top-level subtree, including nested objects/arrays.
+md-utils links convert vault/notes/ --root vault/ --type Article \
+  --key references --include-recommendations --in-place
+```
+
+Contract mode selects whole-value Wikilink declarations in required loaded schemas.
+It supports nested objects/arrays and literal punctuation in keys. It never scans
+body text or repairs a wikilink substring inside prose. `--scope` may be omitted
+or explicitly `frontmatter`; `all` and `body` are rejected. `--key` filters literal
+top-level subtrees and does not require an explicit scope in this mode.
+`--include-recommendations` opts into recommended schemas. Property-name rewriting
+and missing-value creation are outside this mode.
+
+Already-conforming occurrences remain unchanged, even if a preference requests a
+different spelling. Repairs enumerate canonical name, vault-path, relative-path,
+and (for same-file anchored links) self-anchor spellings, with actual or omitted
+Markdown suffixes. Only uniquely resolved, representable outputs preserving the
+original destination, alias, fragment and embed prefix are eligible. There is no
+invented root marker or filesystem-absolute style. Attachments retain their suffix;
+the contract can still make an attachment impossible to repair.
+
+`--prefer-style name|vault-path|relative-path|self-anchor` and
+`--markdown-extension include|omit` filter permissible repair candidates.
+In contract mode `auto` means no extension preference. Exactly one candidate is
+required; zero candidates or remaining ambiguity produces an unresolved result.
+Preferences never weaken constraints, and a styles array's order has no meaning.
+
+References and mandatory `allOf` checks share the semantic schema adapter.
+For failing alternatives, the planner removes lexical policies only to determine
+whether exactly one branch has compatible non-lexical shape; the actual candidate
+must satisfy that branch's full assertions. Ambiguous alternatives, failing
+negated declarations, failing existential `contains`, and link-dependent conditions
+require review rather than guessed edits. Already-satisfied alternatives are not
+repaired through failing sibling branches. Conditions selected by unrelated values
+are supported, and the combined proposal must retain declaration applicability.
+
+Each file is planned against a bounded authoritative collection snapshot. The
+existing Fix-It transition evaluator blocks newly introduced required failures,
+lost passing type conformance, lost rule membership, and unavailable preservation
+evidence. The combined document is reassessed; lexical repair success does not
+mean full type or relationship conformance. Existing unrelated failures remain
+reported separately and do not alone cause the conversion command to fail.
+
+Preview does not create locks, write an index, or refresh cached evidence.
+Application holds the collection writer lease and rechecks definitions, every
+supporting source revision, and the candidate namespace before the existing atomic
+source-revision-checked write. This does not lock external editors or provide batch
+atomicity. Each file is replanned after earlier writes. No-op bytes and timestamps
+are preserved; metadata edits may change comments/formatting but retain native
+values and untouched body bytes.
+
+Contract JSON remains an array of file reports, with `file`, `status`, `changes`,
+`assessment`, and optional `error`. Each change has typed `path` key/index components,
+`original`, optional `replacement`, `status`, optional `reason`, and declaration
+locations. Change statuses are `unchanged`, `would-change`, `changed`, and
+`unresolved`. A rejected proposal may retain its suggested replacement for review;
+only `changed` confirms a write. The separate `assessment` reports the resulting
+whole-type pass/fail/unavailable outcome and diagnostics.
+
+Exit 1 means a requested repair remains unresolved or a file failed operationally.
+Safe repairs can be applied alongside unresolved occurrences; every unresolved
+occurrence remains visible, even in a file reported as `changed`. Operational
+failure stops the batch, preserving prior writes and listing later files as
+`unprocessed`. A blocker rejects the combined edit for that file.
+
+Costs are deliberately conservative: each file's preservation check can read and
+assess the whole collection. The shared snapshot budgets are 10,000 records,
+64 MiB of source bytes and 100,000 candidates; the Fix-It evaluator also bounds
+record/type combinations and graph work. Schema selection is bounded to 100,000
+visits and 128 levels. Each selected source and proposed document is limited to
+8 MiB, matching shared Fix-It mutations. Budget exhaustion never authorizes an unchecked write.
+
+Tests: `swift test --filter 'Wikilink|ContractConvertLinksTests|ConvertLinksTests'`.

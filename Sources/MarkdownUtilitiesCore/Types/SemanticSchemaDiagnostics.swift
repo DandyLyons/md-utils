@@ -20,9 +20,9 @@ struct SemanticSchemaDiagnostics {
     _ = try expanded(root, base: "", depth: 0)
   }
 
-  private func valid(_ schema: JSONValue, value: JSONValue, path: String, base: String = "") throws -> Bool {
+  func valid(_ schema: JSONValue, value: JSONValue, path: String, base: String = "") throws -> Bool {
     let expanded = try expanded(schema, base: base, depth: 0)
-    guard case .object(var object) = try SemanticSchemaAdapter.specialize(expanded, instance: instance) else {
+    guard case .object(var object) = try SemanticSchemaAdapter.specialize(expanded, instance: .array([instance, value])) else {
       return schema != .boolean(false)
     }
     object["$schema"] = .string("https://json-schema.org/draft/2020-12/schema")
@@ -155,7 +155,7 @@ struct SemanticSchemaDiagnostics {
     return result
   }
 
-  private func expanded(_ schema: JSONValue, base: String, depth: Int) throws -> JSONValue {
+  func expanded(_ schema: JSONValue, base: String, depth: Int) throws -> JSONValue {
     var remaining = 10_000
     return try expanded(schema, base: base, depth: depth, remaining: &remaining)
   }
@@ -188,7 +188,7 @@ struct SemanticSchemaDiagnostics {
     return .object(object)
   }
 
-  private func resolve(_ reference: String) -> JSONValue? {
+  func resolve(_ reference: String) -> JSONValue? {
     let parts = reference.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)
     var resource: JSONValue?
     if parts.first == "" { resource = root }

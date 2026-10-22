@@ -40,3 +40,18 @@ Aliases, fragments, and embeds are preserved. Body-only edits preserve frontmatt
 bytes; metadata edits may reformat YAML/TOML. No-op files are not written. Writes
 check source revisions; a batch stops at its first failure and reports partial
 completion. See `docs/wikilink-conversion.md` for detailed semantics.
+
+## Convert declared frontmatter links
+
+Use `md-utils links convert vault/notes/ --root vault/ --type Article` to preview
+repairs for a loaded mdtype v2's declared whole-value wikilinks, including nested
+keys and arrays. `--type` replaces `--to`; body selection is not supported in this
+mode. `--prefer-style` and `--markdown-extension include|omit` select among valid
+outputs only. Already-conforming values stay unchanged; `auto` means no extension
+preference. Recommended schemas require `--include-recommendations`.
+
+The command preserves destination identity and passing required conformance.
+Ambiguous schema intent or output, missing targets and unrepresentable constraints
+remain unresolved. `--json` separates per-occurrence repairs from whole-type
+assessment. Unresolved repairs exit nonzero, including after partial writes.
+Preview is read-only; `--in-place` rechecks authoritative evidence before writing.

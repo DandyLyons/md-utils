@@ -205,6 +205,9 @@ swift run md-utils links backlinks --vault ~/notes/ --target "My Note"
 # Preview explicit-path wikilinks; add --in-place to write
 swift run md-utils links convert --to wiki-path ~/notes/ --root ~/notes/
 
+# Preview repairs for a loaded mdtype's declared frontmatter wikilinks
+swift run md-utils links convert ~/notes/ --root ~/notes/ --type Article
+
 # Validate an OKF v0.1 draft bundle
 swift run md-utils okf validate ./knowledge/
 
