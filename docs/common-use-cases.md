@@ -222,6 +222,9 @@ revision check and the atomic replacement.
 md-utils fm has --key published document.md
 ```
 
+Read stdout (`true` or `false`); missing keys still exit 0. File/read/parse errors
+fail. Do not use `fm has ... || ...` to detect absence.
+
 #### List all frontmatter keys
 ```bash
 md-utils fm list document.md
@@ -235,6 +238,12 @@ md-utils fm search 'status == `"published"`' posts/
 ```
 
 `fm search` is YAML-only; TOML support is intentionally out of scope for that command.
+It always searches directories recursively, defaults omitted paths to `.`, and
+reads files directly without an index. `--no-recursive` and `--query` are not
+options. The expression is positional. `--format raw` (default) prints absolute
+paths; `json`, `yaml`, and `plist` serialize the matches; `toml` is rejected.
+No matches exit 0 with empty stdout and a message on stderr. Per-file query
+evaluation errors skip that file; read/parse errors fail after available matches.
 
 ### Frontmatter Array Operations
 
@@ -378,7 +387,9 @@ md-utils okf type set --type=BigQueryTable --dir=./knowledge/tables/
 
 ### Find files with specific tag and publish them
 ```bash
-md-utils fm array contains --key tags --value swift posts/ | xargs md-utils fm set --key published --value true
+md-utils fm array contains --key tags --value swift posts/ | while IFS= read -r file; do
+  md-utils fm set "$file" --key status --value published
+done
 ```
 
 ### Extract TOC and pipe to file
@@ -388,7 +399,7 @@ md-utils toc document.md --format md-bullet-links > toc.md
 
 ### Find files missing a frontmatter key
 ```bash
-find posts/ -name "*.md" | xargs -I {} sh -c 'md-utils fm has --key author {} || echo {}'
+md-utils fm dump posts/ | jq -r '.noFrontMatter[], (.frontMatter[] | select(has("author") | not) | ."$path"), .emptyFrontMatter[]'
 ```
 
 ### Batch update author across all files
@@ -403,7 +414,7 @@ md-utils extract --name "API Reference" document.md | md-utils convert to-text
 
 ### Search for files with status "draft" and list them
 ```bash
-md-utils fm search --key status --value draft . | xargs ls -l
+md-utils fm search 'status == `"draft"`' .
 ```
 
 ### Get all titles from multiple files
@@ -423,7 +434,7 @@ for file in docs/*.md; do echo "## $file"; md-utils toc "$file"; echo; done
 
 ### Find files with multiple tags
 ```bash
-md-utils fm array contains --key tags --value swift posts/ | xargs -I {} sh -c 'md-utils fm array contains --key tags --value tutorial {} && echo {}'
+md-utils fm search 'contains(tags, `"swift"`) && contains(tags, `"tutorial"`)' posts/
 ```
 
 ### Read file metadata

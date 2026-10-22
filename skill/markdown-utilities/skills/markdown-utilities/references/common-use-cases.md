@@ -9,10 +9,10 @@ Practical recipes for the `md-utils` CLI.
 md-utils fm array contains --key tags --value swift posts/
 
 # Find files by frontmatter value
-md-utils fm search --key status --value published posts/
+md-utils fm search 'status == `"published"`' posts/
 
 # Find files missing a key
-find posts/ -name "*.md" | xargs -I {} sh -c 'md-utils fm has --key author {} || echo {}'
+md-utils fm dump posts/ | jq -r '.noFrontMatter[], (.frontMatter[] | select(has("author") | not) | ."$path"), .emptyFrontMatter[]'
 
 # JMESPath search (files where status is "draft")
 md-utils fm search "status == 'draft'" posts/
@@ -30,9 +30,10 @@ md-utils fm set --key updated --value "2026-01-24" posts/
 # Tag all files in a directory
 md-utils fm array append --key tags --value tutorial posts/*.md
 
-# Find files with a tag, then publish them
-md-utils fm array contains --key tags --value swift posts/ \
-  | xargs md-utils fm set --key published --value true
+# Find files with a tag, then set a string status
+md-utils fm array contains --key tags --value swift posts/ | while IFS= read -r file; do
+  md-utils fm set "$file" --key status --value published
+done
 ```
 
 ## Document Structure
@@ -86,13 +87,15 @@ md-utils body document.md
 md-utils extract --name "API Reference" document.md | md-utils convert to-text
 
 # Find files with tag and extract their TOC
-md-utils fm array contains --key tags --value swift posts/ \
-  | xargs -I {} md-utils toc {}
+md-utils fm array contains --key tags --value swift posts/ | while IFS= read -r file; do
+  md-utils toc "$file"
+done
 
 # Find drafts, search for pattern in them
-md-utils fm search "status == 'draft'" posts/ \
-  | xargs grep -l "TODO"
+md-utils fm search 'status == `"draft"`' posts/ | while IFS= read -r file; do
+  grep -l -e "TODO" -- "$file"
+done
 
 # Check wikilinks across a vault
-md-utils links check posts/ --root ~/vault/
+md-utils links check ~/vault/posts/ --root ~/vault/
 ```

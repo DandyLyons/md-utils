@@ -227,6 +227,16 @@ Force unwrapping optionals with `!` is absolutely prohibited. Use safe alternati
 
 ## Documentation
 
+### CLI help verification before committing
+
+Any time an `AsyncParsableCommand` is edited, view its `--help` page from the
+actual executable before committing and verify that the help is up to date with
+the implementation. Check descriptions, defaults, aliases, options, examples,
+output formats, input scope/recursion, frontmatter support, and index behavior
+where applicable. Verify affected parent/group help for discoverability and any
+other help pages changed through shared options or command configuration. Rebuild
+first when needed; record the verification in the task's review notes.
+
 Detailed guidance organized by topic:
 
 - **[Architecture](docs/architecture.md)** - Project structure, core types, dependencies, features

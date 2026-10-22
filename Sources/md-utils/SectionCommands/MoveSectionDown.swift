@@ -63,7 +63,7 @@ extension CLIEntry {
 
     @Option(
       name: [.short, .long],
-      help: "Number of positions to move (default: 1)"
+      help: "Number of positions to move"
     )
     var count: Int = 1
 

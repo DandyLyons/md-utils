@@ -22,6 +22,8 @@ extension CLIEntry.FrontMatterCommands {
         Keys are specified as a comma-separated list via --keys.
         If a key already exists, it is left unchanged (idempotent).
         If the document has no frontmatter, it will be created.
+        TOML cannot represent null: adding keys to TOML fails unless you explicitly
+        convert with --frontmatter-format yaml. Existing keys remain unchanged.
 
         The operation is silent on success (no output).
 

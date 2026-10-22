@@ -16,7 +16,8 @@ extension CLIEntry {
   struct Check: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "check",
-      abstract: "Check for broken or ambiguous wikilinks"
+      abstract: "Check for broken or ambiguous wikilinks",
+      discussion: "Reads source files directly. Outputs text by default or a JSON report with --json. Broken or ambiguous targets produce exit 1; list only reports their status. --root controls resolution, not input-path selection.",
     )
 
     @OptionGroup var options: GlobalOptions

@@ -17,6 +17,16 @@ public struct CLIEntry: AsyncParsableCommand {
   public static let configuration = CommandConfiguration(
     commandName: "md-utils",
     abstract: "A utility for working with Markdown files.",
+    discussion: """
+      Discover nested workflows:
+        md-utils fm search --help          Search files with JMESPath (YAML frontmatter).
+        md-utils links convert --help      Preview wikilink conversion, including --type contracts.
+        md-utils relationships --help      Query outgoing, incoming and bidirectional relationships.
+        md-utils rules validate --help     Validate selected files against project rules.
+        md-utils index --help              Manage the optional SQLite collection index.
+
+      Run 'md-utils <command> --help' for each group's subcommands and options.
+      """,
     version: buildVersion,
     subcommands: [
       AgentCommands.self,

@@ -34,7 +34,7 @@ extension CLIEntry.FileMetadataCommands {
 
     @Option(
       name: .long,
-      help: "Output format: md-table, csv, json, json-pretty (default: json-pretty)"
+      help: "Output format: md-table, csv, json, json-pretty"
     )
     var format: OutputFormat = .jsonPretty
 

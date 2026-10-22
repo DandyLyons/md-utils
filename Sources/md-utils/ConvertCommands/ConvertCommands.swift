@@ -18,13 +18,11 @@ extension CLIEntry {
 
         Available commands:
         - to-text: Convert Markdown to plain text
+        - to-csv: Combine YAML/TOML frontmatter and optional bodies into one CSV file
 
-        Future formats (planned):
-        - to-html: Convert Markdown to HTML
-        - to-rtf: Convert Markdown to RTF
-
-        By default, processes directories recursively and outputs
-        converted files with the appropriate extension.
+        Directories are processed recursively by default. to-text writes one
+        file or stdin to stdout; batches require --output ./output/ or --in-place.
+        to-csv writes a CSV file, not stdout. See each subcommand's --help.
         """,
       subcommands: [
         ToText.self,

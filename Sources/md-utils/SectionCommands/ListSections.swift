@@ -13,6 +13,7 @@ extension CLIEntry {
     static let configuration = CommandConfiguration(
       commandName: "list",
       abstract: "List sections/headings in a Markdown document",
+      usage: "md-utils section list [<options>] [<paths> ...]",
       discussion: """
         Lists document sections by extracting Markdown headings in document order.
 
@@ -21,7 +22,10 @@ extension CLIEntry {
           md-utils section list document.md --min-level 2 --max-level 4
           md-utils section list document.md --format plain
 
-        This command is the same as `md-utils toc <file>`.
+        This command is the same as `md-utils toc <file>`: headings-only Markdown
+        by default; use --format md-bullet-links for anchor links. Directories
+        recurse by default. Multiple files include filename headers, including
+        with JSON formats.
         """,
       aliases: ["ls"]
     )

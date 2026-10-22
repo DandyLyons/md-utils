@@ -14,6 +14,21 @@ extension CLIEntry {
         /// Registers directory, type, and rule selection entry points.
         static let configuration = CommandConfiguration(commandName: "index",
             abstract: "Maintain a rebuildable SQLite collection cache",
+            discussion: """
+                Register recursive scopes with index update ./notes/, index type Book ./notes/,
+                or index rule books. Omit the update directory to refresh saved scopes.
+                Scans skip hidden files and symlinks. Files remain authoritative.
+
+                New caches retain metadata only. index search enable opts into body retention
+                and FTS5; query it with index query '<SQL>'. fm search is a separate YAML
+                JMESPath file scan and does not use this index.
+
+                query/explain refresh saved scopes before executing read-only SQL. status,
+                field and search status do not refresh sources; opening them can initialize
+                cache state. --verify-hashes affects refreshes, not those inspection commands.
+                index draft manages durable edits outside the disposable SQLite cache;
+                index apply writes pending source edits unless --dry-run is supplied.
+                """,
             subcommands: [Update.self, Watch.self, SelectType.self, SelectRule.self, Query.self, Explain.self,
                 Field.self, Search.self, Status.self, Provenance.self, Draft.self, Apply.self,])
 
@@ -40,7 +55,7 @@ extension CLIEntry {
             /// Project resolution and content-verification settings.
             @OptionGroup var options: IndexOptions
             /// Forces reevaluation while retaining saved declarations and SQL schema objects.
-            @Flag(help: "Regenerate all saved scopes while preserving field indexes and views") var rebuild = false
+            @Flag(help: "Create a fresh cache from files and saved configuration; restore managed fields/type views, discard history") var rebuild = false
             /// Explicit compatibility recovery from authoritative files.
             @Option(help: "Use text with --rebuild to recover a JSONB cache on older SQLite") var metadataEncoding: String?
             /// Resolves the project and commits a refresh, reporting partial failures.
@@ -100,7 +115,7 @@ extension CLIEntry {
             @Option(help: "Maximum rows to return") var limit = 1_000
             @Option(help: "Maximum aggregate SQLite value bytes") var maxBytes = 64 * 1_024 * 1_024
             @Option(help: "Maximum bytes in one text or BLOB value") var maxValueBytes = 16 * 1_024 * 1_024
-            @Option(help: "Output format: json, jsonl, csv, or nul") var format: IndexQueryFormat = .json
+            @Option(help: "Output: json, jsonl (unique column names), csv, or nul (one text column only)") var format: IndexQueryFormat = .json
 
             mutating func run() async throws {
                 let database = try await options.run(kind: .directory, directory: nil, name: "", quiet: true)
@@ -118,7 +133,7 @@ extension CLIEntry {
             @Option(help: "Maximum plan rows to return") var limit = 1_000
             @Option(help: "Maximum aggregate SQLite value bytes") var maxBytes = 64 * 1_024 * 1_024
             @Option(help: "Maximum bytes in one text or BLOB value") var maxValueBytes = 16 * 1_024 * 1_024
-            @Option(help: "Output format: json, jsonl, csv, or nul") var format: IndexQueryFormat = .json
+            @Option(help: "Output: json, jsonl, or csv; nul is rejected for multi-column query plans") var format: IndexQueryFormat = .json
 
             mutating func run() async throws {
                 let database = try await options.run(kind: .directory, directory: nil, name: "", quiet: true)
@@ -134,6 +149,7 @@ extension CLIEntry {
                 subcommands: [Add.self, Remove.self, List.self])
 
             struct Add: ParsableCommand {
+                static let configuration = CommandConfiguration(abstract: "Add a managed JSON expression index and optional projected column")
                 @Argument(help: "SQLite JSON path, such as $.status") var jsonPath: String
                 @Option(help: "Projected SQL column name (lowercase letters, numbers, underscores)") var name: String?
                 @OptionGroup var options: IndexOptions
@@ -146,6 +162,7 @@ extension CLIEntry {
             }
 
             struct Remove: ParsableCommand {
+                static let configuration = CommandConfiguration(abstract: "Remove a managed field index and its projection")
                 @Argument(help: "JSON path or projected column name") var field: String
                 @OptionGroup var options: IndexOptions
                 mutating func run() throws {
@@ -158,6 +175,7 @@ extension CLIEntry {
             }
 
             struct List: ParsableCommand {
+                static let configuration = CommandConfiguration(abstract: "List managed fields as tab-separated rows without refreshing sources")
                 @OptionGroup var options: IndexOptions
                 mutating func run() throws {
                     for field in try options.context().database.fields() {
@@ -173,6 +191,7 @@ extension CLIEntry {
                 subcommands: [Enable.self, Disable.self, Status.self])
 
             struct Enable: AsyncParsableCommand {
+                static let configuration = CommandConfiguration(abstract: "Enable body retention and FTS5, then refresh saved scopes")
                 @OptionGroup var options: IndexOptions
                 mutating func run() async throws {
                     let database = try options.context().database
@@ -186,6 +205,7 @@ extension CLIEntry {
             }
 
             struct Disable: ParsableCommand {
+                static let configuration = CommandConfiguration(abstract: "Remove retained bodies and FTS5; optionally reclaim space with --vacuum")
                 @OptionGroup var options: IndexOptions
                 @Flag(help: "Run VACUUM after removing cached bodies and FTS pages") var vacuum = false
                 mutating func run() throws {
@@ -196,6 +216,7 @@ extension CLIEntry {
             }
 
             struct Status: ParsableCommand {
+                static let configuration = CommandConfiguration(abstract: "Print stored body mode and metadata encoding without refreshing sources")
                 @OptionGroup var options: IndexOptions
                 mutating func run() throws {
                     let policy = try options.context().database.storagePolicy()
@@ -312,7 +333,7 @@ struct IndexOptions: ParsableArguments {
     /// Alternate SQLite cache path; the stored root must match this project.
     @Option(help: "SQLite index path (defaults to <project-root>/.md-utils/index.sqlite)") var database: String?
     /// Saved per newly registered scope; existing declarations retain their setting.
-    @Flag(name: .customLong("include-non-md"), help: "Include other UTF-8 text files with existing wrapper/comment extraction") var includeNonMD = false
+    @Flag(name: .customLong("include-non-md"), help: "Include non-Markdown UTF-8 files in newly registered scopes; existing scopes retain their setting") var includeNonMD = false
     /// Enables content verification for all scopes in this invocation.
     @Flag(help: "Hash every candidate, detecting content changes even when mtime and size are unchanged") var verifyHashes = false
 

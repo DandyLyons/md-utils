@@ -22,7 +22,7 @@ enum OutputFormat: String, CaseIterable, ExpressibleByArgument {
 
   var defaultValueDescription: String {
     switch self {
-      case .json: return "json (default)"
+      case .json: return "json"
       case .yaml: return "yaml"
       case .toml: return "toml"
       case .raw: return "raw"

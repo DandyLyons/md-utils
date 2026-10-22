@@ -34,7 +34,7 @@ md-utils fm get --key title document.md
 ### Set a value
 ```bash
 md-utils fm set --key author --value "Jane Doe" document.md
-# Batch: applies to all .md files in the directory
+# Batch: recursively applies to .md and .markdown files
 md-utils fm set --key status --value published posts/
 # Create TOML frontmatter
 md-utils fm set --key status --value published --frontmatter-format toml document.md
@@ -43,7 +43,7 @@ md-utils fm set --key status --value published --frontmatter-format toml documen
 ### Check if key exists
 ```bash
 md-utils fm has --key published document.md
-# Exit code 0 = exists, non-zero = not found
+# Prints true/false; a missing key still exits 0. Read/parse errors fail.
 ```
 
 ### List all keys
@@ -67,7 +67,7 @@ md-utils fm rmfm posts/ --yes --include-non-md
 
 ### Rename a key
 ```bash
-md-utils fm rename --old-key pubDate --new-key date document.md
+md-utils fm rename --key pubDate --new-key date document.md
 ```
 
 ### Replace entire frontmatter
@@ -77,12 +77,12 @@ md-utils fm replace --data '{"title":"New Title","author":"Jane"}' document.md
 
 ### Add keys without values (touch)
 ```bash
-md-utils fm touch --key reviewed document.md
+md-utils fm touch --keys reviewed document.md
 ```
 
 ### Sort keys alphabetically
 ```bash
-md-utils fm sort-keys document.md --in-place
+md-utils fm sort-keys document.md
 ```
 
 ## Dump Frontmatter
@@ -115,7 +115,10 @@ md-utils fm dump posts/ --cat-headers
 **Formats:** `json` (default), `yaml`, `toml`, `raw`, `plist`
 
 TOML requires a table at the document root, so scalar and array output uses a
-stable `value` envelope. Raw dumps retain the source format and delimiter style.
+stable `value` envelope. Raw dumps reserialize the source format; original bytes,
+comments and layout are not preserved. Collection raw output is YAML. Delimiters
+require `--include-delimiters` and are ignored by categorized collection output;
+with `--cat-headers` they apply to each block.
 
 `fm dump` automatically processes Markdown, `.txt`, and mapped non-Markdown
 files; it does not accept `--include-non-md`. Multi-file output is an object:
@@ -129,6 +132,13 @@ files; it does not accept `--include-non-md`. Multi-file output is an object:
 `fm search` filters files using a JMESPath expression evaluated against each file's frontmatter. Outputs matching file paths.
 
 `fm search` supports YAML frontmatter only. TOML search is intentionally out of scope.
+The query is positional. Omitted paths default to `.`, directories always recurse
+(including hidden descendants), and no SQLite index is used. Output formats are
+raw paths (default), JSON, YAML or plist; TOML output is rejected. No matches
+succeed with empty stdout in every format. Per-file query evaluation errors skip
+the file; read/parse errors fail after available matches. `fm array contains`
+also supports TOML and optional case folding; missing/non-array keys are skipped
+even with `--invert`, and no matches exit nonzero.
 
 ```bash
 # Find files where status is "published"
@@ -137,8 +147,10 @@ md-utils fm search "status == 'published'" posts/
 # Find files where a key exists
 md-utils fm search "author" posts/
 
-# Combine with xargs to act on results
-md-utils fm search "status == 'draft'" posts/ | xargs md-utils fm set --key reviewed --value false
+# Set a string status on matches; preserve spaces and handle empty output
+md-utils fm search 'draft == `true`' posts/ | while IFS= read -r file; do
+  md-utils fm set "$file" --key status --value reviewed
+done
 ```
 
 ## Check Unique Frontmatter Values
@@ -206,14 +218,17 @@ are written to stderr; stdout remains empty.
 
 ## Common Pipelines
 
+Quoted read loops below preserve spaces and do nothing for empty input, but do
+not support embedded newlines in paths. `fm set --value` writes a string.
+
 ```bash
-# Find files tagged 'swift' and mark them published
-md-utils fm array contains --key tags --value swift posts/ \
-  | xargs md-utils fm set --key published --value true
+# Find files tagged 'swift' and set a string status
+md-utils fm array contains --key tags --value swift posts/ | while IFS= read -r file; do
+  md-utils fm set "$file" --key status --value published
+done
 
 # Find files with BOTH 'swift' AND 'tutorial' tags
-md-utils fm array contains --key tags --value swift posts/ \
-  | xargs -I {} sh -c 'md-utils fm array contains --key tags --value tutorial {} && echo {}'
+md-utils fm search 'contains(tags, `"swift"`) && contains(tags, `"tutorial"`)' posts/
 
 # List all unique authors across a directory
 md-utils fm dump posts/ | jq -r '.frontMatter[].author' | sort -u
@@ -222,5 +237,5 @@ md-utils fm dump posts/ | jq -r '.frontMatter[].author' | sort -u
 md-utils fm dump posts/ | jq '[.frontMatter[] | select(.status == "published")] | length'
 
 # Find files missing a required key
-find posts/ -name "*.md" | xargs -I {} sh -c 'md-utils fm has --key author {} || echo {}'
+md-utils fm dump posts/ | jq -r '.noFrontMatter[], (.frontMatter[] | select(has("author") | not) | ."$path"), .emptyFrontMatter[]'
 ```

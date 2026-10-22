@@ -40,7 +40,7 @@ JSON is a useful common denominator, but it is not identical to either format. I
 
 YAML and TOML both allow comments. JSON does not, and neither does the `md-utils fm` data model.
 
-Once an `fm` command mutates frontmatter, however, `md-utils` parses and serializes the complete block. Comments—and syntax choices such as quoting or inline layout—are not guaranteed to survive. Avoid comments in frontmatter that will be managed with `md-utils fm`. Note: Read-only operations do not rewrite a file, and `fm dump --format raw` can return the original frontmatter text.
+Once an `fm` command mutates frontmatter, however, `md-utils` parses and serializes the complete block. Comments—and syntax choices such as quoting or inline layout—are not guaranteed to survive. Avoid comments in frontmatter that will be managed with `md-utils fm`. Read-only operations do not rewrite a file, but `fm dump --format raw` still reserializes its output; it does not return original bytes or comments.
 
 ## CLI-specific differences
 
@@ -50,7 +50,11 @@ Most frontmatter CRUD, array, batch, rules, schema, and Markdown type workflows 
 - Open Knowledge Format commands use YAML because the OKF v0.1 specification defines YAML frontmatter.
 - Project configuration files do not currently support TOML. That is a planned feature. See https://github.com/DandyLyons/md-utils/issues/105
 
-Use `fm dump --format raw` when the source representation matters. Use `--format json`, `--format yaml`, or `--format toml` when downstream tools need a particular serialization, and use `--frontmatter-format yaml|toml` only when creating or explicitly converting a stored frontmatter block.
+Use `fm dump --format raw` to serialize a single file in its source format;
+collection raw output is YAML. Read the original file when exact bytes matter.
+Use `--format json`, `--format yaml`, or `--format toml` when downstream tools need
+a particular serialization, and use `--frontmatter-format yaml|toml` only when
+creating or explicitly converting a stored frontmatter block.
 
 See <doc:FrontmatterCommands> for command details.
 

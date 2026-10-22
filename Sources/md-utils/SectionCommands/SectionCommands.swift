@@ -20,7 +20,7 @@ extension CLIEntry {
         Available commands:
         - list: List headings/sections in document order
         - get: Extract a section and output it
-        - set: Replace a section with new content
+        - set: Replace a section's body while preserving its heading
         - insert: Insert a new contained section
         - remove: Remove a section and its descendants
         - move-up: Move a section up by one position

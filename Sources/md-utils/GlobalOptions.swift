@@ -11,7 +11,7 @@ import PathKit
 struct GlobalOptions: ParsableArguments {
   /// Paths to files or directories to process.
   @Argument(
-    help: "Paths to Markdown files or directories to process",
+    help: "Input files or directories; usually defaults to . (body/to-text require paths or stdin; fm commands may also select mapped text files)",
     completion: .file(),
     transform: { Path($0) }
   )
@@ -35,7 +35,7 @@ struct GlobalOptions: ParsableArguments {
   /// File extensions to process (comma-separated).
   @Option(
     name: .long,
-    help: "File extensions to process (comma-separated; default: md,markdown, while fm dump scans all supported extensions)"
+    help: "File extensions to process (comma-separated); fm commands use supported syntax mappings unless this differs from md,markdown"
   )
   var extensions: String = "md,markdown"
 

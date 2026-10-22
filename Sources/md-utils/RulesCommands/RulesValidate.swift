@@ -26,7 +26,7 @@ extension CLIEntry.RulesCommands {
     @Argument(help: "Optional rule name to validate")
     var ruleName: String?
 
-    @Flag(name: .long, help: "Include successful validation results in output")
+    @Flag(name: .long, help: "Include successful validation results in text output; JSON/YAML always retain complete evidence")
     var includeOk: Bool = false
 
     @Flag(name: .long, help: "Include non-Markdown files selected by configured rule paths")

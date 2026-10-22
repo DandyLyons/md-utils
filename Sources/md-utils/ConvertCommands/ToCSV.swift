@@ -18,8 +18,8 @@ extension CLIEntry.ConvertCommands {
             commandName: "to-csv",
             abstract: "Convert Markdown files with frontmatter to CSV format",
             discussion: """
-                Converts a directory of Markdown files with YAML or TOML frontmatter into a single CSV file.
-                Each YAML key becomes a column, and each file becomes a row.
+                Combines selected Markdown files with YAML or TOML frontmatter into one CSV file.
+                Each frontmatter key becomes a column, and each file becomes a row.
 
                 EXAMPLES:
                   # Convert directory to CSV
@@ -43,13 +43,14 @@ extension CLIEntry.ConvertCommands {
                   Files without frontmatter are included with empty frontmatter columns.
                   The $body column (if enabled) will still contain their content.
 
-                NESTED YAML:
-                  Nested YAML structures (arrays, objects) are serialized as JSON strings.
+                NESTED VALUES:
+                  Arrays and objects are serialized as JSON strings.
 
                 By default:
                 - Includes body content in $body column
                 - No metadata columns
-                - Outputs to {inputFolder}.csv
+                - Writes {inputFolder}.csv in the working directory for one directory input
+                - Otherwise writes output.csv in the working directory (not stdout)
                 """
         )
 

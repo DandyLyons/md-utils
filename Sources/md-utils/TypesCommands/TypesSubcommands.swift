@@ -9,7 +9,8 @@ extension CLIEntry.TypesCommands {
   struct Add: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "add",
-      abstract: "Add a Markdown type definition to the project"
+      abstract: "Add a Markdown type definition to the project",
+      discussion: "Creates an mdtype v1 definition. --version <version> is the type contract version; use 'md-utils --version' for the CLI version. --root defaults to the current directory.",
     )
 
     @Argument(help: "Type name to add; names are stable and case-sensitive")
@@ -134,13 +135,13 @@ extension CLIEntry.TypesCommands {
     @Option(name: .long, help: "Project root directory", completion: .directory, transform: { Path($0) })
     var root: Path = .current
 
-    @Option(name: .long, help: "Output format: text, json, or yaml")
+    @Option(name: .long, help: "Output format: text, markdown (text-style), json, yaml, or toml")
     var format: TypesOutputFormat = .text
 
-    @Flag(name: .long, help: "Include successful results")
+    @Flag(name: .long, help: "Include successful results in text/markdown output; structured output always includes all results")
     var includeOK = false
 
-    @Flag(name: .customLong("no-advisories"), help: "Hide advisory diagnostics")
+    @Flag(name: .customLong("no-advisories"), help: "Hide advisory diagnostics in text/markdown output; structured output retains them")
     var noAdvisories = false
 
     mutating func run() async throws {
@@ -173,7 +174,7 @@ extension CLIEntry.TypesCommands {
     @Option(name: .long, help: "Project root directory", completion: .directory, transform: { Path($0) })
     var root: Path = .current
 
-    @Option(name: .long, help: "Output format: text, json, or yaml")
+    @Option(name: .long, help: "Output format: text, markdown (text-style), json, yaml, or toml")
     var format: TypesOutputFormat = .text
 
     @Flag(name: .long, help: "Include confirmed type hints")
@@ -206,7 +207,7 @@ extension CLIEntry.TypesCommands {
     @Option(name: .long, help: "Project root directory", completion: .directory, transform: { Path($0) })
     var root: Path = .current
 
-    @Option(name: .long, help: "Output format: text, json, or yaml")
+    @Option(name: .long, help: "Output format: text, markdown (text-style), json, yaml, or toml")
     var format: TypesOutputFormat = .text
 
     @Flag(name: .long, help: "Include nonconforming assessments")
@@ -374,7 +375,7 @@ extension CLIEntry.TypesCommands {
     @Option(name: .long, help: "Output format: json, yaml, or toml")
     var format: TypesDefinitionFormat = .json
 
-    @Option(name: .long, help: "Definition schema version: 1 (default) or 2 (semantic string formats)")
+    @Option(name: .long, help: "Definition schema version: 1 or 2 (semantic strings plus gated wikilink constraints and relationships)")
     var schemaVersion: String = "1"
 
     mutating func run() async throws {

@@ -20,7 +20,8 @@ extension CLIEntry.FrontMatterCommands {
         Checks whether a specified key exists in the frontmatter.
 
         Prints 'true' if the key exists, 'false' otherwise.
-        Always exits with success code (0), even when the key doesn't exist.
+        A missing key still exits successfully (0); file/read/parse errors fail.
+        Test stdout, not exit status, to distinguish presence from absence.
         When processing multiple files, the filename is included in the output.
         """)
     )

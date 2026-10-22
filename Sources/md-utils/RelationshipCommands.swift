@@ -9,19 +9,20 @@ extension CLIEntry {
   struct Relationships: AsyncParsableCommand {
     static let configuration = CommandConfiguration(commandName: "relationships",
       abstract: "Query named relationships and ordinary links across selected Markdown files",
+      discussion: RelationshipOptions.helpDiscussion,
       subcommands: [Outgoing.self, Incoming.self, Both.self], aliases: ["rel"])
     struct Outgoing: AsyncParsableCommand {
-      static let configuration = CommandConfiguration(commandName: "outgoing", abstract: "Query outgoing relationships and links", aliases: ["out"])
+      static let configuration = CommandConfiguration(commandName: "outgoing", abstract: "Query outgoing relationships and links", discussion: RelationshipOptions.helpDiscussion, aliases: ["out"])
       @OptionGroup var options: RelationshipOptions
       mutating func run() async throws { try await options.run(.outgoing) }
     }
     struct Incoming: AsyncParsableCommand {
-      static let configuration = CommandConfiguration(commandName: "incoming", abstract: "Find incoming sources throughout the root", aliases: ["in"])
+      static let configuration = CommandConfiguration(commandName: "incoming", abstract: "Find incoming sources throughout the root", discussion: RelationshipOptions.helpDiscussion, aliases: ["in"])
       @OptionGroup var options: RelationshipOptions
       mutating func run() async throws { try await options.run(.incoming) }
     }
     struct Both: AsyncParsableCommand {
-      static let configuration = CommandConfiguration(commandName: "both", abstract: "Query both directions, with separate self-links")
+      static let configuration = CommandConfiguration(commandName: "both", abstract: "Query both directions, with separate self-links", discussion: RelationshipOptions.helpDiscussion)
       @OptionGroup var options: RelationshipOptions
       mutating func run() async throws { try await options.run(.both) }
     }
@@ -29,6 +30,31 @@ extension CLIEntry {
 }
 
 struct RelationshipOptions: ParsableArguments {
+  /// Selection and snapshot semantics shared by every directional help page.
+  static let helpDiscussion = """
+    --root is required. Positional files and folder selectors are collection-relative.
+    Supply at least one selector; --select-folder . selects the entire collection.
+    Multiple selectors require --select-mode union|intersection. All positional
+    paths and file lists together form one selector. Exclusions subtract afterward.
+    --type overrides declaring contracts; --relation requires --type.
+
+    Text is the default; --json and --yaml are mutually exclusive. --detail
+    summary|explain|evidence affects presentation only. Complete queries exit 0
+    even for broken/nonconforming assertions; incomplete queries exit 1 with
+    available results. Incoming sources are searched throughout the root.
+
+    Live outgoing queries read selected sources and dependencies without a whole-
+    collection index refresh. Incoming/both refresh an existing compatible index;
+    --no-index bypasses it. --index-only
+    (alias --indexed-only) reads only the published SQLite snapshot, without
+    source/configuration/schema reads, refresh, writes or fallback. It rejects
+    --no-index and --verify-hashes; missing evidence remains unavailable.
+    Snapshot JMESPath selection is unavailable without full-body envelope evidence.
+
+    Example: md-utils rel out Note.md --root ./vault/ --json
+    Example: md-utils rel in --select-folder notes/ --root ./vault/ --detail explain
+    """
+
   @Argument(help: "Collection-relative Markdown paths forming one supplied file set") var files: [String] = []
   @Option(name: .long, help: "UTF-8 LF-delimited path list; - reads stdin once") var filesFrom: [String] = []
   @Option(name: .customLong("files-from0"), help: "UTF-8 NUL-delimited path list; - reads stdin once") var filesFrom0: [String] = []
@@ -47,7 +73,7 @@ struct RelationshipOptions: ParsableArguments {
   @Option(name: .long, help: "Explicit declaring-contract override; repeatable") var type: [String] = []
   @Option(name: .long, help: "Filter named relationships; requires --type; ordinary links remain visible") var relation: String?
   @Option(name: .long, help: "Explicit collection/project root directory, for example ./vault/") var root: String
-  @Option(name: .long, help: "summary (default), explain, or evidence; applies to text, JSON and YAML") var detail = "summary"
+  @Option(name: .long, help: "summary, explain, or evidence; applies to text, JSON and YAML") var detail = "summary"
   @Flag(name: .long, help: "Emit one JSON document at the selected detail level") var json = false
   @Flag(name: .long, help: "Emit one YAML document at the selected detail level") var yaml = false
   @Flag(name: .long, help: "Bypass the existing index") var noIndex = false

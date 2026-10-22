@@ -63,7 +63,10 @@ md-utils index status
 ```
 
 The database lives at `.md-utils/index.sqlite` under the project root. Each
-command refreshes every saved scope. Directory scopes select all eligible files;
+registration/refresh command refreshes every saved scope, as do `query` and
+`explain`. Inspection commands such as `status`, `field list` and `search status`
+do not refresh sources, though opening them may initialize cache state. `--verify-hashes`
+applies to refreshes, not those inspections. Directory scopes select all eligible files;
 type scopes select only conforming records; rule scopes retain matching records
 even when validation fails. Overlapping memberships remain independent.
 
@@ -82,7 +85,8 @@ and evaluation failures are recorded separately from nonconformance and advisori
 Ordinary updates use mtime and size to avoid unnecessary reads. `--verify-hashes`
 checks every candidate's SHA-256, including files whose stat values are unchanged.
 Configuration, transitive schema, and evaluator changes invalidate assessments.
-`--rebuild` reevaluates all saved scopes while retaining SQL field indexes and views.
+`--rebuild` creates a fresh cache from files and saved index configuration,
+restoring managed fields/type views and discarding observation history.
 
 An incomplete scope retains old rows but does not expose them as current.
 Read/parse/evaluation failures and incomplete scans produce a failing exit status.
@@ -91,14 +95,17 @@ Use the `current_documents` SQL view for current parsed members and inspect
 their selection records but are excluded from current parsed results.
 
 Files remain authoritative. SQLite is neither a folder backup nor an atomic
-filesystem snapshot, and no index command writes changes back to source files.
+filesystem snapshot. Registration, query and inspection commands do not edit
+sources; `index apply` explicitly persists pending edits unless `--dry-run` is used.
 
 ## Query and accelerate fields
 
 `index query` and `index explain` refresh every saved scope before executing one
 read-only statement. Refresh failures prevent the query; mutations are rejected.
 JSON output is the default, with JSONL, CSV, and one-text-column NUL output
-available through `--format`. NUL output safely preserves whitespace and newlines
+available through `--format`. JSONL requires unique SQL column names; NUL
+requires exactly one text column and is unavailable for multi-column query plans.
+NUL output safely preserves whitespace and newlines
 in paths. Rows stream from a consistent snapshot with callback/output backpressure.
 `--limit`, `--max-bytes`, and `--max-value-bytes` independently cap rows,
 aggregate value bytes, and one text/BLOB value.

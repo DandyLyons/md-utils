@@ -20,7 +20,9 @@ extension CLIEntry.FrontMatterCommands {
       commandName: "dump",
       abstract: "Dump entire frontmatter in specified format",
       discussion: NonMarkdownFrontMatterHelp.appendingForDump(to: """
-        Outputs complete frontmatter as JSON, YAML, TOML, raw source, or plist.
+        Outputs complete frontmatter as JSON, YAML, TOML, raw, or plist.
+        raw reserializes the source format (YAML by default); it does not preserve
+        original bytes, comments or layout. Collection raw output is YAML.
 
         Supports multiple files and directory processing with recursive mode.
 
@@ -33,7 +35,8 @@ extension CLIEntry.FrontMatterCommands {
           "frontMatter" contains nonempty mappings with a "$path" key, "noFrontMatter"
           contains paths with no complete block, and "emptyFrontMatter" contains paths
           whose complete block has an empty mapping.
-          The --include-delimiters flag is ignored in collection mode.
+          The --include-delimiters flag is ignored in categorized collection mode,
+          but applies to each YAML/TOML/raw block with --cat-headers.
 
           Use --cat-headers for the legacy cat-style format (==> path <==).
 

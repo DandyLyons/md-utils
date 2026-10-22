@@ -35,7 +35,7 @@ extension CLIEntry.ConvertCommands {
           md-utils convert to-text docs/ -o output/
           md-utils convert to-text *.md -o output/
 
-          # In-place conversion (.md → .txt)
+          # Write sibling .txt files (original Markdown files remain)
           md-utils convert to-text docs/ --in-place
           md-utils convert to-text file.md --in-place
 
@@ -74,7 +74,7 @@ extension CLIEntry.ConvertCommands {
     @Flag(
       name: .long,
       help: """
-        Convert .md files to .txt in their original locations. \
+        Write sibling .txt files; retain original Markdown files (existing .txt files may be overwritten). \
         Cannot be used with --output.
         """
     )
@@ -88,7 +88,7 @@ extension CLIEntry.ConvertCommands {
 
     @Option(
       name: .long,
-      help: "Number of newlines between block elements (default: 2)"
+      help: "Number of newlines between block elements"
     )
     var blockSeparator: Int = 2
 
@@ -101,7 +101,7 @@ extension CLIEntry.ConvertCommands {
 
     @Option(
       name: .long,
-      help: "Number of spaces per indentation level (default: 2)"
+      help: "Number of spaces per indentation level"
     )
     var indentSpaces: Int = 2
 

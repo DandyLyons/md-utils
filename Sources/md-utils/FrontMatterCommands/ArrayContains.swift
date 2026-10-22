@@ -23,11 +23,13 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
       discussion: NonMarkdownFrontMatterHelp.appending(to: """
         Search for files whose frontmatter contains an array with a specific value.
 
-        This command performs case-sensitive string comparison only.
+        This command compares string elements only, case-sensitively by default.
+        Use --case-insensitive to ignore case.
         Currently, boolean, null, integer, and float values are not supported.
 
         Files where the key doesn't exist or the value is not an array are silently
-        skipped.
+        skipped, including with --invert. No matches exit nonzero. Output is
+        absolute paths, one per line; file/read/parse errors also exit nonzero.
 
         EXAMPLES:
           # Find files where tags array contains "swift"
@@ -37,18 +39,13 @@ extension CLIEntry.FrontMatterCommands.ArrayCommands {
           md-utils fm array contains --key aliases --value Blue ./
 
         PIPING TO OTHER COMMANDS:
-          The command outputs file paths (one per line), making it ideal for piping:
+          This loop preserves spaces and does nothing for empty output.
+          Paths containing newlines need a different consumer. --value writes strings.
 
-          # Bulk update: mark all posts tagged "swift" as published
-          md-utils fm array contains --key tags --value swift posts/ | xargs md-utils fm set --key published --value true
-
-          # Chain operations
-          md-utils fm array contains --key tags --value tutorial . | while read -r file; do
-            md-utils fm set "$file" --key featured --value true
+          # Give matching posts a string status
+          md-utils fm array contains --key tags --value swift posts/ | while IFS= read -r file; do
+            md-utils fm set "$file" --key status --value published
           done
-
-          # Find and list frontmatter
-          md-utils fm array contains --key categories --value tech . | xargs md-utils fm list
 
         INVERT RESULTS:
           Use --invert to find files that DON'T contain the value:

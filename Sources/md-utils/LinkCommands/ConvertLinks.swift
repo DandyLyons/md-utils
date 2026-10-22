@@ -12,6 +12,8 @@ extension CLIEntry {
       abstract: "Convert wikilink targets to a style or loaded type's constraints",
       discussion: """
         Preview by default; --in-place explicitly writes changes. --root is required.
+        Supply exactly one of --to or --type. Input paths are relative to the
+        working directory and must be inside --root (they are not root-relative).
         wiki-path emits collection-root-relative paths with extensions; wiki-link
         emits unique names. --markdown-extension overrides Markdown suffix spelling;
         non-Markdown extensions are always retained. Missing, ambiguous,
@@ -23,8 +25,13 @@ extension CLIEntry {
         including nested objects/arrays. Preferences only disambiguate permitted
         repairs; conforming values stay unchanged. Unresolved repairs exit nonzero.
         Contract preview reads bounded collection evidence without refreshing an index.
-        Example: md-utils links convert --to wiki-path notes/ --root vault/
-        Example: md-utils links convert notes/ --root vault/ --type Article --prefer-style relative-path
+        --to defaults to --scope all; --type selects frontmatter only. With --to,
+        auto includes Markdown extensions for wiki-path and omits them for wiki-link.
+        With --type, auto expresses no extension preference. --prefer-style and
+        --include-recommendations require --type. Lexical repairs do not establish
+        whole-type conformance; inspect the separate assessment in the report.
+        Example: md-utils links convert --to wiki-path vault/notes/ --root vault/
+        Example: md-utils links convert vault/notes/ --root vault/ --type Article --prefer-style relative-path
         """,
     )
 
@@ -35,13 +42,13 @@ extension CLIEntry {
     var to: String?
     @Option(name: .long, help: "Loaded mdtype v2 name; mutually exclusive with --to; selects declared frontmatter values")
     var type: String?
-    @Option(name: .long, help: "Contract repair preference: name, vault-path, relative-path, self-anchor")
+    @Option(name: .long, help: "Requires --type; repair preference: name, vault-path, relative-path, self-anchor")
     var preferStyle: String?
-    @Flag(name: .long, help: "Include recommended schemas in contract repairs")
+    @Flag(name: .long, help: "Requires --type; include recommended schemas in contract repairs")
     var includeRecommendations = false
     @Option(name: .long, help: "Markdown extensions: auto (style default, or no preference with --type), include, omit; never overrides a contract")
     var markdownExtension = "auto"
-    @Option(name: .long, help: "Occurrences to select: all, body, frontmatter")
+    @Option(name: .long, help: "Occurrences: all (default with --to), body, frontmatter (only scope with --type)")
     var scope: String?
     @Option(name: .long, help: "Literal top-level key/subtree; repeatable, requires --scope frontmatter with --to")
     var key: [String] = []

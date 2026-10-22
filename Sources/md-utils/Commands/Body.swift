@@ -50,7 +50,7 @@ extension CLIEntry {
 
     @Option(
       name: [.short, .long],
-      help: "Output format: 'markdown' (default) or 'plain-text'"
+      help: "Output format: markdown or plain-text"
     )
     var format: BodyFormat = .markdown
     /// Runs the command using the parsed command-line arguments.
@@ -186,7 +186,7 @@ enum BodyFormat: String, CaseIterable, ExpressibleByArgument {
 
   var defaultValueDescription: String {
     switch self {
-    case .markdown: return "markdown (default)"
+    case .markdown: return "markdown"
     case .plainText: return "plain-text"
     }
   }

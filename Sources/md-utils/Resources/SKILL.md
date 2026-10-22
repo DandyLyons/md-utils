@@ -52,7 +52,9 @@ positional paths form one deduplicated selector. No selection is an error; use
 Complete queries exit 0 even for broken/nonconforming assertions; incomplete queries
 exit 1 with available results. Ordinary links need no declarations; embeds/images,
 attachments, external URLs and same-document anchors remain outside ordinary discovery.
-Existing indexes refresh automatically; `--no-index` bypasses them and
+Ordinary outgoing queries read selected sources/dependencies without refreshing
+the whole index. Incoming/both refresh an existing compatible index;
+`--no-index` bypasses it and
 `--index-only` (alias `--indexed-only`) means SQLite-only on both relationships and
 rule validation: no raw source/configuration/schema reads, source stats, refresh,
 index writes or fallback. It rejects `--verify-hashes` and `--no-index`. Findings
@@ -96,8 +98,9 @@ failures exit nonzero. Cached assessments never replace final Fix-It review/revi
 | Command | Purpose |
 |---------|---------|
 | `md-utils fm` | YAML/TOML frontmatter: get, set, remove blocks, uniqueness checks, array ops, dump; YAML-only search |
+| `md-utils fm search '<JMESPath>' ./posts/` | Find files by YAML metadata; the query is positional |
 | `md-utils explore` | Progressively inspect large Markdown files by tree, heading, and line |
-| `md-utils toc` | Generate table of contents |
+| `md-utils toc` | Generate headings-only Markdown by default; use `--format md-bullet-links` for anchor links |
 | `md-utils slug 'My Title'` | Print a slug candidate without changing files or checking uniqueness; `--policy unicode`, `strictASCII`, or `preserve` |
 | `md-utils headings` | Promote or demote heading levels |
 | `md-utils section` | Get, replace, or reorder sections |
@@ -108,10 +111,17 @@ failures exit nonzero. Cached assessments never replace final Fix-It review/revi
 | `md-utils links` | List, check, find backlinks, or convert wikilink target styles |
 | `md-utils meta` | Read file metadata |
 | `md-utils rules` | Validate Markdown files with project-level rules |
+| `md-utils types` | Define/check structural types, find conforming files, fix or create instances |
+| `md-utils relationships` / `md-utils rel` | Query outgoing/incoming/both with explicit root and file selectors |
+| `md-utils template render` | Render Knap with JSON input files |
+| `md-utils format` | Normalize bullet/italic markers or tables |
+| `md-utils okf` | Work with experimental OKF v0.1 draft bundles |
+| `md-utils config` | Initialize, inspect or migrate project configuration |
+| `md-utils agents` | Print bundled skill/schema or installation instructions |
 | `md-utils index` | Maintain a rebuildable SQLite collection cache with type/rule assessments |
 | `md-utils copy` / `md-utils move` | Revision-checked transfers through configured resource opt-ins; copy allocates a fresh configured UUID |
 
-`links convert --to wiki-path|wiki-link files/ --root vault/` requires explicit
+`links convert --to wiki-path|wiki-link vault/files/ --root vault/` requires explicit
 collection context and previews by default; `--in-place` writes.
 `--markdown-extension auto|include|omit` controls Markdown suffixes: `auto`
 includes them for wiki-path and omits them for wiki-link. Other extensions are
@@ -122,7 +132,7 @@ are skipped. Writes check revisions, preserve no-ops, and stop at the first file
 failure with partial-completion reporting. Metadata edits may reformat frontmatter.
 Markdown-link output and server conversion are not supported by this command.
 
-Alternatively, `links convert files/ --root vault/ --type Name` repairs declared
+Alternatively, `links convert vault/files/ --root vault/ --type Name` repairs declared
 whole-value frontmatter wikilinks, including nested keys/arrays. It replaces `--to`;
 body/all scope is invalid. `--key` optionally filters literal top-level subtrees.
 `--prefer-style name|vault-path|relative-path|self-anchor` and extension include/omit
@@ -211,7 +221,25 @@ array does not accelerate individual elements.
 
 ## Batch Operations
 
-All commands accept multiple files and directories. Directories are processed recursively by default (`--no-recursive` to disable).
+Commands using shared path options generally accept files and directories and
+recurse by default (`--no-recursive` disables traversal). Check each command's
+help: `lines`, `explore`, `extract`, and most section edits require one file;
+`fm search` always recurses and has its own options. `body` and `convert to-text`
+require paths or stdin rather than implicitly scanning the working directory.
+`links backlinks` traversal flags select targets; its source scan always recurses.
+
+`fm search '<JMESPath>' ./posts/` directly scans YAML frontmatter without the
+SQLite index. Raw output is absolute paths, one per line; `--format json|yaml|plist`
+serializes matches. TOML input/output is rejected. No matches succeed with empty
+stdout (including structured formats). Query evaluation errors skip a file;
+read/parse errors fail after reporting available matches. `fm array contains`
+supports string membership in YAML/TOML and `--case-insensitive`; unlike search,
+no matches fail. Missing/non-array keys are skipped even with `--invert`.
+`fm has` prints true/false and succeeds for missing keys; never use its exit code
+as a presence predicate. `fm set --value` always stores a string, not a boolean
+or array. `fm dump --format raw` reserializes the source format; it does not
+preserve original bytes or comments. Use `fm dump` for full collection inventory;
+`fm list` currently stops at the first file without keys.
 
 ```bash
 md-utils fm set --key author --value "Jane Doe" posts/

@@ -10,7 +10,7 @@ struct Slug: ParsableCommand {
   @Argument(help: "Source text; quote spaces. Use -- before text starting with a hyphen.")
   var text: String
 
-  @Option(help: "Slug policy: unicode (default), strictASCII, or preserve.")
+  @Option(help: "Slug policy: unicode, strictASCII, or preserve.")
   var policy: String = "unicode"
 
   func run() throws {

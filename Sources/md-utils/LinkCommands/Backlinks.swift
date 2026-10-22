@@ -24,6 +24,11 @@ extension CLIEntry {
 
         Scans Markdown files for wikilinks that resolve to the given target \
         file(s). Use --scan-scope to limit the search directory.
+        Positional paths select targets; --root does not rebase those paths.
+        The source scan is always recursive and skips hidden files and symlinks;
+        shared recursion/extension/exclusion options apply to target selection.
+        Multiple targets currently share aggregate matching-link results; query
+        one target per invocation for a per-target result. Self-links are omitted.
         """,
       aliases: ["bl"]
     )

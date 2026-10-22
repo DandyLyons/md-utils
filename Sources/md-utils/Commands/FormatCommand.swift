@@ -63,7 +63,7 @@ extension CLIEntry {
         var normalizeTables: Bool = false
 
         @Option(name: .customLong("max-width"),
-                help: "Cap column padding to this width when normalizing tables (default: 80); content wider than this is never truncated")
+                help: "Cap column padding to this width when normalizing tables; content wider than this is never truncated")
         var maxWidth: Int = 80
 
         @Flag(name: .long,

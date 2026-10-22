@@ -35,12 +35,13 @@ extension CLIEntry.FrontMatterCommands {
             md-utils fm replace post.md --from-file new-frontmatter.json --format json
 
           TIP: When passing inline data that starts with -, use --data= syntax:
-            md-utils fm replace post.md --data='- item1' --format yaml
-            This prevents the argument parser from treating - as a flag.
+          This prevents the argument parser from treating - as a flag. The data
+          must still be a mapping; a YAML sequence such as '- item1' is rejected.
 
         SUPPORTED FORMATS:
           - json: JavaScript Object Notation
           - yaml: YAML Ain't Markup Language
+          - raw: Alias for YAML input
           - toml: Tom's Obvious, Minimal Language
           - plist: Apple PropertyList XML
 
@@ -75,7 +76,7 @@ extension CLIEntry.FrontMatterCommands {
     @Option(name: .long, help: "Path to file containing new frontmatter")
     var fromFile: String?
 
-    @Option(name: [.short, .long], help: "Data format (json, yaml, toml, plist)")
+    @Option(name: [.short, .long], help: "Data format (json, yaml, raw as YAML, toml, plist)")
     var format: OutputFormat = .json
 
     @Option(name: .long, help: "Frontmatter format to create or convert to (yaml, toml)")

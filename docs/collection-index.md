@@ -34,8 +34,12 @@ md-utils index status
 `update <directory>/` registers an unrestricted directory collection. `type`
 registers a directory collection containing only conforming records. `rule`
 registers a project-wide collection selected by the named rule, including
-selected records that fail validation. Every invocation refreshes **all saved
-scopes**. Adding another selection does not replace existing scopes. Nonmembers
+selected records that fail validation. These three registration/refresh commands
+refresh **all saved scopes**. `query` and `explain` also refresh before SQL;
+inspection commands such as `status`, `field list`, and `search status` do not
+refresh sources, though opening them can initialize cache state. `--verify-hashes`
+affects refreshes, not those inspection commands. Adding another selection does
+not replace existing scopes. Nonmembers
 within scanned directories have cached assessments but are not documents unless
 another scope selects them.
 
@@ -58,11 +62,14 @@ the existing evaluator diagnostics. Binary/non-UTF-8 files report read failures.
 
 ## Automatic Rule Validation
 
-Named relationship queries also use the existing index refresh, writer lease,
-and generation checks. They reuse cross-document assessments only after verifying
+Ordinary incoming/bidirectional relationship queries also use the existing index
+refresh, writer lease and generation checks. Outgoing queries instead plan
+selected sources and dependencies without a whole-collection index refresh.
+Collection queries reuse cross-document assessments only after verifying
 a whole-collection dependency certificate; see [relationship cache](relationship-cache.md). See
 [relationship index semantics](relationships.md#existing-index-behavior), including
-the limited coverage of `--indexed-only` and the need to materialize source text.
+the limited coverage of `--indexed-only`. SQLite-only queries never materialize
+source text; ordinary queries may read authoritative source evidence as needed.
 
 `md-utils rules validate` and `md-utils rules validate books` automatically use
 an existing `<project-root>/.md-utils/index.sqlite`. Missing rule scopes are

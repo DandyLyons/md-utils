@@ -172,8 +172,9 @@ swift run md-utils fm get --key title document.md
 # => [{"path":"...","value":"My Title"}]
 swift run md-utils fm get --key title posts/ | jq '.[] | select(has("value")) | .value'
 
-# Set a frontmatter value
-swift run md-utils fm set --key tags --value "[swift, cli]" document.md
+# Set a string value; use array commands to create actual arrays
+swift run md-utils fm set --key status --value draft document.md
+swift run md-utils fm array append --key tags --value swift document.md
 
 # Create TOML frontmatter in a document that has none
 swift run md-utils fm set --key title --value "TOML Note" --frontmatter-format toml document.md
@@ -182,7 +183,7 @@ swift run md-utils fm set --key title --value "TOML Note" --frontmatter-format t
 swift run md-utils fm dump document.md
 
 # Search frontmatter with JMESPath
-swift run md-utils fm search --query "tags[?contains(@, 'swift')]" docs/
+swift run md-utils fm search 'contains(tags, `"swift"`)' docs/
 
 # Convert Markdown to plain text
 swift run md-utils convert to-text document.md
@@ -190,17 +191,17 @@ swift run md-utils convert to-text document.md
 # Extract a section by name
 swift run md-utils extract --name "Installation" README.md
 
-# Promote all headings by one level
-swift run md-utils headings promote document.md
+# Promote the first heading and its descendants by one level
+swift run md-utils headings promote --index 1 document.md
 
 # List wikilinks with resolution status
-swift run md-utils links list --vault ~/notes/ note.md
+swift run md-utils links list ~/notes/note.md --root ~/notes/
 
 # Check for broken wikilinks
-swift run md-utils links check --vault ~/notes/ docs/
+swift run md-utils links check ~/notes/docs/ --root ~/notes/
 
 # Find backlinks to a file
-swift run md-utils links backlinks --vault ~/notes/ --target "My Note"
+swift run md-utils links backlinks ~/notes/target.md --root ~/notes/
 
 # Preview explicit-path wikilinks; add --in-place to write
 swift run md-utils links convert --to wiki-path ~/notes/ --root ~/notes/
@@ -238,6 +239,10 @@ swift run md-utils lines --start 10 --end 20 document.md
 
 Run `swift run md-utils --help` or `swift run md-utils <command> --help` for full usage details.
 
+Root help points to nested workflows such as `fm search --help`, `links convert
+--help`, and `index --help`. See the [complete CLI help audit](docs/cli-help-audit.md)
+for page coverage, verified corrections, and existing command limitations.
+
 ### ANSI Color
 
 Human-facing CLI output may use ANSI color to distinguish status, errors, warnings, paths, and metadata from Markdown content. Machine-readable output such as JSON, YAML, PropertyList, raw path lists, and extracted Markdown content remains unstyled. Color handling is provided by Rainbow, which automatically emits plain text when output is redirected; use `NO_COLOR=1` to disable color or `FORCE_COLOR=1` to force color when supported by Rainbow.
@@ -248,8 +253,9 @@ Create or refresh a rebuildable collection cache with `md-utils index update ./n
 Use `md-utils index type Book ./notes/` to retain conforming documents or
 `md-utils index rule books` to retain rule-selected documents, including invalid members.
 `md-utils index update --verify-hashes` checks for edits missed by mtime/size;
-`md-utils index update --rebuild` regenerates all saved scopes while preserving
-SQL field indexes and views. `md-utils index query '<sql>'` refreshes first and
+`md-utils index update --rebuild` creates a fresh cache from files and saved
+configuration, restoring managed fields/type views and discarding history.
+`md-utils index query '<sql>'` refreshes first and
 streams bounded read-only SQL; `index field add '$.status'` adds an explicit JSON
 expression index, and `index status` reports freshness. New caches retain metadata
 only. Run `md-utils index search enable` to opt into one retained body per document
@@ -325,7 +331,7 @@ Compatibility:
 
 | CLI version | Supported config schema versions | Default generated config schema version |
 | --- | --- | --- |
-| 0.1.0-alpha | 0.1.0, 0.2.0 | 0.2.0 |
+| Current build | 0.1.0, 0.2.0, opt-in 0.3.0 | 0.2.0 |
 
 The config schema is published at `https://dandylyons.github.io/md-utils/schemas/0.2.0/md-utils.schema.json` for editor integration and IDE IntelliSense. The moving `https://dandylyons.github.io/md-utils/schemas/latest/md-utils.schema.json` alias points to the latest published schema, and `https://dandylyons.github.io/md-utils/md-utils.schema.json` is maintained as a root compatibility alias. Runtime config validation does not fetch these URLs; the CLI validates configs against bundled schemas selected by `configVersion`.
 
@@ -450,7 +456,7 @@ md-utils rules remove books
 md-utils rules remove books --delete-schema
 ```
 
-`config init` bootstraps `.md-utils/`, including empty `.md-utils/schemas/`, `.md-utils/types/`, and `.md-utils/rules/` directories, without adding a rule or type. The empty rules directory prepares the proposed standalone format; existing configurations still load their embedded rules. `rules add` adds a frontmatter schema rule to existing config. `rules describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema when the rule has one; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `rules remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
+`config init` bootstraps `.md-utils/`, including empty `.md-utils/schemas/`, `.md-utils/types/`, and `.md-utils/rules/` directories, without adding a rule or type. Default 0.2.0 configurations use embedded rules; opt-in 0.3.0 loads standalone rule files. `rules add` adds a frontmatter schema rule to existing config. `rules describe` explains which files a rule affects and summarizes every field in the referenced JSON Schema when the rule has one; `--format markdown` emits a docs-friendly summary and `--format json` emits the rule configuration with the embedded schema definition. `rules remove` removes a rule; `--delete-schema` also deletes that rule's schema file when it is not shared by another rule.
 
 Rules project scans remain Markdown-only by default. Use `--include-non-md` with
 `rules validate` or `rules files-matching` to include other files selected by

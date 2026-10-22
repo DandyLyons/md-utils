@@ -25,7 +25,17 @@ extension CLIEntry.FrontMatterCommands {
         frontmatter is intentionally outside the scope of this command.
         Files where the expression evaluates to true (or truthy) are included.
 
-        Directories are searched recursively.
+        Omitted paths default to the current directory. Directories are always
+        searched recursively, including hidden descendants; --no-recursive,
+        --exclude and --no-index are not options here. This command reads files
+        directly and does not use the SQLite index.
+
+        OUTPUT AND ERRORS:
+          raw (default) prints absolute paths, one per line. json, yaml and plist
+          serialize the path array. TOML output is rejected. No matches produce
+          empty stdout and exit 0, with a message on stderr. Read/parse errors,
+          including TOML frontmatter, produce exit 1 after available matches;
+          per-file query evaluation errors are skipped.
 
         TIP: 
           To search for files where a value is present in an array, it is easier/more reliable to use `md-utils fm array contains`. 
@@ -41,7 +51,7 @@ extension CLIEntry.FrontMatterCommands {
           md-utils fm search 'draft == `false` && author == `"John"`' .
 
         JMESPATH SYNTAX:
-          Use backticks for ALL literal values:
+          These examples use JSON literals enclosed in backticks:
           - Booleans: `true`, `false`
           - Strings: `"text"`
           - Numbers: `42`, `3.14`
@@ -66,20 +76,14 @@ extension CLIEntry.FrontMatterCommands {
                        (missing backticks - "swift" is a field reference, not a string!)
 
         PIPING TO OTHER COMMANDS:
-          The search command outputs file paths (one per line), making it perfect
-          for piping into other commands:
+          This loop preserves spaces and does nothing for empty output. Paths
+          containing newlines require a structured format and a suitable consumer.
+          fm set --value writes a string, not a boolean or an array.
 
-          # Bulk update: mark all drafts as published
-          md-utils fm search 'draft == `true`' ./posts/ | xargs md-utils fm set --key draft --value false
-
-          # Chain operations: publish posts and add date
-          md-utils fm search 'ready == `true`' . | while read -r file; do
-            md-utils fm set "$file" --key published --value true
-            md-utils fm set "$file" --key date --value "$(date +%Y-%m-%d)"
+          # Give matching drafts a string status
+          md-utils fm search 'draft == `true`' ./posts/ | while IFS= read -r file; do
+            md-utils fm set "$file" --key status --value published
           done
-
-          # Remove a key from matching files
-          md-utils fm search 'deprecated == `true`' . | xargs md-utils fm remove --key temporary
         """)
     )
 
@@ -87,17 +91,17 @@ extension CLIEntry.FrontMatterCommands {
     var query: String
 
     @Argument(
-      help: "Path(s) to the file(s)/directory(ies) to search",
+      help: "Files or directories to search; defaults to .; directories always recurse",
       completion: .file()
     )
     var pathStrings: [String] = []
 
-    @Option(name: [.short, .long], help: "Output format")
+    @Option(name: [.short, .long], help: "Output: raw paths, json, yaml, or plist; toml is rejected")
     var format: OutputFormat = .raw
 
     @Option(
       name: [.short, .long],
-      help: "File extensions to process (comma-separated, no spaces)"
+      help: "Filter supported candidate extensions (comma-separated); --include-non-md expands default candidates"
     )
     var extensions: String = "md,markdown"
 

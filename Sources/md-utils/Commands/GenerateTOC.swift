@@ -19,7 +19,9 @@ extension CLIEntry {
         Supports multiple output formats: Markdown, JSON, plain text, and HTML.
 
         By default, processes directories recursively and generates Markdown output
-        with unordered links.
+        with headings only (--format md-only-headings). Use --format md-bullet-links
+        for an unordered list of anchor links. Multiple files have filename headers,
+        so batch JSON output is not a single JSON document.
         """,
       aliases: ["toc"]
     )
@@ -28,13 +30,13 @@ extension CLIEntry {
 
     @Option(
       name: .long,
-      help: "Minimum heading level to include (1-6, default: 1)"
+      help: "Minimum heading level to include (1-6)"
     )
     var minLevel: Int = 1
 
     @Option(
       name: .long,
-      help: "Maximum heading level to include (1-6, default: 6)"
+      help: "Maximum heading level to include (1-6)"
     )
     var maxLevel: Int = 6
 
@@ -52,7 +54,7 @@ extension CLIEntry {
 
     @Option(
       name: .long,
-      help: "Output format: md-bullet-links, md-only-headings, tree, json, json-pretty, plain, html (default: md-only-headings)"
+      help: "Output format: md-bullet-links, md-only-headings, tree, json, json-pretty, plain, html"
     )
     var format: OutputFormat = .mdOnlyHeadings
     /// Runs the command using the parsed command-line arguments.

@@ -11,7 +11,8 @@ extension CLIEntry.ConfigCommands {
   struct Init: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "init",
-      abstract: "Initialize md-utils project configuration"
+      abstract: "Initialize md-utils project configuration",
+      discussion: "Creates .md-utils/ with default config schema 0.2.0 and empty schemas/, types/ and rules/ directories. Preserves existing configuration. It does not add a rule or type. --root defaults to the current directory; parent directories are not searched.",
     )
 
     @Option(name: .long, help: "Project root directory", completion: .directory, transform: { Path($0) })

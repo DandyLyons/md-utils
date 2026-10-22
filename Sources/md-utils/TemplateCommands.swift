@@ -19,13 +19,13 @@ extension CLIEntry {
       @Option(help: "Knap template file (.knap or .knap.md recommended).")
       var template: String
 
-      @Option(help: "JSON object of variables; body mode requires data and optional frontmatter.")
+      @Option(help: "Path to a JSON object file of variables; body mode requires data and optional frontmatter.")
       var data: String
 
-      @Option(help: "Rendering mode: document (default) or body with separate JSON frontmatter.")
+      @Option(help: "Rendering mode: document or body with separate JSON frontmatter.")
       var mode: MarkdownTemplateMode = .document
 
-      @Option(help: "Optional JSON Schema: fill missing defaults, then validate input.")
+      @Option(help: "Path to an optional JSON Schema file: fill missing defaults, then validate input.")
       var schema: String?
 
       @Option(help: "Markdown output file (.md or .markdown); omit to write Markdown to stdout.")

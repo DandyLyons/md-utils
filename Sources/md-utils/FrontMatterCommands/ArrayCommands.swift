@@ -56,8 +56,11 @@ extension CLIEntry.FrontMatterCommands {
         PIPING:
           Array commands work great with piping for bulk operations:
 
-          # Find files and update them
-          md-utils fm array contains --key tags --value swift . | xargs md-utils fm set --key published --value true
+          # Set a string status; this loop handles spaces and empty output
+          md-utils fm array contains --key tags --value swift . | while IFS= read -r file; do
+            md-utils fm set "$file" --key status --value published
+          done
+          Newlines in paths require a different consumer.
         """),
       subcommands: [Initialize.self, Clear.self, Contains.self, Append.self, Prepend.self, Remove.self],
     )

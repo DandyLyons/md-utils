@@ -74,10 +74,39 @@ literals from shell command substitution.
 
 Commands that report values preserve the distinction between a missing key and a YAML null value. TOML cannot represent null. Machine-readable formats should be preferred when that distinction matters.
 
-`--format toml` is available anywhere the shared structured-output format is supported. Because TOML requires a document root to be a table, scalar and array roots are emitted under a stable `value` key. `fm dump --format raw` emits the source format, and `--include-delimiters` uses the matching `---` or `+++` lines.
+`fm dump` and `fm unique` support TOML output; `fm search` rejects it. Because TOML
+requires a document root to be a table, generic scalar and array outputs use a
+stable `value` key. `fm dump --format raw` reserializes the source format and
+does not preserve original bytes, comments or layout. Collection raw output is
+YAML. `--include-delimiters` uses matching `---` or `+++` lines for one file or
+each `--cat-headers` block and is ignored for categorized collection output.
 
 `fm dump` is read-only and automatically selects Markdown, plain-text, and
 mapped non-Markdown files. A sole explicit file outputs its mapping directly.
 Directory and explicit file-list invocations output an object whose
 `frontMatter`, `noFrontMatter`, and `emptyFrontMatter` members distinguish
 nonempty mappings, absent blocks, and complete blocks with empty mappings.
+
+`fm has` prints `true`/`false` and succeeds for a missing key; read/parse errors
+fail. `fm list` currently stops at the first file with no keys; use `fm dump`
+for a complete collection inventory. `fm rename` uses `--key` and `--new-key`;
+`fm touch` uses plural `--keys`. Frontmatter mutation commands write directly;
+`fm sort-keys` does not take `--in-place`.
+
+## JMESPath File Search
+
+```bash
+md-utils fm search 'draft == `true`' ./posts/
+md-utils fm search 'contains(tags, `"swift"`)' ./posts/ --format json
+```
+
+The expression is positional, not `--query`, `--key` or `--value`. Search reads
+YAML frontmatter directly without SQLite and always recurses through directories,
+including hidden descendants. Omitted paths default to `.`; there is no
+`--no-recursive` or `--exclude`. Raw output (default) is absolute paths, one per
+line; JSON/YAML/plist output is a path array when matches exist. No matches
+succeed with empty stdout in every format and diagnostics on stderr. TOML
+frontmatter/output is rejected. Read/parse errors fail after available matches;
+per-file query evaluation errors are skipped. For YAML/TOML string membership,
+use `fm array contains`; it supports `--case-insensitive`, skips missing/non-array
+keys even with `--invert`, and fails for no matches.

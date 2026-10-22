@@ -13,7 +13,8 @@ extension CLIEntry.ConfigCommands {
   struct Migrate: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
       commandName: "migrate",
-      abstract: "Migrate md-utils project configuration to another schema version"
+      abstract: "Migrate md-utils project configuration to another schema version",
+      discussion: "Supports 0.1.0 to 0.2.0 and supported legacy configurations to opt-in 0.3.0; downgrades are unsupported. Use --dry-run to review changes. Back up .md-utils/ before migrating to 0.3.0; only compatible required-schema rules migrate automatically. Existing legacy artifacts are preserved; writes across files are not atomic.",
     )
 
     @Option(name: .long, help: "Expected source config schema version")

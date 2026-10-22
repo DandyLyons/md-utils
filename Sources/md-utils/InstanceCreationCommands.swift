@@ -8,6 +8,17 @@ import PathKit
 import Yams
 
 struct InstanceCreationOptions: ParsableArguments {
+  /// Shared creation requirements, kept identical on types new and rules new.
+  static let helpDiscussion = """
+    Supply exactly one input form: --value, --values, or repeated --value-file.
+    Supply exactly one filename form: --filename or --filename-data (JSONPath,
+    not JMESPath). Bulk input requires --filename-data and rejects --filename.
+    --extension applies only to --filename-data; its default suffix is md.
+    Destinations must already exist. Files are never overwritten. --dry-run
+    renders and assesses without persistent writes. Type/rule nonconformance is
+    advisory; input, rendering, naming and persistence errors fail creation.
+    """
+
   @Option(help: "JSON object file containing template variables (single instance).") var value: String?
   @Option(help: "JSON array file containing a nonempty batch of input objects.") var values: String?
   @Option(help: "JSON object file in a batch; repeat this option for each file.") var valueFile: [String] = []
@@ -64,7 +75,8 @@ struct InstanceCreationOptions: ParsableArguments {
 
 extension CLIEntry.TypesCommands {
   struct New: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Create a Markdown instance and report type conformance.")
+    static let configuration = CommandConfiguration(abstract: "Create a Markdown instance and report type conformance.",
+      discussion: InstanceCreationOptions.helpDiscussion)
     @Option(name: .customLong("type"), help: "Type name whose creation template to use.") var typeName: String
     @Option(help: "Project root directory.", transform: { Path($0) }) var root: Path = .current
     @Argument(help: "Existing destination directory (for example ./Books/).") var destination: String
@@ -81,7 +93,8 @@ extension CLIEntry.TypesCommands {
 
 extension CLIEntry.RulesCommands {
   struct New: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Create a Markdown instance and report type and rule conformance.")
+    static let configuration = CommandConfiguration(abstract: "Create a Markdown instance and report type and rule conformance.",
+      discussion: InstanceCreationOptions.helpDiscussion)
     @Option(name: .customLong("rule"), help: "Rule with an explicit creation directory.") var ruleName: String
     @OptionGroup var project: RuleProjectOptions
     @OptionGroup var creation: InstanceCreationOptions

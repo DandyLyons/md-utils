@@ -12,9 +12,13 @@ applicability, YAML tags, JMESPath and LF/NUL file lists can select documents.
 Multiple selectors require explicit union/intersection. Incoming discovery remains
 root-wide. Complete queries exit 0; incomplete queries exit 1 with available results.
 Self-links have a separate
-section. Existing indexes refresh automatically; `--no-index`, `--indexed-only` (`--index-only`)
-and `--verify-hashes` follow existing freshness conventions. Indexed-only coverage
-cannot prove incoming absence or basename uniqueness. Domain truth remains the
+section. Ordinary outgoing queries use source-directed reads without whole-index
+refresh; incoming/both refresh an existing compatible index. `--no-index`,
+`--indexed-only` (`--index-only`)
+and `--verify-hashes` follow the documented live-query or SQLite-only contracts.
+The two index-only spellings read published evidence without raw-file reads,
+refresh or fallback and reject `--no-index`/`--verify-hashes`. Missing snapshot
+evidence remains unavailable. Domain truth remains the
 user's responsibility; validation checks explicit structural assertions.
 
 ## Create instances
@@ -40,10 +44,18 @@ md-utils types add Article --version 1.0.0 --format toml
 These commands create `.md-utils/types/` when needed and use the compound extension matching the selected format. The declared `name` inside each definition remains the stable type identity; the filename only identifies the file as a Markdown type definition.
 
 Use `types list`, `types describe Book`, and `types doctor` to inspect compiled definitions. `types schema` prints the JSON Schema for definition format version `1`.
+Use `types schema --schema-version 2` for semantic strings and explicitly gated
+wikilink constraints/relationships. New definition scaffolds still default to v1.
 
 ## Assessment and Queries
 
 `types check` assesses records against one named type. `types identify` evaluates every loaded type, and `types find` prints only records that fully conform. Context predicates may narrow candidates, but a path match never substitutes for complete assessment.
+
+Check, identify and verify accept `--format text|markdown|json|yaml|toml`; markdown
+uses the text-style renderer for these commands. On `types check`, `--include-ok`
+and `--no-advisories` affect text/markdown only; structured output always retains
+all results and advisories. `rules validate --include-ok` similarly controls
+text visibility while JSON/YAML retain complete evidence.
 
 ```bash
 md-utils types check Book books/

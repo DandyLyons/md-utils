@@ -22,6 +22,8 @@ extension CLIEntry.FrontMatterCommands {
 
         When processing multiple files, each file's keys are prefixed with the filename.
         Keys are listed one per line in alphabetical order.
+        Currently stops at the first file with no keys. Use fm dump for a
+        complete collection inventory.
         """),
       aliases: ["ls"]
     )
