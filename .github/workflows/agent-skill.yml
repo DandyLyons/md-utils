@@ -1,0 +1,21 @@
+name: Agent Skill
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check skill routing and synchronization
+        run: python3 scripts/check-agent-skill.py
+      - name: Build and verify export and mutation workflows
+        run: swift test --filter 'AgentCommandsTests|IndexApplyCommandsTests|TransferCommandsTests'
+      - name: Verify command coverage and documented workflows
+        run: |
+          python3 scripts/check-agent-skill.py --cli .build/debug/md-utils
+          python3 scripts/verify-agent-skill-examples.py --cli .build/debug/md-utils

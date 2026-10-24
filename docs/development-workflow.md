@@ -12,6 +12,23 @@ When adding new features:
 2. Add comprehensive tests using Swift Testing
 3. Add CLI command in md-utils (if user-facing)
 4. Update `AGENTS.md` or relevant docs if architecture changes
+5. Update the agent skill for user-facing CLI changes, following
+   [Maintaining the Agent Skill](../AGENTS.md#maintaining-the-agent-skill).
+
+## CLI Changes and Agent Skill Documentation
+
+Apply the skill-maintenance procedure to changed or removed behavior as well as
+new commands, including shared-library changes that affect the CLI. Update the
+relevant canonical `references/` file with detailed guidance. Keep `SKILL.md` for
+introductions, routing, and shared constraints; synchronize the complete bundled
+folder after any canonical skill change, including reference-only edits.
+
+Verify affected examples against the current executable using project-local
+fixtures, check reference links and discoverability, and record the results in
+review notes. If no skill documentation needs changing, explain why.
+`AgentCommandsTests` checks every bundled file and complete export. Agent Skill CI
+checks synchronization, routing, command coverage, and executable workflows. See
+[the audit and coverage matrix](agent-skill-audit.md) for verification limits.
 
 ## Before Committing
 
@@ -43,3 +60,7 @@ has stricter matching-version requirements. See [WASI setup](webassembly.md).
 - [ ] WebAssembly Core build and smoke test pass when Core or its dependencies changed
 - [ ] CLI help displays correctly
 - [ ] Documentation updated if needed
+- [ ] CLI behavior changes reflected in the relevant skill references, or a concrete reason no update is needed recorded
+- [ ] Skill introductions/routing updated when needed; changed reference links and representative examples verified
+- [ ] Complete canonical skill synchronized with `scripts/sync-agent-skill.py`; routing, examples, and `AgentCommandsTests` passed for skill changes
+- [ ] Skill documentation changes and verification recorded in review notes

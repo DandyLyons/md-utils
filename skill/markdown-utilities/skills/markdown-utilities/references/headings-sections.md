@@ -142,7 +142,7 @@ md-utils links check ~/vault/posts/ --root ~/vault/
 md-utils links backlinks ~/vault/target.md --root ~/vault/
 ```
 
-> Note: For Obsidian vault-specific operations, the Obsidian CLI may provide more reliable results. `md-utils links` is designed for general Markdown workflows.
+Read [Links](links.md) for resolution rules, preview/application, and conversion.
 
 ## File Metadata
 

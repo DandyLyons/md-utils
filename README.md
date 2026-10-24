@@ -16,13 +16,23 @@ The `markdown-utilities` Agent Skill teaches AI coding assistants how to use `md
 
 > **Prerequisite:** Install the `md-utils` CLI first (see [CLI Installation](#cli-installation) below).
 
-### Install from skills.sh
+### Export the complete bundled skill
 
 ```bash
-npx skills add https://github.com/DandyLyons/md-utils --skill markdown-utilities
+# Create the parent and export to a new destination, including all references.
+mkdir -p ~/.claude/skills/
+md-utils agents skill --output-directory ~/.claude/skills/markdown-utilities/
 ```
 
-Visit the [skills.sh page](https://skills.sh/dandylyons/md-utils/markdown-utilities) for more details.
+Choose your assistant's skill parent directory when different. The destination
+must not exist; to upgrade, export to a fresh directory and review before replacing
+your installation. `md-utils agents install` prints instructions, including
+project-knowledge uploads. `md-utils agents skill` without options prints only
+the entrypoint and is not a complete installation.
+
+From a checkout, copy the entire `skill/markdown-utilities/skills/markdown-utilities/`
+folder. Third-party skill installers must also retain `references/`; see the
+[skills.sh listing](https://skills.sh/dandylyons/md-utils/markdown-utilities).
 
 ---
 

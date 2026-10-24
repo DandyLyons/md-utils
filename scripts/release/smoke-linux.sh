@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Verify the installed release in a clean runtime: exercise CLI resources,
+# configuration, and document behavior without relying on a source checkout.
+# Complete skill export must retain its reference tree in packaged artifacts.
 set -euo pipefail
 ulimit -c 0
 version="${1:?Expected artifact version}"
@@ -7,6 +10,14 @@ md-utils --help > help.txt
 grep -q 'Markdown' help.txt
 md-utils agents skill > skill.md
 grep -q 'markdown-utilities' skill.md
+md-utils agents skill --output-directory exported-skill/
+test -s exported-skill/SKILL.md
+test -s exported-skill/references/rules.md
+test -s exported-skill/references/installation.md
+if md-utils agents skill --output-directory exported-skill/; then
+  echo 'Skill export unexpectedly overwrote an existing directory' >&2
+  exit 1
+fi
 md-utils config schema > schema.json
 grep -q '"properties"' schema.json
 # The first Linux prerelease rejected even config init's empty rules array.

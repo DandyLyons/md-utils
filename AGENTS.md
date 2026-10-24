@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Agent skill maintenance (#198, 2026-10-24)**: User-facing CLI changes update focused references, with `SKILL.md` reserved for introductions/routing. `agents skill --output-directory` exports the full bundled folder without replacing installations. Run `scripts/sync-agent-skill.py` after every canonical skill edit; CI checks all bundled files, routing, examples, and export. See `docs/agent-skill-audit.md` for coverage and validation limits.
+
 - **Contract-aware wikilink conversion (#185)**: `links convert --type Name` selects declared whole-value frontmatter wikilinks, including nested literal keys/arrays. Explicit style/extension preferences only disambiguate permitted repairs; conforming values remain unchanged. Core shares semantic policy/reference evaluation and typed edits; native preview uses bounded read-only snapshots, shared Fix-It conformance preservation, combined reassessment, and authoritative pre-write checks. Unresolved repairs exit nonzero with partial-batch reports. Recommendations are opt-in. Ambiguous alternatives and negative/existential rewrite intent remain review-required. See `docs/wikilink-conversion.md`; tests: `swift test --filter 'Wikilink|ContractConvertLinksTests|ConvertLinksTests'`.
 
 - **mdstandards roadmap (#191)**: Design issues #192–#196 track adoption, structural rule conformance/possible mdrule format changes, versioning/publication, user-owned strategies and standard-author migrations, and exchange primitives. They use the Standards interoperability design milestone. Coordinate #169/#184/#135/#186 without expanding mdtype v2 completion scope; no mdrule v2 is selected. See `docs/mdstandards-roadmap-proposal.md`.
@@ -249,17 +251,63 @@ Detailed guidance organized by topic:
 - **[Common Use Cases](docs/common-use-cases.md)** - CLI usage examples and recipes
 - **[Release Procedures](docs/release-procedures.md)** - Versioning and release process
 
-## Syncing SKILL.md
+## Maintaining the Agent Skill
 
-`Sources/md-utils/Resources/SKILL.md` is a copy of the canonical file at
-`skill/markdown-utilities/skills/markdown-utilities/SKILL.md`. Both must be kept in sync.
+For every user-facing CLI change, review and update the canonical skill at
+`skill/markdown-utilities/skills/markdown-utilities/` in the same change. This
+includes new or removed commands and changes to flags, defaults, aliases, output,
+exit status, selection, supported formats, version/capability gates, persistence,
+or recovery. Changes in shared libraries that affect CLI behavior also count.
 
-After editing the canonical SKILL.md, run:
+Keep `SKILL.md` focused on introductions, task routing, and essential shared
+constraints. Put detailed syntax, examples, workflows, limitations, and recovery
+instructions in the relevant `references/` file. Update the entrypoint only when
+its introduction, routing, or shared guidance changes; do not append every feature
+detail there. Add a focused reference and a discoverable link when no existing
+reference fits. Keep guidance self-contained for installed skill users.
+
+Contract authoring belongs in `references/rules.md`, `types.md`, and `schemas.md`.
+Keep `references/standards.md` a short upcoming-feature notice linked to
+[#191](https://github.com/DandyLyons/md-utils/issues/191) until supported standards
+authoring is ready. Other features use their relevant document-operation reference;
+do not load or duplicate unrelated guidance.
+
+Before completing a CLI change:
+
+1. Compare affected skill guidance with implementation and actual executable help,
+   including parent/group help when discoverability changes.
+2. Run representative changed examples against isolated project-local fixtures,
+   checking expected success/failure and preview/write behavior as applicable.
+   Rebuild first when the executable would otherwise be stale.
+3. Check added or changed reference links resolve from their containing file and
+   that detailed guidance is reachable from `SKILL.md` or another routed reference.
+4. Synchronize the complete bundled skill after any canonical skill change,
+   including reference-only edits, using the procedure below.
+5. Record the skill files updated and verification performed in review notes. If
+   no skill update is needed, record the concrete reason (for example, an internal
+   refactor with no user-visible behavior change).
+
+### Synchronizing the complete bundled skill
+
+`Sources/md-utils/Resources/AgentSkill/` is generated from the complete canonical
+`skill/markdown-utilities/skills/markdown-utilities/` folder. SwiftPM preserves this
+directory in the CLI bundle. Do not edit the generated copy directly.
+
+After editing any canonical skill file, run:
 ```bash
-cp skill/markdown-utilities/skills/markdown-utilities/SKILL.md \
-   Sources/md-utils/Resources/SKILL.md
+# Synchronize all files, then check routing, built resources, and examples.
+python3 scripts/sync-agent-skill.py
+python3 scripts/check-agent-skill.py
+swift test --filter AgentCommandsTests
+python3 scripts/check-agent-skill.py --cli .build/debug/md-utils
+python3 scripts/verify-agent-skill-examples.py --cli .build/debug/md-utils
 ```
-Then commit both files. A Swift test enforces this and will fail if they drift.
+Include canonical and generated changes together. Agent Skill CI checks added and
+deleted references as well as bytes. Update [the coverage matrix](docs/agent-skill-audit.md)
+for new command groups and extend representative workflows for changed behavior.
+Automated checks cannot prove all prose correct: review implementation and help.
+Linux release smoke exports the folder too; local Linux verification remains CI-only.
+`agents skill` prints only the entrypoint; `--output-directory` exports the full skill.
 
 ## Refreshing Official fm-var Fixtures
 

@@ -360,7 +360,8 @@ tree:
         1_md-utils-type.schema.json: Bundled JSON Schema for Markdown type-definition
           format version 1.
         OKF-concept.schema.json: Bundled JSON Schema for OKF concept metadata validation.
-        SKILL.md: Embedded copy of the markdown-utilities agent skill instructions.
+        AgentSkill:
+          _doc: Generated complete skill folder, preserving references for offline CLI export.
       RulesCommands:
         _doc: CLI rules command group implementation for project-level Markdown validation.
         RulesAdd.swift: Command that adds frontmatter schema-backed rules to configuration.
@@ -622,3 +623,15 @@ tree:
             frontmatter.md: Reference guide for frontmatter commands and patterns.
             headings-sections.md: Reference guide for heading and section manipulation
               commands.
+            rules.md: Rule authoring, selection, validation, policies, and migration.
+            types.md: Type definitions, relationships, creation, and assessment.
+            schemas.md: Frontmatter JSON Schema authoring and semantic profiles.
+            standards.md: Upcoming standards notice linked to the roadmap.
+            links.md: Wikilink resolution and reviewed conversion.
+            relationships.md: Scoped relationship query selection and evidence.
+            indexing.md: Collection cache, SQL, search, watching, and provenance.
+            mutations.md: Durable drafts, apply recovery, and managed transfers.
+            templates.md: Knap rendering and creation routing.
+            batch.md: File selection and batch outcome semantics.
+            other-commands.md: Configuration, formatting, metadata, slugs, and OKF.
+            installation.md: Complete skill export and installation paths.

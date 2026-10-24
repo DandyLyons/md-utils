@@ -1,0 +1,241 @@
+# Frontmatter Operations Reference
+
+YAML blocks use `---` delimiters and TOML blocks use `+++`. Mutations preserve
+the existing format. Creation-capable commands accept `--frontmatter-format
+yaml|toml` and default to YAML. Do not rely on YAML or TOML comments surviving a
+mutation: both formats are parsed into structured values and serialized again.
+TOML cannot represent null, so `fm touch` is unavailable for TOML blocks.
+
+## Mapped Non-Markdown Files
+
+Shipped mappings include established host wrappers and fixed hash-comment
+frontmatter. Hash-comment YAML uses `# ---`, TOML uses `# +++`, and each nonempty
+metadata line starts with exactly `# `. Bare `#` is an empty logical line. Legal
+blocks begin at line 1, immediately after a shebang, or after one empty
+post-shebang line, using the package's LF-only frontmatter policy.
+
+Exact mapped basenames include common ignore files, Make/Ruby toolfiles,
+`requirements.txt`, `constraints.txt`, and `.env.schema`. Mapped extensions cover
+shell, Ruby, R, YAML/TOML, Make/CMake, properties, Nix, Bazel, and Terraform.
+Ordinary `.env` and `.env.*` files are not mapped.
+
+Every `fm` leaf accepts `--line-comment-frontmatter` for explicitly supplied
+regular files. The override is rejected for implicit input and directories and
+never overrides Markdown or wrapped mappings. Use `--include-non-md` to include
+shipped mappings in batch and directory operations.
+
+## Basic CRUD
+
+### Get a value
+```bash
+md-utils fm get --key title document.md
+```
+
+### Set a value
+```bash
+md-utils fm set --key author --value "Jane Doe" document.md
+# Batch: recursively applies to .md and .markdown files
+md-utils fm set --key status --value published posts/
+# Create TOML frontmatter
+md-utils fm set --key status --value published --frontmatter-format toml document.md
+```
+
+### Check if key exists
+```bash
+md-utils fm has --key published document.md
+# Prints true/false; a missing key still exits 0. Read/parse errors fail.
+```
+
+### List all keys
+```bash
+md-utils fm list document.md
+```
+
+### Remove a key
+```bash
+md-utils fm remove --key draft document.md
+```
+
+### Remove the complete frontmatter block
+```bash
+# Prompts for exactly y before removing each frontmatter block
+md-utils fm remove-frontmatter document.md
+
+# Short alias, noninteractive confirmation, and mapped non-Markdown files
+md-utils fm rmfm posts/ --yes --include-non-md
+```
+
+### Rename a key
+```bash
+md-utils fm rename --key pubDate --new-key date document.md
+```
+
+### Replace entire frontmatter
+```bash
+md-utils fm replace --data '{"title":"New Title","author":"Jane"}' document.md
+```
+
+### Add keys without values (touch)
+```bash
+md-utils fm touch --keys reviewed document.md
+```
+
+### Sort keys alphabetically
+```bash
+md-utils fm sort-keys document.md
+```
+
+## Dump Frontmatter
+
+Output entire frontmatter in various formats:
+
+```bash
+# Single file (JSON by default)
+md-utils fm dump post.md
+
+# YAML format
+md-utils fm dump post.md --format yaml
+
+# TOML format
+md-utils fm dump post.md --format toml
+
+# Multiple files: categorizes populated, absent, and empty frontmatter
+md-utils fm dump posts/ --format json
+
+# Pipe to jq
+md-utils fm dump posts/ | jq '.frontMatter[].title'
+
+# Pipe to yq
+md-utils fm dump posts/ --format yaml | yq '.frontMatter[].title'
+
+# Cat-style headers (legacy)
+md-utils fm dump posts/ --cat-headers
+```
+
+**Formats:** `json` (default), `yaml`, `toml`, `raw`, `plist`
+
+TOML requires a table at the document root, so scalar and array output uses a
+stable `value` envelope. Raw dumps reserialize the source format; original bytes,
+comments and layout are not preserved. Collection raw output is YAML. Delimiters
+require `--include-delimiters` and are ignored by categorized collection output;
+with `--cat-headers` they apply to each block.
+
+`fm dump` automatically processes Markdown, `.txt`, and mapped non-Markdown
+files; it does not accept `--include-non-md`. Multi-file output is an object:
+
+- `frontMatter` contains nonempty mappings with a `$path` key.
+- `noFrontMatter` contains paths with no complete frontmatter block.
+- `emptyFrontMatter` contains paths whose complete block has an empty mapping.
+
+## Search with JMESPath
+
+`fm search` filters files using a JMESPath expression evaluated against each file's frontmatter. Outputs matching file paths.
+
+`fm search` supports YAML frontmatter only. TOML search is intentionally out of scope.
+The query is positional. Omitted paths default to `.`, directories always recurse
+(including hidden descendants), and no SQLite index is used. Output formats are
+raw paths (default), JSON, YAML or plist; TOML output is rejected. No matches
+succeed with empty stdout in every format. Per-file query evaluation errors skip
+the file; read/parse errors fail after available matches. `fm array contains`
+also supports TOML and optional case folding; missing/non-array keys are skipped
+even with `--invert`, and no matches exit nonzero.
+
+```bash
+# Find files where status is "published"
+md-utils fm search "status == 'published'" posts/
+
+# Find files where a key exists
+md-utils fm search "author" posts/
+
+# Set a string status on matches; preserve spaces and handle empty output
+md-utils fm search 'draft == `true`' posts/ | while IFS= read -r file; do
+  md-utils fm set "$file" --key status --value reviewed
+done
+```
+
+## Check Unique Frontmatter Values
+
+`fm unique` evaluates one JMESPath expression per note and checks that the
+selected scalar value is unique. Strings, numbers, and booleans are supported.
+
+```bash
+# Check every ID in a directory
+md-utils fm unique 'id' notes/
+
+# Select a nested value
+md-utils fm unique 'metadata.id' notes/
+
+# Check one note's ID against a directory
+md-utils fm unique 'id' --reference foo.md notes/
+
+# Require every note to have an ID
+md-utils fm unique 'id' --require-value notes/
+```
+
+Missing and null values are skipped unless `--require-value` is supplied. Arrays,
+objects, and array projections such as `authors[].id` are unsupported; there is
+currently no `--each` option.
+
+Simple selectors such as `id` work without shell quoting, but single-quote the
+entire JMESPath expression so Bash and Zsh preserve it exactly. In particular,
+never double-quote an expression containing JMESPath backtick literals because
+the shell interprets backticks as command substitution.
+
+## Array Operations
+
+For frontmatter keys that hold arrays (e.g. `tags: [swift, ios]`):
+
+```bash
+# Create an empty array if the key is missing or null; preserve existing arrays
+md-utils fm array init --key tags posts/
+
+# Empty an existing array while retaining the key
+md-utils fm array clear --key tags post.md
+
+# Check if array contains value (outputs matching file paths)
+md-utils fm array contains --key tags --value swift posts/
+
+# Append a value
+md-utils fm array append --key tags --value tutorial posts/*.md
+
+# Prepend a value
+md-utils fm array prepend --key tags --value featured posts/*.md
+
+# Remove first occurrence of a value
+md-utils fm array remove --key tags --value draft posts/*.md
+```
+
+`init` reports existing nonempty arrays on stderr and preserves their values.
+`clear` leaves missing keys and already-empty arrays unchanged and never creates
+frontmatter. `init` converts null values to empty arrays; `clear` rejects null.
+Both reject other non-array values and use literal
+top-level keys. No-op files retain their bytes and modification time;
+`--frontmatter-format yaml|toml` applies only to changed files. Use `fm remove`
+to delete a key. `init` follows existing `--create-frontmatter` authorization
+rules for non-Markdown files. Bulk errors are reported per file, processing
+continues, and any failure produces a nonzero exit status. Status and counts
+are written to stderr; stdout remains empty.
+
+## Common Pipelines
+
+Quoted read loops below preserve spaces and do nothing for empty input, but do
+not support embedded newlines in paths. `fm set --value` writes a string.
+
+```bash
+# Find files tagged 'swift' and set a string status
+md-utils fm array contains --key tags --value swift posts/ | while IFS= read -r file; do
+  md-utils fm set "$file" --key status --value published
+done
+
+# Find files with BOTH 'swift' AND 'tutorial' tags
+md-utils fm search 'contains(tags, `"swift"`) && contains(tags, `"tutorial"`)' posts/
+
+# List all unique authors across a directory
+md-utils fm dump posts/ | jq -r '.frontMatter[].author' | sort -u
+
+# Count published posts
+md-utils fm dump posts/ | jq '[.frontMatter[] | select(.status == "published")] | length'
+
+# Find files missing a required key
+md-utils fm dump posts/ | jq -r '.noFrontMatter[], (.frontMatter[] | select(has("author") | not) | ."$path"), .emptyFrontMatter[]'
+```

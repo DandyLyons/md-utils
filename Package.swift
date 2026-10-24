@@ -257,7 +257,7 @@ let package = Package(
       ],
       resources: [
         .process("Resources/BuildVersion.txt"),
-        .process("Resources/SKILL.md"),
+        .copy("Resources/AgentSkill"),
         .process("Resources/0.1.0_md-utils.schema.json"),
         .process("Resources/0.2.0_md-utils.schema.json"),
         .process("Resources/0.3.0_md-utils.schema.json"),
