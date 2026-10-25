@@ -5,6 +5,25 @@ remain subject to the individual issues' design gates.
 
 ## Published tracking
 
+Design #192–#196 together using the
+[shared decision checklist](mdstandards-design.md#shared-decision-checklist-for-192196).
+The owner requested coordinated, incremental decisions on 2026-10-22; issue
+ownership does not imply isolated sequential design.
+
+Owner clarification, 2026-10-22: every authored standard release after its first
+must define migration from the preceding version, including patch and major
+releases. **#195 owns designing standard-version migration definitions and
+execution; #194 owns their versioning and publication.** #193's format migration
+criterion is a separate concern. See the
+[explicit requirement and example](mdstandards-design.md#required-migrations-between-authored-standard-versions).
+The issue bodies quoted below are historical roadmap text; they have not yet
+been updated on GitHub with this clarification.
+
+Local review artifact for #192: [adoption and rule bindings](mdstandard-adoption.md).
+It proposes selector interpretation, binding cardinality, mode granularity, and
+separate assessments with worked cases. Owner agreement is pending; no issue
+acceptance checkbox or implementation gate is completed by this draft.
+
 - [Epic #191](https://github.com/DandyLyons/md-utils/issues/191): mdstandards — structural interoperability and data exchange.
 - [Design milestone](https://github.com/DandyLyons/md-utils/milestone/3): Standards interoperability design; no release number or due date.
 - [#192](https://github.com/DandyLyons/md-utils/issues/192): adoption, rule bindings, and conformance modes.

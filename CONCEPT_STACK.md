@@ -3,6 +3,8 @@
 Status: existing concepts documented on 2026-10-21. Standards are a design
 proposal, not implemented behavior. Their open decisions are recorded in
 [the mdstandards design draft](docs/mdstandards-design.md).
+The [adoption and binding proposal](docs/mdstandard-adoption.md) develops #192
+with worked examples; owner approval remains pending.
 
 ## Overview
 
