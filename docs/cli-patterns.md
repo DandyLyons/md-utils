@@ -1,5 +1,12 @@
 # CLI Patterns
 
+## Index-aware reads
+
+Follow the [shared index cache policy](index-cache-policy.md) when adding an
+index-aware read command: ordinary queries use the index as a verified cache with
+direct fallback; explicit index-only queries read a published snapshot without
+fallback. Preserve command-specific scope and dependency optimizations.
+
 ## CLI Pattern
 
 - Each subcommand is a struct conforming to `AsyncParsableCommand`

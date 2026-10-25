@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Shared index cache policy (2026-10-25)**: `docs/index-cache-policy.md` codifies existing cache reuse, requested-scope refresh, direct fallback, cancellation, no implicit index creation, and separate snapshot-only semantics. Preserve source-directed outgoing queries. Proposed survey follows this policy; malformed-frontmatter findings are successful query results, distinct from execution failure. Survey remains design-only.
+
 - **Agent skill maintenance (#198, 2026-10-24)**: User-facing CLI changes update focused references, with `SKILL.md` reserved for introductions/routing. `agents skill --output-directory` exports the full bundled folder without replacing installations. Run `scripts/sync-agent-skill.py` after every canonical skill edit; CI checks all bundled files, routing, examples, and export. See `docs/agent-skill-audit.md` for coverage and validation limits.
 
 - **mdstandard parser decisions (2026-10-23)**: RFC 0005 requires explicit `predecessor: null` on the initial release and a predecessor object thereafter; omission is invalid. Owner approved rejecting duplicate keys, unknown fields, missing resources, unsupported language versions, and invalid digests, with optional `$schema` as editor metadata only (no runtime selection or fetching authority). Other concrete field syntax remains proposed.
