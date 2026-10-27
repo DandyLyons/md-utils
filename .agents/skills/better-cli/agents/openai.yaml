@@ -1,0 +1,4 @@
+interface:
+  display_name: "Better CLI"
+  short_description: "Design and review usable, dependable CLI interfaces"
+  default_prompt: "Use $better-cli to review the affected CLI experience and implement improvements within the requested scope."
