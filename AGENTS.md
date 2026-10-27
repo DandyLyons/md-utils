@@ -11,6 +11,10 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Linked-data integration deferred (2026-10-26)**: Owner deferred JSON-LD/YAML-LD incorporation. `docs/schema-org-alignment.md` and `docs/linked-data-authoring-proposal.md` retain research, not mdstandards release prerequisites. Interpretation versus validation, context applicability independent of conformance, and possible future standard-layer profiles remain reconsideration notes, not approved features. Schema.org vocabulary/application research may continue separately. Recipe design is not finalized and needs human review.
+
+- **Standards workflow fixtures (#201, 2026-10-25)**: Owner approved installable example standards, multiple migratable releases, differing local definitions, and expected outcomes before implementation. `docs/mdstandards-fixture-plan.md` tracks release acceptance; `docs/md-recipes-proposal.md` researches Schema.org/Nextcloud, Cooklang, and Open Recipe Format and proposes a domain design awaiting approval. Explicit lossy imports require acknowledgment; lossless round trip and valid export are distinct capabilities. No mdstandards runtime tests are claimed.
+
 - **Shared index cache policy (2026-10-25)**: `docs/index-cache-policy.md` codifies existing cache reuse, requested-scope refresh, direct fallback, cancellation, no implicit index creation, and separate snapshot-only semantics. Preserve source-directed outgoing queries. Proposed survey follows this policy; malformed-frontmatter findings are successful query results, distinct from execution failure. Survey remains design-only.
 
 - **Agent skill maintenance (#198, 2026-10-24)**: User-facing CLI changes update focused references, with `SKILL.md` reserved for introductions/routing. `agents skill --output-directory` exports the full bundled folder without replacing installations. Run `scripts/sync-agent-skill.py` after every canonical skill edit; CI checks all bundled files, routing, examples, and export. See `docs/agent-skill-audit.md` for coverage and validation limits.

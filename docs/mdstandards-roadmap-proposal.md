@@ -5,6 +5,11 @@ remain subject to the individual issues' design gates.
 
 ## Published tracking
 
+- [#201](https://github.com/DandyLyons/md-utils/issues/201): approved cross-cutting
+  installable example standards and fixture-first acceptance work; see
+  [fixture plan](mdstandards-fixture-plan.md). Recipe domain choices await owner
+  approval of [the researched proposal](md-recipes-proposal.md).
+
 Design #192–#196 together using the
 [shared decision checklist](mdstandards-design.md#shared-decision-checklist-for-192196).
 The owner requested coordinated, incremental decisions on 2026-10-22; issue

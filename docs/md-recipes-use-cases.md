@@ -1,5 +1,11 @@
 # md-recipes: exploring storage and exchange
 
+Scope update, 2026-10-25: the owner approved developing installable example
+standards and fixture-first workflows, and requested a recipe-domain proposal
+for approval. See [the current research and proposal](md-recipes-proposal.md) and
+[fixture plan](mdstandards-fixture-plan.md). The original exploration below is
+historical context; the recipe schema itself is still not approved.
+
 Status: exploratory examples, 2026-10-21. No recipe schema, field names, profiles,
 exchange format, or CLI syntax are approved or implemented. This applies the
 [mdstandards proposal](mdstandards-design.md) to the owner's interoperability goal.

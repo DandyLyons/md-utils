@@ -231,7 +231,25 @@ promised. Retention of review reports after successful staging deletion and back
 retention are still open; proposed approach is to preserve a report/receipt outside
 the temporary stage before deleting it.
 
+## Deferred interoperability research
+
+JSON-LD/YAML-LD integration was deferred by the owner on 2026-10-26. The
+[Schema.org alignment proposal](../schema-org-alignment.md) and
+[linked-data authoring proposal](../linked-data-authoring-proposal.md) retain
+research for possible reconsideration. They are not specification deliverables
+or mdstandards release prerequisites. Domain vocabulary research may inform
+example standards without introducing linked-data processing.
+
 ## Next specification deliverables
+
+Owner-approved release acceptance work is tracked in [#201](https://github.com/DandyLyons/md-utils/issues/201):
+installable example standards, multiple migratable releases, different local
+definitions, and fixture-first workflows. See [fixture plan](../mdstandards-fixture-plan.md)
+and [recipe proposal](../md-recipes-proposal.md); domain details need owner approval.
+Explicitly lossy imports are permitted with acknowledged loss; distinguish lossless
+round trips from the ability to produce a conforming, but incomplete, export.
+Discarding required fields prevents conforming export unless they are supplied
+again. Exact acknowledgment syntax remains design work.
 
 1. Settle standard identity, publisher trust references, and canonical comparisons.
 2. Finalize standard fields, resource references, dependency closure, and predecessor
