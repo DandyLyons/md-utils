@@ -51,7 +51,8 @@ public struct MarkdownSurveyObservation: Codable, Sendable {
   package static func fromAnalysis(_ analyzed: AnalyzedMarkdownRecord, path: String) -> Self {
     let syntaxErrors = analyzed.parseDiagnostics.filter { $0.code.hasPrefix("record.frontmatter.") }
     let state: MarkdownSurveyState
-    if analyzed.record.content.utf8.contains(0) { state = .binary }
+    if analyzed.record.content.utf8.contains(0)
+      || isNonText(Data(analyzed.record.content.utf8.prefix(8192))) { state = .binary }
     else if analyzed.unavailableFrontmatterExtension != nil { state = .unsupported }
     else if !syntaxErrors.isEmpty { state = .malformed }
     else { state = analyzed.hasFrontmatter ? .parsed : .absent }
@@ -61,6 +62,17 @@ public struct MarkdownSurveyObservation: Codable, Sendable {
       nativeTemporalPaths: analyzed.nativeTemporalPaths, nativeTemporalKinds: analyzed.nativeTemporalKinds,
       format: analyzed.frontmatterFormat, diagnostics: syntaxErrors,
     )
+  }
+
+  /// Recognize common attachment signatures and NUL bytes without relying on extensions.
+  /// Invalid UTF-8 alone is not proof of non-text: it can be another text encoding.
+  package static func isNonText(_ prefix: Data) -> Bool {
+    let signatures: [[UInt8]] = [
+      Array("%PDF-".utf8), [0x89, 0x50, 0x4e, 0x47], [0xff, 0xd8, 0xff],
+      Array("GIF87a".utf8), Array("GIF89a".utf8), [0x50, 0x4b, 0x03, 0x04],
+      [0x50, 0x4b, 0x05, 0x06], [0x1f, 0x8b],
+    ]
+    return prefix.contains(0) || signatures.contains { prefix.starts(with: $0) }
   }
 
   /// Reads a literal top-level key, or an explicitly selected RFC 6901 pointer.

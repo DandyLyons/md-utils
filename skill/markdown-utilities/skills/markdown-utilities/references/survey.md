@@ -38,7 +38,10 @@ Scope is a deduplicated union of recursive directories and explicit files within
 one project root. It includes Markdown and supported other UTF-8 text files.
 Hidden entries and symlinks are skipped with a visible note; configured definitions
 inside `.md-utils/` may still load. Unsupported host syntax, absent frontmatter,
-malformed frontmatter, binary files and unreadable files are distinct outcomes.
+malformed frontmatter, non-text files and unreadable files are distinct outcomes.
+Recognized non-text attachments are skipped before text-size budgets are applied;
+their presence does not make the survey incomplete. Large text files still obey
+the read budgets. `survey key` text output summarizes presence, absence, and kinds.
 
 Use `--markdown-only`, `--no-recursive`, and repeated root-relative `--exclude`
 paths/globs to narrow scope. `--files-from` and `--files-from0` accept UTF-8 LF/NUL
@@ -92,7 +95,7 @@ Do not interpret unsupported as an empty standards inventory.
 Recursive directory surveys reuse an existing project index and refresh requested
 scopes; no absent index is created. Contract metrics also read authoritative source
 records. Explicit-file and nonrecursive surveys currently read directly. Cache
-errors warn on stderr and fall back; cancellation stops. `--no-index` bypasses the
+unavailability produces a performance advisory on stderr and falls back; cancellation stops. `--no-index` bypasses the
 cache; `--verify-hashes` detects stat-preserving edits during indexed refresh.
 
 `--index-only` (alias `--indexed-only`) reads published SQLite evidence only, without
@@ -105,6 +108,30 @@ their existing published projection with its coverage limitations.
 `--json` emits one versioned report with scope, metric completion, provenance,
 coverage, findings, truncation and hints. Diagnostics go to stderr. `--no-hints`
 suppresses investigation hints, not coverage limitations.
+Use `coverage.skippedNonText` for the skipped attachment count. Schema version 1
+also retains `coverage.skippedBinary` as a compatibility alias with the same count.
+Human output uses a value-distribution table and nested findings summaries for
+contracts, malformed frontmatter, and relationships. JSON envelopes are exclusive
+to `--json`; individual structured property values can still use compact JSON
+notation in the value column. Hints quote only shell arguments that need escaping.
+
+For individual scalar values, ordinary unrestricted directory surveys offer one
+`fm dump --format json | jq ...` example, preferring the most frequent non-null
+value among displayed rows. Change the value to investigate others. `fm dump` reads supported Markdown and
+mapped text frontmatter, including YAML and TOML; its traversal is distinct from
+survey discovery. Output includes `$path` for provenance. For example:
+
+```bash
+md-utils fm dump ./knowledge/ --format json |
+  jq --arg key Status --argjson value '"✅ Read"' '.frontMatter[] | select(has($key) and .[$key] == $value)'
+```
+
+These hints require `jq`. Structured hints retain the first command in `argv`
+and add optional `pipeTo` for the second command's argument array. Connect the
+first process's stdout to the second's stdin, use `workingDirectory`, and check
+both exit statuses. Do not join unescaped arguments into shell code. Hints are
+omitted for restricted/file-list/snapshot scopes, pointers, array elements, and
+native temporal values where this pipeline would not preserve query meaning.
 
 Exit 0 means analysis completed, even with malformed files or outliers. Exit 1
 means incomplete execution/evidence; inspect partial results. Invalid usage follows

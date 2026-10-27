@@ -18,12 +18,34 @@ struct SurveyCoverageReport: Codable {
   var skippedBinary = 0
   var markdownStates: [String: Int] = [:]
   var otherTextStates: [String: Int] = [:]
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(files, forKey: .files)
+    try container.encode(markdown, forKey: .markdown)
+    try container.encode(otherText, forKey: .otherText)
+    try container.encode(parsed, forKey: .parsed)
+    try container.encode(absent, forKey: .absent)
+    try container.encode(malformed, forKey: .malformed)
+    try container.encode(unsupported, forKey: .unsupported)
+    try container.encode(unreadable, forKey: .unreadable)
+    try container.encode(skippedBinary, forKey: .skippedBinary)
+    try container.encode(markdownStates, forKey: .markdownStates)
+    try container.encode(otherTextStates, forKey: .otherTextStates)
+    // Keep the original schema-v1 key for existing agents; new callers use non-text.
+    var additions = encoder.container(keyedBy: NonTextKey.self)
+    try additions.encode(skippedBinary, forKey: .skippedNonText)
+  }
+
+  private enum NonTextKey: String, CodingKey { case skippedNonText }
 }
 
 struct SurveyHint: Codable {
   var argv: [String]
   var workingDirectory: String
   var explanation: String
+  /// Optional second process: connect argv's stdout to this command's stdin.
+  var pipeTo: [String]? = nil
 }
 
 struct SurveyReport: Codable {
@@ -64,13 +86,37 @@ struct SurveyReport: Codable {
       lines.append(row(label, coverage.markdownStates[state] ?? 0, coverage.otherTextStates[state] ?? 0))
     }
     lines += ["",
-      "Unreadable: \(coverage.unreadable); skipped binary: \(coverage.skippedBinary)",
+      "Skipped: \(coverage.skippedBinary) non-text files",
+      "Unreadable: \(coverage.unreadable)",
       "Source: \(source)" + (snapshotGeneration.map { " (generation \($0))" } ?? ""),
     ]
     lines += scopeNotes
     for metric in requestedMetrics where metric != "coverage" {
       guard let value = metrics[metric] else { continue }
       lines.append("\n\(metric):")
+      if metric == "key", let summary = value.objectValue?["summary"]?.objectValue {
+        let key = summary["key"]?.stringValue ?? ""
+        lines.append("  Property: \(key)")
+        lines.append("  Present: \(Self.display(summary["present"] ?? .integer(0))) files")
+        lines.append("  Missing: \(Self.display(summary["missing"] ?? .integer(0))) files")
+        lines.append("  Could not assess: \(Self.display(summary["unassessable"] ?? .integer(0))) files")
+        let kinds = summary["kinds"]?.objectValue ?? [:]
+        if kinds.isEmpty { lines.append("  No values found for this property.") }
+        else {
+          lines.append("  Value kinds:")
+          for kind in kinds.keys.sorted() {
+            lines.append("    \(kind): \(Self.display(kinds[kind] ?? .integer(0))) files")
+          }
+        }
+        if parameters["outliers"] == .boolean(true) {
+          lines.append("  Outliers: \(Self.display(value.objectValue?["outlierTotal"] ?? .integer(0)))")
+          if case .array(let paths) = summary["outlierPaths"] {
+            for path in paths { if let path = path.stringValue { lines.append("    \(path)") } }
+          }
+          lines.append("  Omitted outliers: \(Self.display(value.objectValue?["outlierOmitted"] ?? .integer(0)))")
+        }
+        continue
+      }
       if metric == "keys", let rowsValue = value.objectValue?["rows"], case .array(let rows) = rowsValue {
         for row in rows {
           guard let object = row.objectValue, let key = object["key"]?.stringValue else { continue }
@@ -81,20 +127,98 @@ struct SurveyReport: Codable {
         lines.append("  Omitted keys: \(Self.display(value.objectValue?["omitted"] ?? .integer(0)))")
         continue
       }
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-      if let data = try? encoder.encode(value) { lines.append(String(decoding: data, as: UTF8.self)) }
+      if metric == "values", let distribution = value.objectValue {
+        lines += Self.valueDistribution(distribution, property: parameters["property"]?.stringValue ?? "")
+      } else {
+        lines += Self.findings(value)
+      }
     }
     lines += limitations.map { "Incomplete: " + $0 }
     for hint in hints {
       lines.append("\n" + hint.explanation)
-      lines.append("  " + hint.argv.map(Self.quote).joined(separator: " "))
+      var command = hint.argv.map(Self.quote).joined(separator: " ")
+      if let pipeTo = hint.pipeTo { command += " | " + pipeTo.map(Self.quote).joined(separator: " ") }
+      lines.append("  " + command)
     }
     return lines.joined(separator: "\n")
   }
 
   static func quote(_ value: String) -> String {
-    "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:@%+=,-")
+    if !value.isEmpty && value.unicodeScalars.allSatisfy(safe.contains) { return value }
+    return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+  }
+
+  /// Render distributions for people while retaining the typed, lossless JSON API.
+  static func valueDistribution(_ report: [String: JSONValue], property: String) -> [String] {
+    func count(_ name: String) -> String { display(report[name] ?? .integer(0)) }
+    let counting = report["counting"]?.stringValue ?? "documents"
+    var lines = [
+      "  Property: \(property)",
+      "  Present: \(count("present")); missing: \(count("missing")); could not assess: \(count("unassessable")) files",
+      "  Counting: \(counting); percentage base: \(count("denominator")) \(counting)",
+      "  Count    Share  Kind          Value",
+    ]
+    if case .array(let rows) = report["rows"] {
+      if rows.isEmpty { lines.append("  No values found.") }
+      for row in rows {
+        guard let fields = row.objectValue, let typed = fields["value"]?.objectValue else { continue }
+        let number = display(fields["count"] ?? .integer(0))
+        let proportion = Double(display(fields["proportion"] ?? .integer(0))) ?? 0
+        let kind = typed["kind"]?.stringValue ?? "unknown"
+        let countColumn = number + String(repeating: " ", count: max(1, 7 - number.count))
+        let kindColumn = kind + String(repeating: " ", count: max(1, 14 - kind.count))
+        lines.append("  \(countColumn)\(String(format: "%5.1f%%", proportion * 100))  \(kindColumn)\(display(typed["value"] ?? .null))")
+        if let temporal = typed["temporalKinds"]?.objectValue, !temporal.isEmpty {
+          lines.append("    Temporal kinds:")
+          lines += findings(.object(temporal), indent: "      ")
+        }
+      }
+    }
+    lines.append("  Distinct values: \(count("total")); omitted: \(count("omitted")) (\(count("omittedCount")) counts)")
+    if report["nonArrays"] != .integer(0) || report["emptyArrays"] != .integer(0) {
+      lines.append("  Non-array files: \(count("nonArrays")); empty arrays: \(count("emptyArrays"))")
+    }
+    return lines
+  }
+
+  /// Present nested diagnostic and contract evidence without exposing JSON envelopes.
+  /// Table totals and omission counts remain visible even when detailed rows are limited.
+  static func findings(_ value: JSONValue, indent: String = "  ") -> [String] {
+    switch value {
+    case .object(let object):
+      if case .array(let rows) = object["rows"] {
+        var lines = ["\(indent)Total: \(display(object["total"] ?? .integer(rows.count))); omitted: \(display(object["omitted"] ?? .integer(0)))"]
+        if rows.isEmpty { lines.append("\(indent)No findings.") }
+        for (index, row) in rows.enumerated() {
+          lines.append("\(indent)\(index + 1).")
+          lines += findings(row, indent: indent + "  ")
+        }
+        return lines
+      }
+      if object.isEmpty { return [indent + "None."] }
+      return object.keys.sorted().flatMap { key -> [String] in
+        guard let child = object[key] else { return [] }
+        let label = key.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
+        let title = label.prefix(1).uppercased() + label.dropFirst()
+        switch child {
+        case .object, .array: return [indent + title + ":"] + findings(child, indent: indent + "  ")
+        default: return [indent + title + ": " + readable(child)]
+        }
+      }
+    case .array(let values):
+      if values.isEmpty { return [indent + "None."] }
+      return values.flatMap { findings($0, indent: indent) }
+    default: return [indent + readable(value)]
+    }
+  }
+
+  static func readable(_ value: JSONValue) -> String {
+    if let text = value.stringValue {
+      // Keep embedded control characters from corrupting terminal structure.
+      return text.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) ? display(value) : text
+    }
+    return display(value)
   }
 
   static func display(_ value: JSONValue) -> String {
@@ -185,7 +309,7 @@ enum SurveyRunner {
         } catch is CancellationError { throw CancellationError() }
         catch {
           try Task.checkCancellation()
-          FileHandle.standardError.write(Data("Warning: survey index unavailable (\(error)); reading source files directly.\n".utf8))
+          FileHandle.standardError.write(Data("Note: reading source files because cached survey evidence is unavailable; this may take longer.\n".utf8))
         }
       }
       if !usedCache || needsRecords {
@@ -301,9 +425,33 @@ enum SurveyRunner {
             workingDirectory: Path.current.string, explanation: "Inspect the mixed observed value kinds for \(name); these are conventions, not requirements."))
         }
       }
-      if metric == "key", let key {
+      if metric == "key", let key,
+        report.metrics["key"]?.objectValue?["summary"]?.objectValue?["present"] != .integer(0) {
         report.hints.append(.init(argv: ["md-utils", "survey", "values", key] + scope + (options.pointer ? ["--pointer"] : []),
           workingDirectory: Path.current.string, explanation: "Explore frequent values and their distribution for this property."))
+      }
+      if metric == "values", let key, key != "$path", !options.pointer,
+        !options.elements, !options.indexOnly, !options.markdownOnly,
+        options.recursive, options.exclude.isEmpty,
+        options.filesFrom.isEmpty, options.filesFrom0.isEmpty,
+        !paths.isEmpty, paths.allSatisfy({ Path($0).isDirectory }),
+        case .array(let rows) = report.metrics["values"]?.objectValue?["rows"] {
+        // One example is enough to teach the workflow. Prefer a non-null value,
+        // preserving frequency order; state dump's distinct scope explicitly.
+        let candidates = rows.compactMap { $0.objectValue?["value"]?.objectValue }.filter {
+          ["string", "null", "boolean", "integer", "number"].contains($0["kind"]?.stringValue ?? "")
+        }
+        if let typed = candidates.first(where: { $0["kind"] != .string("null") }) ?? candidates.first,
+          let value = typed["value"] {
+          report.hints.append(.init(
+            argv: ["md-utils", "fm", "dump"] + paths + ["--format", "json"],
+            workingDirectory: Path.current.string,
+            explanation: "Example: show frontmatter where \(key) equals \(SurveyReport.display(value)); replace the value to investigate others (requires jq). Reads current supported text files using fm dump traversal; $path identifies each source.",
+            pipeTo: ["jq", "--arg", "key", key, "--argjson", "value", SurveyReport.display(value),
+              ".frontMatter[] | select(has($key) and .[$key] == $value)",
+            ],
+          ))
+        }
       }
       // A consumed stdin list cannot be replayed by a generated command. Preserve
       // the report's evidence instead of presenting a command that would hang.
@@ -401,6 +549,12 @@ enum SurveyRunner {
           }
         }
       } else if values.isRegularFile == true && (!options.markdownOnly || isMarkdown(path)) {
+        // Classify a bounded prefix before applying text-read budgets: attachments
+        // must not consume the budget or prevent later text documents being read.
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let prefix = try handle.read(upToCount: 8192) ?? Data()
+        if MarkdownSurveyObservation.isNonText(prefix) { report.coverage.skippedBinary += 1; return }
         guard records.count < options.maxFiles, let size = values.fileSize, size <= 64 * 1024 * 1024,
           bytes + size <= 256 * 1024 * 1024 else { throw SurveyDiscoveryError.budget }
         let data = try Data(contentsOf: url)
@@ -409,8 +563,8 @@ enum SurveyRunner {
           after.contentModificationDate == values.contentModificationDate else {
           throw ValidationError("File changed while reading: \(relative); retry survey")
         }
-        bytes += data.count
         if data.contains(0) { report.coverage.skippedBinary += 1; return }
+        bytes += data.count
         guard let text = String(data: data, encoding: .utf8) else { throw ValidationError("Invalid UTF-8: \(relative)") }
         records.append(MarkdownRecord(content: text, context: MarkdownRecordContext(
           path: try MarkdownRecordPath(relative), modificationDate: values.contentModificationDate,
@@ -432,6 +586,7 @@ enum SurveyRunner {
   static func matches(_ path: String, glob: String) -> Bool {
     (try? MarkdownRecordPath(path).matches(glob: glob)) ?? false
   }
+
 }
 
 private enum SurveyDiscoveryError: Error, CustomStringConvertible {

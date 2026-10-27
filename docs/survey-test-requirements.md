@@ -108,6 +108,47 @@ the default overview and points to focused commands.
 
 ### Current limits and remaining verification
 
+Value-investigation iteration: ordinary directory scalar-value rows offer one
+frontmatter dump/filter example with typed jq arguments, preferring the most
+frequent displayed non-null value. The owner chose jq over fm search syntax.
+JSON hints expose an
+optional `pipeTo` argument array; shell output escapes both stages. Null predicates
+require key presence. Restricted scopes do not get misleading broader pipelines.
+Focused hint and renderer regressions were run; the owner's `Status = ✅ Read`
+query returned 150 frontmatter objects. The full suite remains deferred during
+iteration.
+
+Human-output iteration: the `values` renderer now shows counts, percentages,
+typed values, denominators, and truncation. The JSON fallback was also present in
+malformed-fm, rules, types, uncovered, overlaps, type-matches, and relationships;
+these now render nested findings with totals and omissions. The structured JSON
+contract is unchanged. Hints quote only shell-unsafe arguments. Cache fallback is
+a stderr performance advisory rather than a warning.
+
+Focused rendering/quoting, non-text, and investigation-hint tests pass. The two
+requested `Status` commands complete successfully against the owner's collection.
+All thirteen subcommands were exercised in an isolated fixture, including real
+malformed frontmatter and contracts; 28 printed examples also passed. No full
+suite was run for this iteration. Evidence: `tmp/survey-render-green.log` and
+`tmp/survey-human-metrics.txt`.
+
+Iteration after initial commit: a focused regression creates an 81 MiB PDF,
+two other non-text attachments, and a later Markdown document. Text and JSON
+commands must succeed, count three skipped non-text files, and include the later
+document. Existing text-budget exhaustion remains incomplete. Classification
+parity also covers a PDF whose bytes happen to be valid UTF-8. Native cache
+fingerprint v4 invalidates older classification evidence. Only focused tests
+were run for this iteration at the owner's request.
+
+The owner's Inputs collection now completes in both modes: 522 text files,
+four non-text files skipped, no unreadable files. The previous scan stopped at
+an 81 MiB PDF after counting three skips. Its existing cache cannot supply all
+attachment observations and falls back to direct reads; snapshot-only behavior
+is unchanged. JSON adds `coverage.skippedNonText`, retaining `skippedBinary`
+as a schema-v1 compatibility alias. Human key output reports counts and kinds
+instead of an internal JSON dump, without suggesting value distributions when
+the property is absent.
+
 Pre-commit verification on 2026-10-27: the complete native `swift test
 --disable-automatic-resolution` run passed **1,922 tests across 183 suites** in
 eight test products. The 137-page executable help audit and all 17 canonical/

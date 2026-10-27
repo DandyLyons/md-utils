@@ -25,6 +25,87 @@ private struct SurveyFixture {
 }
 
 struct SurveyCommandsTests {
+  @Test func valueHintsDescribeAFrontmatterPipelineAndRespectRestrictedScope() async throws {
+    let fixture = try SurveyFixture()
+    defer { fixture.remove() }
+    try fixture.write("notes/read.md", "---\nStatus: ✅ Read\n---\nBody must not appear")
+    try fixture.write("notes/null.md", "---\nStatus: null\n---\n")
+    try fixture.write("notes/missing.md", "---\ntitle: Missing\n---\n")
+    let report = try await fixture.report("values", paths: ["Status", (fixture.root + "notes/").string])
+    let encoded = try SurveyRunner.json(report)
+    guard case .array(let hints) = encoded.objectValue?["hints"] else {
+      Issue.record("Expected structured hints"); return
+    }
+    #expect(hints.count == 1)
+    #expect(hints.allSatisfy { $0.objectValue?["pipeTo"] != nil })
+    #expect(report.text().contains("md-utils fm dump"))
+    #expect(report.text().contains(" | jq "))
+    #expect(report.text().contains("✅ Read"))
+    let hint = try #require(report.hints.first)
+    let matches = try CLIProcessTestHelper.run(Array(hint.argv.dropFirst()))
+    #expect(matches.status == 0)
+    #expect(matches.standardOutput.contains("Body must not appear") == false)
+    #expect(hint.pipeTo == ["jq", "--arg", "key", "Status", "--argjson", "value", "\"✅ Read\"", ".frontMatter[] | select(has($key) and .[$key] == $value)"])
+    let restricted = try await fixture.report("values", paths: ["Status", (fixture.root + "notes/").string], flags: ["--exclude", "notes/missing.md"])
+    #expect(restricted.hints.isEmpty)
+  }
+
+  @Test func textReportsRenderValuesAndNestedFindingsWithoutJSONEnvelopes() {
+    var report = SurveyReport(root: ".", paths: ["notes/"], requestedMetrics: ["values", "rules", "types", "malformed-fm", "uncovered", "overlaps", "type-matches", "relationships"])
+    report.parameters["property"] = .string("Status")
+    report.metrics["values"] = .object([
+      "present": .integer(2), "missing": .integer(1), "denominator": .integer(2),
+      "counting": .string("documents"), "total": .integer(1), "omitted": .integer(0),
+      "rows": .array([.object(["count": .integer(2), "proportion": .number(1),
+        "value": .object(["kind": .string("string"), "value": .string("Read")]),
+      ])]),
+    ])
+    for metric in report.requestedMetrics where metric != "values" {
+      report.metrics[metric] = .object(["total": .integer(1), "omitted": .integer(0),
+        "rows": .array([.object(["name": .string("Example"), "selected": .integer(2)])]),
+      ])
+    }
+    let text = report.text()
+    #expect(text.contains("100.0%"))
+    #expect(text.contains("Read"))
+    #expect(text.contains("Selected: 2"))
+    #expect(text.contains("\"rows\"") == false)
+    #expect(text.contains("\"counting\"") == false)
+    #expect(SurveyReport.quote("md-utils") == "md-utils")
+    #expect(SurveyReport.quote("a folder/") == "'a folder/'")
+    #expect(SurveyReport.quote("$(touch file)") == "'$(touch file)'")
+    #expect(SurveyReport.quote("it's") == "'it'\\''s'")
+  }
+
+  @Test func largeNonTextAttachmentsDoNotStopKeySurvey() async throws {
+    let fixture = try SurveyFixture()
+    defer { fixture.remove() }
+    try fixture.write("a.pdf", "%PDF-1.7\n")
+    let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: (fixture.root + "a.pdf").string))
+    try handle.truncate(atOffset: 81 * 1024 * 1024)
+    try handle.close()
+    try fixture.write("b.dat", "attachment\0bytes")
+    try fixture.write("c.zip", "PK\u{3}\u{4}archive")
+    try fixture.write("z.md", "---\nstatus: draft\n---\n")
+    for json in [false, true] {
+      let result = try CLIProcessTestHelper.run([
+        "survey", "key", "status", fixture.root.string,
+        "--project-root", fixture.root.string, "--no-index",
+      ] + (json ? ["--json"] : []))
+      #expect(result.status == 0)
+      #expect(result.standardError.isEmpty)
+      if json {
+        let report = try JSONDecoder().decode(JSONValue.self, from: Data(result.standardOutput.utf8))
+        #expect(report.objectValue?["complete"] == .boolean(true))
+        #expect(report.objectValue?["coverage"]?.objectValue?["skippedNonText"] == .integer(3))
+      } else {
+        #expect(result.standardOutput.contains("Skipped: 3 non-text files"))
+        #expect(result.standardOutput.contains("Present: 1"))
+        #expect(result.standardOutput.contains("\"summary\"") == false)
+      }
+    }
+  }
+
   @Test func vanillaSurveySelectsOverview() throws {
     let parsed = try CLIEntry.parseAsRoot(["survey", "./notes/"])
     #expect(parsed is SurveyCommand<SurveyOverview>)
@@ -192,6 +273,7 @@ struct SurveyCommandsTests {
     defer { fixture.remove() }
     try fixture.write("notes/bad.md", "---\nx: [broken\n---\n")
     try fixture.write("notes/blob.bin", "binary\0bytes")
+    try fixture.write("notes/document.pdf", "%PDF-1.7\nattachment")
     try (fixture.root + ".md-utils/").mkpath()
     let database = try SQLiteIndexDatabase(path: (fixture.root + ".md-utils/index.sqlite").string)
     _ = try CollectionIndexer(database: database, root: URL(fileURLWithPath: fixture.root.string))
@@ -200,7 +282,7 @@ struct SurveyCommandsTests {
     let cached = try await fixture.report("coverage", paths: paths)
     #expect(cached.complete)
     #expect(cached.coverage.files == direct.coverage.files)
-    #expect(cached.coverage.skippedBinary == 1)
+    #expect(cached.coverage.skippedBinary == 2)
     #expect(cached.coverage.malformed == 1)
   }
 

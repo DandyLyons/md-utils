@@ -76,7 +76,7 @@ enum SurveyHelp {
         "md-utils survey ./notes/\nmd-utils survey overview ./notes/ --json\nmd-utils survey ./notes/ --metrics coverage,keys\nmd-utils survey values status ./notes/")
     case "coverage":
       return ("See which files can contribute to a survey and which could not be read.",
-        "Check the input population before interpreting statistics. Compare Markdown and other text files with parsed, malformed, or absent frontmatter, and see skipped binary files and unreadable inputs.",
+        "Check the input population before interpreting statistics. Compare Markdown and other text files with parsed, malformed, or absent frontmatter, and see skipped non-text files and unreadable inputs.",
         "md-utils survey coverage ./notes/\nmd-utils survey coverage ./notes/ --markdown-only --json")
     case "malformed-fm":
       return ("Find files whose frontmatter cannot be parsed so you can investigate syntax errors.",

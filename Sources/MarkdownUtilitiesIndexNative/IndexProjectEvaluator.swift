@@ -31,7 +31,7 @@ public struct IndexProjectEvaluator: Sendable {
         types = (root + MarkdownTypeFileRegistryLoader.relativeTypesDirectory).exists
             ? try MarkdownTypeFileRegistryLoader.load(projectRoot: root) : try MarkdownTypeRegistry(definitions: [])
         var standalone: MarkdownStandaloneRuleProject?
-        var components = [configPath.string, "survey-observation-v3"]
+        var components = [configPath.string, "survey-observation-v4"]
         if includeRules && configPath.exists {
             let data = try Data(contentsOf: URL(fileURLWithPath: configPath.string))
             components.append(String(decoding: data, as: UTF8.self))
