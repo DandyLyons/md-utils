@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Folder surveys now provide compact colored summaries, key prevalence, per-file
+  assessment reasons, focused investigation hints, and delayed progress feedback.
+  Rule surveys share file analysis across rules, improving measured Inputs-folder
+  performance about sixfold. Functional standards discovery remains upcoming.
+- **Breaking:** Survey output selection is `--format text|json|json-pretty`;
+  `--json` is removed. Malformed-frontmatter filtering uses `--fm-format yaml|toml`.
+
 - **Breaking:** Knap (through SwiftKnap) replaces the previous template engine for
   library, CLI, and server creation. Rewrite existing templates using Knap; there
   is no compatibility mode or automatic translation. `template render` retains

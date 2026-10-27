@@ -3,6 +3,11 @@
 Use survey to get oriented before validating or editing documents. Observed
 conventions do not create requirements. All examples assume the working directory
 is the project root; supply `--project-root ./vault/` otherwise.
+The default text overview is compact: coverage, up to five common keys, leading
+rules/types, and at most three hints. Dedicated subcommands and JSON retain detailed
+results. Rules rank by selected files, then unknown applicability, then name;
+types referenced by applicable rules rank before locally discovered and other
+configured definitions. Display limits apply after ranking.
 Use `md-utils help survey` for the command group; `survey --help` describes the
 default overview and lists the available subcommands. Each
 `md-utils survey <subcommand> --help` page explains its purpose, gives starting
@@ -14,7 +19,7 @@ md-utils survey ./knowledge/
 md-utils survey ./knowledge/ --metrics coverage,keys
 
 # Investigate metadata syntax, conventions, and informal vocabularies.
-md-utils survey malformed-fm ./knowledge/ --format yaml
+md-utils survey malformed-fm ./knowledge/ --fm-format yaml
 md-utils survey key tags ./knowledge/ --outliers
 md-utils survey values status ./knowledge/
 md-utils survey values tags ./knowledge/ --elements
@@ -28,8 +33,8 @@ md-utils survey ./knowledge/ --metrics rules,uncovered,overlaps
 md-utils survey relationships ./knowledge/
 
 # Structured output and strictly published snapshot findings.
-md-utils survey keys ./knowledge/ --json
-md-utils survey malformed-fm ./knowledge/ --index-only --json
+md-utils survey keys ./knowledge/ --format json
+md-utils survey malformed-fm ./knowledge/ --index-only --format json
 ```
 
 ## Scope and properties
@@ -74,23 +79,88 @@ separate. `keys --min-files` filters the key inventory (default 1).
 
 ## Contracts and investigation
 
+`survey keys` and `survey key` show prevalence against assessable files
+(`present + missing`), including files without frontmatter. Null values count as
+present; malformed/unsupported/read-failed files do not enter the denominator.
+Key summary JSON adds `assessable`, `presentProportion`, and `missingProportion`
+(fractions from 0 to 1). With no assessable files proportions are null and text
+shows N/A. Percentages are rounded to one decimal only for human output.
+Relationship investigation hints prefer sources with unresolved/ambiguous/malformed
+link evidence, then unavailable named assessments, then a source with observed
+links. Selection precedes display truncation; type and cache options are retained.
+
+`survey keys` and literal `survey key` include one `fm has --key NAME <folders>`
+hint using the surveyed paths and supported recursion/exclusion options. Look for
+true in the per-file output to find files with the key, including null values;
+false means absent, not a failed command. Supported mapped non-Markdown formats
+are included unless Markdown-only was requested. Substitute another key.
+Pointer, file-list, and snapshot-only surveys omit this folder hint. Existing
+hint limits and `--no-hints` still apply.
+
+Human survey reports use the CLI's shared Rainbow/CLIStyle colors for headings,
+table labels, counts, paths, hints, and scope notes. Existing terminal detection
+and `NO_COLOR`/`FORCE_COLOR` behavior apply; redirected reports remain plain under
+normal detection. JSON is never styled. Color adds no new warning/error semantics.
+
+Every survey report includes `fileIssues`: bounded `rows` with project-relative
+`path`, `category` (`unsupported`, `malformed`, or `unreadable`), and `reasons`
+containing diagnostic `code` and `message`. `total`, `omitted`, and category
+`counts` describe the full observed scope. These are frontmatter/read observations,
+not type-validation failures or proof that every metric needs the missing evidence.
+Text shows three examples; `--limit 0` expands all. Follow the generated
+`survey coverage ... --format json --limit 0 --no-hints` command to investigate the same
+scope. `--no-hints` retains diagnostics. Non-text skips and absent frontmatter are
+not file issues. Snapshot queries derive these findings from stored observations;
+limitations without per-file evidence remain in `limitations`.
+
+Focused `types`, `type-matches`, `relationships`, `uncovered`, and `overlaps`
+reports lead with counts/tables. File and edge examples are capped at three by
+default; `--limit 0` expands them. Type matching samples the first displayed type;
+use `--type NAME` to investigate another. JSON retains bounded detailed evidence
+and totals regardless of the human presentation. Uncertain coverage is not proof
+that no relationships or overlaps exist.
+
 `rules` describes selection and referenced types without full validation.
+Human output leads with rule coverage and a compact table, hiding confirmed
+zero-match rules behind a count. JSON retains detailed rule rows and adds `summary`
+and bounded `uncertainties` (path, rule, diagnostic codes/messages). Summary counts
+distinguish unique uncertain files from rule/file pairs; `assessmentComplete`
+indicates whether every selection was decidable. Uncertain rule selections are
+successful survey findings, not execution failures. Use `--limit 0` for all details.
+Missing explicit input paths fail before discovery or rule evaluation; snapshot-only
+queries continue to use published evidence without checking source paths.
 `uncovered` reports confirmed non-selection; `overlaps` reports multiple matches.
 Unknown applicability remains separate. `types` inventories configured/discovered
 definitions; `type-matches` explicitly assesses conformance, which does not prove
 intended usage. `--rule` filters rule inventory; `--type` filters types or matching.
 
-Follow generated investigation hints. A named rule's `rules validate` command can
+Follow generated `rules describe`, `rules matching <file> --explain`, and
+`rules files-matching <rule>` hints before validation. Matching uses a concrete
+surveyed example file; files-matching lists the rule's full project selection,
+including files beyond the survey folder or exclusions. Named-rule commands can
 extend beyond the surveyed folder. Survey never repairs documents. Relationship
 surveying summarizes outgoing Markdown evidence within the full project namespace;
 non-Markdown relationship coverage is excluded explicitly. Detailed directional
 investigation belongs to [Relationships](relationships.md).
 
-`survey standards` explicitly reports unsupported and exits unsuccessfully.
+`survey standards` says it is an upcoming feature and exits unsuccessfully.
+When standards is the only requested metric, it does not scan source files or
+touch the index: `source` is `not-run` and `coverageEvaluated` is false. Its zero
+coverage counters are placeholders, not an empty-folder finding. Mixed metrics
+still evaluate supported metrics and report standards as unsupported.
 Functional support is deferred to [#202](https://github.com/DandyLyons/md-utils/issues/202).
 Do not interpret unsupported as an empty standards inventory.
 
 ## Cache, JSON, and completion
+
+All survey commands use `--format text|json|json-pretty`. Text is the default;
+json emits one compact JSON document and json-pretty emits the same report with
+indentation. `--json` is not accepted. For malformed-frontmatter syntax filtering,
+use `--fm-format yaml|toml` independently of output format, for example:
+
+```sh
+md-utils survey malformed-fm ./knowledge/ --fm-format yaml --format json-pretty
+```
 
 Recursive directory surveys reuse an existing project index and refresh requested
 scopes; no absent index is created. Contract metrics also read authoritative source
@@ -105,14 +175,25 @@ unavailable. Contract inventory, rule coverage and type matching do not yet have
 survey snapshot projections and explicitly report unavailable. Relationships use
 their existing published projection with its coverage limitations.
 
-`--json` emits one versioned report with scope, metric completion, provenance,
+`--format json` emits one versioned report with scope, metric completion, provenance,
 coverage, findings, truncation and hints. Diagnostics go to stderr. `--no-hints`
 suppresses investigation hints, not coverage limitations.
+Hints have an independent maximum of three; `--limit` controls detailed result
+rows, not the hint budget. Keys show one representative mixed-kind investigation,
+prioritizing non-null kind differences. Rule-validation hints are limited to one
+relevant example on rules/overview, not unrelated inventory or coverage commands.
+Follow-up survey commands preserve `--no-index` when supplied.
+
+Slow CLI runs show phase feedback on stderr after one second, then only when the
+phase changes. Known counts come from actual discovered text records, not an
+extra scan or a prior snapshot. Discovery/cache refresh messages omit counts
+until known; snapshot-only execution never scans sources for progress.
+`--no-progress` suppresses these messages without hiding limitations or advisories.
 Use `coverage.skippedNonText` for the skipped attachment count. Schema version 1
 also retains `coverage.skippedBinary` as a compatibility alias with the same count.
 Human output uses a value-distribution table and nested findings summaries for
 contracts, malformed frontmatter, and relationships. JSON envelopes are exclusive
-to `--json`; individual structured property values can still use compact JSON
+to `--format json` and `--format json-pretty`; individual structured property values can still use compact JSON
 notation in the value column. Hints quote only shell arguments that need escaping.
 
 For individual scalar values, ordinary unrestricted directory surveys offer one

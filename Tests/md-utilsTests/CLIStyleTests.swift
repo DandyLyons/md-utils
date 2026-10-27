@@ -31,4 +31,16 @@ struct CLIStyleTests {
 
     #expect(styled.raw == "### A # Heading")
   }
+
+  @Test(arguments: ["overview", "coverage", "malformed-fm", "keys", "key", "values", "rules", "types", "standards", "uncovered", "overlaps", "type-matches", "relationships"])
+  func `survey styling preserves content and alignment`(_ metric: String) {
+    var report = SurveyReport(root: "/notes", paths: ["/notes/a folder/"], requestedMetrics: [metric])
+    report.coverage.files = 12
+    report.coverage.markdown = 12
+    report.parameters["property"] = .string("Status")
+    report.hints = [.init(argv: ["md-utils", "survey", "coverage", "/notes/a folder/"], workingDirectory: "/notes", explanation: "Inspect file coverage.")]
+    #expect(report.coloredText(overview: metric == "overview").raw == report.text(overview: metric == "overview"))
+    report.unavailable("Example failure")
+    #expect(report.coloredText().raw == report.text())
+  }
 }

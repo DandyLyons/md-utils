@@ -87,6 +87,35 @@ metrics, per-metric completion, execution provenance/snapshot, findings, display
 truncation and hints with argv/working directory/scope notes. Warnings use stderr.
 `--no-hints` suppresses hints, not coverage limitations.
 
+Survey output uses `--format text|json|json-pretty` consistently with the existing
+metadata format vocabulary. Text is the default; json is compact and json-pretty
+is indented. Both JSON modes serialize identical data through the shared
+`JSONReportOutput` helper. `--json` is removed, without an alias. The malformed
+frontmatter syntax filter is `--fm-format yaml|toml`, reflected in JSON as
+`parameters.fmFormat`; output presentation does not change report parameters.
+
+Additive `fileIssues` carries observed unsupported/malformed frontmatter and read
+failures, with path/category/reason-code/message rows, full category counts, total,
+and omitted count. `--limit` bounds JSON evidence; text shows up to three examples
+unless `--limit 0`. Same-scope coverage JSON hints expose all retained diagnostic
+evidence without requiring a new query language. This inventory does not change
+metric completion semantics or classify non-text skips as errors.
+
+Key summaries retain counts and add `assessable` (`present + missing`),
+`presentProportion`, and `missingProportion`. Fractions are null when the
+denominator is zero; human prevalence is rounded to one decimal. Null-valued
+properties count as present, absent frontmatter as missing, and unassessable
+inputs are excluded. Relationship follow-ups select problematic sources from
+untruncated occurrence/assessment evidence and preserve type/cache options.
+
+Focused types, type-matches, relationships, uncovered, and overlaps text output
+leads with totals/tables, then at most three examples per displayed file/edge
+group. Type-matches samples the first displayed type unless `--limit 0` is used;
+`--type` narrows investigation. JSON evidence is unchanged by presentation limits.
+Standalone standards short-circuits source discovery and cache access, reporting
+`source: not-run` and `coverageEvaluated: false`; zero counters are not measurements.
+Mixed requests continue evaluating supported metrics.
+
 Exit 0 means the requested analysis completed, even with malformed frontmatter or
 outliers. Exit 1 means execution or required evidence is incomplete; retain partial
 results. Invalid usage follows the existing ArgumentParser exit 64 convention,
@@ -94,6 +123,15 @@ replacing the proposed exit 2 to preserve project consistency. Malformed files a
 `malformed-fm` and explicitly unassessable inputs for key statistics. Unreadable
 files prevent completion. Snapshot missing evidence is unavailable, never empty
 success. Cancellation does not trigger fallback.
+
+For `rules`, undecidable per-file selections are successful survey findings, with
+structured path/rule/reason details. `metrics.rules.summary.assessmentComplete`
+distinguishes exhaustive selection knowledge from completed execution; counts
+separate unique uncertain files from uncertain rule/file pairs. `uncovered` and
+`overlaps` retain their conservative incomplete-evidence semantics. Missing explicit
+source paths fail before discovery/contract evaluation (except snapshot-only mode,
+which must not inspect sources). Human rules output leads with rule coverage,
+summarizes zero-match rules, and retains uncertain-only rules in its compact table.
 
 Hints are executable and correctly quoted, preserve scope/configuration, and
 disclose broader rule-validation scope. Reuse `rules describe`, `rules validate`,

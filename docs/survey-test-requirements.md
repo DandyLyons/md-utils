@@ -6,6 +6,48 @@ remaining work belong in the progress section.
 
 ## Portable observations and statistics
 
+Output format regressions cover all survey subcommands accepting text/json/json-pretty,
+rejecting the removed --json flag and invalid output formats, one-line compact
+JSON versus indented JSON with identical decoded data, and independent --fm-format
+syntax filtering. Historical command transcripts below predate this flag migration.
+
+Performance regression: rule and type-inventory surveys analyze each record once
+regardless of rule count. Compare against per-rule analysis for heading selectors,
+frontmatter selection, malformed YAML, and unmapped hosts; preserve referenced-type
+labels and cancellation. Real collection complete-JSON/exit equivalence and timings
+are recorded in `survey-performance.md`.
+
+Prevalence tests cover null presence, absent frontmatter, malformed and unsupported
+exclusions, zero assessable files, all-present/all-missing cases, and additive JSON
+denominators/proportions. Relationship hints must choose a source with evidence
+rather than an alphabetically earlier link-free file, even with `--limit 1`, and
+retain applicable cache options.
+
+Human color presentation uses shared CLIStyle/Rainbow after column layout. Every
+survey renderer preserves its plain text when ANSI styling is removed; verify
+terminal output, NO_COLOR, redirection, and JSON independently. Advisory findings
+must not acquire warning/error semantics merely through color.
+
+File-issue regressions distinguish unsupported frontmatter hosts, malformed YAML,
+and invalid-UTF-8 read failures; assert bounded JSON rows plus complete counts,
+human path/reason examples, same-scope investigation hints, `--limit 0`, and
+`--no-hints`. Standalone standards human output is only the upcoming-feature notice.
+
+Summary-first focused output retains JSON evidence and reports totals before
+bounded file/edge examples. `--limit 0` expands human examples. Type matches lead
+with type identity and separate assessed/pass/fail/unavailable counts. Standalone
+standards returns unsupported with `source: not-run`, `coverageEvaluated: false`,
+and no source discovery; mixed metrics still evaluate supported work. Focused
+regressions cover empty summaries, sample expansion, no-scan budget behavior,
+and mixed-metric standards completion.
+
+Rules orientation regressions: missing explicit paths return an immediate clean
+failure without rule findings; human output omits the frontmatter table and hides
+zero-match rules, while JSON retains them. Unassessed file/rule pairs retain their
+path and diagnostic reasons and do not fail `survey rules`. Summary counts separate
+unique files from rule/file pairs. Discovery hints use `rules describe` and disclose
+the full project scope. These cases are covered by `SurveyCommandsTests`.
+
 - [x] YAML/TOML and supported non-Markdown extraction retain absent, empty,
   malformed, unsupported and parsed states without treating hint diagnostics as
   malformed YAML. LF/CRLF behavior follows the existing parser.
@@ -61,6 +103,27 @@ remaining work belong in the progress section.
 - [x] Canonical/bundled Agent Skill workflow examples and actual executable help
   match implementation; Linux remains CI-only and WASM verification deferred.
 
+## Stabilization verification — 2026-10-27
+
+The accumulated survey improvements passed the complete native `swift test` run:
+**1,936 tests across eight test products**, exit 0. Product totals were 736, 4,
+122, 34, 66, 76, 67, and 831. Evidence is retained locally in
+`tmp/survey-stabilization-full-tests.log`. This supersedes historical iteration
+notes below that deferred full-suite testing.
+
+The stabilization review corrected stale discovery-hint wording and the standards
+help notice. The affected help tests and all 14 survey/group help pages were
+verified from the rebuilt executable. Canonical/bundled skill equality, routing,
+and the 137-page help audit passed; representative installed-skill examples are
+also checked. Current survey flags are `--format text|json|json-pretty` and
+`--fm-format yaml|toml`.
+
+Local Inputs performance measurements and the completed 26,241-file root type
+survey are recorded in `survey-performance.md`; neither establishes multi-process
+stress behavior. Functional standards (#202), dedicated contract snapshot
+projections, and non-Markdown/custom-config relationship limitations remain
+explicit. Linux verification remains CI-only and WASM is deferred by policy.
+
 ## Progress
 
 Requirements were recorded before production code. Functional standards support
@@ -107,6 +170,22 @@ reads after deleting sources, plus bundle export/relocation. The help audit read
 the default overview and points to focused commands.
 
 ### Current limits and remaining verification
+
+Orientation implementation (2026-10-27): focused tests cover compact overview and
+visible partial completion, one representative mixed-key hint, rules/types ranked
+before `--limit 1`, unrelated validation-hint suppression, preserved `--no-index`,
+and progress phase deduplication/finish behavior. The survey, help, and agent skill
+suites passed 39 tests. The initial red run lacked the compact renderer/progress
+API. CLI progress runs as a cancellable structured child and is joined before
+final output; no additional filesystem pass obtains counts.
+
+Real Notes checks: Inputs overview shrank from 309 to 25 lines and reports rules
+incomplete without obscuring the metadata results. A full-root `values Status
+--json --no-index` finished in 17.61 seconds, first feedback at 1.04 seconds, with
+discovery followed by the actual 26,241-text-file count on stderr and parseable
+JSON on stdout. A roughly ten-second rule run with `--no-progress` had empty
+stderr. Evidence: `tmp/survey-orientation-checks/` and
+`tmp/verify-survey-orientation.py`. Full-suite verification remains deferred.
 
 Value-investigation iteration: ordinary directory scalar-value rows offer one
 frontmatter dump/filter example with typed jq arguments, preferring the most
@@ -172,7 +251,8 @@ md_utilsTests` then passed **720 tests in 61 suites**. Red/green logs are
   unavailable rather than silently using another configuration.
 - Invalid usage follows existing ArgumentParser exit 64, replacing proposed exit 2.
   Linux is CI-only and WASM verification is deferred by project policy.
-- Large-population performance and multi-process stress benchmarks have not been
-  run. Controlled budget/interruption tests and existing index regressions are not
-  presented as production-scale benchmark evidence. Unchecked broad requirements
-  remain tracked in #200 rather than being marked complete without full coverage.
+- Local large-collection observations are recorded in `survey-performance.md`;
+  multi-process stress benchmarks have not been run. Controlled budget/interruption
+  tests and existing index regressions are not presented as production-scale
+  stress evidence. Unchecked broad requirements remain tracked in #200 rather
+  than being marked complete without full coverage.

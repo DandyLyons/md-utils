@@ -60,11 +60,13 @@ struct SurveyReport: Codable {
   var source = "direct"
   var snapshotGeneration: Int?
   var coverage = SurveyCoverageReport()
+  var coverageEvaluated = true
   var scopeNotes = ["Scope note: hidden directory entries and symlinks are currently skipped. Configured definitions inside .md-utils/ may still be loaded."]
   var limitations: [String] = []
   var metrics: [String: JSONValue] = [:]
   var hints: [SurveyHint] = []
   var omittedHints = 0
+  var fileIssues = SurveyFileIssues()
 
   mutating func unavailable(_ message: String, metric: String? = nil) {
     complete = false
@@ -73,7 +75,25 @@ struct SurveyReport: Codable {
     else { for metric in requestedMetrics { metricComplete[metric] = false } }
   }
 
-  func text() -> String {
+  func text(overview: Bool = false) -> String {
+    let body = bodyText(overview: overview)
+    let details = fileIssueText()
+    if !details.isEmpty, let hint = hints.first,
+      let position = body.range(of: "\n\n" + hint.explanation) {
+      return String(body[..<position.lowerBound]) + "\n\n" + details + body[position.lowerBound...]
+    }
+    return details.isEmpty ? body : body + "\n\n" + details
+  }
+
+  private func bodyText(overview: Bool = false) -> String {
+    if requestedMetrics == ["standards"] && !coverageEvaluated { return "survey standards is an upcoming feature." }
+    if metrics.isEmpty && !complete { return limitations.map { "Error: " + $0 }.joined(separator: "\n") }
+    if requestedMetrics == ["rules"] { return rulesText() }
+    if requestedMetrics.count == 1, let metric = requestedMetrics.first,
+      ["types", "type-matches", "relationships", "uncovered", "overlaps"].contains(metric) {
+      return focusedSummary(metric)
+    }
+    if overview { return overviewText() }
     func row(_ label: String, _ markdown: Int, _ other: Int) -> String {
       label.padding(toLength: 27, withPad: " ", startingAt: 0)
         + String(format: "%10d %10d %10d", markdown, other, markdown + other)
@@ -97,9 +117,12 @@ struct SurveyReport: Codable {
       if metric == "key", let summary = value.objectValue?["summary"]?.objectValue {
         let key = summary["key"]?.stringValue ?? ""
         lines.append("  Property: \(key)")
-        lines.append("  Present: \(Self.display(summary["present"] ?? .integer(0))) files")
-        lines.append("  Missing: \(Self.display(summary["missing"] ?? .integer(0))) files")
-        lines.append("  Could not assess: \(Self.display(summary["unassessable"] ?? .integer(0))) files")
+        let present = Self.integer(summary["present"]), missing = Self.integer(summary["missing"])
+        let assessable = present + missing
+        lines.append("  Present: \(present) of \(assessable) assessable files (\(Self.percentage(present, of: assessable)))")
+        lines.append("  Missing: \(missing) \(missing == 1 ? "file" : "files") (\(Self.percentage(missing, of: assessable)))")
+        let unassessable = Self.integer(summary["unassessable"])
+        lines.append("  Could not assess: \(unassessable) \(unassessable == 1 ? "file" : "files")")
         let kinds = summary["kinds"]?.objectValue ?? [:]
         if kinds.isEmpty { lines.append("  No values found for this property.") }
         else {
@@ -122,7 +145,8 @@ struct SurveyReport: Codable {
           guard let object = row.objectValue, let key = object["key"]?.stringValue else { continue }
           let kinds = object["kinds"]?.objectValue ?? [:]
           let summary = kinds.keys.sorted().map { "\($0): \(Self.display(kinds[$0] ?? .null))" }.joined(separator: ", ")
-          lines.append("  \(key): \(Self.display(object["present"] ?? .null)) files; \(summary)")
+          let present = Self.integer(object["present"]), assessable = present + Self.integer(object["missing"])
+          lines.append("  \(key): \(present) files (\(Self.percentage(present, of: assessable)) of \(assessable) assessable); \(summary)")
         }
         lines.append("  Omitted keys: \(Self.display(value.objectValue?["omitted"] ?? .integer(0)))")
         continue
@@ -143,10 +167,129 @@ struct SurveyReport: Codable {
     return lines.joined(separator: "\n")
   }
 
+  /// Rule orientation emphasizes selection; uncertainty is a finding, not validation failure.
+  private func rulesText() -> String {
+    guard let rules = metrics["rules"]?.objectValue,
+      let summary = rules["summary"]?.objectValue else {
+      return limitations.map { "Incomplete: " + $0 }.joined(separator: "\n")
+    }
+    func number(_ key: String) -> Int {
+      if case .integer(let value) = summary[key] { return value }
+      return 0
+    }
+    var lines = ["Survey: " + paths.joined(separator: ", "),
+      "\(number("selectedFiles")) of \(number("surveyedFiles")) text files selected by \(number("matchingRules")) rules (\(number("rules")) rules surveyed).",
+      "\(number("noMatchRules")) rules have no matches; \(number("uncertainOnlyRules")) have only uncertain matches.", "",
+      "Rule                      Selected  Uncertain  Types",
+    ]
+    var shown = 0
+    if case .array(let rows) = rules["rows"] {
+      for row in rows {
+        guard let fields = row.objectValue,
+          fields["selected"] != .integer(0) || fields["unknown"] != .integer(0) else { continue }
+        let name = fields["name"]?.stringValue ?? ""
+        let types: String
+        if case .array(let values) = fields["types"] { types = values.compactMap(\.stringValue).joined(separator: ", ") }
+        else { types = "" }
+        let selected = Self.display(fields["selected"] ?? .integer(0))
+        let uncertain = Self.display(fields["unknown"] ?? .integer(0))
+        lines.append(name + String(repeating: " ", count: max(2, 26 - name.count))
+          + selected.padding(toLength: max(10, selected.count + 2), withPad: " ", startingAt: 0)
+          + uncertain.padding(toLength: max(11, uncertain.count + 2), withPad: " ", startingAt: 0) + types)
+        shown += 1
+      }
+    }
+    if shown == 0 { lines.append("No confirmed or uncertain rule matches.") }
+    let omitted = number("matchingRules") + number("uncertainOnlyRules") - shown
+    if omitted > 0 { lines.append("\(omitted) relevant rules omitted; use --limit 0 to show all.") }
+    if number("uncertainFiles") > 0 {
+      lines.append("\nCould not assess \(number("uncertainFiles")) unique file(s) for \(number("uncertainRuleFilePairs")) rule/file matches; other findings are available.")
+      if case .array(let rows) = rules["uncertainties"]?.objectValue?["rows"] {
+        let grouped = Dictionary(grouping: rows) { $0.objectValue?["path"]?.stringValue ?? "" }
+        for path in grouped.keys.sorted() {
+          let entries = grouped[path] ?? []
+          let names = entries.compactMap { $0.objectValue?["rule"]?.stringValue }.sorted()
+          lines.append("  \(path) — \(names.joined(separator: ", "))")
+          var messages: Set<String> = []
+          for entry in entries {
+            if case .array(let reasons) = entry.objectValue?["reasons"] {
+              for reason in reasons { if let message = reason.objectValue?["message"]?.stringValue { messages.insert(message) } }
+            }
+          }
+          lines += messages.sorted().map { "    " + $0 }
+        }
+      }
+      if let omitted = rules["uncertainties"]?.objectValue?["omitted"], omitted != .integer(0) {
+        lines.append("  \(Self.display(omitted)) uncertainty details omitted; use --limit 0 to show all.")
+      }
+    }
+    lines += ["\nSkipped: \(coverage.skippedBinary) non-text files. Source: \(source)."]
+    lines += scopeNotes
+    lines += limitations.map { "Incomplete: " + $0 }
+    for hint in hints {
+      lines += ["\n" + hint.explanation, "  " + hint.argv.map(Self.quote).joined(separator: " ")]
+    }
+    return lines.joined(separator: "\n")
+  }
+
   static func quote(_ value: String) -> String {
     let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:@%+=,-")
     if !value.isEmpty && value.unicodeScalars.allSatisfy(safe.contains) { return value }
     return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+  }
+
+  static func integer(_ value: JSONValue?) -> Int {
+    if case .integer(let value) = value { return value }
+    return 0
+  }
+
+  static func percentage(_ count: Int, of denominator: Int) -> String {
+    guard denominator > 0 else { return "N/A; no assessable files" }
+    return String(format: "%.1f%%", locale: Locale(identifier: "en_US_POSIX"), 100 * Double(count) / Double(denominator))
+  }
+
+  /// A short orientation view; detailed metrics and JSON retain their full results.
+  func overviewText() -> String {
+    var lines = ["Survey: " + paths.joined(separator: ", "),
+      "\(coverage.files) text files (\(coverage.markdown) Markdown, \(coverage.otherText) other); \(coverage.skippedBinary) non-text skipped.",
+      "Frontmatter: \(coverage.parsed) parsed, \(coverage.absent) absent, \(coverage.malformed) malformed; \(coverage.unsupported) unsupported, \(coverage.unreadable) unreadable.",
+    ]
+    let incomplete = metricComplete.filter { !$0.value }.keys.sorted()
+    if !incomplete.isEmpty { lines.append("Incomplete metrics: " + incomplete.joined(separator: ", ")) }
+    for limitation in limitations.prefix(2) { lines.append("  " + limitation) }
+    if limitations.count > 2 { lines.append("  \(limitations.count - 2) additional limitations; use --format json for the full report.") }
+    if let object = metrics["keys"]?.objectValue, case .array(let rows) = object["rows"] {
+      lines.append("\nCommon keys (files containing each key):")
+      for row in rows.prefix(5) {
+        guard let fields = row.objectValue else { continue }
+        let kinds = fields["kinds"]?.objectValue ?? [:]
+        lines.append("  \(fields["key"]?.stringValue ?? "?"): \(Self.display(fields["present"] ?? .integer(0))); " + kinds.keys.sorted().map { "\($0) \(Self.display(kinds[$0] ?? .integer(0)))" }.joined(separator: ", "))
+      }
+      lines.append("  Showing \(min(5, rows.count)) of \(Self.display(object["total"] ?? .integer(rows.count))) keys; use 'survey keys' for the ranked inventory.")
+    }
+    for metric in requestedMetrics where !["coverage", "keys"].contains(metric) {
+      guard let object = metrics[metric]?.objectValue else { continue }
+      if metric == "rules", case .array(let rows) = object["rows"] {
+        let names = rows.prefix(3).compactMap { row -> String? in
+          guard let fields = row.objectValue, let name = fields["name"]?.stringValue else { return nil }
+          return "\(name) (\(Self.display(fields["selected"] ?? .integer(0))) selected, \(Self.display(fields["unknown"] ?? .integer(0))) unknown)"
+        }
+        lines.append("Rules: \(Self.display(object["total"] ?? .integer(0))) configured; leading results: " + (names.isEmpty ? "none" : names.joined(separator: "; ")))
+      } else if metric == "types", case .array(let rows) = object["rows"] {
+        let names = rows.prefix(3).compactMap { $0.objectValue?["name"]?.stringValue }
+        lines.append("Types: \(Self.display(object["total"] ?? .integer(0))) available; leading results: " + (names.isEmpty ? "none" : names.joined(separator: ", ")))
+      } else if metric != "malformed-fm" {
+        lines.append("\(metric): " + (object["total"].map { Self.display($0) + " findings" } ?? "summary available") + "; use 'survey \(metric)' for details.")
+      }
+    }
+    lines.append("Hidden entries and symlinks skipped. Source: \(source). Detailed results: survey <subcommand> <paths>.")
+    for hint in hints {
+      lines.append("\n" + hint.explanation)
+      var command = hint.argv.map(Self.quote).joined(separator: " ")
+      if let next = hint.pipeTo { command += " | " + next.map(Self.quote).joined(separator: " ") }
+      lines.append("  " + command)
+    }
+    return lines.joined(separator: "\n")
   }
 
   /// Render distributions for people while retaining the typed, lossless JSON API.
@@ -234,7 +377,7 @@ enum SurveyRunner {
     try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
   }
 
-  static func run(metric: String, arguments: [String], options: SurveyOptions) async throws -> SurveyReport {
+  static func run(metric: String, arguments: [String], options: SurveyOptions, progress: SurveyProgress? = nil) async throws -> SurveyReport {
     try Task.checkCancellation()
     try options.validateRequest(metric: metric, arguments: arguments)
     let root = Path(options.projectRoot ?? Path.current.string).absolute().normalize()
@@ -275,13 +418,34 @@ enum SurveyRunner {
       "top": .integer(options.top), "limit": .integer(options.limit),
       "minFiles": .integer(options.minFiles ?? (metric == "key" ? 20 : 1)),
       "minShare": .number(options.minShare), "outliers": .boolean(options.outliers),
-      "format": options.format.map(JSONValue.string) ?? .null,
+      "fmFormat": options.fmFormat.map(JSONValue.string) ?? .null,
       "types": .array(options.type.map(JSONValue.string)), "rules": .array(options.rule.map(JSONValue.string)),
     ]
     report.metricComplete = Dictionary(uniqueKeysWithValues: requested.map { ($0, true) })
+    if requested == ["standards"] {
+      report.source = "not-run"
+      report.coverageEvaluated = false
+      report.scopeNotes = ["Source files were not scanned; coverage was not measured."]
+      report.unavailable("survey standards is an upcoming feature.", metric: "standards")
+      return report
+    }
+    // Fail before evaluating definitions so a missing selection cannot look like zero matches.
+    // Snapshot-only queries must never probe the source filesystem.
+    if !options.indexOnly {
+      let missing = paths.filter { !Path($0).exists }
+      if !missing.isEmpty {
+        report.coverage.unreadable = missing.count
+        for path in missing {
+          report.recordFileIssue(path: path, category: "unreadable", code: "survey.input.missing", message: "Input does not exist")
+          report.unavailable("Input does not exist: \(path)")
+        }
+        return report
+      }
+    }
     var records: [MarkdownRecord] = []
     var observations: [MarkdownSurveyObservation] = []
     if options.indexOnly {
+      await progress?.update("Reading published survey evidence…")
       report.source = "snapshot"
       // A snapshot-only failure is never permission to inspect source files.
       do {
@@ -297,6 +461,7 @@ enum SurveyRunner {
       if !options.noIndex, (root + ".md-utils/index.sqlite").exists,
         !paths.isEmpty, paths.allSatisfy({ Path($0).isDirectory }), options.recursive {
         do {
+          await progress?.update("Refreshing cached survey evidence…")
           let directories = selections.map { $0.isEmpty || $0.hasSuffix("/") ? $0 : $0 + "/" }
           let snapshot = try await SurveyIndexSnapshot.refresh(root: root,
             config: options.config.map { Path($0) } ?? root + ".md-utils/md-utils.json",
@@ -313,7 +478,9 @@ enum SurveyRunner {
         }
       }
       if !usedCache || needsRecords {
+        await progress?.update("Discovering files…")
         records = try discover(root: root, paths: paths, options: options, report: &report)
+        await progress?.update("Analyzing \(records.count.formatted(.number.grouping(.automatic))) discovered text files…")
         // Contract metrics consume source records. Keep their observations tied to
         // those same records rather than mixing a cache baseline with newer text.
         observations = []
@@ -327,6 +494,13 @@ enum SurveyRunner {
     // Filters apply to both source and snapshot evidence without filesystem access.
     observations = observations.filter { accepted($0.path, selections: selections, options: options) }
     for observation in observations {
+      if observation.state == .unsupported {
+        report.recordFileIssue(path: observation.path, category: "unsupported", code: "record.frontmatter.syntax-unavailable",
+          message: "No frontmatter syntax mapping for extension '\(URL(fileURLWithPath: observation.path).pathExtension)'.")
+      } else if observation.state == .malformed {
+        report.recordFileIssue(path: observation.path, category: "malformed", code: "record.frontmatter.malformed",
+          message: "Frontmatter could not be parsed.", reasons: observation.diagnostics.map { .init(code: $0.code, message: $0.message) })
+      }
       if observation.state == .binary { report.coverage.skippedBinary += 1; continue }
       report.coverage.files += 1
       if isMarkdown(observation.path) {
@@ -351,24 +525,28 @@ enum SurveyRunner {
       case "coverage": report.metrics[metric] = try json(report.coverage)
       case "malformed-fm":
         let rows = observations.filter { observation in
-          observation.state == .malformed && (options.format == nil || observation.format?.rawValue == options.format || observation.diagnostics.contains {
-            $0.code == "record.frontmatter.invalid-\(options.format ?? "")"
+          observation.state == .malformed && (options.fmFormat == nil || observation.format?.rawValue == options.fmFormat || observation.diagnostics.contains {
+            $0.code == "record.frontmatter.invalid-\(options.fmFormat ?? "")"
           })
         }
         report.metrics[metric] = try table(rows, limit: options.limit)
-      case "keys": report.metrics[metric] = try json(MarkdownSurveyStatistics.keys(observations, top: options.top, minFiles: options.minFiles ?? 1))
+      case "keys":
+        let keys = try MarkdownSurveyStatistics.keys(observations, top: options.top, minFiles: options.minFiles ?? 1)
+        report.metrics[metric] = .object([
+          "rows": .array(try keys.rows.map(keySummary)), "total": .integer(keys.total), "omitted": .integer(keys.omitted),
+        ])
       case "key":
         if let key {
           var row = try MarkdownSurveyStatistics.key(observations, key: key, pointer: options.pointer,
             outliers: options.outliers, minFiles: options.minFiles ?? 20, minShare: options.minShare)
           let total = row.outlierPaths.count
           if options.limit > 0 { row.outlierPaths = Array(row.outlierPaths.prefix(options.limit)) }
-          report.metrics[metric] = .object(["summary": try json(row), "outlierTotal": .integer(total), "outlierOmitted": .integer(total - row.outlierPaths.count)])
+          report.metrics[metric] = .object(["summary": try keySummary(row), "outlierTotal": .integer(total), "outlierOmitted": .integer(total - row.outlierPaths.count)])
         }
       case "values":
         if let key { report.metrics[metric] = try json(MarkdownSurveyStatistics.values(observations, key: key, pointer: options.pointer,
           elements: options.elements, occurrences: options.count == "occurrences", top: options.top)) }
-      case "standards": report.unavailable("survey standards is unsupported until the standards runtime is implemented", metric: metric)
+      case "standards": report.unavailable("survey standards is an upcoming feature.", metric: metric)
       case "relationships":
         if !options.indexOnly && options.config != nil {
           report.unavailable("Relationship queries currently require the conventional project configuration", metric: metric)
@@ -381,6 +559,17 @@ enum SurveyRunner {
             noIndex: options.noIndex, indexedOnly: options.indexOnly, verifyHashes: options.verifyHashes,
           )
           report.metrics[metric] = try relationshipSummary(result.result, selected: selected, limit: options.limit)
+          if !options.noHints, let example = relationshipExample(result.result, selected: selected) {
+            report.hints.append(.init(
+              argv: ["md-utils", "rel", "out", example.path, "--root", root.string, "--detail", "explain"]
+                + options.type.flatMap { ["--type", $0] }
+                + (options.noIndex ? ["--no-index"] : [])
+                + (options.indexOnly ? ["--index-only"] : [])
+                + (options.verifyHashes ? ["--verify-hashes"] : []),
+              workingDirectory: Path.current.string,
+              explanation: "Inspect \(example.reason) in this source. Targets resolve across the full project root.",
+            ))
+          }
           if !result.complete { report.unavailable("Relationship evidence is incomplete", metric: metric) }
           if observations.contains(where: { !isMarkdown($0.path) }) {
             report.scopeNotes.append("Relationship analysis covers Markdown files only; other text files are excluded from this metric.")
@@ -395,7 +584,7 @@ enum SurveyRunner {
       if options.indexOnly {
         for metric in contracts { report.unavailable("Snapshot has no survey \(metric) projection", metric: metric) }
       } else {
-        try await SurveyContracts.populate(root: root, records: records, requested: contracts, options: options, report: &report)
+        try await SurveyContracts.populate(root: root, records: records, requested: contracts, options: options, report: &report, progress: progress)
       }
     }
     if !options.noHints {
@@ -405,6 +594,37 @@ enum SurveyRunner {
         + options.exclude.flatMap { ["--exclude", $0] }
         + (options.recursive ? [] : ["--no-recursive"]) + (options.markdownOnly ? ["--markdown-only"] : [])
         + (options.indexOnly ? ["--index-only"] : [])
+        + (options.noIndex ? ["--no-index"] : [])
+      if report.fileIssues.total > 0 && metric != "rules" {
+        report.hints.insert(.init(
+          argv: ["md-utils", "survey", "coverage"] + scope + ["--format", "json", "--limit", "0", "--no-hints"],
+          workingDirectory: Path.current.string,
+          explanation: "Inspect all file assessment issues in JSON's fileIssues field, including paths, categories, and reasons.",
+        ), at: 0)
+      }
+      // fm has accepts literal keys and live files, not JSON Pointers or snapshot evidence.
+      // File-list inputs cannot be represented by a folder example without widening scope.
+      if ["key", "keys"].contains(metric), !options.pointer, !options.indexOnly,
+        options.filesFrom.isEmpty, options.filesFrom0.isEmpty {
+        let presenceKey: String?
+        if metric == "key" { presenceKey = key }
+        else if case .array(let rows) = report.metrics["keys"]?.objectValue?["rows"] {
+          presenceKey = rows.first?.objectValue?["key"]?.stringValue
+        } else { presenceKey = nil }
+        if let presenceKey {
+          let keyArguments = presenceKey.hasPrefix("-") ? ["--key=\(presenceKey)"] : ["--key", presenceKey]
+          let presencePaths = paths.map { Path($0).absolute().normalize().string }
+          let presenceOptions = (options.recursive ? [] : ["--no-recursive"])
+            + (options.markdownOnly ? [] : ["--include-non-md"])
+            + options.exclude.flatMap { ["--exclude", (root + $0).string] }
+          let hint = SurveyHint(
+            argv: ["md-utils", "fm", "has"] + keyArguments + presencePaths + presenceOptions,
+            workingDirectory: Path.current.string,
+            explanation: "Find files with \(presenceKey) across these folders: look for true (null counts as present). Checks Markdown and supported mapped text formats. Substitute another key.",
+          )
+          report.hints.insert(hint, at: min(report.fileIssues.total > 0 ? 1 : 0, report.hints.count))
+        }
+      }
       if requested.contains("types") {
         report.hints.append(.init(argv: ["md-utils", "survey", "type-matches"] + scope + options.type.flatMap { ["--type", $0] }, workingDirectory: Path.current.string,
           explanation: "To discover which documents conform to these types, run type-matches. This opt-in assessment can be expensive; matching does not establish intended usage."))
@@ -413,16 +633,19 @@ enum SurveyRunner {
         report.hints.append(.init(argv: ["md-utils", "survey", "malformed-fm"] + scope, workingDirectory: Path.current.string,
           explanation: "Inspect malformed frontmatter and parser diagnostics."))
       }
-      if requested.contains("relationships"), let first = observations.first(where: { isMarkdown($0.path) }) {
-        report.hints.append(.init(argv: ["md-utils", "rel", "out", first.path, "--root", root.string, "--detail", "explain"],
-          workingDirectory: Path.current.string, explanation: "Inspect outgoing relationship evidence for a representative source; targets resolve across the project root."))
-      }
       if let rowsValue = report.metrics["keys"]?.objectValue?["rows"], case .array(let rows) = rowsValue {
-        for row in rows {
+        let ranked = rows.enumerated().sorted { left, right in
+          let leftKinds = left.element.objectValue?["kinds"]?.objectValue?.keys.filter { $0 != "null" }.count ?? 0
+          let rightKinds = right.element.objectValue?["kinds"]?.objectValue?.keys.filter { $0 != "null" }.count ?? 0
+          if (leftKinds > 1) != (rightKinds > 1) { return leftKinds > 1 }
+          return left.offset < right.offset
+        }
+        for (_, row) in ranked {
           guard let name = row.objectValue?["key"]?.stringValue,
             (row.objectValue?["kinds"]?.objectValue?.count ?? 0) > 1 else { continue }
           report.hints.append(.init(argv: ["md-utils", "survey", "key", name] + scope,
-            workingDirectory: Path.current.string, explanation: "Inspect the mixed observed value kinds for \(name); these are conventions, not requirements."))
+            workingDirectory: Path.current.string, explanation: "Inspect mixed value kinds for \(name); substitute another key to investigate it."))
+          break
         }
       }
       if metric == "key", let key,
@@ -460,9 +683,9 @@ enum SurveyRunner {
         report.scopeNotes.append("Save the stdin file list to replay scope-specific investigation commands.")
       }
     }
-    if options.limit > 0, report.hints.count > options.limit {
-      report.omittedHints = report.hints.count - options.limit
-      report.hints = Array(report.hints.prefix(options.limit))
+    if report.hints.count > 3 {
+      report.omittedHints = report.hints.count - 3
+      report.hints = Array(report.hints.prefix(3))
     }
     return report
   }
@@ -470,6 +693,34 @@ enum SurveyRunner {
   static func table<T: Encodable>(_ rows: [T], limit: Int) throws -> JSONValue {
     let visible = limit == 0 ? rows : Array(rows.prefix(limit))
     return .object(["rows": try json(visible), "total": .integer(rows.count), "omitted": .integer(rows.count - visible.count)])
+  }
+
+  static func keySummary(_ key: MarkdownSurveyKey) throws -> JSONValue {
+    var fields = try json(key).objectValue ?? [:]
+    let assessable = key.present + key.missing
+    fields["assessable"] = .integer(assessable)
+    fields["presentProportion"] = assessable == 0 ? .null : .number(Double(key.present) / Double(assessable))
+    fields["missingProportion"] = assessable == 0 ? .null : .number(Double(key.missing) / Double(assessable))
+    return .object(fields)
+  }
+
+  /// Choose from complete query evidence before display limits truncate the report.
+  static func relationshipExample(_ query: MarkdownCollectionQueryResult, selected: Set<String>) -> (path: String, reason: String)? {
+    let occurrences = (query.occurrences ?? []).filter { selected.contains($0.source) }.sorted {
+      $0.source == $1.source ? $0.id < $1.id : $0.source < $1.source
+    }
+    if let problem = occurrences.first(where: { $0.resolution?.status.rawValue != "resolved" }) {
+      let status = problem.resolution?.status.rawValue ?? "malformed"
+      return (problem.source, "\(status) link evidence")
+    }
+    let unavailableIDs = Set((query.namedRelationships ?? []).filter {
+      $0.assertion.outcome == .unavailable || $0.assertion.targetOutcome == .unavailable
+    }.map(\.occurrence))
+    if let problem = occurrences.first(where: { unavailableIDs.contains($0.id) }) {
+      return (problem.source, "unavailable named-relationship evidence")
+    }
+    if let example = occurrences.first { return (example.source, "outgoing relationship evidence") }
+    return nil
   }
 
   static func relationshipSummary(_ query: MarkdownCollectionQueryResult, selected: Set<String>, limit: Int) throws -> JSONValue {
@@ -545,7 +796,7 @@ enum SurveyRunner {
           catch SurveyDiscoveryError.budget { throw SurveyDiscoveryError.budget }
           catch {
             report.coverage.unreadable += 1
-            report.unavailable("\(child.path): \(error)")
+            report.recordReadFailure(path: child.path, error: error)
           }
         }
       } else if values.isRegularFile == true && (!options.markdownOnly || isMarkdown(path)) {
@@ -578,7 +829,10 @@ enum SurveyRunner {
         report.unavailable(SurveyDiscoveryError.budget.description)
         break
       }
-      catch { report.coverage.unreadable += 1; report.unavailable("\(path): \(error)") }
+      catch {
+        report.coverage.unreadable += 1
+        report.recordReadFailure(path: path, error: error)
+      }
     }
     return records.sorted { ($0.context.path?.rawValue ?? "") < ($1.context.path?.rawValue ?? "") }
   }

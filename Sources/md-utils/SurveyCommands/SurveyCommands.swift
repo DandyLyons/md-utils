@@ -53,12 +53,19 @@ struct SurveyCommand<Metric: SurveyMetric>: AsyncParsableCommand {
   @OptionGroup var options: SurveyOptions
   mutating func validate() throws { try options.validateRequest(metric: Metric.name, arguments: arguments) }
   mutating func run() async throws {
-    let report = try await SurveyRunner.run(metric: Metric.name, arguments: arguments, options: options)
-    if options.json {
-      let encoder = JSONEncoder()
-      encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-      print(String(decoding: try encoder.encode(report), as: UTF8.self))
-    } else { print(report.text()) }
+    let progress = options.noProgress ? nil : SurveyProgress()
+    let report = try await withThrowingTaskGroup(of: Void.self) { group in
+      if let progress { group.addTask { await progress.watch() } }
+      defer { group.cancelAll() }
+      let report = try await SurveyRunner.run(metric: Metric.name, arguments: arguments, options: options, progress: progress)
+      await progress?.finish()
+      return report
+    }
+    switch options.format {
+    case .text: print(report.coloredText(overview: Metric.name == "overview"))
+    case .json, .jsonPretty:
+      print(try JSONReportOutput.encode(report, pretty: options.format == .jsonPretty))
+    }
     if !report.complete { throw ExitCode.failure }
   }
 }
@@ -73,15 +80,15 @@ enum SurveyHelp {
     case "overview":
       return (introduction,
         "Get oriented in an unfamiliar collection before editing or validating it. The overview reports file coverage, relevant rules and types, common frontmatter keys, and malformed frontmatter. Observed conventions are information, not new requirements. Paths choose what to scan; --metrics chooses what to measure.",
-        "md-utils survey ./notes/\nmd-utils survey overview ./notes/ --json\nmd-utils survey ./notes/ --metrics coverage,keys\nmd-utils survey values status ./notes/")
+        "md-utils survey ./notes/\nmd-utils survey overview ./notes/ --format json\nmd-utils survey ./notes/ --metrics coverage,keys\nmd-utils survey values status ./notes/")
     case "coverage":
       return ("See which files can contribute to a survey and which could not be read.",
         "Check the input population before interpreting statistics. Compare Markdown and other text files with parsed, malformed, or absent frontmatter, and see skipped non-text files and unreadable inputs.",
-        "md-utils survey coverage ./notes/\nmd-utils survey coverage ./notes/ --markdown-only --json")
+        "md-utils survey coverage ./notes/\nmd-utils survey coverage ./notes/ --markdown-only --format json")
     case "malformed-fm":
       return ("Find files whose frontmatter cannot be parsed so you can investigate syntax errors.",
-        "List malformed YAML or TOML frontmatter with diagnostic evidence. Missing frontmatter is not malformed. Finding malformed files is a successful query; survey does not repair them. Use --format to restrict the syntax and --limit 0 to show all findings.",
-        "md-utils survey malformed-fm ./notes/\nmd-utils survey malformed-fm ./notes/ --format yaml --limit 0")
+        "List malformed YAML or TOML frontmatter with diagnostic evidence. Missing frontmatter is not malformed. Finding malformed files is a successful query; survey does not repair them. Use --fm-format to restrict the syntax and --limit 0 to show all findings.",
+        "md-utils survey malformed-fm ./notes/\nmd-utils survey malformed-fm ./notes/ --fm-format yaml --limit 0")
     case "keys":
       return ("Discover common frontmatter keys and the value kinds used for them.",
         "Rank literal top-level keys by the number of documents containing each key. Start here to learn a collection's metadata conventions. The default shows ten keys; --top 0 shows all. --min-files filters uncommon keys. Use the key subcommand to investigate one property.",
@@ -96,32 +103,32 @@ enum SurveyHelp {
         "md-utils survey values status ./notes/\nmd-utils survey values tags ./notes/ --elements\nmd-utils survey values tags ./notes/ --elements --count occurrences")
     case "rules":
       return ("Find relevant rules and their referenced types before validating a folder.",
-        "Inspect rule selection without running full conformance validation. Unknown applicability stays separate from confirmed matches. --rule limits the inventory. Follow the rules validate hints for validation; a named rule may select files outside the surveyed folder. Snapshot-only rule inventory is not yet available.",
-        "md-utils survey rules ./notes/\nmd-utils survey rules ./notes/ --rule Articles --json")
+        "Inspect rule selection without running full conformance validation. Unknown applicability stays separate from confirmed matches. --rule limits the inventory. Follow the rules describe, matching, and files-matching hints to investigate. Use rules validate for conformance checks; a named rule may select files outside the surveyed folder. Snapshot-only rule inventory is not yet available.",
+        "md-utils survey rules ./notes/\nmd-utils survey rules ./notes/ --rule Articles --format json")
     case "types":
       return ("Inventory type definitions to discover the structures available in a collection.",
         "List configured and locally discovered mdtypes, including definitions not referenced by rules. A definition's presence does not establish document conformance or intended usage. For an opt-in conformance assessment, use the type-matches subcommand; it can require more work. Snapshot-only type inventory is not yet available.",
         "md-utils survey types ./notes/\nmd-utils survey types ./notes/ --type Article\nmd-utils survey type-matches ./notes/ --type Article")
     case "standards":
-      return ("Reserved for discovering standards; functional support is not yet available.",
-        "This subcommand currently reports unsupported and exits with status 1 because the mdstandards runtime is not implemented. Its result does not mean that the folder has no standards. Use rules and types to explore the contracts available today. Implementation is tracked at https://github.com/DandyLyons/md-utils/issues/202.",
+      return ("Discover standards used by a collection (upcoming feature).",
+        "This upcoming feature currently prints a short notice and exits with status 1 without scanning source files. Use rules and types to explore the contracts available today. Implementation is tracked at https://github.com/DandyLyons/md-utils/issues/202.",
         "md-utils survey standards ./notes/\nmd-utils survey rules ./notes/\nmd-utils survey types ./notes/")
     case "uncovered":
       return ("Find files no configured rule selects to understand gaps in rule coverage.",
         "Report confirmed non-selection separately from files whose applicability cannot be determined. Uncovered files are not necessarily errors: they may intentionally have no rule. This examines selection, not document conformance. Snapshot-only rule coverage is not yet available.",
-        "md-utils survey uncovered ./notes/\nmd-utils survey uncovered ./notes/ --limit 0 --json")
+        "md-utils survey uncovered ./notes/\nmd-utils survey uncovered ./notes/ --limit 0 --format json")
     case "overlaps":
       return ("Find files selected by multiple rules to understand overlapping requirements.",
         "Show overlapping rule selections without assuming they conflict. Overlap can be intentional, and selection does not prove conformance. Unknown applicability is reported separately. Snapshot-only rule coverage is not yet available.",
-        "md-utils survey overlaps ./notes/\nmd-utils survey overlaps ./notes/ --limit 0 --json")
+        "md-utils survey overlaps ./notes/\nmd-utils survey overlaps ./notes/ --limit 0 --format json")
     case "type-matches":
       return ("Assess documents against discovered types to explore possible structural matches.",
         "Opt into conformance assessment, including types that rules do not reference. A match does not declare intended usage. This can cost more than the types inventory; use --type to narrow the assessment. Unavailable evidence is distinct from nonconformance. Snapshot-only type matching is not yet available.",
-        "md-utils survey type-matches ./notes/ --type Article\nmd-utils survey type-matches ./notes/ --json")
+        "md-utils survey type-matches ./notes/ --type Article\nmd-utils survey type-matches ./notes/ --format json")
     case "relationships":
       return ("Summarize outgoing links and named relationships to understand how documents connect.",
         "Inspect ordinary links, named relationship groups, resolution outcomes, self-links, and destinations inside or outside the selected files. Sources are Markdown only; resolution uses the full project namespace. Custom --config relationship queries are currently unavailable. For directional details, use md-utils relationships outgoing --help.",
-        "md-utils survey relationships ./notes/\nmd-utils survey relationships ./notes/ --type Article --json")
+        "md-utils survey relationships ./notes/\nmd-utils survey relationships ./notes/ --type Article --format json")
     default:
       preconditionFailure("Missing survey help for \(name)")
     }
@@ -166,13 +173,19 @@ enum SurveyHelp {
       \(["rules", "types", "type-matches", "relationships"].contains(name) ? "Replace example type/rule names with definitions from your project." : "No configured types or rules are needed for frontmatter statistics.")
 
     OUTPUT AND CACHE
-      Text or --json results go to stdout; diagnostics go to stderr.
+      --format text (default), json (compact), or json-pretty selects output.
+      Results go to stdout; diagnostics go to stderr. Both JSON forms contain
+      identical data and no terminal colors.
+      Slow work shows delayed phase/count feedback on stderr; --no-progress
+      suppresses it. The text overview is a short summary; use focused
+      subcommands for details. Investigation hints are limited to three.
       Source files are not edited. Recursive directory surveys refresh an
       existing cache; no index is created. --no-index bypasses it.
       --index-only reads stored evidence without refresh or source fallback.
 
     EXIT STATUS
       0  Analysis completed, including findings such as malformed frontmatter.
+         Rule-selection uncertainty is a finding; inspect its file/reason details.
       1  Analysis incomplete or unsupported; inspect the reported limitations.
       64 Invalid command usage.
 
@@ -193,7 +206,7 @@ struct SurveyOptions: ParsableArguments {
   @Option(help: "UTF-8 LF-delimited project-relative files; - reads stdin") var filesFrom: [String] = []
   @Option(name: .customLong("files-from0"), help: "UTF-8 NUL-delimited project-relative files") var filesFrom0: [String] = []
   @Option(help: "Overview only: comma-separated coverage, malformed-fm, keys, rules, types, standards, uncovered, overlaps, type-matches, or relationships; repeatable; replaces defaults") var metrics: [String] = []
-  @Flag(help: "Emit one versioned JSON report") var json = false
+  @Option(help: "Output format: text, json (compact), or json-pretty") var format: ReportOutputFormat = .text
   @Option(help: "Ranked keys/values to display; 0 means all") var top = 10
   @Option(help: "Detailed rows to display; 0 means all") var limit = 20
   @Option(help: "Minimum files: keys default 1, outliers default 20") var minFiles: Int?
@@ -202,10 +215,11 @@ struct SurveyOptions: ParsableArguments {
   @Flag(help: "key/values only: interpret the key as JSON Pointer") var pointer = false
   @Flag(help: "values only: count immediate array elements instead of whole values") var elements = false
   @Option(help: "documents or occurrences; occurrences requires --elements") var count = "documents"
-  @Option(help: "malformed-fm only: filter by yaml or toml") var format: String?
+  @Option(help: "malformed-fm only: filter by yaml or toml") var fmFormat: String?
   @Option(help: "overview/types/type-matches/relationships: limit types by name; repeatable") var type: [String] = []
   @Option(help: "overview/rules: limit rule inventory by name; repeatable") var rule: [String] = []
   @Flag(help: "Suppress investigation hints") var noHints = false
+  @Flag(help: "Suppress delayed analysis progress on stderr") var noProgress = false
   @Flag(help: "Bypass the project index") var noIndex = false
   @Flag(name: [.long, .customLong("indexed-only")], help: "Published SQLite evidence only; no source reads or fallback") var indexOnly = false
   @Flag(help: "Detect stat-preserving edits during indexed refresh") var verifyHashes = false
@@ -218,14 +232,14 @@ struct SurveyOptions: ParsableArguments {
     guard ["documents", "occurrences"].contains(count), count != "occurrences" || elements else {
       throw ValidationError("--count occurrences requires --elements")
     }
-    guard format == nil || ["yaml", "toml"].contains(format ?? "") else { throw ValidationError("--format must be yaml or toml") }
+    guard fmFormat == nil || ["yaml", "toml"].contains(fmFormat ?? "") else { throw ValidationError("--fm-format must be yaml or toml") }
     guard !["key", "values"].contains(metric) || !arguments.isEmpty else { throw ValidationError("\(metric) requires a property key") }
     guard metrics.isEmpty || metric == "overview" else { throw ValidationError("--metrics is only valid on the overview") }
     guard metrics.flatMap({ $0.split(separator: ",", omittingEmptySubsequences: false).map(String.init) }).allSatisfy(SurveyRunner.available.contains) else {
       throw ValidationError("Unknown survey metric")
     }
     guard !elements || metric == "values", !outliers || metric == "key",
-      !pointer || ["key", "values"].contains(metric), format == nil || metric == "malformed-fm",
+      !pointer || ["key", "values"].contains(metric), fmFormat == nil || metric == "malformed-fm",
       rule.isEmpty || metric == "rules" || metric == "overview",
       type.isEmpty || ["types", "type-matches", "relationships", "overview"].contains(metric) else {
       throw ValidationError("Option is not applicable to survey \(metric)")

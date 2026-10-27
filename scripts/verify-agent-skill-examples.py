@@ -203,17 +203,17 @@ survey_notes.mkdir()
 (survey_notes / "one.md").write_text("---\nstatus: draft\ntags: [swift, swift]\n---\n")
 (survey_notes / "two.txt").write_text("---\nstatus: published\n---\n")
 (survey_notes / "bad.md").write_text("---\ntags: [broken\n---\n")
-survey = json.loads(run("survey", "survey-notes/", "--metrics", "coverage,keys", "--json", "--no-index"))
+survey = json.loads(run("survey", "survey-notes/", "--metrics", "coverage,keys", "--format", "json", "--no-index"))
 assert survey["complete"] and survey["coverage"]["files"] == 3
 assert survey["coverage"]["malformed"] == 1
-values = json.loads(run("survey", "values", "status", "survey-notes/", "--json"))
+values = json.loads(run("survey", "values", "status", "survey-notes/", "--format", "json"))
 assert values["metrics"]["values"]["total"] == 2
-run("survey", "malformed-fm", "survey-notes/", "--format", "yaml")
+run("survey", "malformed-fm", "survey-notes/", "--fm-format", "yaml")
 run("survey", "types", "survey-notes/")
 run("survey", "standards", "survey-notes/", expected=1)
 run("index", "update", "survey-notes/", "--include-non-md", expected=1)
 shutil.rmtree(survey_notes)
-snapshot = json.loads(run("survey", "malformed-fm", "survey-notes/", "--index-only", "--json"))
+snapshot = json.loads(run("survey", "malformed-fm", "survey-notes/", "--index-only", "--format", "json"))
 assert snapshot["complete"] and snapshot["coverage"]["malformed"] == 1
 
 # Export from bundled resources, with no dependence on canonical files at the destination.
