@@ -49,7 +49,10 @@ def main():
             command = pending.pop()
             if len(command) > 8 or len(inventory) > 500:
                 raise SystemExit(f"Unexpected help hierarchy: {command}")
-            help_text = subprocess.check_output([str(executable), *command, "--help"], text=True)
+            # Explicit help resolves the declared group even when ArgumentParser
+            # otherwise routes --help through a default subcommand.
+            help_args = ["help", *command] if command else ["--help"]
+            help_text = subprocess.check_output([str(executable), *help_args], text=True)
             inventory[" ".join(command)] = help_text
             if "SUBCOMMANDS:\n" in help_text:
                 # Discussion may contain example SUBCOMMANDS lists; only the final

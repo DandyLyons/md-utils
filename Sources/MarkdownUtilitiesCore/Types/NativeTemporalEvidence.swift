@@ -4,10 +4,17 @@ import Yams
 /// Retains native kinds before the legacy JSON projection converts them to text.
 enum NativeTemporalEvidence {
   static func paths(_ value: FrontMatter, source: String, format: FrontMatterFormat) throws -> Set<String> {
-    var paths: Set<String> = []
+    Set(try kinds(value, source: source, format: format).keys)
+  }
+
+  static func kinds(_ value: FrontMatter, source: String, format: FrontMatterFormat) throws -> [String: String] {
+    var kinds: [String: String] = [:]
     func walk(_ value: FrontMatterValue, path: String) {
       switch value {
-      case .offsetDateTime, .localDateTime, .localDate, .localTime: paths.insert(path)
+      case .offsetDateTime: kinds[path] = "offset-date-time"
+      case .localDateTime: kinds[path] = "local-date-time"
+      case .localDate: kinds[path] = "local-date"
+      case .localTime: kinds[path] = "local-time"
       case .object(let object):
         for (key, child) in object { walk(child, path: path + "/" + SemanticSchemaAdapter.escape(key)) }
       case .array(let values):
@@ -25,10 +32,10 @@ enum NativeTemporalEvidence {
         }
       } else if let sequence = node.sequence {
         for (index, child) in sequence.enumerated() { walkYAML(child, path: path + "/\(index)") }
-      } else if node.tag == Tag(.timestamp) { paths.insert(path) }
+      } else if node.tag == Tag(.timestamp) { kinds[path] = "yaml-timestamp" }
     }
     if format == .yaml, let node = try Yams.compose(yaml: source) { walkYAML(node, path: "") }
-    return paths
+    return kinds
   }
 
   static func instance(_ value: JSONValue, paths: Set<String>, path: String = "") -> Any {

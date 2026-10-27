@@ -31,7 +31,7 @@ public struct IndexProjectEvaluator: Sendable {
         types = (root + MarkdownTypeFileRegistryLoader.relativeTypesDirectory).exists
             ? try MarkdownTypeFileRegistryLoader.load(projectRoot: root) : try MarkdownTypeRegistry(definitions: [])
         var standalone: MarkdownStandaloneRuleProject?
-        var components = [configPath.string]
+        var components = [configPath.string, "survey-observation-v3"]
         if includeRules && configPath.exists {
             let data = try Data(contentsOf: URL(fileURLWithPath: configPath.string))
             components.append(String(decoding: data, as: UTF8.self))
@@ -132,7 +132,8 @@ public struct IndexProjectEvaluator: Sendable {
         var assessment: IndexAssessment
         switch scope.kind {
         case .directory:
-            assessment = IndexAssessment(selected: true, status: analyzed.parseDiagnostics.isEmpty ? "selected" : "parse-error")
+            assessment = IndexAssessment(selected: true, status: analyzed.parseDiagnostics.isEmpty ? "selected" : "parse-error",
+                detail: try Self.json(MarkdownSurveyObservation.fromAnalysis(analyzed, path: path)))
         case .type:
             let result = try MarkdownTypeChecker(registry: types).assess(analyzed, as: MarkdownTypeName(rawValue: scope.name))
             let failedEvaluation = !analyzed.parseDiagnostics.isEmpty || result.diagnostics.contains(where: Self.isEvaluationError)

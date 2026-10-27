@@ -195,6 +195,27 @@ assert "relationship.context.unavailable" in diagnostics
 assert note.read_bytes() == baseline
 run("index", "draft", "discard", draft["id"])
 
+# Exercise the survey workflow independently of validation findings. Explicit
+# index publication may fail on malformed input while still retaining queryable
+# extraction evidence; snapshot surveying must not read the removed sources.
+survey_notes = fixture / "survey-notes"
+survey_notes.mkdir()
+(survey_notes / "one.md").write_text("---\nstatus: draft\ntags: [swift, swift]\n---\n")
+(survey_notes / "two.txt").write_text("---\nstatus: published\n---\n")
+(survey_notes / "bad.md").write_text("---\ntags: [broken\n---\n")
+survey = json.loads(run("survey", "survey-notes/", "--metrics", "coverage,keys", "--json", "--no-index"))
+assert survey["complete"] and survey["coverage"]["files"] == 3
+assert survey["coverage"]["malformed"] == 1
+values = json.loads(run("survey", "values", "status", "survey-notes/", "--json"))
+assert values["metrics"]["values"]["total"] == 2
+run("survey", "malformed-fm", "survey-notes/", "--format", "yaml")
+run("survey", "types", "survey-notes/")
+run("survey", "standards", "survey-notes/", expected=1)
+run("index", "update", "survey-notes/", "--include-non-md", expected=1)
+shutil.rmtree(survey_notes)
+snapshot = json.loads(run("survey", "malformed-fm", "survey-notes/", "--index-only", "--json"))
+assert snapshot["complete"] and snapshot["coverage"]["malformed"] == 1
+
 # Export from bundled resources, with no dependence on canonical files at the destination.
 run("agents", "skill", "--output-directory", "installed/")
 expected = {p.relative_to(skill): p.read_bytes() for p in skill.rglob("*") if p.is_file()}

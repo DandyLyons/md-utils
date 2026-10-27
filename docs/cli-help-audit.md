@@ -170,6 +170,20 @@ table to match every registered command and listed alias.
 | `md-utils section move-down` | — | F02, F05 |
 | `md-utils section move-to` | — | F02 |
 | `md-utils slug` | — | F05 |
+| `md-utils survey` | — | — |
+| `md-utils survey overview` | — | — |
+| `md-utils survey coverage` | — | — |
+| `md-utils survey malformed-fm` | — | — |
+| `md-utils survey keys` | — | — |
+| `md-utils survey key` | — | — |
+| `md-utils survey values` | — | — |
+| `md-utils survey rules` | — | — |
+| `md-utils survey types` | — | — |
+| `md-utils survey standards` | — | — |
+| `md-utils survey uncovered` | — | — |
+| `md-utils survey overlaps` | — | — |
+| `md-utils survey type-matches` | — | — |
+| `md-utils survey relationships` | — | — |
 | `md-utils template` | — | — |
 | `md-utils template render` | — | F12 |
 | `md-utils types` | — | — |
@@ -189,6 +203,11 @@ table to match every registered command and listed alias.
 | `md-utils move` | — | — |
 
 ## Verification
+
+The survey implementation (#200) extends the inventory to **137 pages**.
+Use `md-utils help survey` to inspect the group: `survey --help` displays the
+default overview command. The executable help traversal uses the built-in
+`help` route to retain group coverage for commands with a default subcommand.
 
 Native validation completed successfully:
 
@@ -220,6 +239,43 @@ command suites supply broader behavior, frontmatter, conversion, indexing and
 skill synchronization coverage.
 
 ## Remaining limits
+
+### Survey help follow-up (2026-10-27)
+
+The survey group and its thirteen subcommands now follow the
+[Better CLI help template](https://bettercli.org/design/cli-help-page/#cli-help-template)
+as a starting point: purpose and motivation first, quick-start syntax, practical
+examples, explicit subcommands, configuration/scope, output/cache behavior, exit
+status, and further help. Each subcommand has task-specific guidance. Shared
+options identify restrictions to particular subcommands. The approved default
+overview, parser behavior, output contracts, and exit codes remain unchanged.
+
+Executable help regressions failed before the rewrite and now pass. The full
+CLI target passes **722 tests in 61 suites**. Rendered introductions and examples
+were reviewed for all thirteen leaves and the group; the executable help audit
+covers 137 pages. Canonical and bundled agent guidance is synchronized.
+`AGENTS.md` records the owner's Better CLI policy and approval requirement for
+significant alignment changes. Logs: `tmp/survey-help-red.log` and
+`tmp/survey-help-final.log`.
+
+### Existing audit limits
+
+The subsequent `.agents/skills/better-cli/SKILL.md` review applied its help and
+discovery and output/automation references to all survey pages. It removed the
+duplicate group subcommand inventory, shortened repeated leaf boilerplate,
+clarified example prerequisites and output streams, and linked the workflow guide.
+Default execution and parser/output/exit contracts were preserved. Networking,
+telemetry, distribution, and completion were outside this help-only scope.
+
+Verification: 34 tests in three suites passed (`CLIHelpTests`,
+`SurveyCommandsTests`, `AgentCommandsTests`), including all thirteen leaf help
+pages with nonexistent input/root paths, status 0, stdout help, and empty stderr.
+Group help contains one subcommand inventory. Captured all leaves at requested
+60-column width and ran all 28 distinct printed examples in an isolated fixture;
+standards returned the documented status 1. The 137-page help audit and skill
+sync checks passed. Interactive pager/TTY behavior was not separately tested;
+captures used pipes. Evidence is in `tmp/survey-skill-help-tests.log`,
+`tmp/survey-help-captured.txt`, and `tmp/verify-survey-help.py`.
 
 - Local Linux validation is CI-only. Local WASM build/smoke verification is
   deferred under `AGENTS.md`; neither is claimed as passed. No tools were installed

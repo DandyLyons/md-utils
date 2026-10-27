@@ -19,6 +19,7 @@ public struct CLIEntry: AsyncParsableCommand {
     abstract: "A utility for working with Markdown files.",
     discussion: """
       Discover nested workflows:
+        md-utils help survey              Discover folder conventions and investigation commands.
         md-utils fm search --help          Search files with JMESPath (YAML frontmatter).
         md-utils links convert --help      Preview wikilink conversion, including --type contracts.
         md-utils relationships --help      Query outgoing, incoming and bidirectional relationships.
@@ -52,6 +53,7 @@ public struct CLIEntry: AsyncParsableCommand {
       TypesCommands.self,
       Copy.self,
       Move.self,
+      Survey.self,
     ],
     helpNames: [.long, .short]
   )

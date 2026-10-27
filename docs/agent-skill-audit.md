@@ -16,6 +16,7 @@ the canonical skill's `references/` directory.
 | Commands | Task / reference | Verification |
 | --- | --- | --- |
 | `agents` | Complete export/installation; installation.md | Full-tree byte comparison, stdout compatibility, no overwrite |
+| `survey` | Folder overview and focused investigations; survey.md | Red-green suites, JSON workflows and recursive help inventory |
 | `frontmatter`, `fm` | Metadata, arrays, mapped files, JMESPath; frontmatter.md, batch.md | Two-file author edits/readback, empty arrays, YAML selection |
 | `explore` | Progressive document inspection; headings-sections.md | Tree output and help |
 | `table-of-contents`, `toc` | Outlines/links; headings-sections.md | Heading output and help |

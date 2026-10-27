@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Folder survey (#200, 2026-10-26)**: Red-green implementation adds overview and focused frontmatter, contract, and relationship investigations. Scope, typed observations and per-metric completion are specified in `docs/survey-design.md`; verification requirements/progress are in `docs/survey-test-requirements.md`. Directory index assessments retain survey extraction evidence; missing snapshot projections stay unavailable. Agent Skill workflows live in `references/survey.md`. Functional standards surveying is deferred to #202.
+
 - **Linked-data integration deferred (2026-10-26)**: Owner deferred JSON-LD/YAML-LD incorporation. `docs/schema-org-alignment.md` and `docs/linked-data-authoring-proposal.md` retain research, not mdstandards release prerequisites. Interpretation versus validation, context applicability independent of conformance, and possible future standard-layer profiles remain reconsideration notes, not approved features. Schema.org vocabulary/application research may continue separately. Recipe design is not finalized and needs human review.
 
 - **Standards workflow fixtures (#201, 2026-10-25)**: Owner approved installable example standards, multiple migratable releases, differing local definitions, and expected outcomes before implementation. `docs/mdstandards-fixture-plan.md` tracks release acceptance; `docs/md-recipes-proposal.md` researches Schema.org/Nextcloud, Cooklang, and Open Recipe Format and proposes a domain design awaiting approval. Explicit lossy imports require acknowledgment; lossless round trip and valid export are distinct capabilities. No mdstandards runtime tests are claimed.
@@ -248,6 +250,25 @@ Force unwrapping optionals with `!` is absolutely prohibited. Use safe alternati
 - Do not guess OKF `type` values. Apply a `type` only when the user provides the value explicitly.
 
 ## Documentation
+
+### Better CLI design guidance
+
+Follow [Better CLI](https://bettercli.org/) when designing or changing CLI
+interfaces, help, output, and workflows. Read the relevant guidance; the
+[site index](https://bettercli.org/index.xml) is an additional discovery entry
+point. Use the [CLI help template](https://bettercli.org/design/cli-help-page/#cli-help-template)
+as a starting point: explain what a command does and why to use it first, then
+show usage, practical examples, clearly identified subcommands/options,
+configuration, and paths to further help. Keep generated references consistent
+with actual behavior and tailor explanations to each subcommand.
+
+Deviate only when the owner has explicitly chosen the deviation and a documented
+project design goal justifies it. Record the decision and rationale; existing
+behavior alone is not approval for a new exception. Before making a significant
+CLI change to align with Better CLI (including syntax, defaults, output contracts,
+or exit behavior), notify the owner of the proposed change and obtain approval.
+Routine help improvements within an authorized task may proceed. Better CLI is
+guidance to apply thoughtfully, not authority to silently change approved APIs.
 
 ### CLI help verification before committing
 

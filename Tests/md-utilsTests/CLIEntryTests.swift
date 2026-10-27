@@ -17,7 +17,7 @@ struct CLIEntryTests {
     #expect(config.version == CLIEntry.buildVersion)
     #expect(config.version.isEmpty == false)
     #expect(config.version != "development")
-    #expect(config.subcommands.count == 23)
+    #expect(config.subcommands.count == 24)
 
     // Verify the subcommands are registered (in order as listed in CLIEntry)
     #expect(config.subcommands[0] is CLIEntry.AgentCommands.Type)

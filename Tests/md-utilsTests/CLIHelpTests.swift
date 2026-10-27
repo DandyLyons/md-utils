@@ -39,6 +39,49 @@ struct CLIHelpTests {
   }
 
   @Test
+  func `survey help introduces purpose and explicitly identifies subcommands`() throws {
+    for arguments in [["survey", "--help"], ["help", "survey"]] {
+      let result = try CLIProcessTestHelper.run(arguments)
+      try #require(result.status == 0)
+      #expect(result.standardError.isEmpty)
+      let help = result.standardOutput
+      #expect(help.contains("Understand a folder's metadata conventions"))
+      #expect(help.contains("SUBCOMMANDS"))
+      #expect(help.contains("md-utils survey values status ./notes/"))
+      #expect(help.contains("Focused commands:") == false)
+      #expect(help.components(separatedBy: "SUBCOMMANDS").count == 2)
+    }
+  }
+
+  @Test(arguments: [
+    "overview", "coverage", "malformed-fm", "keys", "key", "values", "rules",
+    "types", "standards", "uncovered", "overlaps", "type-matches", "relationships",
+  ])
+  func `survey subcommand help explains its use and provides a starting example`(_ command: String) throws {
+    let result = try CLIProcessTestHelper.run(["survey", command, "--help"])
+    try #require(result.status == 0)
+    #expect(result.standardError.isEmpty)
+    let help = result.standardOutput
+    #expect(help.contains("DESCRIPTION"))
+    #expect(help.contains("EXAMPLES"))
+    #expect(help.contains("md-utils survey \(command)"))
+    #expect(help.contains("EXIT STATUS"))
+    #expect(help.contains("LEARN MORE"))
+    #expect(help.contains("OVERVIEW: Survey \(command)") == false)
+    if ["key", "values"].contains(command) {
+      #expect(help.contains("<key> [<paths> ...]"))
+    }
+    // Help must short-circuit execution even when the selected inputs do not exist.
+    let missing = "./tmp/nonexistent-survey-help-\(UUID().uuidString)/"
+    let explicitHelp = try CLIProcessTestHelper.run([
+      "survey", command, missing, "--project-root", missing, "--help",
+    ])
+    #expect(explicitHelp.status == 0)
+    #expect(explicitHelp.standardOutput == help)
+    #expect(explicitHelp.standardError.isEmpty)
+  }
+
+  @Test
   func `root help exposes nested search and contract conversion without flattening`() {
     let help = CLIEntry.helpMessage(columns: 120)
     #expect(help.contains("fm search --help"))
