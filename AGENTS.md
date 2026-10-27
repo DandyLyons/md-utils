@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Agent discovery workflows (2026-10-27)**: `references/discovery-workflows.md` provides six scenario-based investigations spanning survey, frontmatter, types/rules, document exploration, and links. `SKILL.md` routes unfamiliar-collection investigations to it; detailed syntax remains in focused references. Canonical and bundled copies are synchronized and example workflows are checked in isolated fixtures.
+
 - **Survey matrix and type matching (2026-10-27)**: `docs/survey-verification-matrix.md` maps implemented requirements to tests. Snapshot/direct text budgets exclude skipped attachments and filtered host kinds; traversal has a separate bounded metadata guard. Recursive matching uses a content-matching snapshot record, retaining revision identity. Local types share one full analysis per file with cancellation checks. Extension designs in `docs/survey-extension-proposals.md` remain proposals.
 
 - **Survey output formats (2026-10-27)**: All survey commands use `--format text|json|json-pretty` (default text; json compact). Shared `JSONReportOutput` serializes both JSON modes identically apart from layout. The former --json flag is removed; syntax filtering is --fm-format yaml|toml and report parameters use fmFormat. Scope is the survey group; other groups retain their current APIs pending separate work.

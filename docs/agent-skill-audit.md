@@ -15,6 +15,7 @@ the canonical skill's `references/` directory.
 
 | Commands | Task / reference | Verification |
 | --- | --- | --- |
+| `survey`, `explore`, `fm`, `types`, `rules`, `rel`, `links` | Scenario-based investigations; discovery-workflows.md | Executed command chains, output handoffs, focused section disclosure, unchanged source bytes |
 | `agents` | Complete export/installation; installation.md | Full-tree byte comparison, stdout compatibility, no overwrite |
 | `survey` | Folder overview and focused investigations; survey.md | Red-green suites, JSON workflows and recursive help inventory |
 | `frontmatter`, `fm` | Metadata, arrays, mapped files, JMESPath; frontmatter.md, batch.md | Two-file author edits/readback, empty arrays, YAML selection |
@@ -43,6 +44,19 @@ the canonical skill's `references/` directory.
 | Standards (upcoming) | Notice only; standards.md | Linked to #191; no proposed authoring syntax |
 
 ## Findings and resolutions
+
+Discovery workflow reference integration (2026-10-27): `SKILL.md` routes
+step-by-step unfamiliar-collection investigations to `discovery-workflows.md`.
+The reference covers six scenarios and links to focused command documentation.
+Its 19 primary examples and 11 conditional follow-ups run in an isolated fixture;
+checks verify output-derived names/paths, targeted section disclosure, expected
+finding statuses, and unchanged source/contract bytes. All 18 canonical/bundled
+files, routing/links, the 137-page executable help audit, installed export/example
+workflows, and the complete native suite (**1,947 tests**) passed. The generic
+skill-creator validator could not import optional PyYAML; the existing CLI YAML
+parser plus equivalent metadata/naming/scaffold checks passed without installing
+dependencies. Local evidence: `tmp/discovery-skill-full-tests.log`,
+`tmp/discovery-skill-check.log`, and `tmp/discovery-skill-examples.log`.
 
 - Query/index/mutation/template/batch details now have focused references, and
   formatting, metadata, slugs, config, OKF, and installation have explicit routing.

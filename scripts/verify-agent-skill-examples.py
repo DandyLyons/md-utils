@@ -14,6 +14,7 @@ import atexit
 import shutil
 import tempfile
 import hashlib
+import shlex
 from pathlib import Path
 
 repo = Path(__file__).resolve().parents[1]
@@ -26,8 +27,8 @@ fixture = Path(tempfile.mkdtemp(prefix="skill-examples-", dir=repo / "tmp"))
 atexit.register(shutil.rmtree, fixture)
 
 
-def run(*args, expected=0, input_text=None):
-    result = subprocess.run([str(cli), *args], cwd=fixture, text=True, capture_output=True, input=input_text)
+def run(*args, expected=0, input_text=None, working_directory=None):
+    result = subprocess.run([str(cli), *args], cwd=working_directory or fixture, text=True, capture_output=True, input=input_text)
     if result.returncode != expected:
         raise AssertionError(f"{args}: expected {expected}, got {result.returncode}\n{result.stdout}\n{result.stderr}")
     print(f"PASS ({expected}): {' '.join(args)}")
@@ -215,6 +216,68 @@ run("index", "update", "survey-notes/", "--include-non-md", expected=1)
 shutil.rmtree(survey_notes)
 snapshot = json.loads(run("survey", "malformed-fm", "survey-notes/", "--index-only", "--format", "json"))
 assert snapshot["complete"] and snapshot["coverage"]["malformed"] == 1
+
+# Verify the discovery reference's actual commands in a separate collection.
+# Outputs must supply the names/paths for the next step, and targeted exploration
+# must reveal the relevant section without exposing unrelated body content.
+discovery = fixture / "discovery"
+for directory in [".md-utils/types", ".md-utils/rules", "notes"]:
+    (discovery / directory).mkdir(parents=True, exist_ok=True)
+(discovery / ".md-utils/md-utils.json").write_text('{"configVersion":"0.3.0"}')
+(discovery / ".md-utils/types/book.mdtype.json").write_text(json.dumps({
+    "md-utils-type-schema": "1", "name": "Book", "version": "1",
+    "frontmatter": {"presence": "required", "schemas": [{"inline": {
+        "type": "object", "required": ["title", "Status"],
+        "properties": {"Status": {"type": "string", "enum": ["Draft", "Read"]}},
+    }}]},
+    "body": {"requirements": [], "recommendations": []},
+    "context": {"requirements": [], "recommendations": []},
+}))
+(discovery / ".md-utils/rules/books.mdrule.json").write_text(json.dumps({
+    "name": "books", "match": {"paths": ["notes/**"]}, "types": "book.mdtype.json",
+}))
+(discovery / "notes/example.md").write_text(
+    "---\ntitle: Example\nStatus: Read\n$md-utils:\n  typeHints: [Book]\n---\n"
+    "# Example\n\nSee [[missing]].\n\n## Lifecycle\n\n"
+    "Draft means reading is unfinished. Read means reading is complete.\n\n"
+    "### History\n\nA previous status.\n\n## Other material\n\n"
+    "This section is unrelated to the lifecycle question.\n"
+)
+(discovery / "notes/draft.md").write_text("---\nStatus: Draft\n---\n# Unfinished\n")
+discovery_before = {path: path.read_bytes() for path in discovery.rglob("*") if path.suffix in {".md", ".json"}}
+discovery_outputs = {}
+for block in blocks("discovery-workflows.md", "sh"):
+    for line in block.splitlines():
+        if not line.startswith("md-utils "):
+            continue
+        arguments = shlex.split(line)[1:]
+        status = 1 if arguments[:2] in [["types", "check"], ["links", "check"]] else 0
+        discovery_outputs[tuple(arguments)] = run(*arguments, expected=status, working_directory=discovery)
+assert all(word in discovery_outputs[("survey", "notes/")] for word in ["Status", "Book", "books"])
+assert "Read" in discovery_outputs[("survey", "values", "Status", "notes/")]
+assert "example.md: true" in discovery_outputs[("fm", "has", "--key", "Status", "notes/", "--include-non-md")]
+assert "Book" in discovery_outputs[("types", "verify", "notes/example.md", "--include-confirmed")]
+assert "draft.md" in discovery_outputs[("survey", "type-matches", "notes/", "--type", "Book")]
+assert "title" in discovery_outputs[("types", "check", "Book", "notes/draft.md")]
+assert "books" in discovery_outputs[("rules", "matching", "notes/example.md", "--explain")]
+expanded = discovery_outputs[("explore", "notes/example.md", "--expand", "Lifecycle")]
+assert "Draft means reading is unfinished" in expanded
+assert "This section is unrelated" not in expanded
+assert "unresolved" in discovery_outputs[("rel", "out", "notes/example.md", "--root", ".", "--detail", "evidence", "--json")]
+for arguments in [
+    ["survey", "keys", "notes/"], ["survey", "uncovered", "notes/"],
+    ["survey", "overlaps", "notes/"], ["survey", "coverage", "notes/"],
+    ["survey", "malformed-fm", "notes/"], ["survey", "notes/", "--format", "json"],
+    ["survey", "notes/", "--format", "json-pretty"],
+    ["explore", "notes/example.md", "--tree-section-title", "Lifecycle"],
+    ["explore", "notes/example.md", "--expand-frontmatter"],
+]:
+    run(*arguments, working_directory=discovery)
+run("rules", "validate", "books", expected=1, working_directory=discovery)
+heading_line = next(index for index, line in enumerate((discovery / "notes/example.md").read_text().splitlines(), 1) if line == "## Lifecycle")
+assert "Draft means" in run("explore", "notes/example.md", "--expand-line", str(heading_line), working_directory=discovery)
+assert all(path.read_bytes() == content for path, content in discovery_before.items())
+assert not (discovery / ".md-utils/index.sqlite").exists()
 
 # Export from bundled resources, with no dependence on canonical files at the destination.
 run("agents", "skill", "--output-directory", "installed/")

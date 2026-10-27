@@ -14,6 +14,7 @@ are explicit. Read only the references relevant to the task.
 
 | Task | Reference |
 | --- | --- |
+| Investigate an unfamiliar collection step by step, choosing follow-up commands from findings | [Discovery workflows](references/discovery-workflows.md) |
 | Get oriented in a folder: frontmatter patterns, distributions, rules/types and investigation hints | [Survey](references/survey.md) |
 | Read/write YAML or TOML metadata, mapped source files, arrays, search | [Frontmatter](references/frontmatter.md) |
 | Explore a long document, TOC, headings, sections, lines, body, text/CSV conversion | [Headings and sections](references/headings-sections.md) |
