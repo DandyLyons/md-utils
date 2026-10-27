@@ -19,6 +19,8 @@ parser.add_argument("--project-root", required=True, type=Path)
 parser.add_argument("--label", required=True)
 parser.add_argument("--sample", action="store_true")
 parser.add_argument("--compare", help="Compare complete JSON and exit status with a prior label")
+parser.add_argument("--metrics", nargs="+", choices=["types", "rules", "overview", "type-matches"], default=["types", "rules", "overview"])
+parser.add_argument("--type", action="append", default=[], help="Restrict type-matches; repeatable")
 args = parser.parse_args()
 if any(not label.replace("-", "").replace("_", "").isalnum() for label in [args.label, args.compare] if label):
     parser.error("label must contain only letters, digits, underscores, or hyphens")
@@ -30,12 +32,15 @@ output.mkdir(parents=True, exist_ok=True)
 measurements = []
 baseline = repo / "tmp" / ("survey-benchmark-" + args.compare) if args.compare else None
 prior = {row["metric"]: row for row in json.loads((baseline / "timings.json").read_text())} if baseline else {}
-for metric in ["types", "rules", "overview"]:
+for metric in args.metrics:
     command = [str(repo / ".build/debug/md-utils"), "survey"]
     if metric != "overview":
         command.append(metric)
     command += [str(args.scope.resolve()), "--project-root", str(args.project_root.resolve()),
                 "--format", "json", "--no-index", "--no-progress"]
+    if metric == "type-matches":
+        for name in args.type:
+            command += ["--type", name]
     with (output / (metric + ".json")).open("w") as stdout, (output / (metric + ".err")).open("w") as stderr:
         started = time.perf_counter()
         process = subprocess.Popen(command, cwd=repo, stdout=stdout, stderr=stderr)

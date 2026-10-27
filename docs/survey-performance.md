@@ -61,6 +61,43 @@ and uncertainty against independently analyzed per-rule inputs, and covers headi
 requirements, malformed YAML, unsupported hosts, type relevance, and cancellation.
 The repeated-analysis path fails the budget assertion; shared analysis passes it.
 
-This does not eliminate the initial metadata observation parse, change the shared
-index policy, optimize type-conformance matching, or skip rule applicability when
-reporting type relevance. Those remain possible separately measured improvements.
+The initial metadata observation parse and rule applicability needed for type
+relevance remain separate work. The shared index policy is unchanged.
+
+## Local type matching follow-up
+
+Local (non-relationship) types now share one full record analysis per selected
+file, rather than parsing once for each type/file pair. Each type retains its own
+schema/body/context assessment and outcome lists. The adapter keeps only the
+current parsed record; it does not introduce a collection-wide AST cache.
+Relationship-aware types retain their recursive collection evaluator and use a
+matching, revision-bound source. Their unused preliminary local parse is removed.
+
+`SurveyVerificationTests.localTypeMatchingParsesEachRecordOnceAndPreservesEveryOutcome`
+compares complete per-type outcome paths with independently analyzed assessments,
+enforces one analysis per input across three local types (including a heading
+requirement), and checks cancellation. Separate recursive-target regressions cover target repairs
+outside selection and refusal to silently replace a changed source.
+
+To reproduce a focused comparison:
+
+```sh
+python3 scripts/benchmark-survey.py /path/to/collection/folder \
+  --project-root /path/to/collection --label matches-before \
+  --metrics type-matches --type Book --type Article
+# Build the changed executable, then repeat with:
+python3 scripts/benchmark-survey.py /path/to/collection/folder \
+  --project-root /path/to/collection --label matches-after --compare matches-before \
+  --metrics type-matches --type Book --type Article
+```
+
+Replace type names with configured local types. This comparison applies to the
+performance change; recursive modes affected by the corrected snapshot-source
+bug intentionally produce improved outcomes rather than matching erroneous ones.
+
+On the unchanged Inputs selection (522 text files), matching the three configured
+local types books/movies/course took **3.516 s before** and **1.859 s after**
+(1.89× speedup). Complete decoded JSON and exit status were identical; both
+correctly retained unavailable inputs. These are single serial debug-build samples,
+not a release-build or all-type speedup claim. Evidence is in ignored
+`tmp/survey-benchmark-matches-before/` and `tmp/survey-benchmark-matches-after/`.

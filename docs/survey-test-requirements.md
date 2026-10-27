@@ -4,6 +4,12 @@ These requirements precede implementation. A checked item requires a passing
 behavioral test, not merely an implementation branch. Red-green evidence and any
 remaining work belong in the progress section.
 
+The current requirement-to-test mapping is in
+[survey-verification-matrix.md](survey-verification-matrix.md), including the
+snapshot-budget and recursive-source defects it exposed and their regressions.
+The matrix distinguishes published resource limits from unclaimed global
+wall-clock/RSS bounds and unsupported future capabilities.
+
 ## Portable observations and statistics
 
 Output format regressions cover all survey subcommands accepting text/json/json-pretty,
@@ -68,42 +74,51 @@ the full project scope. These cases are covered by `SurveyCommandsTests`.
   unknown metrics, incompatible flags and numerical option boundaries are tested.
 - [x] Recursive scope union/deduplication, exclusions, nonrecursive mode,
   Markdown-only mode, file-list-only input, LF/NUL lists and root confinement work.
-- [ ] Hidden entries/symlinks are skipped visibly, including symlink ancestors;
+- [x] Hidden entries/symlinks are skipped visibly, including symlink ancestors;
   explicit missing/unreadable inputs are not silently omitted.
-- [ ] Large input and computation budgets produce incomplete results, never
-  silent sampling or unbounded allocation.
+- [x] Published file-count/source-byte limits and shared relationship query
+  budgets report incomplete results rather than silent sampling. See the matrix
+  evidence and resource-limit qualifications below.
 - [x] Finding malformed files succeeds; unreadable files/missing snapshot evidence
   fail with partial results; invalid usage fails separately; cancellation propagates.
 
 ## Contracts and relationships
 
-- [ ] Rule applicability remains distinct from conformance; uncovered/overlaps
+- [x] Rule applicability remains distinct from conformance; uncovered/overlaps
   retain unknown selection and no-config versus invalid-config distinctions.
-- [ ] Type inventory distinguishes discovered and referenced types, includes the
+- [x] Type inventory distinguishes discovered and referenced types, includes the
   type-matches hint, and never performs implicit all-type assessment.
-- [ ] Optional type matching retains pass/fail/unavailable and recursive evidence.
-- [ ] Relationship summaries reuse named/ordinary/outgoing semantics, preserve
+- [x] Optional type matching retains pass/fail/unavailable and recursive assessment semantics.
+- [x] Relationship summaries reuse named/ordinary/outgoing semantics, preserve
   self-links and selected-folder boundary information, and expose coverage limits.
 - [x] Standards explicitly report unsupported, without pretending no standards exist.
 
 ## Index and output
 
-- [ ] Direct/cached results are equivalent; changed/deleted/new files refresh;
+- [x] Direct/cached results are equivalent; changed/deleted/new files refresh;
   definition changes invalidate; stat-preserving edits honor hash verification.
-- [ ] No absent index is created; failed cache warns/falls back; cancellation does
+- [x] No absent index is created; failed cache advises/falls back; cancellation does
   not fall back; missing required scopes are refreshed without unrelated scans.
-- [ ] Snapshot-only access is read-only, with no source/config/stat/discovery calls,
+- [x] Snapshot-only access is read-only, with no source/config/stat/discovery calls,
   including after source deletion; identity/generation and evidence gaps are shown.
-- [ ] Publication is atomic and generation-bound; failures cannot expose mixed or
+- [x] Publication is atomic and generation-bound; failures cannot expose mixed or
   stale evidence as current. Raw values/kinds and presence survive cache roundtrip.
-- [ ] JSON is a single versioned document with metric completion, provenance,
+- [x] JSON is a single versioned document with metric completion, provenance,
   totals/truncation and executable hints; diagnostics stay on stderr.
-- [ ] Text and JSON agree on findings; hints retain quoting, configuration and
-  scope, warn about broader validation, and do not propose nonexistent commands.
+- [x] Text and JSON agree on findings; hints retain quoting, configuration and
+  scope, disclose broader validation, and do not propose nonexistent commands.
 - [x] Canonical/bundled Agent Skill workflow examples and actual executable help
   match implementation; Linux remains CI-only and WASM verification deferred.
 
 ## Stabilization verification — 2026-10-27
+
+The subsequent verification-matrix pass is mapped in
+`survey-verification-matrix.md`. It adds direct/snapshot attachment-budget parity,
+hidden/symlink ancestors, refresh/delete/definition changes, deleted-source/config
+read-only snapshots, named self-links and boundaries, recursive target conformance,
+and deterministic cache-cancellation checks. The broad checklist above is signed
+off for implemented modes using those regressions and shared index/query tests;
+future projections/host capabilities remain explicitly outside it.
 
 The accumulated survey improvements passed the complete native `swift test` run:
 **1,936 tests across eight test products**, exit 0. Product totals were 736, 4,
@@ -252,7 +267,8 @@ md_utilsTests` then passed **720 tests in 61 suites**. Red/green logs are
 - Invalid usage follows existing ArgumentParser exit 64, replacing proposed exit 2.
   Linux is CI-only and WASM verification is deferred by project policy.
 - Local large-collection observations are recorded in `survey-performance.md`;
-  multi-process stress benchmarks have not been run. Controlled budget/interruption
-  tests and existing index regressions are not presented as production-scale
-  stress evidence. Unchecked broad requirements remain tracked in #200 rather
-  than being marked complete without full coverage.
+  multi-process stress benchmarks have not been run. The current implemented-mode
+  checklist is now mapped and verified in `survey-verification-matrix.md`.
+  Controlled budget/interruption tests and existing index regressions are not
+  presented as production-scale stress evidence. Deferred capability proposals
+  remain separate in `survey-extension-proposals.md`.

@@ -8,6 +8,12 @@
   performance about sixfold. Functional standards discovery remains upcoming.
 - **Breaking:** Survey output selection is `--format text|json|json-pretty`;
   `--json` is removed. Malformed-frontmatter filtering uses `--fm-format yaml|toml`.
+- Survey text-file budgets now handle skipped attachments and Markdown-only
+  snapshot scope consistently. Recursive type matching uses revision-bound sources
+  and rejects changed source bytes; unsupported snapshot configuration overrides
+  report unavailable. Local type matching shares parsing across types, improving
+  the measured three-type query about 1.9×. The verification matrix and extension
+  proposals are documented separately.
 
 - **Breaking:** Knap (through SwiftKnap) replaces the previous template engine for
   library, CLI, and server creation. Rewrite existing templates using Knap; there

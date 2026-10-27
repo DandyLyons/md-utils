@@ -171,24 +171,37 @@ enum SurveyContracts {
         let needsCollection = selectedTypes.contains { !$0.relationships.isEmpty }
         let collection = needsCollection ? try await MarkdownRelationshipNativeCollection.load(root: root,
           noIndex: options.noIndex, includeNonMarkdown: !options.markdownOnly, configPath: options.config.map { Path($0) }) : nil
+        let hasLocalTypes = selectedTypes.contains { $0.relationships.isEmpty }
+        var byType: [MarkdownTypeName: [String: [String]]] = [:]
+        for record in records where !selectedTypes.isEmpty {
+          try Task.checkCancellation()
+          guard let path = record.context.path?.rawValue else { continue }
+          // Local conformance shares one full analysis. Keep just the current
+          // record's parsed state rather than a collection-wide AST cache.
+          let analyzed = hasLocalTypes ? await analyze(record, .all, .rulesKind(forFileName: path)) : nil
+          try Task.checkCancellation()
+          var relationshipSource: MarkdownRecord?
+          if let collection, SurveyRunner.isMarkdown(path),
+            let source = try await collection.record(at: path), source.content.utf8.elementsEqual(record.content.utf8) {
+            relationshipSource = source
+          }
+          for definition in selectedTypes {
+            try Task.checkCancellation()
+            let outcome: MarkdownAssessmentOutcome
+            if definition.relationships.isEmpty, let analyzed {
+              outcome = try checker.assess(analyzed, as: definition.name).outcome
+            } else if let source = relationshipSource {
+              // Recursive checks retain their collection-aware evaluator and
+              // exact snapshot identity. Changed/missing sources stay unavailable.
+              outcome = try await checker.assess(source, as: definition.name, collection: collection).outcome
+            } else { outcome = .unavailable }
+            byType[definition.name, default: [:]][outcome.rawValue, default: []].append(path)
+          }
+        }
         var rows: [JSONValue] = []
         for definition in selectedTypes {
           var outcomes: [String: [String]] = ["pass": [], "fail": [], "unavailable": []]
-          for record in records {
-            try Task.checkCancellation()
-            guard let path = record.context.path?.rawValue else { continue }
-            let analyzed = await MarkdownRecordAnalyzer.analyze(record, contentKind: .rulesKind(forFileName: path))
-            let assessment: MarkdownTypeAssessment
-            if definition.relationships.isEmpty {
-              assessment = try checker.assess(analyzed, as: definition.name)
-            } else if SurveyRunner.isMarkdown(path) {
-              assessment = try await checker.assess(record, as: definition.name, collection: collection)
-            } else {
-              outcomes["unavailable", default: []].append(path)
-              continue
-            }
-            outcomes[assessment.outcome.rawValue, default: []].append(path)
-          }
+          outcomes.merge(byType[definition.name] ?? [:]) { _, paths in paths }
           if !(outcomes["unavailable"] ?? []).isEmpty { report.unavailable("Type \(definition.name.rawValue) has unavailable assessments", metric: "type-matches") }
           rows.append(.object(["type": .string(definition.name.rawValue), "outcomes": .object(try outcomes.mapValues { try SurveyRunner.table($0, limit: options.limit) })]))
         }

@@ -377,7 +377,10 @@ enum SurveyRunner {
     try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(value))
   }
 
-  static func run(metric: String, arguments: [String], options: SurveyOptions, progress: SurveyProgress? = nil) async throws -> SurveyReport {
+  static func run(
+    metric: String, arguments: [String], options: SurveyOptions, progress: SurveyProgress? = nil,
+    cacheRefresh: (@Sendable () async throws -> SurveyIndexSnapshot)? = nil,
+  ) async throws -> SurveyReport {
     try Task.checkCancellation()
     try options.validateRequest(metric: metric, arguments: arguments)
     let root = Path(options.projectRoot ?? Path.current.string).absolute().normalize()
@@ -463,10 +466,14 @@ enum SurveyRunner {
         do {
           await progress?.update("Refreshing cached survey evidence…")
           let directories = selections.map { $0.isEmpty || $0.hasSuffix("/") ? $0 : $0 + "/" }
-          let snapshot = try await SurveyIndexSnapshot.refresh(root: root,
-            config: options.config.map { Path($0) } ?? root + ".md-utils/md-utils.json",
-            directories: directories, includeNonMarkdown: !options.markdownOnly,
-            verifyHashes: options.verifyHashes, maxFiles: options.maxFiles)
+          let snapshot: SurveyIndexSnapshot
+          if let cacheRefresh { snapshot = try await cacheRefresh() }
+          else {
+            snapshot = try await SurveyIndexSnapshot.refresh(root: root,
+              config: options.config.map { Path($0) } ?? root + ".md-utils/md-utils.json",
+              directories: directories, includeNonMarkdown: !options.markdownOnly,
+              verifyHashes: options.verifyHashes, maxFiles: options.maxFiles)
+          }
           observations = snapshot.observations
           report.snapshotGeneration = snapshot.generation
           report.source = "index"
@@ -548,7 +555,7 @@ enum SurveyRunner {
           elements: options.elements, occurrences: options.count == "occurrences", top: options.top)) }
       case "standards": report.unavailable("survey standards is an upcoming feature.", metric: metric)
       case "relationships":
-        if !options.indexOnly && options.config != nil {
+        if options.config != nil {
           report.unavailable("Relationship queries currently require the conventional project configuration", metric: metric)
           continue
         }
@@ -775,6 +782,10 @@ enum SurveyRunner {
   }
 
   static func discover(root: Path, paths: [String], options: SurveyOptions, report: inout SurveyReport) throws -> [MarkdownRecord] {
+    // Bound metadata traversal separately from selected text count. Small text
+    // budgets must still permit attachments and excluded host kinds to be skipped.
+    let scaled = options.maxFiles.multipliedReportingOverflow(by: 4)
+    let discoveryBudget = max(100_000, scaled.overflow ? Int.max : scaled.partialValue)
     var found: Set<String> = []
     var records: [MarkdownRecord] = []
     var bytes = 0
@@ -785,7 +796,7 @@ enum SurveyRunner {
       guard !relative.split(separator: "/").contains(where: { $0.hasPrefix(".") }) else { return }
       guard !options.exclude.contains(where: { matches(relative, glob: $0) || relative == $0 || relative.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }) else { return }
       guard found.insert(path).inserted else { return }
-      if found.count / 4 > options.maxFiles { throw SurveyDiscoveryError.budget }
+      if found.count > discoveryBudget { throw SurveyDiscoveryError.budget }
       let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey, .isRegularFileKey, .fileSizeKey, .contentModificationDateKey])
       if values.isSymbolicLink == true || url.resolvingSymlinksInPath().path != path { return }
       if values.isDirectory == true {

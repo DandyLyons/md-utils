@@ -37,20 +37,34 @@ public struct SurveyIndexSnapshot: Sendable {
       }
       var seen: Set<String> = []
       var bytes = 0
+      var textFiles = 0
       for scope in needed.sorted() {
         let cursor = try Row.fetchCursor(db, sql: "SELECT path,detail FROM assessments WHERE scope_id=? ORDER BY path", arguments: [scope])
         while let row = try cursor.next() {
           try Task.checkCancellation()
           let path: String = row["path"]
+          if !includeNonMarkdown && !["md", "markdown"].contains(URL(fileURLWithPath: path).pathExtension.lowercased()) { continue }
           guard selections.contains(where: { $0.isEmpty || path == $0 || path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }),
             seen.insert(path).inserted else { continue }
           let detail: String = row["detail"]
           bytes += detail.utf8.count
-          guard result.observations.count < maxFiles, bytes <= 256 * 1024 * 1024 else {
+          guard bytes <= 256 * 1024 * 1024 else {
             result.limitations.append("Survey snapshot budget exhausted")
             return result
           }
-          do { result.observations.append(try JSONDecoder().decode(MarkdownSurveyObservation.self, from: Data(detail.utf8))) }
+          do {
+            let observation = try JSONDecoder().decode(MarkdownSurveyObservation.self, from: Data(detail.utf8))
+            // Non-text skips do not consume the source text-file budget. Apply
+            // Markdown filtering before budgeting, matching direct survey scope.
+            if observation.state != .binary {
+              guard textFiles < maxFiles else {
+                result.limitations.append("Survey snapshot budget exhausted")
+                return result
+              }
+              textFiles += 1
+            }
+            result.observations.append(observation)
+          }
           catch { result.limitations.append("Missing survey extraction evidence: \(path)") }
         }
       }

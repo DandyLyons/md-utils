@@ -153,6 +153,12 @@ Do not interpret unsupported as an empty standards inventory.
 
 ## Cache, JSON, and completion
 
+`--max-files` counts selected text files consistently in direct and snapshot
+queries; non-text skips and excluded non-Markdown evidence do not consume it.
+Relationship-aware type matching uses a content-matching collection snapshot
+source and evaluates targets across the full project namespace. A source that
+changed between discovery and snapshot construction remains unavailable.
+
 All survey commands use `--format text|json|json-pretty`. Text is the default;
 json emits one compact JSON document and json-pretty emits the same report with
 indentation. `--json` is not accepted. For malformed-frontmatter syntax filtering,
