@@ -5,6 +5,19 @@ import Testing
 
 @Suite("CLI help audit regressions")
 struct CLIHelpTests {
+  @Test func queryHelpExplainsScopeResultsAndFurtherDiscoveryWithoutScanning() throws {
+    for arguments in [["query", "--help"], ["query", "filter", "--help"], ["query", "./tmp/nonexistent-query-help", "--help"]] {
+      let result = try CLIProcessTestHelper.run(arguments)
+      try #require(result.status == 0)
+      #expect(result.standardError.isEmpty)
+      for section in ["EXAMPLES", "SCOPE", "OUTPUT", "EXIT STATUS", "LEARN MORE", "SUBCOMMANDS"] {
+        #expect(result.standardOutput.contains(section), Comment(rawValue: section))
+      }
+      #expect(result.standardOutput.contains("--oformat"))
+      #expect(result.standardOutput.contains("--no-progress"))
+      #expect(result.standardOutput.contains("path order"))
+    }
+  }
   /// Follow registration rather than a second command list, so new nested pages
   /// must be added to the reviewable audit inventory as the CLI grows.
   private func registeredCommands(

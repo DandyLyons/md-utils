@@ -1,8 +1,8 @@
 import Foundation
 
-/// Delayed, phase-based feedback; all state is isolated and no filesystem work
+/// Shared delayed, phase-based feedback; all state is isolated and no filesystem work
 /// is performed to obtain a progress count. Callers supply counts they discovered.
-actor SurveyProgress {
+actor AnalysisProgress {
   private var phase = "Discovering files…"
   private var lastMessage: String?
   private var finished = false
@@ -27,7 +27,7 @@ actor SurveyProgress {
         try await Task.sleep(for: .seconds(1))
         try Task.checkCancellation()
         if let message = nextMessage() {
-          FileHandle.standardError.write(Data((message + "\n").utf8))
+          CLIStyle.writeStderr(CLIStyle.hint(message))
         }
       }
     } catch is CancellationError {
@@ -35,3 +35,5 @@ actor SurveyProgress {
     } catch { return }
   }
 }
+
+typealias SurveyProgress = AnalysisProgress

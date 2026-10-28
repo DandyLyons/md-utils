@@ -20,6 +20,7 @@ public struct CLIEntry: AsyncParsableCommand {
     discussion: """
       Discover nested workflows:
         md-utils help survey              Discover folder conventions and investigation commands.
+        md-utils query --help             Find documents by metadata, type, or rule.
         md-utils fm search --help          Search files with JMESPath (YAML frontmatter).
         md-utils links convert --help      Preview wikilink conversion, including --type contracts.
         md-utils relationships --help      Query outgoing, incoming and bidirectional relationships.
@@ -54,6 +55,7 @@ public struct CLIEntry: AsyncParsableCommand {
       Copy.self,
       Move.self,
       Survey.self,
+      Query.self,
     ],
     helpNames: [.long, .short]
   )

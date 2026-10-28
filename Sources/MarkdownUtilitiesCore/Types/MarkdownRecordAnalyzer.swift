@@ -90,6 +90,7 @@ package enum MarkdownRecordContentKind: Sendable {
 /// Package visibility keeps parser implementation details out of the public API while
 /// allowing sibling targets to guarantee that one snapshot build parses each record once.
 package struct AnalyzedMarkdownRecord: Sendable {
+  package var valueMetadata: [String: FrontMatterEvidence] = [:]
   package var nativeTemporalPaths: Set<String> = []
   package var nativeTemporalKinds: [String: String] = [:]
   package var frontmatterFormat: FrontMatterFormat? = nil
@@ -209,21 +210,20 @@ package enum MarkdownRecordAnalyzer {
     var relationshipFrontmatter: [String: JSONValue]?
     var nativeTemporalPaths: Set<String> = []
     var nativeTemporalKinds: [String: String] = [:]
+    var valueMetadata: [String: FrontMatterEvidence] = [:]
     var hints: [MarkdownTypeHint] = []
     var diagnostics = parts.diagnostics
 
     if parts.hasFrontmatter {
       do {
-        let frontMatter = try FrontMatterConversion.parse(
+        let parsed = try ParsedFrontMatter.parse(
           parts.rawFrontmatter,
           format: parts.format ?? .yaml
         )
-        let dynamicValue = FrontMatterConversion.foundationValue(frontMatter)
-        nativeTemporalKinds = try NativeTemporalEvidence.kinds(
-          frontMatter, source: parts.rawFrontmatter, format: parts.format ?? .yaml,
-        )
+        valueMetadata = parsed.metadata
+        nativeTemporalKinds = parsed.metadata.filter { !["integer", "number"].contains($0.value.kind) }.mapValues(\.kind)
         nativeTemporalPaths = Set(nativeTemporalKinds.keys)
-        guard case .object(var object) = try JSONValue(any: dynamicValue) else {
+        guard case .object(var object) = ParsedFrontMatter.project(.object(parsed.mapping)) else {
           throw YAMLConversionError.notAMapping
         }
         relationshipFrontmatter = object
@@ -239,6 +239,7 @@ package enum MarkdownRecordAnalyzer {
     }
 
     return AnalyzedMarkdownRecord(
+      valueMetadata: valueMetadata,
       nativeTemporalPaths: nativeTemporalPaths,
       nativeTemporalKinds: nativeTemporalKinds,
       frontmatterFormat: parts.format,

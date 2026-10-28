@@ -11,7 +11,9 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
-- **Agent discovery workflows (2026-10-27)**: `references/discovery-workflows.md` provides six scenario-based investigations spanning survey, frontmatter, types/rules, document exploration, and links. `SKILL.md` routes unfamiliar-collection investigations to it; detailed syntax remains in focused references. Canonical and bundled copies are synchronized and example workflows are checked in isolated fixtures.
+- **Document query (#203, 2026-10-28)**: `query` supports typed literal/JSONPath filtering, ranges, calendar/instant comparisons, required type conformance, rule selection, and existing `query rel` aliases. Shared parsing retains numeric/native temporal evidence; SQLite projects requested subtrees before decoding. Survey discovery/budgets and delayed stderr progress are reused. `--limit 20`/`--diagnostic-limit 100` bound display only. Snapshot-only frontmatter predicates require versioned evidence; type/rule snapshot-only remains deferred. See `docs/query-design.md` and the bundled `references/query.md`; red-green suites: `QueryCommandsTests|MarkdownQueryTests`, with survey/parser/index regressions and native suite verification.
+
+- **Agent discovery workflows (2026-10-28)**: `references/discovery-workflows.md` provides seven investigations spanning survey → query → explore, frontmatter, types/rules, and links. Latest-five discovery retrieves complete candidates before date ranking; query limits are path-ordered, not chronological. `references/query.md` explains this boundary and predicate composition limits. Canonical/bundled copies are synchronized; fixtures reverse filename/date order and verify the date-window cross-check.
 
 - **Survey matrix and type matching (2026-10-27)**: `docs/survey-verification-matrix.md` maps implemented requirements to tests. Snapshot/direct text budgets exclude skipped attachments and filtered host kinds; traversal has a separate bounded metadata guard. Recursive matching uses a content-matching snapshot record, retaining revision identity. Local types share one full analysis per file with cancellation checks. Extension designs in `docs/survey-extension-proposals.md` remain proposals.
 
@@ -295,6 +297,17 @@ output formats, input scope/recursion, frontmatter support, and index behavior
 where applicable. Verify affected parent/group help for discoverability and any
 other help pages changed through shared options or command configuration. Rebuild
 first when needed; record the verification in the task's review notes.
+
+For new commands or materially changed help, also update `docs/cli-help-audit.md`
+and add focused `CLIHelpTests` assertions for purpose, examples, scope, output,
+exit status and further discovery. Test that explicit help succeeds without
+scanning nonexistent inputs. Run `swift test --filter CLIHelpTests`, then
+`python3 scripts/check-agent-skill.py --cli <rebuilt-executable>` for recursive
+command/alias coverage and `scripts/verify-agent-skill-examples.py` for executable
+examples. These structural checks complement human review: inspect actual
+root/parent/leaf help, terminal wrapping, and captured output. Determine the
+current executable path with `swift build --show-bin-path`; do not assume an old
+`.build/debug` artifact is current.
 
 Detailed guidance organized by topic:
 

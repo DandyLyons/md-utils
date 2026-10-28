@@ -171,6 +171,12 @@ table to match every registered command and listed alias.
 | `md-utils section move-to` | — | F02 |
 | `md-utils slug` | — | F05 |
 | `md-utils survey` | — | — |
+| `md-utils query` | — | — |
+| `md-utils query filter` | — | — |
+| `md-utils query relationships` | `rel` | — |
+| `md-utils query relationships outgoing` | `out` | — |
+| `md-utils query relationships incoming` | `in` | — |
+| `md-utils query relationships both` | — | — |
 | `md-utils survey overview` | — | — |
 | `md-utils survey coverage` | — | — |
 | `md-utils survey malformed-fm` | — | — |
@@ -297,6 +303,22 @@ captures used pipes. Evidence is in `tmp/survey-skill-help-tests.log`,
 - This is help/usage verification, not a new exhaustive behavioral or security
   audit of every existing command. Unrelated runtime defects and new features
   remain outside issue #187's scope.
+
+## Query release verification (2026-10-28)
+
+Query root/default-filter help now explains scope, examples, output, exit status,
+and further discovery. `CLIHelpTests` verifies explicit help also succeeds with
+nonexistent input paths without scanning. Reviewed rebuilt root, query parent,
+filter, and relationship-group help and wrapped examples. The recursive skill
+audit passed 143 help pages and all 19 synchronized skill resources; executable
+skill examples passed, including complete-candidate date ranking.
+
+PTY captures verified shared color styling in human frontmatter output and no
+ANSI escapes in JSON. CLI regressions verify escaped human paths and exact JSON/
+NUL paths. The final `swift test` run passed 1,970 tests across eight test products.
+Linux remains CI-only and local WASM verification remains deferred. Project-local
+logs: `tmp/query-final-release-tests.log`, `tmp/query-final-skill-check.log`, and
+`tmp/query-final-examples.log`. The ongoing help-review procedure is in `AGENTS.md`.
 
 ## Follow-up: keyless files in fm list
 

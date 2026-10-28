@@ -223,7 +223,7 @@ struct SurveyOptions: ParsableArguments {
   @Flag(help: "Bypass the project index") var noIndex = false
   @Flag(name: [.long, .customLong("indexed-only")], help: "Published SQLite evidence only; no source reads or fallback") var indexOnly = false
   @Flag(help: "Detect stat-preserving edits during indexed refresh") var verifyHashes = false
-  @Option(help: "Maximum selected text files; exhaustion is incomplete") var maxFiles = 100_000
+  @Option(help: "Maximum selected text files; exhaustion is incomplete") var maxFiles = DocumentReadBudgets.files
 
   func validateRequest(metric: String, arguments: [String]) throws {
     guard top >= 0, limit >= 0, maxFiles > 0, (minFiles ?? 1) > 0,

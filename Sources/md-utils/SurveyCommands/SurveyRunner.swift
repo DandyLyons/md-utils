@@ -233,9 +233,7 @@ struct SurveyReport: Codable {
   }
 
   static func quote(_ value: String) -> String {
-    let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:@%+=,-")
-    if !value.isEmpty && value.unicodeScalars.allSatisfy(safe.contains) { return value }
-    return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    CLIInvocation.quote(value)
   }
 
   static func integer(_ value: JSONValue?) -> Int {
@@ -395,8 +393,8 @@ enum SurveyRunner {
     }
     requested = requested.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
     for (file, nul) in options.filesFrom.map({ ($0, false) }) + options.filesFrom0.map({ ($0, true) }) {
-      let data = file == "-" ? FileHandle.standardInput.readDataToEndOfFile() : try Data(contentsOf: URL(fileURLWithPath: file))
-      guard data.count <= 64 * 1024 * 1024, let text = String(data: data, encoding: .utf8) else { throw ValidationError("File lists require bounded UTF-8 input") }
+      let data = try CLIFileListInput.read(file)
+      guard data.count <= DocumentReadBudgets.sourceBytes, let text = String(data: data, encoding: .utf8) else { throw ValidationError("File lists require bounded UTF-8 input") }
       var input = Substring(text)
       paths += try MarkdownQueryFileListParser(nulDelimited: nul).parse(&input).map { (root + $0).string }
     }
@@ -447,12 +445,14 @@ enum SurveyRunner {
     }
     var records: [MarkdownRecord] = []
     var observations: [MarkdownSurveyObservation] = []
+    let projection: FrontmatterIndexSnapshot.Projection = requested == ["coverage"] ? .coverage : requested == ["keys"] ? .keys :
+      ((metric == "key" || metric == "values") && !options.pointer ? .selected(Set(key.map { [$0] } ?? [])) : .full)
     if options.indexOnly {
       await progress?.update("Reading published survey evidence…")
       report.source = "snapshot"
       // A snapshot-only failure is never permission to inspect source files.
       do {
-        let snapshot = try SurveyIndexSnapshot.read(root: root, selections: selections, includeNonMarkdown: !options.markdownOnly, maxFiles: options.maxFiles)
+        let snapshot = try SurveyIndexSnapshot.read(root: root, selections: selections, includeNonMarkdown: !options.markdownOnly, maxFiles: options.maxFiles, projection: projection)
         observations = snapshot.observations
         report.snapshotGeneration = snapshot.generation
         for problem in snapshot.limitations { report.unavailable(problem) }
@@ -472,7 +472,7 @@ enum SurveyRunner {
             snapshot = try await SurveyIndexSnapshot.refresh(root: root,
               config: options.config.map { Path($0) } ?? root + ".md-utils/md-utils.json",
               directories: directories, includeNonMarkdown: !options.markdownOnly,
-              verifyHashes: options.verifyHashes, maxFiles: options.maxFiles)
+              verifyHashes: options.verifyHashes, maxFiles: options.maxFiles, projection: projection)
           }
           observations = snapshot.observations
           report.snapshotGeneration = snapshot.generation
@@ -660,26 +660,25 @@ enum SurveyRunner {
         report.hints.append(.init(argv: ["md-utils", "survey", "values", key] + scope + (options.pointer ? ["--pointer"] : []),
           workingDirectory: Path.current.string, explanation: "Explore frequent values and their distribution for this property."))
       }
-      if metric == "values", let key, key != "$path", !options.pointer,
-        !options.elements, !options.indexOnly, !options.markdownOnly,
-        options.recursive, options.exclude.isEmpty,
-        options.filesFrom.isEmpty, options.filesFrom0.isEmpty,
-        !paths.isEmpty, paths.allSatisfy({ Path($0).isDirectory }),
+      if metric == "values", let key, !options.pointer, !options.elements,
         case .array(let rows) = report.metrics["values"]?.objectValue?["rows"] {
-        // One example is enough to teach the workflow. Prefer a non-null value,
-        // preserving frequency order; state dump's distinct scope explicitly.
+        // Preserve survey's literal case semantics and exact scope in the native query.
         let candidates = rows.compactMap { $0.objectValue?["value"]?.objectValue }.filter {
           ["string", "null", "boolean", "integer", "number"].contains($0["kind"]?.stringValue ?? "")
         }
         if let typed = candidates.first(where: { $0["kind"] != .string("null") }) ?? candidates.first,
           let value = typed["value"] {
+          let condition: [String]
+          if value == .null { condition = ["--is-null"] }
+          else {
+            condition = ["--equals", value.stringValue ?? SurveyReport.display(value),
+              "--vtype", typed["kind"]?.stringValue ?? "string", "--case-sensitive",
+            ]
+          }
           report.hints.append(.init(
-            argv: ["md-utils", "fm", "dump"] + paths + ["--format", "json"],
+            argv: ["md-utils", "query"] + scope + ["--key", key] + condition + ["--output", "frontmatter", "--oformat", "json"],
             workingDirectory: Path.current.string,
-            explanation: "Example: show frontmatter where \(key) equals \(SurveyReport.display(value)); replace the value to investigate others (requires jq). Reads current supported text files using fm dump traversal; $path identifies each source.",
-            pipeTo: ["jq", "--arg", "key", key, "--argjson", "value", SurveyReport.display(value),
-              ".frontMatter[] | select(has($key) and .[$key] == $value)",
-            ],
+            explanation: "Find documents where \(key) equals \(SurveyReport.display(value)) in the same scope; replace the value to investigate others. Results retain document paths and complete frontmatter.",
           ))
         }
       }
@@ -784,8 +783,7 @@ enum SurveyRunner {
   static func discover(root: Path, paths: [String], options: SurveyOptions, report: inout SurveyReport) throws -> [MarkdownRecord] {
     // Bound metadata traversal separately from selected text count. Small text
     // budgets must still permit attachments and excluded host kinds to be skipped.
-    let scaled = options.maxFiles.multipliedReportingOverflow(by: 4)
-    let discoveryBudget = max(100_000, scaled.overflow ? Int.max : scaled.partialValue)
+    let discoveryBudget = DocumentReadBudgets.traversal(files: options.maxFiles)
     var found: Set<String> = []
     var records: [MarkdownRecord] = []
     var bytes = 0
@@ -817,8 +815,8 @@ enum SurveyRunner {
         defer { try? handle.close() }
         let prefix = try handle.read(upToCount: 8192) ?? Data()
         if MarkdownSurveyObservation.isNonText(prefix) { report.coverage.skippedBinary += 1; return }
-        guard records.count < options.maxFiles, let size = values.fileSize, size <= 64 * 1024 * 1024,
-          bytes + size <= 256 * 1024 * 1024 else { throw SurveyDiscoveryError.budget }
+        guard records.count < options.maxFiles, let size = values.fileSize, size <= DocumentReadBudgets.sourceBytes,
+          bytes + size <= DocumentReadBudgets.aggregateBytes else { throw SurveyDiscoveryError.budget }
         let data = try Data(contentsOf: url)
         let after = try url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
         guard after.fileSize == size, data.count == size,

@@ -1,7 +1,7 @@
 ---
 name: markdown-utilities
 description: >-
-  Parse, edit, and analyze Markdown and mapped text files with md-utils. Use for YAML/TOML frontmatter, headings and sections, wikilinks and relationship queries, rules/types/schema authoring and validation, templates, batch operations, indexing, and reviewed document mutations. Standards are upcoming.
+  Parse, edit, and analyze Markdown and mapped text files with md-utils. Use survey to discover conventions, query to find documents by metadata or dates, and explore to read selected sections. Supports YAML/TOML frontmatter, relationships, rules/types/schema authoring and validation, templates, indexing, and reviewed document mutations. Standards are upcoming.
 ---
 
 # Markdown Utilities
@@ -16,6 +16,7 @@ are explicit. Read only the references relevant to the task.
 | --- | --- |
 | Investigate an unfamiliar collection step by step, choosing follow-up commands from findings | [Discovery workflows](references/discovery-workflows.md) |
 | Get oriented in a folder: frontmatter patterns, distributions, rules/types and investigation hints | [Survey](references/survey.md) |
+| Find documents by literal/JSONPath values, ranges, dates, type conformance or rule selection | [Query](references/query.md) |
 | Read/write YAML or TOML metadata, mapped source files, arrays, search | [Frontmatter](references/frontmatter.md) |
 | Explore a long document, TOC, headings, sections, lines, body, text/CSV conversion | [Headings and sections](references/headings-sections.md) |
 | List/check/backlink or convert wikilinks | [Links](references/links.md) |

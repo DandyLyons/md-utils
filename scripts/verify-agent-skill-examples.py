@@ -51,6 +51,27 @@ for name in ("rules.md", "types.md", "schemas.md"):
 print("PASS: local reference links and JSON examples")
 assert (skill / "SKILL.md").read_bytes() == (repo / "Sources/md-utils/Resources/AgentSkill/SKILL.md").read_bytes()
 
+# Exercise query's documented selectors, range and temporal forms on isolated files.
+# The report assertions prove that nested values select whole documents and that
+# calendar grouping honors the requested zone without leaking source bodies.
+query_notes = fixture / "query-notes"
+query_notes.mkdir()
+(query_notes / "read.md").write_text("---\nStatus: Read\nauthors: [{name: Daniel}]\nrating: 4\nCreated: '2026-10-28T12:00:00Z'\n---\nPRIVATE BODY\n")
+(query_notes / "absent.md").write_text("No frontmatter\n")
+for flags in (
+    ("--key", "Status", "--equals", "Read"),
+    ("--json-path", "$.authors[*].name", "--equals", "Daniel"),
+    ("--key", "rating", "--vtype", "integer", "--greater-than-or-equal", "3", "--less-than", "5"),
+    ("--key", "Created", "--vformat", "DateTime", "--same-day", "2026-10-28", "--timezone", "UTC"),
+):
+    report = json.loads(run("query", "query-notes/", *flags, "--oformat", "json", "--no-index"))
+    assert report["complete"] and report["summary"]["matched"] == 1
+    assert report["results"]["paths"] == [str(query_notes / "read.md")]
+missing = run("query", "query-notes/", "--missing-key", "Status", "--output", "frontmatter", "--oformat", "json", "--no-index")
+assert "PRIVATE BODY" not in missing
+assert json.loads(missing)["results"]["noFrontMatter"] == [str(query_notes / "absent.md")]
+run("query", "rel", "out", "--help")
+
 # Build the standalone project directly from the complete reference examples.
 for directory in (".md-utils/types", ".md-utils/rules", ".md-utils/schemas", "Books", "Articles", "People"):
     (fixture / directory).mkdir(parents=True, exist_ok=True)
@@ -244,6 +265,17 @@ for directory in [".md-utils/types", ".md-utils/rules", "notes"]:
     "This section is unrelated to the lifecycle question.\n"
 )
 (discovery / "notes/draft.md").write_text("---\nStatus: Draft\n---\n# Unfinished\n")
+# Latest-five discovery must rank the full population, not a path-limited prefix.
+# Reverse the filename order relative to dates, mix quoted/native dates, and add
+# an untagged series index so candidate classification and ranking stay distinct.
+(discovery / "sermons").mkdir()
+sermon_dates = ["2026-09-13", "2026-09-20", "2026-09-27", "2026-10-04", "2026-10-11", "2026-10-18", "2026-10-25"]
+for index, date in enumerate(sermon_dates):
+    encoded_date = json.dumps(date) if index % 2 else date
+    (discovery / "sermons" / f"{7-index}.md").write_text(
+        f"---\ntags: [sermonNotes]\ndate: {encoded_date}\ntitle: Example {index}\n---\nSermon body\n"
+    )
+(discovery / "sermons/series.md").write_text("---\ntitle: Series index\n---\n")
 discovery_before = {path: path.read_bytes() for path in discovery.rglob("*") if path.suffix in {".md", ".json"}}
 discovery_outputs = {}
 for block in blocks("discovery-workflows.md", "sh"):
@@ -260,6 +292,15 @@ assert "Book" in discovery_outputs[("types", "verify", "notes/example.md", "--in
 assert "draft.md" in discovery_outputs[("survey", "type-matches", "notes/", "--type", "Book")]
 assert "title" in discovery_outputs[("types", "check", "Book", "notes/draft.md")]
 assert "books" in discovery_outputs[("rules", "matching", "notes/example.md", "--explain")]
+assert "example.md" in discovery_outputs[("query", "notes/", "--is-type", "Book")]
+assert "draft.md" in discovery_outputs[("query", "notes/", "--in-rule", "books")]
+sermons = json.loads(discovery_outputs[("query", "sermons/", "--key", "tags", "--contains", "sermonNotes", "--markdown-only", "--output", "frontmatter", "--oformat", "json", "--limit", "0", "--no-index")])
+assert sermons["complete"] and sermons["summary"]["omitted"] == 0
+ranked_sermons = sorted(sermons["results"]["frontMatter"], key=lambda row: row["frontmatter"]["date"], reverse=True)[:5]
+assert [row["frontmatter"]["date"] for row in ranked_sermons] == list(reversed(sermon_dates[-5:]))
+recent_sermons = json.loads(discovery_outputs[("query", "sermons/", "--key", "date", "--after", "2026-09-26", "--markdown-only", "--output", "frontmatter", "--oformat", "json", "--limit", "0", "--no-index")])
+assert recent_sermons["complete"] and recent_sermons["summary"]["matched"] == 5
+assert {row["path"] for row in recent_sermons["results"]["frontMatter"]} == {row["path"] for row in ranked_sermons}
 expanded = discovery_outputs[("explore", "notes/example.md", "--expand", "Lifecycle")]
 assert "Draft means reading is unfinished" in expanded
 assert "This section is unrelated" not in expanded

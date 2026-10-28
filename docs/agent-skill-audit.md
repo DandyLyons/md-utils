@@ -18,6 +18,7 @@ the canonical skill's `references/` directory.
 | `survey`, `explore`, `fm`, `types`, `rules`, `rel`, `links` | Scenario-based investigations; discovery-workflows.md | Executed command chains, output handoffs, focused section disclosure, unchanged source bytes |
 | `agents` | Complete export/installation; installation.md | Full-tree byte comparison, stdout compatibility, no overwrite |
 | `survey` | Folder overview and focused investigations; survey.md | Red-green suites, JSON workflows and recursive help inventory |
+| `query` | Typed document filtering, JSONPath, calendar comparisons and snapshots; query.md | Red-green Core/CLI suites, source-independent projected snapshots and executable examples |
 | `frontmatter`, `fm` | Metadata, arrays, mapped files, JMESPath; frontmatter.md, batch.md | Two-file author edits/readback, empty arrays, YAML selection |
 | `explore` | Progressive document inspection; headings-sections.md | Tree output and help |
 | `table-of-contents`, `toc` | Outlines/links; headings-sections.md | Heading output and help |
@@ -44,6 +45,18 @@ the canonical skill's `references/` directory.
 | Standards (upcoming) | Notice only; standards.md | Linked to #191; no proposed authoring syntax |
 
 ## Findings and resolutions
+
+Query discovery follow-up (2026-10-28): the entrypoint now introduces
+survey → query → explore. `references/query.md` explains path ordering versus
+date ranking, and `references/discovery-workflows.md` adds native value/type/rule
+selection and a seventh investigation for the latest five sermon notes. The
+workflow checks array tags, mixed date kinds, untagged candidates, completeness,
+and unlimited candidate retrieval before ranking. Executable fixtures deliberately
+reverse filename/date order and compare ranked candidates with a date-window
+query. Canonical and bundled references are synchronized; verification uses
+`scripts/check-agent-skill.py` and `scripts/verify-agent-skill-examples.py` with
+the rebuilt executable. Real-collection investigation used read-only `--no-index`
+commands; no source notes or installed skill directories were changed.
 
 Discovery workflow reference integration (2026-10-27): `SKILL.md` routes
 step-by-step unfamiliar-collection investigations to `discovery-workflows.md`.

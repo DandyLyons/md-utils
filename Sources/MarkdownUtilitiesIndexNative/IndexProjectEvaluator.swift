@@ -31,7 +31,7 @@ public struct IndexProjectEvaluator: Sendable {
         types = (root + MarkdownTypeFileRegistryLoader.relativeTypesDirectory).exists
             ? try MarkdownTypeFileRegistryLoader.load(projectRoot: root) : try MarkdownTypeRegistry(definitions: [])
         var standalone: MarkdownStandaloneRuleProject?
-        var components = [configPath.string, "survey-observation-v4"]
+        var components = [configPath.string, "frontmatter-evidence-v5"]
         if includeRules && configPath.exists {
             let data = try Data(contentsOf: URL(fileURLWithPath: configPath.string))
             components.append(String(decoding: data, as: UTF8.self))
@@ -110,6 +110,7 @@ public struct IndexProjectEvaluator: Sendable {
         let record = MarkdownRecord(content: content,
             context: MarkdownRecordContext(path: try MarkdownRecordPath(path), modificationDate: modified))
         let analyzed = await MarkdownRecordAnalyzer.analyze(record,
+            requirements: scopes.allSatisfy { $0.kind == .directory } ? [] : .all,
             contentKind: .rulesKind(forFileName: URL(fileURLWithPath: path).lastPathComponent))
         var evaluations: [String: IndexEvaluation] = [:]
         for scope in scopes {

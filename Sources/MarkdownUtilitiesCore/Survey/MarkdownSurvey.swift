@@ -28,6 +28,8 @@ public struct MarkdownSurveyValue: Codable, Equatable, Sendable {
 
 /// Portable evidence for a single file; safe to persist without retaining its body.
 public struct MarkdownSurveyObservation: Codable, Sendable {
+  package var evidenceVersion: Int? = nil
+  package var valueMetadata: [String: FrontMatterEvidence]? = nil
   public var path: String
   public var state: MarkdownSurveyState
   public var frontmatter: [String: JSONValue]?
@@ -57,8 +59,9 @@ public struct MarkdownSurveyObservation: Codable, Sendable {
     else if !syntaxErrors.isEmpty { state = .malformed }
     else { state = analyzed.hasFrontmatter ? .parsed : .absent }
     return Self(
+      evidenceVersion: 1, valueMetadata: analyzed.valueMetadata,
       path: path, state: state,
-      frontmatter: state == .parsed ? (analyzed.relationshipFrontmatter ?? [:]) : nil,
+      frontmatter: state == .parsed ? (analyzed.relationshipFrontmatter ?? [:]).mapValues(ParsedFrontMatter.jsonSafe) : nil,
       nativeTemporalPaths: analyzed.nativeTemporalPaths, nativeTemporalKinds: analyzed.nativeTemporalKinds,
       format: analyzed.frontmatterFormat, diagnostics: syntaxErrors,
     )
@@ -100,6 +103,7 @@ public struct MarkdownSurveyObservation: Codable, Sendable {
   package func observed(_ value: JSONValue, path: String) -> MarkdownSurveyValue {
     let kind: String
     if let temporal = nativeTemporalKinds[path] { kind = temporal }
+    else if let evidence = valueMetadata?[path] { kind = evidence.kind }
     else {
       switch value {
       case .null: kind = "null"

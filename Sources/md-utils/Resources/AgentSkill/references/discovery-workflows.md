@@ -1,16 +1,20 @@
 # Discover a collection through focused investigations
 
-Use `survey` to learn a folder's patterns, then `explore` to read the relevant
-parts of individual Markdown files. Let each result choose the next question.
+Use `survey` to learn a folder's patterns, `query` to select matching documents,
+then `explore` to read relevant sections. Let each result choose the next question.
 Run the relevant follow-ups below, rather than executing every command for every task.
 
 Examples assume the current directory is the collection's project root (where
 `.md-utils/` lives). Replace `notes/`, filenames, property keys, and contract names
 with ones returned by your investigation. Property and type names are case-sensitive.
+Query string values are case-insensitive by default; use `--case-sensitive` when
+the distinction matters. Survey uses `--format`; query uses `--output-format`
+(alias `--oformat`). These flags are not interchangeable.
 
 | Question | Start with | What it gives you |
 | --- | --- | --- |
 | What patterns matter across these files? | `survey` | Coverage, common metadata, relevant contracts, and next-step hints. |
+| Which documents match a value, date, type, or rule? | `query` | Paths, frontmatter, or counts with explicit completion and provenance. |
 | Where is the useful content in this document? | `explore --tree` | Heading structure and source lines, without dumping the body. |
 | What does a particular finding mean? | Focused `survey`, `fm`, `types`, `rules`, or `rel` commands | Values, definitions, selection explanations, and individual-file evidence. |
 
@@ -51,6 +55,17 @@ scenarios 3–4. Frequency establishes convention, not domain meaning or a requi
 contract. Use the single investigation example printed by `survey values` when
 you need frontmatter for files containing one particular value.
 
+```sh
+md-utils query notes/ --key Status --equals 'Read' --case-sensitive
+md-utils query notes/ --key Status --equals 'Read' --output frontmatter --oformat json
+```
+
+For an array such as `tags`, use `--contains sermonNotes` rather than scalar
+`--equals`. `survey values tags sermons/ --elements` discovers the actual member
+spelling. For nested arrays, select nodes with a quoted JSONPath such as
+`--json-path '$.authors[*].name' --equals 'Daniel'`. Results still identify whole
+documents. Use `--missing-key Status` to investigate missing metadata separately.
+
 ## 3. “Which types are used by this file or folder?”
 
 ```sh
@@ -70,6 +85,7 @@ opt into a targeted assessment:
 
 ```sh
 md-utils survey type-matches notes/ --type Book
+md-utils query notes/ --is-type Book
 ```
 
 If the report lists `notes/draft.md` as a failing example, inspect its diagnostics:
@@ -79,7 +95,9 @@ md-utils types check Book notes/draft.md
 ```
 
 Structural conformance does not establish intended usage. Start with a named type
-and narrow folder before trying every type.
+and narrow folder before trying every type. Survey summarizes conformance;
+query returns the matching documents. A frontmatter property named `type` may
+contain informal labels or wikilinks: it is not automatically a loaded mdtype.
 
 ## 4. “Which rules govern this file or folder, and why?”
 
@@ -88,6 +106,7 @@ md-utils survey rules notes/
 md-utils rules matching notes/example.md --explain
 md-utils rules describe books
 md-utils rules files-matching books
+md-utils query notes/ --in-rule books
 ```
 
 The survey identifies relevant rules. `matching` explains the specific file's
@@ -95,6 +114,8 @@ selection; use a returned rule name such as `books` in `describe` to inspect its
 requirements and in `files-matching` to see its population. Named-rule commands
 can cover files outside the surveyed folder. Add `--include-non-md` to the rule
 matching commands when investigating supported non-Markdown hosts.
+`query notes/ --in-rule books` restricts the selected population to that folder;
+membership does not imply that the documents satisfy the rule's requirements.
 
 If coverage is the question, branch to `survey uncovered notes/` or
 `survey overlaps notes/`. Unknown selection is not confirmed non-selection;
@@ -138,6 +159,50 @@ confine targets to that folder. Current relationship survey sources are Markdown
 Broken-link checks and conformance checks can exit nonzero for findings; inspect
 their output. Investigation does not imply permission to repair files.
 
+## 7. “Find the latest five sermon notes.”
+
+First narrow to the sermon folder discovered in the collection. Inspect its
+classification and date fields instead of guessing a property name or relying on
+filesystem modification times:
+
+```sh
+md-utils survey keys sermons/ --top 0 --no-index
+md-utils survey values tags sermons/ --elements --no-index
+md-utils survey key date sermons/ --no-index
+md-utils query sermons/ --key tags --contains sermonNotes --markdown-only --output frontmatter --oformat json --limit 0 --no-index
+```
+
+Check `complete`, `summary.unknown`, `summary.omitted`, and `results.unavailable`
+before ranking results. Use the sermon date, not the file's edit date. Request
+**all matches before sorting**: query orders paths, so `--limit 5` does not mean
+“latest five.” Query currently has no date-sort or top-N option. Sort the returned
+frontmatter by the chosen date semantics, descending, and take five afterward.
+For uniformly validated `YYYY-MM-DD` dates, lexical date sorting works; for mixed
+dates/local datetimes/offset timestamps, normalize to a deliberate calendar or
+instant policy first. Do not silently rank missing or invalid dates.
+
+Check untagged documents when tags may be incomplete:
+
+```sh
+md-utils query sermons/ --missing-key tags --markdown-only --output frontmatter --oformat json --limit 0 --no-index
+```
+
+Once the date distribution supplies a useful cutoff, a separate date query can
+confirm the candidate window. This example means strictly after September 26:
+
+```sh
+md-utils query sermons/ --key date --after '2026-09-26' --markdown-only --output frontmatter --oformat json --limit 0 --no-index
+```
+
+This second command selects by date, not by tag: compare its paths with the sermon
+candidates. V1 does not combine independent tag and date predicates. Narrowing to
+a known sermon folder helps, but series indexes and templates can still live there.
+Native YAML dates and date strings can both participate in temporal comparisons;
+inspect survey's kind counts before imposing a particular string format.
+
+Finally, report paths and dates, retaining “untitled” when the title is absent.
+Use scenario 5 on an individual result only if the user needs its content.
+
 ## Keep investigations small and interpretable
 
 - Scope to the smallest useful folder; widen only when the result calls for it.
@@ -151,6 +216,7 @@ their output. Investigation does not imply permission to repair files.
   remain expensive even with concise output.
 
 Detailed command references: [Survey](survey.md),
+[document queries](query.md),
 [document exploration](headings-sections.md),
 [frontmatter](frontmatter.md),
 [types](types.md),

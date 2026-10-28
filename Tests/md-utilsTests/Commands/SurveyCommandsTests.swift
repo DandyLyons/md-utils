@@ -194,17 +194,19 @@ struct SurveyCommandsTests {
       Issue.record("Expected structured hints"); return
     }
     #expect(hints.count == 1)
-    #expect(hints.allSatisfy { $0.objectValue?["pipeTo"] != nil })
-    #expect(report.text().contains("md-utils fm dump"))
-    #expect(report.text().contains(" | jq "))
+    #expect(hints.allSatisfy { $0.objectValue?["pipeTo"] == nil })
+    #expect(report.text().contains("md-utils query"))
+    #expect(report.text().contains("--case-sensitive"))
     #expect(report.text().contains("✅ Read"))
     let hint = try #require(report.hints.first)
     let matches = try CLIProcessTestHelper.run(Array(hint.argv.dropFirst()))
     #expect(matches.status == 0)
     #expect(matches.standardOutput.contains("Body must not appear") == false)
-    #expect(hint.pipeTo == ["jq", "--arg", "key", "Status", "--argjson", "value", "\"✅ Read\"", ".frontMatter[] | select(has($key) and .[$key] == $value)"])
+    #expect(hint.pipeTo == nil)
+    #expect(matches.standardOutput.contains("read.md"))
+    #expect(matches.standardOutput.contains("missing.md") == false)
     let restricted = try await fixture.report("values", paths: ["Status", (fixture.root + "notes/").string], flags: ["--exclude", "notes/missing.md"])
-    #expect(restricted.hints.isEmpty)
+    #expect(restricted.hints.first?.argv.contains("--exclude") == true)
   }
 
   @Test func textReportsRenderValuesAndNestedFindingsWithoutJSONEnvelopes() {
