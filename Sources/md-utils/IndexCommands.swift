@@ -235,12 +235,26 @@ extension CLIEntry {
                 print("current: \(status.isCurrent ? "yes" : "no")")
                 print("generation: \(status.generation)")
                 print("failures: \(status.hasFailures ? "yes" : "no")")
-                print("last-started: \(status.lastStartedAt.map { String($0) } ?? "never")")
-                print("last-completed: \(status.lastCompletedAt.map { String($0) } ?? "never")")
+                print("last-started: \(Self.timestampDescription(status.lastStartedAt))")
+                print("last-completed: \(Self.timestampDescription(status.lastCompletedAt))")
                 for scope in status.scopes {
                     let label = scope.definition.name.isEmpty ? scope.definition.path : scope.definition.name
                     print("\(scope.definition.kind.rawValue)\t\(label)\t\(scope.state)\t\(scope.error ?? "")")
                 }
+            }
+
+            /// Formats stored Unix seconds in local time with an unambiguous UTC offset.
+            static func timestampDescription(_ timestamp: Double?, timeZone: TimeZone = .current) -> String {
+                guard let timestamp else { return "never" }
+                let style = Date.VerbatimFormatStyle(
+                    format: "\(year: .defaultDigits)-\(month: .twoDigits)-\(day: .twoDigits) \(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)):\(minute: .twoDigits):\(second: .twoDigits) \(timeZone: .iso8601(.long))",
+                    locale: Locale(identifier: "en_US_POSIX"),
+                    timeZone: timeZone,
+                    calendar: Calendar(identifier: .gregorian),
+                )
+                // Foundation spells a zero ISO 8601 offset as Z; keep the numeric display consistent.
+                return Date(timeIntervalSince1970: timestamp).formatted(style)
+                    .replacingOccurrences(of: " Z", with: " +00:00")
             }
         }
     }

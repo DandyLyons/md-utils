@@ -37,6 +37,8 @@ document and build external-content FTS; `index search disable --vacuum` removes
 bodies and search storage. Use `index explain '<sql>'` for query plans, `index field
 add '$.field'` for an explicit JSON expression index and type-view projection, and
 `index status` for freshness. Type views are named `type_<normalized-name>`.
+Status refresh timestamps use local time in `YYYY-MM-DD HH:mm:ss ±HH:mm` format
+with an explicit UTC offset, or `never` if no timestamp has been recorded.
 `index provenance <path>...` prints retained observations and confirmed operations
 after a hash-verified refresh; it never repairs UUIDs automatically.
 

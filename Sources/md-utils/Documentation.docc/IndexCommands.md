@@ -125,6 +125,8 @@ successful type memberships. Arrays are indexed as whole JSON values; use
 `json_each` for element membership, which is not accelerated by that index.
 
 `index status` reports generation, refresh timestamps, and saved scope states.
+Refresh timestamps use local time in `YYYY-MM-DD HH:mm:ss ±HH:mm` format, including
+the UTC offset; timestamps that have not been recorded display `never`.
 Public views always expose ordinary JSON text. Raw metadata is JSONB when the
 linked SQLite runtime supports it and JSON text otherwise; the cache records the
 choice. Views, optional FTS5, and expression indexes use no md-utils-only SQL

@@ -39,6 +39,39 @@ private struct IndexCommandFixture {
 
 @Suite("Index commands")
 struct IndexCommandsTests {
+    @Test func `status command prints readable timestamps and preserves never`() throws {
+        let fixture = try IndexCommandFixture()
+        defer { fixture.remove() }
+        _ = try fixture.database()
+        let arguments = ["index", "status", "--project-root", fixture.root.string]
+        let empty = try CLIProcessTestHelper.run(arguments, environment: ["TZ": "UTC"])
+        #expect(empty.status == 0)
+        #expect(empty.standardOutput.contains("last-started: never\n"))
+        #expect(empty.standardOutput.contains("last-completed: never\n"))
+
+        // Seed known Unix seconds to verify both output fields through the executable.
+        try DatabaseQueue(path: fixture.databasePath.string).write { database in
+            try database.execute(
+                sql: "INSERT OR REPLACE INTO index_metadata(key,value) VALUES ('last_started_at','0'),('last_completed_at','60')",
+            )
+        }
+        let recorded = try CLIProcessTestHelper.run(arguments, environment: ["TZ": "UTC"])
+        #expect(recorded.status == 0)
+        #expect(recorded.standardOutput.contains("last-started: 1970-01-01 00:00:00 +00:00\n"))
+        #expect(recorded.standardOutput.contains("last-completed: 1970-01-01 00:01:00 +00:00\n"))
+    }
+
+    @Test func `status timestamps use readable dates and explicit timezone offsets`() throws {
+        let utc = try #require(TimeZone(secondsFromGMT: 0))
+        let chicago = try #require(TimeZone(identifier: "America/Chicago"))
+        let india = try #require(TimeZone(secondsFromGMT: 19_800))
+        #expect(CLIEntry.Index.Status.timestampDescription(nil, timeZone: utc) == "never")
+        #expect(CLIEntry.Index.Status.timestampDescription(0, timeZone: utc) == "1970-01-01 00:00:00 +00:00")
+        #expect(CLIEntry.Index.Status.timestampDescription(0, timeZone: chicago) == "1969-12-31 18:00:00 -06:00")
+        #expect(CLIEntry.Index.Status.timestampDescription(0, timeZone: india) == "1970-01-01 05:30:00 +05:30")
+        #expect(CLIEntry.Index.Status.timestampDescription(1_751_328_000.5, timeZone: chicago) == "2025-06-30 19:00:00 -05:00")
+    }
+
     @Test func `watch parses optional scope and rejects invalid timing options`() throws {
         let watch = try #require(CLIEntry.parseAsRoot(["index", "watch", "./notes/",
             "--debounce", "0.5", "--reconcile-interval", "10"]) as? CLIEntry.Index.Watch)
