@@ -47,7 +47,10 @@ public enum WikilinkConversion {
     scope: WikilinkConversionScope = .all,
     keys: [String] = [],
   ) throws -> WikilinkConversionPlan {
-    var document = try MarkdownDocument(content: source)
+    // Body-scoped conversion does not need to decode frontmatter values.
+    var document = try scope == .body
+      ? MarkdownBodySource(content: source).document
+      : MarkdownDocument(content: source)
     let original = document
     var changes: [WikilinkConversionChange] = []
 

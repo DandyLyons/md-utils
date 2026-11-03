@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Body-edit frontmatter preservation (2026-11-03)**: Section edits, heading adjustments, formatting, and extract source removal use an opaque frontmatter prefix without YAML/TOML decoding or serialization. Body-scoped wikilink conversion likewise skips metadata decoding; mixed-scope conversion retains its existing unchanged-metadata byte preservation. Regression suite: `BodyEditPreservationTests`.
+
 - **Document query (#203, 2026-10-28)**: `query` supports typed literal/JSONPath filtering, ranges, calendar/instant comparisons, required type conformance, rule selection, and existing `query rel` aliases. Shared parsing retains numeric/native temporal evidence; SQLite projects requested subtrees before decoding. Survey discovery/budgets and delayed stderr progress are reused. `--limit 20`/`--diagnostic-limit 100` bound display only. Snapshot-only frontmatter predicates require versioned evidence; type/rule snapshot-only remains deferred. See `docs/query-design.md` and the bundled `references/query.md`; red-green suites: `QueryCommandsTests|MarkdownQueryTests`, with survey/parser/index regressions and native suite verification.
 
 - **Agent discovery workflows (2026-10-28)**: `references/discovery-workflows.md` provides seven investigations spanning survey → query → explore, frontmatter, types/rules, and links. Latest-five discovery retrieves complete candidates before date ranking; query limits are path-ordered, not chronological. `references/query.md` explains this boundary and predicate composition limits. Canonical/bundled copies are synchronized; fixtures reverse filename/date order and verify the date-window cross-check.

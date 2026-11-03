@@ -108,9 +108,10 @@ extension CLIEntry {
             // Process each file
             for file in files {
                 let content: String = try file.read()
-                let doc = try MarkdownDocument(content: content)
+                let source = try MarkdownBodySource(content: content)
+                let doc = source.document
                 let formatted = try await doc.format(options: formatOptions)
-                let output = try reconstructOutput(formatted)
+                let output = source.render(body: formatted.body)
 
                 if inPlace {
                     try file.write(output)
@@ -124,10 +125,6 @@ extension CLIEntry {
                     print(output)
                 }
             }
-        }
-        /// Reconstructs formatted Markdown output from parsed document parts.
-        private func reconstructOutput(_ doc: MarkdownDocument) throws -> String {
-            try doc.render()
         }
     }
 }

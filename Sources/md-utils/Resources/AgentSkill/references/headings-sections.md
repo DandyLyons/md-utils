@@ -1,5 +1,12 @@
 # Headings, Sections & Document Structure Reference
 
+Body-only edits (`section set/insert/remove/move-up/move-down/move-to`,
+`headings promote/demote`, `format`, and source removal with `extract`)
+preserve the original frontmatter text exactly, including dates, quoting,
+comments, key order, and delimiters. They separate the body without decoding or
+serializing YAML/TOML values, so malformed values inside a recognized frontmatter
+block do not prevent body editing. Existing LF delimiter recognition still applies.
+
 ## Explore Large Documents
 
 Use `md-utils explore` when reading especially lengthy Markdown files, such as files around 400+ lines or 1000+ words. It supports progressive disclosure: inspect the structure first, then expand only the sections you need.

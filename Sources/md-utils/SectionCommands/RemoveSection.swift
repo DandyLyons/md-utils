@@ -57,7 +57,8 @@ extension CLIEntry {
       }
 
       let original: String = try into.read()
-      let doc = try MarkdownDocument(content: original)
+      let source = try MarkdownBodySource(content: original)
+      let doc = source.document
       let result: MarkdownDocument
 
       do {
@@ -72,7 +73,7 @@ extension CLIEntry {
         throw ValidationError(error.description)
       }
 
-      let output = try reconstructDocument(result)
+      let output = source.render(body: result.body)
       if inPlace && !dryRun {
         try into.write(output)
       } else {
@@ -98,8 +99,5 @@ extension CLIEntry {
       }
     }
 
-    private func reconstructDocument(_ doc: MarkdownDocument) throws -> String {
-      try doc.render()
-    }
   }
 }

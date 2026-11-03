@@ -148,7 +148,8 @@ extension CLIEntry {
     /// See <doc:ContentSelectionCommands> for workflow details.
     private func processFile(_ path: Path) async throws {
       let content: String = try path.read()
-      let doc = try MarkdownDocument(content: content)
+      let source = try MarkdownBodySource(content: content)
+      let doc = source.document
 
       let replacementContent = try readReplacementContent()
 
@@ -169,19 +170,13 @@ extension CLIEntry {
         throw ValidationError(error.description)
       }
 
-      let output = try reconstructDocument(result)
+      let output = source.render(body: result.body)
 
       if inPlace {
         try path.write(output)
       } else {
         print(output)
       }
-    }
-    /// Reconstructs Markdown text from the updated document.
-    ///
-    /// See <doc:ContentSelectionCommands> for workflow details.
-    private func reconstructDocument(_ doc: MarkdownDocument) throws -> String {
-      try doc.render()
     }
   }
 }

@@ -5,6 +5,17 @@ import Testing
 @testable import MarkdownUtilities
 
 struct WikilinkConversionTests {
+  @Test(arguments: ["---\ninvalid: [\n---\n", "+++\ninvalid = [\n+++\n"])
+  func bodyConversionDoesNotDecodeFrontmatter(prefix: String) throws {
+    let root = try vault(["People/Alice.md", "source.md"])
+    defer { try? root.delete() }
+    let plan = try WikilinkConversion.plan(
+      source: prefix + "[[Alice]]", file: root + "source.md",
+      resolver: WikilinkResolver(root: root), style: .path, scope: .body,
+    )
+    #expect(plan.proposed.utf8.elementsEqual((prefix + "[[People/Alice.md]]").utf8))
+  }
+
   @Test(arguments: [WikilinkTargetStyle.path, .name], [WikilinkMarkdownExtension.auto, .include, .omit])
   func `extension policy preserves actual Markdown and attachment suffixes`(
     style: WikilinkTargetStyle,

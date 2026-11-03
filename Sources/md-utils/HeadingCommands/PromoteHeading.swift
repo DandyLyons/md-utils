@@ -71,7 +71,8 @@ extension CLIEntry {
       let content: String = try path.read()
 
       // Parse document
-      let doc = try MarkdownDocument(content: content)
+      let source = try MarkdownBodySource(content: content)
+      let doc = source.document
 
       // Promote heading
       let result: MarkdownDocument
@@ -83,7 +84,7 @@ extension CLIEntry {
       }
 
       // Reconstruct full document (frontmatter + body)
-      let output = try reconstructDocument(result)
+      let output = source.render(body: result.body)
 
       if inPlace {
         // Write back to file
@@ -103,9 +104,5 @@ extension CLIEntry {
       }
     }
 
-    /// Reconstructs the full document including frontmatter if present.
-    private func reconstructDocument(_ doc: MarkdownDocument) throws -> String {
-      try doc.render()
-    }
   }
 }

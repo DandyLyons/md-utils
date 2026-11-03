@@ -139,7 +139,8 @@ extension CLIEntry {
       let content: String = try path.read()
 
       // Parse document
-      let doc = try MarkdownDocument(content: content)
+      let source = try MarkdownBodySource(content: content)
+      let doc = source.document
 
       // Extract section
       let (extracted, updated): (MarkdownDocument, MarkdownDocument?)
@@ -181,7 +182,7 @@ extension CLIEntry {
         if inPlace {
           // Write updated content back to source
           if let updatedDoc = updated {
-            let updatedOutput = try reconstructDocument(updatedDoc)
+            let updatedOutput = source.render(body: updatedDoc.body)
             try path.write(updatedOutput)
             FileHandle.standardError.write("Source file updated: \(path)\n".data(using: .utf8)!)
           }

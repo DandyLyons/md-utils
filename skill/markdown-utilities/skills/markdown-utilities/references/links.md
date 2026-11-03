@@ -11,6 +11,7 @@ with `--scope all|body|frontmatter`; repeated `--key` requires frontmatter scope
 `--json` reports per-file outcomes. Missing/ambiguous or destination-changing links
 are skipped. Writes check revisions, preserve no-ops, and stop at the first file
 failure with partial-completion reporting. Metadata edits may reformat frontmatter.
+Body-only scope preserves frontmatter bytes without decoding YAML/TOML values.
 Markdown-link output and server conversion are not supported by this command.
 
 Alternatively, `links convert vault/files/ --root vault/ --type Name` repairs declared
