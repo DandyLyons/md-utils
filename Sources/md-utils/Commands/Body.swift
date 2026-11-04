@@ -7,6 +7,7 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 /// Adds command implementations to ``CLIEntry``.
@@ -113,10 +114,8 @@ extension CLIEntry {
     ///
     /// See <doc:ContentSelectionCommands> for workflow details.
     func processStdin() async throws {
-      // Read from stdin
-      var stdinContent = ""
-      while let line = readLine(strippingNewline: false) {
-        stdinContent += line
+      guard let stdinContent = UTF8Text.decode(FileHandle.standardInput.readDataToEndOfFile()) else {
+        throw ValidationError("Markdown from stdin must be valid UTF-8")
       }
 
       guard !stdinContent.isEmpty else {
@@ -132,7 +131,7 @@ extension CLIEntry {
     ///
     /// See <doc:ContentSelectionCommands> for workflow details.
     func processSingleFile(_ file: Path) async throws {
-      let content: String = try file.read()
+      let content = try FrontMatterFileWriter.readSnapshot(from: file)
       let doc = try MarkdownDocument(content: content)
       let output = try await extractBody(from: doc)
       print(output, terminator: "")
@@ -142,7 +141,7 @@ extension CLIEntry {
     /// See <doc:ContentSelectionCommands> for workflow details.
     func processMultipleFiles(_ files: [Path]) async throws {
       for file in files {
-        let content: String = try file.read()
+        let content = try FrontMatterFileWriter.readSnapshot(from: file)
         let doc = try MarkdownDocument(content: content)
         let output = try await extractBody(from: doc)
 

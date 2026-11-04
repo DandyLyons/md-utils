@@ -1,4 +1,5 @@
 import Foundation
+import MarkdownUtilitiesCore
 import PathKit
 
 /// Errors produced while safely replacing a frontmatter-bearing text file.
@@ -30,10 +31,10 @@ public enum FrontMatterFileWriter {
   /// Reads one exact UTF-8 snapshot without discarding a leading byte-order mark.
   public static func readSnapshot(from path: Path) throws -> String {
     let data = try Data(contentsOf: URL(fileURLWithPath: path.absolute().string))
-    guard String(data: data, encoding: .utf8) != nil else {
+    guard let source = UTF8Text.decode(data) else {
       throw FrontMatterFileWriteError.invalidUTF8
     }
-    return String(decoding: data, as: UTF8.self)
+    return source
   }
 
   /// Replaces a file only if it still matches the snapshot used to build the edit.

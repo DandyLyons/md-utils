@@ -210,7 +210,7 @@ public struct MarkdownResourceCodec: ResourceCodec {
       } else {
         serialized = try FrontMatterConversion.serialize(Self.normalized(metadata), format: format)
       }
-      content = format.delimiter + "\n" + serialized
+      content = original.encodingSignature + format.delimiter + "\n" + serialized
         + (serialized.hasSuffix("\n") ? "" : "\n") + format.delimiter + "\n" + body
     }
     let verified = try Self.document(content)
@@ -247,14 +247,16 @@ public struct MarkdownResourceCodec: ResourceCodec {
   /// A strict boundary check around the existing LF-only document parser.
   /// Delimiter-like or unterminated blocks must not be mistaken for absent metadata.
   package static func document(_ content: String) throws -> MarkdownDocument {
-    var input = content[...]
+    let source: Substring
+    do { source = try UTF8Text.afterSignature(content[...]) }
+    catch { throw ResourceCodecError("encoding", error.localizedDescription) }
+    var input = source
     let opening = Parse(input: Substring.self) {
-      Skip { Optionally { "\u{FEFF}" } }
       OneOf { "---"; "+++" }
     }
     if (try? opening.parse(&input)) != nil {
-      var block = content[...]
-      let delimiter = content.hasPrefix("---") ? "---" : "+++"
+      var block = source
+      let delimiter = source.hasPrefix("---") ? "---" : "+++"
       let boundary = Parse(input: Substring.self) {
         delimiter
         "\n"
@@ -270,7 +272,7 @@ public struct MarkdownResourceCodec: ResourceCodec {
         delimiter
         OneOf { "\n"; End() }
       }
-      var emptyInput = content[...]
+      var emptyInput = source
       guard (try? boundary.parse(&block)) != nil || (try? empty.parse(&emptyInput)) != nil else {
         throw ResourceCodecError("boundary", "Unsupported or malformed frontmatter boundary; LF delimiters are required.")
       }

@@ -166,7 +166,7 @@ struct QueryScope: ParsableArguments {
   @Flag(inversion: .prefixedNo, help: "Recurse into directories") var recursive = true
   @Flag(help: "Include Markdown files only") var markdownOnly = false
   @Option(help: "Project-relative path/glob exclusions; repeatable") var exclude: [String] = []
-  @Option(help: "UTF-8 LF-delimited root-relative file list; - for stdin") var filesFrom: [String] = []
+  @Option(help: "UTF-8 LF/CRLF root-relative file list with optional BOM; - for stdin") var filesFrom: [String] = []
   @Option(name: .customLong("files-from0"), help: "UTF-8 NUL-delimited root-relative file list") var filesFrom0: [String] = []
   @Flag(help: "Suppress delayed progress") var noProgress = false
   @Flag(help: "Bypass the project index") var noIndex = false

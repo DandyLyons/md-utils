@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 /// Adds command implementations to ``CLIEntry``.
@@ -107,7 +108,7 @@ extension CLIEntry {
 
             // Process each file
             for file in files {
-                let content: String = try file.read()
+                let content = try FrontMatterFileWriter.readSnapshot(from: file)
                 let source = try MarkdownBodySource(content: content)
                 let doc = source.document
                 let formatted = try await doc.format(options: formatOptions)

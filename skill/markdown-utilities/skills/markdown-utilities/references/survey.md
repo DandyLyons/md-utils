@@ -49,8 +49,10 @@ their presence does not make the survey incomplete. Large text files still obey
 the read budgets. `survey key` text output summarizes presence, absence, and kinds.
 
 Use `--markdown-only`, `--no-recursive`, and repeated root-relative `--exclude`
-paths/globs to narrow scope. `--files-from` and `--files-from0` accept UTF-8 LF/NUL
-lists of root-relative files (`-` reads stdin once). File lists alone do not add the
+paths/globs to narrow scope. File lists contain strict UTF-8 root-relative paths
+(`-` reads stdin once). `--files-from` accepts LF or CRLF and one optional initial
+BOM. Prefix a first path starting with literal U+FEFF with `./`. `--files-from0`
+uses NUL separators and preserves U+FEFF anywhere. File lists alone do not add the
 current directory. With no inputs, select the current directory. `--config`
 selects a nonstandard project configuration.
 

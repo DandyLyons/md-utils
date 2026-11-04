@@ -11,6 +11,8 @@ struct BodyEditPreservationTests {
     "---\ninvalid: [\n---\n",
     "+++\ninvalid = [\n+++\n",
     "---\n---\n",
+    "\u{FEFF}---\ninvalid: [\n---\n",
+    "\u{FEFF}",
     "",
   ], [
     "set", "insert", "remove", "move-up", "move-down", "move-to",
@@ -48,13 +50,14 @@ struct BodyEditPreservationTests {
     }
     var command = try #require(CLIEntry.parseAsRoot(arguments) as? any AsyncParsableCommand)
     try await command.run()
-    let output: String = try file.read()
-    #expect(output.utf8.starts(with: prefix.utf8))
-    #expect(output != prefix + body)
+    let output = try Data(contentsOf: URL(fileURLWithPath: file.string))
+    #expect(output.starts(with: prefix.utf8))
+    let text = String(decoding: output, as: UTF8.self)
+    #expect(text != prefix + body)
     if operation == "set" {
-      #expect(output.contains("replacement"))
-      #expect(output.contains("# Second"))
-      #expect(output.contains("* old") == false)
+      #expect(text.contains("replacement"))
+      #expect(text.contains("# Second"))
+      #expect(text.contains("* old") == false)
     }
   }
 }

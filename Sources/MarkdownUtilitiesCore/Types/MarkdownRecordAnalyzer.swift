@@ -133,39 +133,36 @@ package enum MarkdownRecordAnalyzer {
     requirements: MarkdownRecordAnalysisRequirements = .all,
     contentKind: MarkdownRecordContentKind = .markdown
   ) async -> AnalyzedMarkdownRecord {
+    let text: Substring
+    do { text = try UTF8Text.afterSignature(record.content[...]) }
+    catch {
+      return AnalyzedMarkdownRecord(
+        record: record,
+        body: record.content,
+        hasFrontmatter: false,
+        userFrontmatter: nil,
+        systemTypeHints: [],
+        headings: [],
+        parseDiagnostics: [parseDiagnostic(error.localizedDescription, format: nil)],
+        supportsMarkdownStructure: contentKind.supportsMarkdownStructure,
+        unavailableFrontmatterExtension: nil,
+      )
+    }
+
     let parts: RecordParts
     switch contentKind {
     case .markdown, .plainText:
-      let parser = FrontMatterParser()
-      var input = Substring(record.content)
-      do {
-        let parsed = try parser.parse(&input)
-        parts = RecordParts(
-          rawFrontmatter: parsed.rawFrontMatter,
-          body: parsed.body,
-          hasFrontmatter: parsed.format != nil,
-          format: parsed.format,
-          diagnostics: []
-        )
-      } catch {
-        let supportsMarkdownStructure = contentKind.supportsMarkdownStructure
-        return AnalyzedMarkdownRecord(
-          record: record,
-          body: record.content,
-          hasFrontmatter: containsFrontmatterBlock(record.content),
-          userFrontmatter: nil,
-          systemTypeHints: [],
-          headings: supportsMarkdownStructure
-            ? await analyzeHeadings(in: record.content, when: requirements)
-            : [],
-          parseDiagnostics: [parseDiagnostic(error.localizedDescription, format: nil)],
-          supportsMarkdownStructure: supportsMarkdownStructure,
-          unavailableFrontmatterExtension: nil
-        )
-      }
+      let parsed = FrontMatterParser.split(String(text))
+      parts = RecordParts(
+        rawFrontmatter: parsed.rawFrontMatter,
+        body: parsed.body,
+        hasFrontmatter: parsed.format != nil,
+        format: parsed.format,
+        diagnostics: [],
+      )
     case .wrapped(let syntax):
       let scan = WrappedFrontMatterParser(syntax: syntax).parse(record.content)
-      var body = record.content
+      var body = text
       if let block = scan.firstBlock {
         body.removeSubrange(block.range)
       }
@@ -174,20 +171,20 @@ package enum MarkdownRecordAnalyzer {
       } ?? []
       parts = RecordParts(
         rawFrontmatter: scan.firstBlock?.rawFrontMatter ?? "",
-        body: body,
+        body: String(body),
         hasFrontmatter: scan.firstBlock != nil,
         format: scan.firstBlock?.format,
         diagnostics: diagnostics
       )
     case .lineComment:
       let scan = LineCommentFrontMatterParser().parse(record.content)
-      var body = record.content
+      var body = text
       if let recognizedRange = scan.recognizedRange {
         body.removeSubrange(recognizedRange)
       }
       parts = RecordParts(
         rawFrontmatter: scan.frontMatter?.rawFrontMatter ?? "",
-        body: body,
+        body: String(body),
         hasFrontmatter: scan.recognizedRange != nil,
         format: scan.frontMatter?.format,
         diagnostics: scan.diagnostic.map { [lineCommentDiagnostic($0)] } ?? []
@@ -195,7 +192,7 @@ package enum MarkdownRecordAnalyzer {
     case .unmapped(let fileExtension):
       return AnalyzedMarkdownRecord(
         record: record,
-        body: record.content,
+        body: String(text),
         hasFrontmatter: false,
         userFrontmatter: nil,
         systemTypeHints: [],
@@ -313,12 +310,6 @@ package enum MarkdownRecordAnalyzer {
     } catch {
       return []
     }
-  }
-
-  private static func containsFrontmatterBlock(_ content: String) -> Bool {
-    let parser = FrontMatterParser()
-    var input = Substring(content)
-    return (try? parser.parse(&input).format) != nil
   }
 
   private static func parseTypeHints(

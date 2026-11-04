@@ -402,12 +402,54 @@ struct CollectionRelationshipQueryTests {
     try fixture.write("empty.txt", "")
     try Data([0xff]).write(to: URL(fileURLWithPath: (fixture.root + "unreadable.md").string))
     #expect(try await fixture.run(["--files-from", (fixture.root + "empty.txt").string]).complete)
-    try fixture.write("bad.txt", "space name.md\r\n")
+    try fixture.write("bad.txt", "space name.md\r")
     await #expect(throws: (any Error).self) { try await fixture.run(["--files-from", (fixture.root + "bad.txt").string]) }
     var input: Substring = "line\nbreak.md\0space name.md\0"
     #expect(try MarkdownQueryFileListParser(nulDelimited: true).parse(&input) == ["line\nbreak.md", "space name.md"])
     await #expect(throws: (any Error).self) { try await fixture.run(["../escape.md"]) }
     await #expect(throws: (any Error).self) { try await fixture.run(["--select-folder", ".", "--select-tag", "swift"]) }
+  }
+
+  @Test func `file list encoding distinguishes line signatures from NUL path data`() throws {
+    let fixture = try QueryFixture(); defer { fixture.remove() }
+    let list = URL(fileURLWithPath: (fixture.root + "paths.txt").string)
+    let arguments = ["rel", "out", "--root", fixture.root.string, "--json", "--detail", "explain"]
+    let plain = "note.md"
+    let leading = "\u{FEFF}leading.md"
+    let repeated = "\u{FEFF}\u{FEFF}repeated.md"
+    let internalMark = "another\u{FEFF}note.md"
+    let root = URL(fileURLWithPath: fixture.root.string, isDirectory: true)
+    for name in [plain, leading, repeated, internalMark] {
+      try Data("# Note\n".utf8).write(to: root.appendingPathComponent(name))
+    }
+
+    let lineInput = "\u{FEFF}" + plain + "\r\n" + internalMark + "\n" + leading
+    let nulInput = repeated + "\0" + leading + "\0" + internalMark + "\0"
+    for (flag, input, expected) in [
+      ("--files-from", lineInput, [plain, leading, internalMark]),
+      ("--files-from", "./" + leading + "\r\n", [leading]),
+      ("--files-from0", nulInput, [repeated, leading, internalMark]),
+    ] {
+      try Data(input.utf8).write(to: list)
+      let file = try CLIProcessTestHelper.run(arguments + [flag, list.path])
+      let stdin = try CLIProcessTestHelper.run(arguments + [flag, "-"], standardInput: input)
+      for result in [file, stdin] {
+        try #require(result.status == 0, Comment(rawValue: result.standardError + result.standardOutput))
+        let decoded = try JSONDecoder().decode(MarkdownCollectionQueryResult.self, from: Data(result.standardOutput.utf8))
+        #expect(Set(decoded.selected) == Set(expected))
+      }
+    }
+
+    let doubleBOM = try CLIProcessTestHelper.run(arguments + ["--files-from", "-"], standardInput: repeated + "\r\n")
+    #expect(doubleBOM.status != 0)
+    #expect(doubleBOM.standardError.contains("at most one leading UTF-8 BOM"))
+
+    try Data([0xFF]).write(to: list)
+    for flag in ["--files-from", "--files-from0"] {
+      let malformed = try CLIProcessTestHelper.run(arguments + [flag, list.path])
+      #expect(malformed.status != 0)
+      #expect(malformed.standardError.contains("not valid UTF-8"))
+    }
   }
 
   @Test func `Markdown destinations are exact source relative and once decoded`() async throws {

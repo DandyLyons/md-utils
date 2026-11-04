@@ -36,7 +36,7 @@ struct MarkdownDraftPlanning: Sendable {
     }
     let url = try NativeMutationFiles.url(root: root, path: path)
     guard let data = try NativeMutationFiles.read(url) else { return nil }
-    guard let content = String(data: data, encoding: .utf8) else {
+    guard let content = UTF8Text.decode(data) else {
       throw MarkdownMutationError(422, "source.encoding", "Source must be UTF-8.")
     }
     let modified = try url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate

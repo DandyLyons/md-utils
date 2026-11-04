@@ -6,7 +6,7 @@ import SystemPackage
 /// Stable SHA-256 fingerprints for content and evaluator cache provenance.
 public enum IndexFingerprint {
     /// Bump when extraction or evaluator semantics change, independently of cache format changes.
-    public static let runtimeVersion = "collection-extraction-evaluation-6"
+    public static let runtimeVersion = "collection-extraction-evaluation-7"
 
     /// Returns the lowercase hexadecimal SHA-256 digest of the exact supplied bytes.
     public static func hash(_ data: Data) -> String {
@@ -323,9 +323,10 @@ public struct CollectionIndexer: Sendable {
                         throw SQLiteIndexError(message: "File changed while reading; retry update: \(path)")
                     }
                     try database.stageVerified(generation: generation, path: path)
-                    guard let content = String(data: data, encoding: .utf8) else {
+                    guard String(data: data, encoding: .utf8) != nil else {
                         throw SQLiteIndexError(message: "File is not UTF-8 text: \(path)")
                     }
+                    let content = String(decoding: data, as: UTF8.self)
                     var scopesToEvaluate: [IndexScope] = []
                     for scopeID in scopeIDs {
                         if reusable(scopeID), cache[scopeID]?.file?.hash == hash {

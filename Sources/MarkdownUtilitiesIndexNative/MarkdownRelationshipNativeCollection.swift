@@ -226,7 +226,7 @@ public enum MarkdownRelationshipNativeCollection {
     }
     let after = try Stat(FilePath(file.path), followTargetSymlink: false)
     guard data.count <= maximum, before.size == after.size, before.st_mtim.tv_sec == after.st_mtim.tv_sec,
-      before.st_mtim.tv_nsec == after.st_mtim.tv_nsec, let content = String(data: data, encoding: .utf8) else {
+      before.st_mtim.tv_nsec == after.st_mtim.tv_nsec, let content = UTF8Text.decode(data) else {
       throw IndexProjectError("Source changed, is not UTF-8, or exceeds byte budget")
     }
     let modified = Double(after.st_mtim.tv_sec) + Double(after.st_mtim.tv_nsec) / 1_000_000_000

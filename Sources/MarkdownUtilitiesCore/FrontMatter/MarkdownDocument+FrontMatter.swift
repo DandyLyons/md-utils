@@ -20,18 +20,17 @@ extension MarkdownDocument {
   /// Reconstruct the full document from frontmatter and body.
   ///
   /// This method combines the frontmatter (with delimiters) and body back into
-  /// a single markdown document string. If there's no frontmatter (empty mapping),
-  /// it returns just the body.
+  /// a single Markdown document string and restores the original UTF-8 signature.
   ///
   /// - Returns: The reconstructed markdown document
   /// - Throws: If serialization in the selected frontmatter format fails
   public func render() throws -> String {
-    guard !frontMatter.isEmpty else { return body }
+    guard !frontMatter.isEmpty else { return encodingSignature + body }
     let format = frontMatterFormat ?? .yaml
 
     let serialized = try FrontMatterConversion.serialize(frontMatter, format: format)
 
-    return """
+    return encodingSignature + """
     \(format.delimiter)
     \(serialized)\(format.delimiter)
     \(body)

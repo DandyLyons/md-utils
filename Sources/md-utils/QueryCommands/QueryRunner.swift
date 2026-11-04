@@ -60,9 +60,7 @@ enum QueryRunner {
     var paths = command.paths
     for (file, nul) in command.scope.filesFrom.map({ ($0, false) }) + command.scope.filesFrom0.map({ ($0, true) }) {
       let data = try CLIFileListInput.read(file)
-      guard data.count <= DocumentReadBudgets.sourceBytes, let text = String(data: data, encoding: .utf8) else { throw ValidationError("File lists require bounded UTF-8 input") }
-      var input = Substring(text)
-      paths += try MarkdownQueryFileListParser(nulDelimited: nul).parse(&input).map { (root + $0).string }
+      paths += try CLIFileListInput.parse(data, from: file, nulDelimited: nul).map { (root + $0).string }
     }
     if paths.isEmpty && command.scope.filesFrom.isEmpty && command.scope.filesFrom0.isEmpty { paths = [Path.current.string] }
     let selections = try paths.map { path in

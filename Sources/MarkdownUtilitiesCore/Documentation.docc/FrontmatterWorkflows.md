@@ -6,6 +6,10 @@ Read, write, and convert YAML or TOML frontmatter while preserving the Markdown 
 
 Frontmatter support starts with `FrontMatterParser`, which detects YAML delimited by `---` or TOML delimited by `+++` and separates it from the body text. `MarkdownDocument` parses either format into the ordered, format-neutral ``FrontMatter`` model and records the source ``FrontMatterFormat``.
 
+Markdown accepts one optional UTF-8 BOM before the first line and rejects repeated
+initial BOMs. The signature is excluded from the parsed body and restored when
+rendering an edited document. Markdown frontmatter delimiter lines use LF.
+
 Non-Markdown text uses ``WrappedFrontMatterParser`` with a ``FrontMatterSyntax``.
 The parser scans LF text for complete host wrappers containing complete YAML or TOML
 blocks. It returns the first block's raw frontmatter, format, and snapshot-relative source range,

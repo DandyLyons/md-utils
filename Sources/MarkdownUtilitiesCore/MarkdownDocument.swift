@@ -15,6 +15,8 @@ import Parsing
 /// for canonical, addressable content that must remain representable even when
 /// its frontmatter is invalid.
 public struct MarkdownDocument: @unchecked Sendable {
+  /// The original UTF-8 signature, retained when rendering the document.
+  package var encodingSignature = ""
   /// The YAML or TOML frontmatter as a format-neutral parsed mapping.
   ///
   /// This is an empty mapping if the document has no frontmatter.
@@ -23,10 +25,10 @@ public struct MarkdownDocument: @unchecked Sendable {
   /// The serialization format of the physical frontmatter block, or `nil` when absent.
   public var frontMatterFormat: FrontMatterFormat?
 
-  /// The body content of the document (everything after frontmatter, or entire document if no frontmatter).
+  /// The body content after the encoding signature and any frontmatter.
   ///
   /// This starts immediately after the closing `---` delimiter if frontmatter exists,
-  /// otherwise it contains the entire document content.
+  /// otherwise it contains the document text after any initial UTF-8 BOM.
   public var body: String
 
   /// Initialize a markdown document by parsing the content to separate frontmatter from body.
@@ -45,6 +47,7 @@ public struct MarkdownDocument: @unchecked Sendable {
       ?? FrontMatter()
     self.frontMatterFormat = format
     self.body = body
+    self.encodingSignature = content.hasPrefix(UTF8Text.signature) ? UTF8Text.signature : ""
   }
 
   /// Initialize a markdown document directly from its parsed components.

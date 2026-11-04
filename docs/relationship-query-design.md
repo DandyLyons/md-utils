@@ -185,11 +185,12 @@ parity. Run native tests locally, Linux in CI; WASM remains deferred under AGENT
   Leading `/` is unsupported without a publishing-root contract. Preserve
   fragments without validating renderer-specific anchors. Keep resolution confined
   to the explicit root; these rules do not change existing wikilink semantics.
-- File-list contract (approved): repeatable `--files-from <file>` for LF-delimited
+- File-list contract (approved): repeatable `--files-from <file>` for LF/CRLF-delimited
   entries and `--files-from0 <file>` for NUL-delimited entries. Either accepts `-`
   for stdin, consumed at most once. Strict UTF-8 only; invalid encoding fails.
-  Line mode rejects CRLF with guidance. NUL mode preserves valid UTF-8 path bytes,
-  including newline characters. Do not trim, unquote, expand, interpret comments
+  Line mode rejects bare CR and consumes one optional initial UTF-8 BOM. NUL
+  mode preserves valid UTF-8 path bytes, including newline characters and any
+  leading U+FEFF. Do not trim, unquote, expand, interpret comments
   or escapes; ignore empty entries.
 - Document entries and positional paths are root-relative. List-file locations
   are working-directory-relative and may be outside the root. Reject absolute
@@ -214,14 +215,24 @@ parity. Run native tests locally, Linux in CI; WASM remains deferred under AGENT
 
 `--relation` qualification is settled: require explicit `--type`.
 
-### Deferred BOM decision (#189)
+### UTF-8 BOM policy (#189)
 
-UTF-8-only does not decide BOM treatment. Existing fm-var inputs accept one BOM;
-canonical frontmatter mutation envelopes reject it. The project owner deferred
-the file-list choice to [#189](https://github.com/DandyLyons/md-utils/issues/189).
-No acceptance/rejection choice is implied, and the earlier rejection suggestion
-remains unapproved. This separate decision does not block starting #188
-implementation; do not claim a finalized BOM contract until it is settled.
+Relationships, query, and survey use the same file-list parser for files and
+stdin. Line lists accept one initial UTF-8 signature for interoperability with
+text producers such as Windows PowerShell. Repeated initial BOMs fail with
+guidance. U+FEFF elsewhere is path data, including at the start of a later entry.
+Prefix a first filename that starts with literal U+FEFF with `./` to avoid the
+signature interpretation. NUL lists preserve U+FEFF at every position so that
+exact-path producers such as `find -print0` can round-trip UTF-8 filenames.
+
+| Input | Initial UTF-8 BOM behavior | Regression coverage |
+| --- | --- | --- |
+| Line- and NUL-delimited lists | Line mode accepts one signature and rejects repeats. NUL mode preserves every U+FEFF as data. Both reject malformed UTF-8. | `CollectionRelationshipQueryTests` |
+| Fm-var sources | Consume one signature before parsing. Reject repeats and invalid UTF-8. | `FMVarSourceResolverTests` |
+| Markdown documents and mutation envelopes | Consume one signature for parsing, reject repeats, and preserve the original bytes during edits. LF delimiter rules still apply. | `ResourceCodecTests`, `BodyEditPreservationTests` |
+| Line-comment frontmatter hosts | Recognize the host BOM when locating a block, including around a shebang. Preserve it during mutation. | `LineCommentFrontMatterParserTests`, `NonMDFrontmatterCLISemanticsTests` |
+| Native edit snapshots | Reject invalid UTF-8 and retain the original BOM for revision checks and byte-preserving writes. | `FrontMatterFileWriterTests` |
+| Generated body templates | Treat BOM-prefixed delimiter lines as frontmatter and reject them in body output. | `MarkdownTemplateRendererTests` |
 
 Exact Swift types, schema field layout, finite work budgets and serialization
 mechanics are implementation choices to document and test against this contract.

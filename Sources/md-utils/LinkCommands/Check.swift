@@ -47,7 +47,7 @@ extension CLIEntry {
       var problems: [CheckProblem] = []
 
       for file in files {
-        let content: String = try file.read()
+        let content = try FrontMatterFileWriter.readSnapshot(from: file)
         let doc = try MarkdownDocument(content: content)
         let wikilinks = doc.wikilinks()
 

@@ -5,9 +5,15 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 import Yams
+
+private func readText(_ file: Path) throws -> String {
+  let source = try FrontMatterFileWriter.readSnapshot(from: file)
+  return String(try UTF8Text.afterSignature(source[...]))
+}
 
 enum OKFConstants {
   static let specURL = "https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md"
@@ -110,7 +116,7 @@ enum OKFValidator {
 
   private static func validateConceptFile(_ file: Path, relativePath: String) -> [OKFValidationIssue] {
     do {
-      let content: String = try file.read()
+      let content = try readText(file)
       let presence = frontmatterPresence(in: content)
       guard presence.hasFrontmatter else {
         let message = content.hasPrefix("---\n")
@@ -145,7 +151,7 @@ enum OKFValidator {
   private static func validateReservedFile(_ file: Path, relativePath: String) -> [OKFValidationIssue] {
     guard file.lastComponent == "log.md" else { return [] }
     do {
-      let content: String = try file.read()
+      let content = try readText(file)
       let lines = content.split(separator: "\n", omittingEmptySubsequences: false)
       var issues: [OKFValidationIssue] = []
       for (index, line) in lines.enumerated() {
@@ -197,7 +203,7 @@ enum OKFAnalyzer {
     for file in files {
       guard !OKFConstants.reservedFilenames.contains(file.lastComponent) else { continue }
       let relative = relativePath(from: bundlePath, to: file)
-      let content: String = try file.read()
+      let content = try readText(file)
       guard frontmatterPresence(in: content).hasFrontmatter else { continue }
       guard let document = try? MarkdownDocument(content: content) else { continue }
 
@@ -614,7 +620,7 @@ enum OKFTypeSetter {
         continue
       }
 
-      let content: String = try file.read()
+      let content = try FrontMatterFileWriter.readSnapshot(from: file)
       let document = try MarkdownDocument(content: content)
       guard matchesFilter(document: document, key: options.arrayKey, contains: options.arrayContains) else {
         continue

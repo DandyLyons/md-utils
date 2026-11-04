@@ -175,7 +175,7 @@ public enum MarkdownRecordFileAdapter {
     }
     return MarkdownRecord(
       identity: MarkdownRecordIdentity(rawValue: logicalPath.rawValue),
-      content: try file.read(.utf8),
+      content: try FrontMatterFileWriter.readSnapshot(from: file),
       context: MarkdownRecordContext(path: logicalPath, modificationDate: modificationDate)
     )
   }

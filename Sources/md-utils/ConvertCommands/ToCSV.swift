@@ -101,7 +101,7 @@ extension CLIEntry.ConvertCommands {
 
             for file in files {
                 do {
-                    let content: String = try file.read()
+                    let content = try FrontMatterFileWriter.readSnapshot(from: file)
                     let doc = try MarkdownDocument(content: content)
                     documents.append((file.string, doc))
                 } catch {

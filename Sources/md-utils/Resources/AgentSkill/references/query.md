@@ -71,6 +71,9 @@ unstyled. Existing terminal detection and color environment conventions apply.
 Scope follows survey: files/folders, `--project-root`, repeatable `--exclude`,
 `--files-from`/`--files-from0`, `--markdown-only`, `--no-recursive`, `--max-files`.
 File-list paths are project-root-relative; CLI paths are working-directory-relative.
+File lists use strict UTF-8. `--files-from` accepts LF or CRLF and one optional
+initial BOM. Prefix a first path starting with literal U+FEFF with `./`.
+`--files-from0` uses NUL separators and preserves U+FEFF anywhere.
 Hidden entries and symlinks are skipped. An existing index may be refreshed;
 `--no-index` bypasses it. `--index-only`/`--indexed-only` uses published evidence
 without source/config reads or fallback; type/rule conditions are unsupported

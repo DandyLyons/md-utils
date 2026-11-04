@@ -17,11 +17,16 @@ struct FrontMatterParser: Parsing.Parser {
   ///
   /// See <doc:FrontmatterWorkflows> for workflow details.
   func parse(_ input: inout Substring) throws -> Output {
-    let originalSource = String(input)
+    let originalSource = String(try UTF8Text.afterSignature(input))
+    input = ""
+    return Self.split(originalSource)
+  }
+
+  /// Splits text whose encoding signature has already been handled.
+  static func split(_ originalSource: String) -> Output {
     guard let format = FrontMatterFormat.allCases.first(where: {
       originalSource.hasPrefix("\($0.delimiter)\n")
     }) else {
-      input = ""
       return ("", originalSource, nil)
     }
     let bytes = Array(originalSource.utf8)
@@ -34,7 +39,6 @@ struct FrontMatterParser: Parsing.Parser {
         && bytes[index..<(index + delimiter.count)].elementsEqual(delimiter)
     }
     guard let closingStart else {
-      input = ""
       return ("", originalSource, nil)
     }
 
@@ -49,7 +53,27 @@ struct FrontMatterParser: Parsing.Parser {
       bodyStart += 1
     }
     let body = String(decoding: bytes[bodyStart...], as: UTF8.self)
-    input = ""
     return (rawFrontMatter, body, format)
+  }
+}
+
+/// Separates a UTF-8 encoding signature from text while retaining exact snapshots.
+package enum UTF8Text {
+  package static let signature = "\u{FEFF}"
+
+  package static func decode(_ bytes: Data) -> String? {
+    guard String(data: bytes, encoding: .utf8) != nil else { return nil }
+    return String(decoding: bytes, as: UTF8.self)
+  }
+
+  package static func afterSignature(_ input: Substring) throws -> Substring {
+    guard input.unicodeScalars.first?.value == 0xFEFF else { return input }
+    let text = input[input.unicodeScalars.index(after: input.startIndex)...]
+    guard text.unicodeScalars.first?.value != 0xFEFF else { throw RepeatedSignature() }
+    return text
+  }
+
+  private struct RepeatedSignature: LocalizedError {
+    var errorDescription: String? { "UTF-8 text accepts at most one leading BOM. Remove extra BOMs." }
   }
 }

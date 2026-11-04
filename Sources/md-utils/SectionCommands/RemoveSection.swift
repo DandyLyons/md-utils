@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 import Yams
@@ -56,7 +57,7 @@ extension CLIEntry {
         throw ValidationError("--into must be a Markdown file, not a directory: \(into)")
       }
 
-      let original: String = try into.read()
+      let original = try FrontMatterFileWriter.readSnapshot(from: into)
       let source = try MarkdownBodySource(content: original)
       let doc = source.document
       let result: MarkdownDocument

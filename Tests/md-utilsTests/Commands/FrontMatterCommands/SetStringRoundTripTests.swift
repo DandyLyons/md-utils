@@ -4,6 +4,34 @@ import Testing
 @testable import md_utils
 
 struct SetStringRoundTripTests {
+  @Test func markdownFrontmatterEditsPreserveTheEncodingSignature() throws {
+    let workspace = try makeWorkspace()
+    defer { try? FileManager.default.removeItem(at: workspace) }
+    let file = workspace.appending(path: "signed.md")
+    let signature = "\u{FEFF}"
+    let body = "# Body\n\nInternal\u{FEFF}mark.\n"
+    try Data((signature + "---\nsummary: before\n---\n" + body).utf8).write(to: file)
+
+    let set = try CLIProcessTestHelper.run(["fm", "set", "--key", "summary", "--value", "after", file.path])
+    try #require(set.status == 0, Comment(rawValue: set.standardError))
+    let edited = try Data(contentsOf: file)
+    #expect(edited.starts(with: signature.utf8))
+    let document = try MarkdownDocument(content: String(decoding: edited, as: UTF8.self))
+    #expect(document.getValue(forKey: "summary") == .string("after"))
+    #expect(document.body.utf8.elementsEqual(body.utf8))
+
+    let remove = try CLIProcessTestHelper.run(["fm", "rmfm", "--yes", file.path])
+    try #require(remove.status == 0, Comment(rawValue: remove.standardError))
+    #expect(try Data(contentsOf: file) == Data((signature + body).utf8))
+
+    let repeated = Data((signature + signature + body).utf8)
+    try repeated.write(to: file)
+    let rejected = try CLIProcessTestHelper.run(["fm", "set", "--key", "summary", "--value", "after", file.path])
+    #expect(rejected.status != 0)
+    #expect(rejected.standardError.contains("Remove extra BOMs"))
+    #expect(try Data(contentsOf: file) == repeated)
+  }
+
   @Test(.bug("https://github.com/DandyLyons/md-utils/issues/164"), arguments: ["yaml", "toml"])
   func emptyStringSurvivesCLIAndStringSchema(format: String) async throws {
     let workspace = try makeWorkspace()

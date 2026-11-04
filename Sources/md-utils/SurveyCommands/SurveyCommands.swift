@@ -203,7 +203,7 @@ struct SurveyOptions: ParsableArguments {
   @Flag(inversion: .prefixedNo, help: "Recurse into directories") var recursive = true
   @Flag(help: "Survey Markdown files only") var markdownOnly = false
   @Option(help: "Project-relative path/glob to exclude; repeatable") var exclude: [String] = []
-  @Option(help: "UTF-8 LF-delimited project-relative files; - reads stdin") var filesFrom: [String] = []
+  @Option(help: "UTF-8 LF/CRLF project-relative files with optional BOM; - reads stdin") var filesFrom: [String] = []
   @Option(name: .customLong("files-from0"), help: "UTF-8 NUL-delimited project-relative files") var filesFrom0: [String] = []
   @Option(help: "Overview only: comma-separated coverage, malformed-fm, keys, rules, types, standards, uncovered, overlaps, type-matches, or relationships; repeatable; replaces defaults") var metrics: [String] = []
   @Option(help: "Output format: text, json (compact), or json-pretty") var format: ReportOutputFormat = .text

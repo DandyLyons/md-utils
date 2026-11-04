@@ -220,11 +220,13 @@ extension MarkdownDocument {
   }
 
   private func rebuildDocumentAfterInsertion(withBody newBody: String) throws -> MarkdownDocument {
-    MarkdownDocument(
+    var updated = MarkdownDocument(
       frontMatter: frontMatter,
       body: newBody,
       frontMatterFormat: frontMatterFormat
     )
+    updated.encodingSignature = encodingSignature
+    return updated
   }
 }
 

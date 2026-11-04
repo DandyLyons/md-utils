@@ -77,7 +77,7 @@ extension CLIEntry {
             continue
           }
 
-          let content: String = try scanFile.read()
+          let content = try FrontMatterFileWriter.readSnapshot(from: scanFile)
           let doc = try MarkdownDocument(content: content)
           let wikilinks = doc.wikilinks()
 

@@ -236,7 +236,7 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
           guard ["md", "markdown"].contains(URL(fileURLWithPath: path).pathExtension.lowercased()) else { continue }
           let hash: String = row["hash"]
           let data = try readSource(path: path, hash: hash)
-          guard let content = String(data: data, encoding: .utf8) else { throw MarkdownServerReadError.sourceChanged }
+          guard let content = UTF8Text.decode(data) else { throw MarkdownServerReadError.sourceChanged }
           let record = MarkdownRecord(identity: .init(rawValue: path), content: content,
             context: .init(path: try MarkdownRecordPath(path), modificationDate: Date(timeIntervalSince1970: row["mtime"])),
             revision: .init(rawValue: hash))
@@ -573,7 +573,7 @@ public actor IndexedMarkdownRepository: MarkdownServerReadRepository, RecordStor
     let path: String = row["path"]
     let hash: String = row["hash"]
     let bytes = try readSource(path: path, hash: hash)
-    guard let content = String(data: bytes, encoding: .utf8) else { throw MarkdownServerReadError.sourceChanged }
+    guard let content = UTF8Text.decode(bytes) else { throw MarkdownServerReadError.sourceChanged }
     return MarkdownRecord(identity: .init(rawValue: path), content: content,
       context: .init(path: try MarkdownRecordPath(path), modificationDate: Date(timeIntervalSince1970: row["mtime"])),
       revision: .init(rawValue: hash))

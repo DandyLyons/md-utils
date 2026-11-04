@@ -12,6 +12,20 @@ private actor QueryAnalysisCounter {
 }
 
 struct QueryCommandsTests {
+  @Test func fileListsDistinguishTextSignaturesFromLiteralPaths() throws {
+    let root = try fixture()
+    defer { try? root.delete() }
+    let literal = root + "\u{FEFF}literal.md"
+    try literal.write("\u{FEFF}---\nStatus: read\n---\n")
+    let arguments = ["query", "--project-root", root.string, "--key", "Status", "--equals", "read", "--no-index", "--print0"]
+    let line = try CLIProcessTestHelper.run(arguments + ["--files-from", "-"], standardInput: "\u{FEFF}a.md\r\n")
+    let nul = try CLIProcessTestHelper.run(arguments + ["--files-from0", "-"], standardInput: "\u{FEFF}literal.md\0")
+    #expect(line.status == 0)
+    #expect(line.standardOutput == (root + "a.md").string + "\0")
+    #expect(nul.status == 0)
+    #expect(nul.standardOutput == literal.string + "\0")
+  }
+
   @Test func machinePathsPreserveControlsWhileTextEscapesThem() throws {
     let root = try fixture()
     defer { try? root.delete() }

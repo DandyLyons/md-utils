@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 /// Adds Markdown document behavior to ``CLIEntry.ConvertCommands``.
@@ -196,10 +197,8 @@ extension CLIEntry.ConvertCommands {
     ///
     /// See <doc:ConversionCommands> for workflow details.
     func processStdin(options conversionOptions: PlainTextOptions) async throws {
-      // Read from stdin
-      var stdinContent = ""
-      while let line = readLine(strippingNewline: false) {
-        stdinContent += line
+      guard let stdinContent = UTF8Text.decode(FileHandle.standardInput.readDataToEndOfFile()) else {
+        throw ValidationError("Markdown from stdin must be valid UTF-8")
       }
 
       guard !stdinContent.isEmpty else {
@@ -224,7 +223,7 @@ extension CLIEntry.ConvertCommands {
     /// See <doc:ConversionCommands> for workflow details.
     func processSingleFile(_ file: Path, options conversionOptions: PlainTextOptions) async throws {
       // Read and convert
-      let content: String = try file.read()
+      let content = try FrontMatterFileWriter.readSnapshot(from: file)
       let doc = try MarkdownDocument(content: content)
       let plainText = try await doc.toPlainText(options: conversionOptions)
 
@@ -272,7 +271,7 @@ extension CLIEntry.ConvertCommands {
 
       for file in files {
         do {
-          let content: String = try file.read()
+          let content = try FrontMatterFileWriter.readSnapshot(from: file)
           let doc = try MarkdownDocument(content: content)
           let plainText = try await doc.toPlainText(options: conversionOptions)
 

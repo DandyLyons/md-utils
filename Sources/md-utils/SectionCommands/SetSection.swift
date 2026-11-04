@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 import Yams
@@ -147,7 +148,7 @@ extension CLIEntry {
     ///
     /// See <doc:ContentSelectionCommands> for workflow details.
     private func processFile(_ path: Path) async throws {
-      let content: String = try path.read()
+      let content = try FrontMatterFileWriter.readSnapshot(from: path)
       let source = try MarkdownBodySource(content: content)
       let doc = source.document
 

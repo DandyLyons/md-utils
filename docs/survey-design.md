@@ -23,7 +23,9 @@ replaces defaults. Parameterized key/value inspection uses focused commands.
 Paths select a deduplicated union of files and recursive directories. Without
 paths or file-list inputs, select the current directory. Include Markdown and
 supported other UTF-8 text files. `--markdown-only`, `--no-recursive`, repeatable
-`--exclude`, `--files-from`, and `--files-from0` refine this scope. CLI paths are
+`--exclude`, `--files-from`, and `--files-from0` refine this scope. Survey and
+query share the [file-list encoding policy](relationship-query-design.md#utf-8-bom-policy-189)
+with relationship queries. CLI paths are
 working-directory-relative; file-list entries are project-root-relative. File
 lists alone must not add the working directory. One project root confines inputs;
 `--project-root` and `--config` retain project resolution conventions.

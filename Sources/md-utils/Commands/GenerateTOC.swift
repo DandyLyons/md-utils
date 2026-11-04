@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 /// Adds command implementations to ``CLIEntry``.
@@ -85,7 +86,7 @@ extension CLIEntry {
     /// Processes one Markdown file for the command.
     private func processFile(_ path: Path, totalFiles: Int) async throws {
       // Read file content
-      let content: String = try path.read()
+      let content = try FrontMatterFileWriter.readSnapshot(from: path)
 
       // Parse document
       let doc = try MarkdownDocument(content: content)

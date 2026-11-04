@@ -95,27 +95,7 @@ public struct FMVarSourceResolver: Sendable {
         )
       )
     }
-    let bom = Data([0xEF, 0xBB, 0xBF])
-    let sourceBytes: Data
-    if resource.bytes.starts(with: bom) {
-      sourceBytes = Data(resource.bytes.dropFirst(bom.count))
-      guard sourceBytes.starts(with: bom) == false else {
-        return failed(
-          reference: reference,
-          identifier: identifier,
-          resourceKind: kind,
-          failure: FMVarSourceFailure(
-            reason: .unreadableSource,
-            code: .unreadableSource,
-            identifier: identifier,
-            message: "The fm-var source contains more than one leading UTF-8 BOM."
-          )
-        )
-      }
-    } else {
-      sourceBytes = resource.bytes
-    }
-    guard let source = String(data: sourceBytes, encoding: .utf8) else {
+    guard let decoded = UTF8Text.decode(resource.bytes) else {
       return failed(
         reference: reference,
         identifier: identifier,
@@ -128,14 +108,27 @@ public struct FMVarSourceResolver: Sendable {
         )
       )
     }
+    guard let source = try? UTF8Text.afterSignature(decoded[...]) else {
+      return failed(
+        reference: reference,
+        identifier: identifier,
+        resourceKind: kind,
+        failure: FMVarSourceFailure(
+          reason: .unreadableSource,
+          code: .unreadableSource,
+          identifier: identifier,
+          message: "The fm-var source contains more than one leading UTF-8 BOM."
+        )
+      )
+    }
     let yaml: String
     let rootRequirement: FMVarYAMLRootRequirement
     switch kind {
     case .yaml:
-      yaml = source
+      yaml = String(source)
       rootRequirement = .any
     case .markdown:
-      var markdown = source[...]
+      var markdown = source
       switch FMVarMarkdownYAMLExtractor().parse(&markdown) {
       case .yaml(let extracted):
         yaml = extracted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

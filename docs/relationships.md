@@ -128,13 +128,16 @@ paths and all file lists form one supplied set. Repeatable `--exclude-file`,
 `--exclude-folder`, `--exclude-type`, `--exclude-rule` and `--exclude-tag` subtract
 after combination. No selector is an error; `--select-folder .` selects the root.
 
-List files use strict UTF-8 with LF (`--files-from`) or NUL (`--files-from0`)
-separators. `-` consumes stdin once. Entries are root-relative; the list file itself
+List input uses strict UTF-8. `--files-from` accepts LF and CRLF and consumes one
+optional initial BOM. Repeated initial BOMs are errors. Prefix a first filename
+that starts with literal U+FEFF with `./`. `--files-from0` uses NUL separators
+and preserves U+FEFF anywhere in a path, including at the start of the list.
+`-` consumes stdin once and follows the same rules. Entries are root-relative; the list file itself
 is working-directory-relative and may live outside the root. Preserve whitespace,
 ignore empty entries, perform no expansion/unquoting, and reject absolute document
 paths, root escapes, directories and non-Markdown entries. Empty lists select zero
 documents successfully. Malformed/unreadable lists fail preflight; missing/unreadable
-selected documents produce incomplete results. BOM handling remains deferred to #189.
+selected documents produce incomplete results.
 
 Ordinary links need no definitions and include body/frontmatter Markdown and
 wikilinks between Markdown files. Markdown paths are source-relative, percent-decoded

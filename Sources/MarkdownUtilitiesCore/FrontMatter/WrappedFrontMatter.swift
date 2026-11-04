@@ -205,7 +205,7 @@ public struct WrappedFrontMatterParser: Parsing.Parser, Sendable {
   /// - Parameter input: Complete LF text to scan and consume.
   /// - Returns: The first complete block and locations of later complete blocks.
   public func parse(_ input: inout Substring) -> WrappedFrontMatterScan {
-    let source = input
+    let source = (try? UTF8Text.afterSignature(input)) ?? input[input.endIndex...]
     input = input[input.endIndex...]
     let lines = physicalLines(in: source)
     var blocks: [WrappedFrontMatterBlock] = []

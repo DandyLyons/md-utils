@@ -190,6 +190,7 @@ struct ParsedFrontMatterFile {
   /// - Returns: Parsed frontmatter tied to `source`.
   /// - Throws: A conversion error when the first complete block is invalid.
   static func parse(source: String, syntax: FrontMatterFileSyntax) throws -> ParsedFrontMatterFile {
+    _ = try UTF8Text.afterSignature(source[...])
     switch syntax {
     case .markdown:
       return ParsedFrontMatterFile(
@@ -260,7 +261,8 @@ struct ParsedFrontMatterFile {
       let serialized = try FrontMatterConversion.serialize(updatedDocument.frontMatter, format: format)
       let renderedBlock = "\(wrapper.openingWrapper)\n\(format.delimiter)\n\(serialized)\(format.delimiter)\n\(wrapper.closingWrapper)"
       guard let wrappedBlock else {
-        return "\(renderedBlock)\n\n\(source)"
+        let text = try UTF8Text.afterSignature(source[...])
+        return String(source[..<text.startIndex]) + renderedBlock + "\n\n" + text
       }
       var result = source
       result.replaceSubrange(wrappedBlock.range, with: renderedBlock)
@@ -320,7 +322,7 @@ struct ParsedFrontMatterFile {
   func renderingWithoutFrontMatter() -> String {
     switch syntax {
     case .markdown:
-      return document.body
+      return document.encodingSignature + document.body
     case .wrapped:
       guard let wrappedBlock else { return source }
       let removalEnd = endAfterOneLineEnding(from: wrappedBlock.range.upperBound)

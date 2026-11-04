@@ -5,6 +5,7 @@
 
 import ArgumentParser
 import Foundation
+import MarkdownUtilities
 import MarkdownUtilitiesCore
 import PathKit
 
@@ -131,7 +132,7 @@ extension CLIEntry {
         throw ValidationError("Use either --tree or --tree-section-title/--tree-section-line, not both")
       }
 
-      let content: String = try path.read()
+      let content = try FrontMatterFileWriter.readSnapshot(from: path)
       let document = try await ExploreDocument.build(from: content)
       let renderer = ExploreRenderer(
         document: document,

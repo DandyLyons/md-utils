@@ -109,8 +109,9 @@ HTTP PATCH media type or wire format.
 - YAML aliases may expand to their parsed values; anchor/alias syntax is not preserved.
   Metadata edits involving merge keys, custom tags, or non-string keys are unsupported.
   Malformed/duplicate mappings fail parsing. No lossless YAML editing claim is made.
-- Canonical LF delimiter lines are required. CRLF delimiter blocks, BOM-prefixed
-  blocks, malformed closing lines, and non-Markdown paths are rejected. Existing
+- One optional initial UTF-8 BOM is accepted and retained across edits. Repeated
+  initial BOMs are rejected. Canonical LF delimiter lines are required. CRLF
+  delimiter blocks, malformed closing lines, and non-Markdown paths are rejected. Existing
   CRLF body bytes may be retained for byte preservation; this is not supported
   Markdown parsing. LF is the only supported newline format for Markdown document
   processing; CRLF and mixed-line-ending documents are unsupported and must not

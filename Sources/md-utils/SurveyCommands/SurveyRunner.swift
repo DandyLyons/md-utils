@@ -394,9 +394,7 @@ enum SurveyRunner {
     requested = requested.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
     for (file, nul) in options.filesFrom.map({ ($0, false) }) + options.filesFrom0.map({ ($0, true) }) {
       let data = try CLIFileListInput.read(file)
-      guard data.count <= DocumentReadBudgets.sourceBytes, let text = String(data: data, encoding: .utf8) else { throw ValidationError("File lists require bounded UTF-8 input") }
-      var input = Substring(text)
-      paths += try MarkdownQueryFileListParser(nulDelimited: nul).parse(&input).map { (root + $0).string }
+      paths += try CLIFileListInput.parse(data, from: file, nulDelimited: nul).map { (root + $0).string }
     }
     if paths.isEmpty && options.filesFrom.isEmpty && options.filesFrom0.isEmpty { paths = [Path.current.string] }
     let selections = try paths.map { path -> String in
@@ -825,7 +823,7 @@ enum SurveyRunner {
         }
         if data.contains(0) { report.coverage.skippedBinary += 1; return }
         bytes += data.count
-        guard let text = String(data: data, encoding: .utf8) else { throw ValidationError("Invalid UTF-8: \(relative)") }
+        guard let text = UTF8Text.decode(data) else { throw ValidationError("Invalid UTF-8: \(relative)") }
         records.append(MarkdownRecord(content: text, context: MarkdownRecordContext(
           path: try MarkdownRecordPath(relative), modificationDate: values.contentModificationDate,
         )))

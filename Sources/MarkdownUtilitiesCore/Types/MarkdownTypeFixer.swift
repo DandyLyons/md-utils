@@ -52,12 +52,12 @@ public enum MarkdownTypeFixer {
     let prefix: String
     if frontmatterEdits.isEmpty {
       prefix = ensureFrontmatter && original.hasFrontmatter == false
-        ? "---\n---\n"
+        ? original.signature + "---\n---\n"
         : original.prefix
     } else if canAppendWithoutReformatting(frontmatterEdits, original: original) {
       prefix = try appending(frontmatterEdits, to: original.prefix)
     } else {
-      prefix = try renderFrontmatter(
+      prefix = try original.signature + renderFrontmatter(
         frontmatter,
         preserveEmpty: ensureFrontmatter,
         format: original.format ?? .yaml
@@ -141,11 +141,13 @@ public enum MarkdownTypeFixer {
     let parser = FrontMatterParser()
     var input = Substring(content)
     let parts = try parser.parse(&input)
+    let signature = content.hasPrefix(UTF8Text.signature) ? UTF8Text.signature : ""
     let hasFrontmatter = parts.format != nil
     guard hasFrontmatter else {
       return ParsedRecordContent(
         frontmatter: [:],
-        prefix: "",
+        prefix: signature,
+        signature: signature,
         body: parts.body,
         hasFrontmatter: false,
         format: nil
@@ -156,12 +158,11 @@ public enum MarkdownTypeFixer {
       format: parts.format ?? .yaml
     )
     let value = try JSONValue(any: FrontMatterConversion.foundationValue(frontMatter))
-    let prefix = parts.body.isEmpty
-      ? content
-      : String(content.dropLast(parts.body.count))
+    let prefix = String(decoding: content.utf8.prefix(content.utf8.count - parts.body.utf8.count), as: UTF8.self)
     return ParsedRecordContent(
       frontmatter: value.objectValue ?? [:],
       prefix: prefix,
+      signature: signature,
       body: parts.body,
       hasFrontmatter: true,
       format: parts.format
@@ -259,6 +260,7 @@ public enum MarkdownTypeFixer {
   private struct ParsedRecordContent {
     var frontmatter: [String: JSONValue]
     var prefix: String
+    var signature: String
     var body: String
     var hasFrontmatter: Bool
     var format: FrontMatterFormat?

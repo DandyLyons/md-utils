@@ -19,8 +19,10 @@ frontmatterFormat, frontmatter and body; TOML selector skips are reported.
 Multiple selectors require `--select-mode union|intersection`; repeated
 `--exclude-file|--exclude-folder|--exclude-type|--exclude-rule|--exclude-tag` subtract
 afterward. Incoming sources are searched throughout the explicit root.
-`--files-from` accepts UTF-8 LF-separated root-relative paths; `--files-from0`
-accepts NUL-separated paths. Either accepts `-` for stdin once. All lists and
+`--files-from` accepts strict UTF-8 root-relative paths separated by LF or CRLF
+and consumes one optional initial BOM. Repeated initial BOMs fail. Prefix a
+first path starting with literal U+FEFF with `./`. `--files-from0` uses NUL
+separators and preserves U+FEFF anywhere. Either accepts `-` for stdin once. All lists and
 positional paths form one deduplicated selector. No selection is an error; use
 `--select-folder .` for the collection. Empty supplied lists succeed with zero results.
 Complete queries exit 0 even for broken/nonconforming assertions; incomplete queries

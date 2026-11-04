@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **File-list encoding (#189)**: Relationships, query, and survey share strict UTF-8 parsing. Line lists accept LF or CRLF and one optional initial BOM. NUL lists preserve U+FEFF as path data at every position. See `docs/relationship-query-design.md` for the encoding inventory.
+
 - **Backlink attribution (#197)**: Multi-target `links backlinks` reports only occurrences resolving to each entry's target in text and JSON, retaining self-link exclusion. `BacklinksCommandsTests` covers explicit and directory-expanded targets, shared sources, empty targets, and single-target equivalence.
 
 - **Body-edit frontmatter preservation (2026-11-03)**: Section edits, heading adjustments, formatting, and extract source removal use an opaque frontmatter prefix without YAML/TOML decoding or serialization. Body-scoped wikilink conversion likewise skips metadata decoding; mixed-scope conversion retains its existing unchanged-metadata byte preservation. Regression suite: `BodyEditPreservationTests`.
@@ -77,7 +79,7 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
   Detail never changes evaluation or exit status. Selection/applicability decisions
   and input contracts are in `docs/relationship-query-design.md`. Core owns
   selection/applicability and normalized evidence; native sessions reuse #180.
-  File lists use LF/NUL with strict UTF-8; BOM policy remains deferred to #189.
+  File lists use strict UTF-8 with LF/CRLF or NUL separators.
   Tests: `swift test --filter 'CollectionRelationshipQueryTests|RelationshipCommandsTests|RelationshipCacheTests'`.
 
 - **Verified relationship cache (#180)**: Native relationship queries and rule validation reuse whole-collection-certified evidence across unchanged refresh generations. Certificates cover source/context revisions, candidate namespaces (including negative/ambiguous lookups), definitions/bindings, scopes, coverage, profiles and budgets. Cache format 9 uses bounded SQLite staging, atomic publication, epoch/generation checks, four-request/64 MiB retention, and 256 KiB chunks. Limited coverage stays limited; transient failures and exhaustion are uncached. Rebuild preserves external drafts/receipts. See `docs/relationship-cache.md` and `docs/relationship-cache-benchmarks.md`; tests: `swift test --filter 'RelationshipCache|RelationshipPolicyCommands|RelationshipRegressionCommands|RelationshipCommands|MarkdownMutationTests|MarkdownDraftTests'`.
@@ -230,10 +232,16 @@ Force unwrapping optionals with `!` is absolutely prohibited. Use safe alternati
 - UTF-8 is the only supported text encoding. Reject invalid UTF-8 with a
   user-visible error; do not guess legacy encodings or silently replace invalid
   bytes while decoding authoritative input.
-- Encoding validity and BOM handling are separate. Follow the specific input
-  contract rather than adding a blanket BOM rule: fm-var sources explicitly
-  accept one leading UTF-8 BOM, while canonical Markdown frontmatter mutation
-  envelopes reject BOM-prefixed blocks.
+- For relationship, query, and survey file lists, apply the same rules to files
+  and stdin. `--files-from` accepts LF and CRLF and consumes one optional initial
+  BOM. Reject repeated initial BOMs. Prefix a first path that starts with literal
+  U+FEFF with `./`. `--files-from0` preserves U+FEFF at every position for exact
+  path interchange with tools such as `find -print0`.
+- Markdown and fm-var text accept one optional initial BOM as an encoding
+  signature and reject repeated signatures. Markdown analysis excludes the
+  signature from the body, and edits preserve it at the beginning of the file.
+  CLI frontmatter commands apply the same signature rule to wrapped and
+  line-comment hosts and preserve their signature during edits.
 - Existing references: `docs/collection-index.md` (non-UTF-8 read failures),
   `Sources/MarkdownUtilitiesCore/Documentation.docc/ResolvingFMVarSources.md`
   (strict UTF-8 and BOM handling), and `docs/resource-mutations.md`.

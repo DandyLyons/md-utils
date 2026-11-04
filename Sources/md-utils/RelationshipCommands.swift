@@ -56,7 +56,7 @@ struct RelationshipOptions: ParsableArguments {
     """
 
   @Argument(help: "Collection-relative Markdown paths forming one supplied file set") var files: [String] = []
-  @Option(name: .long, help: "UTF-8 LF-delimited path list; - reads stdin once") var filesFrom: [String] = []
+  @Option(name: .long, help: "UTF-8 LF/CRLF path list with optional BOM; - reads stdin once") var filesFrom: [String] = []
   @Option(name: .customLong("files-from0"), help: "UTF-8 NUL-delimited path list; - reads stdin once") var filesFrom0: [String] = []
   @Option(name: .long, help: "Recursive collection-relative folder (use . for the entire root)") var selectFolder: [String] = []
   @Option(name: .long, help: "Select structural type conformance") var selectType: [String] = []
@@ -117,10 +117,7 @@ struct RelationshipOptions: ParsableArguments {
         if chunk.isEmpty { break }
         data.append(chunk); bytes += chunk.count
       }
-      guard let text = String(data: data, encoding: .utf8) else { throw ValidationError("File list \(file) is not valid UTF-8") }
-      // No special BOM acceptance/rejection policy is introduced here; #189 owns it.
-      var input = text[...]
-      paths += try MarkdownQueryFileListParser(nulDelimited: nul).parse(&input)
+      paths += try CLIFileListInput.parse(data, from: file, nulDelimited: nul)
       guard paths.count <= maximumEntries else { throw ValidationError("File-set input exceeds 100000 entries") }
     }
     guard bytes <= maximumBytes, paths.count <= maximumEntries else { throw ValidationError("File-set input limit exceeded") }

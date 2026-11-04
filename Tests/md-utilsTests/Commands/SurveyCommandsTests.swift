@@ -312,7 +312,7 @@ struct SurveyCommandsTests {
     defer { fixture.remove() }
     try fixture.write("one.md", "one")
     try fixture.write("two.md", "two")
-    try fixture.write("selected.paths", "one.md\n")
+    try fixture.write("selected.paths", "\u{FEFF}one.md\r\n")
     let result = try await fixture.report("coverage", paths: [], flags: ["--files-from", (fixture.root + "selected.paths").string])
     #expect(result.coverage.files == 1)
   }
@@ -670,9 +670,9 @@ struct SurveyCommandsTests {
   @Test func nulListsExclusionsAndConfinement() async throws {
     let fixture = try SurveyFixture()
     defer { fixture.remove() }
-    try fixture.write("one.md", "one")
+    try fixture.write("\u{FEFF}one.md", "one")
     try fixture.write("two.md", "two")
-    try fixture.write("selected.paths0", "one.md\0two.md\0")
+    try fixture.write("selected.paths0", "\u{FEFF}one.md\0two.md\0")
     let report = try await fixture.report("coverage", paths: [], flags: ["--files-from0", (fixture.root + "selected.paths0").string, "--exclude", "two.md"])
     #expect(report.coverage.files == 1)
     await #expect(throws: ValidationError.self) { try await fixture.report("coverage", paths: ["/"]) }

@@ -156,16 +156,24 @@ package enum MarkdownQueryLinks {
   }
 }
 
-/// Explicit list syntax; BOM policy is intentionally not implemented here (#189).
+/// Parses LF/CRLF or NUL file lists from strict UTF-8 text decoded with its BOM intact.
 public struct MarkdownQueryFileListParser: Parsing.Parser {
   public let nulDelimited: Bool
   public init(nulDelimited: Bool) { self.nulDelimited = nulDelimited }
   public func parse(_ input: inout Substring) throws -> [String] {
+    if !nulDelimited {
+      do { input = try UTF8Text.afterSignature(input) }
+      catch {
+        throw MarkdownQueryInputError("Line-delimited file lists accept at most one leading UTF-8 BOM. Remove extra BOMs or prefix a literal filename with './'.")
+      }
+    }
     let delimiter: Character = nulDelimited ? "\0" : "\n"
     var result: [String] = []
     while !input.isEmpty {
-      let part = try Prefix<Substring> { $0 != delimiter }.parse(&input)
-      if !nulDelimited && part.contains("\r") { throw MarkdownQueryInputError("File lists require LF separators; CRLF is unsupported. Use LF or --files-from0.") }
+      let part = try Prefix<Substring> { $0 != delimiter && (nulDelimited || $0 != "\r\n") }.parse(&input)
+      if !nulDelimited && part.unicodeScalars.contains("\r") {
+        throw MarkdownQueryInputError("Line-delimited file lists require LF or CRLF separators. Use --files-from0 for paths containing carriage returns.")
+      }
       if !part.isEmpty { result.append(String(part)) }
       guard result.count <= 100_000 else { throw MarkdownQueryInputError("File-set input exceeds 100000 entries") }
       if !input.isEmpty { input.removeFirst() }

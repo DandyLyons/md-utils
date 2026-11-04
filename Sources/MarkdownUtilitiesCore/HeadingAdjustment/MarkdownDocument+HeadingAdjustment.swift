@@ -126,7 +126,7 @@ extension MarkdownDocument {
     frontMatter: FrontMatter,
     body: String
   ) throws -> String {
-    try MarkdownDocument(
+    try encodingSignature + MarkdownDocument(
       frontMatter: frontMatter,
       body: body,
       frontMatterFormat: frontMatterFormat

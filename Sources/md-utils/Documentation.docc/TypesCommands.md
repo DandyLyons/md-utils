@@ -8,7 +8,7 @@ context. Use `relationships` (alias `rel`) to query declaration-scoped occurrenc
 optional declaring-contract override `--type`, `--relation` (requiring `--type`),
 and `--json` or `--yaml`. All formats use `--detail summary|explain|evidence`, defaulting
 to concise triples and ordinary links. Files, folders, structural types, rule
-applicability, YAML tags, JMESPath and LF/NUL file lists can select documents.
+applicability, YAML tags, JMESPath and LF/CRLF or NUL file lists can select documents.
 Multiple selectors require explicit union/intersection. Incoming discovery remains
 root-wide. Complete queries exit 0; incomplete queries exit 1 with available results.
 Self-links have a separate

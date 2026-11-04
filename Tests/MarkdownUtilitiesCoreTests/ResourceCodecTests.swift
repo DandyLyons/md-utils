@@ -99,12 +99,24 @@ struct ResourceCodecTests {
   }
 
   @Test(arguments: ["---\ntitle: x", "---\r\ntitle: x\r\n---\r\nBody", "---\ntitle: x\n---suffix\nBody",
-    "\u{FEFF}---\ntitle: x\n---\nBody", "---\n[invalid\n---\nBody"])
+    "\u{FEFF}\u{FEFF}---\ntitle: x\n---\nBody", "---\n[invalid\n---\nBody"])
   func `malformed and unsupported source is rejected`(_ text: String) throws {
     let original = try source(text)
     #expect(throws: (any Error).self) {
       try codec().plan(.patch(frontmatter: ["title": .set(.string("New"))], body: nil), source: original)
     }
+  }
+
+  @Test(arguments: ["\u{FEFF}---\ntitle: Old\n---\n", "\u{FEFF}+++\ntitle = 'Old'\n+++\n", "\u{FEFF}"])
+  func `Markdown mutations preserve the original encoding signature`(_ prefix: String) throws {
+    let original = try source(prefix + "Body\u{FEFF}\n")
+    let bodyEdit = try codec().plan(.patch(frontmatter: [:], body: "Updated"), source: original)
+    #expect(bodyEdit.record.content.utf8.elementsEqual((prefix + "Updated").utf8))
+    let metadataEdit = try codec().plan(.patch(frontmatter: ["title": .set(.string("New"))], body: nil), source: original)
+    #expect(metadataEdit.record.content.utf8.starts(with: "\u{FEFF}".utf8))
+    let parsed = try MarkdownDocument(content: metadataEdit.record.content)
+    #expect(parsed.body.utf8.elementsEqual("Body\u{FEFF}\n".utf8))
+    #expect(parsed.frontMatter["title"] == .string("New"))
   }
 
   @Test

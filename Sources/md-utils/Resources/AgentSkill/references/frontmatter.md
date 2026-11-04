@@ -6,6 +6,9 @@ yaml|toml` and default to YAML. Do not rely on YAML or TOML comments surviving a
 mutation: both formats are parsed into structured values and serialized again.
 TOML cannot represent null, so `fm touch` is unavailable for TOML blocks.
 
+Markdown accepts one optional initial UTF-8 BOM. Repeated initial BOMs fail.
+Frontmatter edits, including block removal, preserve the original signature.
+
 ## Mapped Non-Markdown Files
 
 Shipped mappings include established host wrappers and fixed hash-comment
