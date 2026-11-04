@@ -2,6 +2,10 @@
 
 Use `links list <paths>`, `links check <paths>`, or `links backlinks <target>` to inspect resolution, failures, or incoming references. `list` also has alias `ls`; use `--json` for structured results. `check` fails for broken/ambiguous links. Backlinks traversal flags select targets; source discovery always recurses.
 
+For multiple backlink targets, each text or JSON entry contains only occurrences
+resolving to that target. A source linking to both targets appears under both,
+with only the relevant links in each entry. Self-links are omitted.
+
 `links convert --to wiki-path|wiki-link vault/files/ --root vault/` requires explicit
 collection context and previews by default; `--in-place` writes.
 `--markdown-extension auto|include|omit` controls Markdown suffixes: `auto`

@@ -45,7 +45,7 @@ representative examples are covered by native verification.
 | F07 | Array contains claimed case-sensitive-only operation despite `--case-insensitive`; invert/no-match semantics were omitted. | Describe string-only comparisons, optional case folding, skipped missing/non-array keys even with invert, and nonzero no-match status. See `ArrayHelpers.containsValue` and `Contains.outputResults`. |
 | F08 | `fm has` claimed unconditional success; touch lacked its TOML-null limit; raw dump claimed original source; delimiter wording ignored cat mode. | Explain has read/parse failures, null creation limits, raw reserialization and categorized versus cat output. Help now discloses list's early stop at a keyless file. Existing operational behavior is retained. |
 | F09 | Wikilink conversion examples selected `notes/` outside `--root vault/`; scope/preference defaults and required mode selection were incomplete. | Use `vault/notes/`; explain exactly one of `--to`/`--type`, cwd-relative inputs, scope defaults, extension defaults, contract-only preferences, opt-in recommendations, no-op conformance preservation and separate whole-type assessment. |
-| F10 | Backlink help did not distinguish target selection from source scanning. | Explain positional targets, always-recursive source scanning, hidden/symlink exclusions, self-link omission and existing aggregate multi-target behavior. Check help also distinguishes reporting from failure status. |
+| F10 | Backlink help did not distinguish target selection from source scanning. | Explain positional targets, always-recursive source scanning, hidden/symlink exclusions and self-link omission. The #197 follow-up fixes multi-target attribution and documents independent text/JSON entries. Check help also distinguishes reporting from failure status. |
 | F11 | Six index leaves had no descriptions; rebuild help promised general view preservation; shared index flags obscured scope persistence and inspection side effects. | Add field/FTS leaf descriptions; describe fresh rebuild from saved configuration, managed projections and discarded history. Explain refresh-before-SQL, metadata-only versus opt-in FTS, persistent per-scope non-Markdown selection, and cache initialization during inspection. `IndexOptions.context/run` and each leaf are authoritative. |
 | F12 | SQL format descriptions omitted JSONL column-name and NUL shape constraints; template data/schema descriptions looked like inline values. | Document unique JSONL columns and one text column for NUL (query plans cannot satisfy it). Label template input/schema as file paths, matching bounded file reads. |
 | F13 | Creation help did not explain required mutually exclusive input/filename forms or advisory conformance. Config bootstrap/migration and relationship leaves lacked key scope/default guidance; related guidance implied every live direction refreshed an index. | Share creation requirements across types/rules new; add config version/migration constraints and relationship selection, presentation, completeness and SQLite-only semantics. Distinguish source-directed outgoing reads from incoming/both index refresh. No creation/selection behavior changes. |
@@ -289,9 +289,17 @@ captures used pipes. Evidence is in `tmp/survey-skill-help-tests.log`,
 - Preserve existing search behavior: no matches yield empty stdout even with
   structured formats; per-file JMESPath evaluation errors are skipped. Search
   scans hidden descendants and does not accept shared traversal flags.
-- Preserve aggregate multi-target backlink matches. Help describes this limit;
-  changing the behavior requires separate work. Query backlinks one target at
-  a time. The keyless-file `fm list` limit recorded during the audit was fixed
+- Multi-target backlink attribution was corrected in the #197 follow-up: each
+  target reports only its own incoming occurrences, with self-links omitted.
+  Verification: the new regression failed before the fix and passed afterward
+  for explicit and directory-expanded targets, shared sources, empty targets,
+  self-links, cross-target links, single-target equivalence, and text/JSON parity.
+  Native `BacklinksCommandsTests|Wikilink|LinkCommandsTests|CLIHelpTests|AgentCommandsTests`
+  passed (143 tests across the selected test targets). Rebuilt root, links, and
+  backlinks help were inspected; the skill checker verified 143 help pages and
+  all installed-skill example workflows passed. Canonical `references/links.md`
+  and its generated bundled copy were updated together.
+  The keyless-file `fm list` limit recorded during the audit was fixed
   in the subsequent follow-up below.
 - `types add` has a local `--version <version>` option and also inherits a
   generated `--version` flag line. The discussion explains the local contract

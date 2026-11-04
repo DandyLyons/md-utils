@@ -27,8 +27,8 @@ extension CLIEntry {
         Positional paths select targets; --root does not rebase those paths.
         The source scan is always recursive and skips hidden files and symlinks;
         shared recursion/extension/exclusion options apply to target selection.
-        Multiple targets currently share aggregate matching-link results; query
-        one target per invocation for a per-target result. Self-links are omitted.
+        Each target reports only its own incoming links in text and JSON.
+        Self-links are omitted.
         """,
       aliases: ["bl"]
     )
@@ -65,17 +65,15 @@ extension CLIEntry {
       let scanResolver = try WikilinkResolver(root: scope)
       let filesToScan = scanResolver.markdownFiles
 
-      // Normalize target paths for comparison
-      let targetAbsolute = Set(targetFiles.map { $0.absolute().string })
-
       var entries: [BacklinkEntry] = []
 
       for targetFile in targetFiles {
+        let targetAbsolute = targetFile.absolute().string
         var linkingFiles: [BacklinkSource] = []
 
         for scanFile in filesToScan {
           // Don't report a file as backlinking to itself
-          if scanFile.absolute().string == targetFile.absolute().string {
+          if scanFile.absolute().string == targetAbsolute {
             continue
           }
 
@@ -86,7 +84,7 @@ extension CLIEntry {
           let matchingLinks = wikilinks.filter { link in
             let resolution = resolver.resolve(link, from: scanFile)
             if case .resolved(let path) = resolution {
-              return targetAbsolute.contains(path.string)
+              return path.string == targetAbsolute
             }
             return false
           }

@@ -5,6 +5,16 @@ import Testing
 
 @Suite("CLI help audit regressions")
 struct CLIHelpTests {
+  @Test func backlinksHelpExplainsPerTargetAttributionWithoutScanning() throws {
+    let result = try CLIProcessTestHelper.run([
+      "links", "backlinks", "./tmp/nonexistent-backlink-help.md", "--help",
+    ])
+    try #require(result.status == 0)
+    #expect(result.standardError.isEmpty)
+    #expect(result.standardOutput.contains("Each target reports only its own incoming links in text and JSON."))
+    #expect(result.standardOutput.contains("Self-links are omitted."))
+    #expect(result.standardOutput.contains("aggregate") == false)
+  }
   @Test func queryHelpExplainsScopeResultsAndFurtherDiscoveryWithoutScanning() throws {
     for arguments in [["query", "--help"], ["query", "filter", "--help"], ["query", "./tmp/nonexistent-query-help", "--help"]] {
       let result = try CLIProcessTestHelper.run(arguments)
