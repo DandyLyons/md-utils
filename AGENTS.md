@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **Template skill discovery (2026-11-05)**: The agent skill routes JSON-driven `rules new` / `types new` creation to `references/templates.md`, with a full config/type/rule/Knap/input walkthrough and report, bulk and body-mode scenarios. `references/knap-syntax.md` contains the language cheatsheet and upstream links. `scripts/verify-agent-template-examples.py` extracts executable examples and checks creation, validation, defaults, refusals and syntax; the full skill example harness invokes it. Canonical and bundled references must stay synchronized.
+
 - **File-list encoding (#189)**: Relationships, query, and survey share strict UTF-8 parsing. Line lists accept LF or CRLF and one optional initial BOM. NUL lists preserve U+FEFF as path data at every position. See `docs/relationship-query-design.md` for the encoding inventory.
 
 - **Backlink attribution (#197)**: Multi-target `links backlinks` reports only occurrences resolving to each entry's target in text and JSON, retaining self-link exclusion. `BacklinksCommandsTests` covers explicit and directory-expanded targets, shared sources, empty targets, and single-target equivalence.

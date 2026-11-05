@@ -165,6 +165,8 @@ run("index", "status")
 (fixture / "report.knap").write_text("{{ title | h1 }}\n")
 (fixture / "data.json").write_text('{"title":"Report"}')
 assert "# Report" in run("template", "render", "--template", "report.knap", "--data", "data.json")
+# Exercise the extracted type/rule/template tutorial and full Knap syntax reference.
+subprocess.run(["python3", str(repo / "scripts/verify-agent-template-examples.py"), "--cli", str(cli)], check=True)
 run("config", "init", "--root", "legacy/")
 run("config", "migrate", "--config", "legacy/.md-utils/md-utils.json", "--to", "0.3.0", "--dry-run")
 assert json.loads((fixture / "legacy/.md-utils/md-utils.json").read_text())["configVersion"] == "0.2.0"

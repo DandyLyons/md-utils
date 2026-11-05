@@ -224,13 +224,16 @@ commits are not repeated. Cached evidence never replaces final repair checks.
 
 ## Creation, interactive authoring, and removal
 
+Start with [Templates and file creation](templates.md) to build a complete type,
+rule and Knap template from scratch, feed JSON, and validate the created file.
+
 To create documents through a rule, add `creation: {"type":"Book",
 "directory":"./Books/"}`. The directory is project-relative and must exist;
 `type` is a declared name referenced by the rule, required when ambiguous.
 `rules new --rule books --value ./dune.json --filename Dune.md --dry-run` previews
 the chosen type's template. Omit `--dry-run` to save without overwriting. Creation
-nonconformance is advisory; follow with validation. See [types.md](types.md) for
-template/input/filename and bulk behavior.
+nonconformance is advisory; follow with validation. See [templates.md](templates.md)
+for the full workflow and [types.md](types.md) for creation metadata details.
 
 `rules interactive --edit books` requires config 0.3.0 and a terminal. It supports
 CRUD, recursive expressions, and drafting a new type in-process. Complete drafts

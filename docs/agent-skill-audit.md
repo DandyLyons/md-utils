@@ -33,7 +33,7 @@ the canonical skill's `references/` directory.
 | `rules` | Author/select/enforce/repair/migrate; rules.md | Extracted rule example, valid/invalid member, policy compilation |
 | `types` | Structural contracts, hints, creation; types.md | Complete type, shared schema, semantic and relationship assessment |
 | `config` | Initialize/inspect/migrate; other-commands.md, rules.md | Legacy init, migration preview preserves config |
-| `template` | Knap rendering; templates.md, types.md | Named object input renders heading |
+| `template`, `types new`, `rules new` | Complete creation workflow and Knap language; templates.md, knap-syntax.md, types.md, rules.md | Extracted first-use project, defaults, conformance, dry run, no overwrite, invalid input/template refusal, bulk, report/body modes and 66 syntax snippets |
 | `index` | Refresh/query/FTS/watch/provenance; indexing.md | Refresh, SQL query, status, recursive help |
 | `index draft`, `index apply` | Durable intent/recovery; mutations.md | CLI stage/preview/apply/discard and missing-input tests |
 | `copy`, `move` | Revision-bound transfers; mutations.md | Transfer integration tests including replay |
@@ -45,6 +45,32 @@ the canonical skill's `references/` directory.
 | Standards (upcoming) | Notice only; standards.md | Linked to #191; no proposed authoring syntax |
 
 ## Findings and resolutions
+
+Template discovery and authoring (2026-11-05): the skill description, routing
+table and starting examples now surface `rules new` for JSON-driven creation in
+a configured folder. `references/templates.md` supplies a complete new project
+with config, type, template, rule, JSON input and preview/create/validate steps,
+plus common syntax, filename choices, bulk imports, reports and body-mode meetings.
+`references/knap-syntax.md` holds the full language cheatsheet and standard filter
+families with links to knap.md. Rule/type references link directly to the workflow.
+The examples distinguish creation input validation from output conformance and
+explicitly describe advisory creation, destination requirements and overwrite
+differences. Syntax was checked against current upstream documentation and the
+pinned SwiftKnap bundle (Knap 0.6.0); the website can advance independently.
+
+`scripts/verify-agent-template-examples.py` extracts and executes the published
+project and scenario blocks in an isolated project-local fixture. It verifies
+default insertion, correct paths, current-source type/rule conformance, previews,
+collision/input/template refusals, advisory creation, safe YAML serialization,
+bulk output, standalone reports, body mode and 66 syntax snippets, plus explicit
+truthiness/assignment/control-flow outputs. The existing full example harness invokes
+it, so CI retains the workflow coverage. Verification logs use
+`tmp/template-skill-*.log`. The generic skill-creator validator cannot import its
+optional PyYAML dependency; no software was installed. Existing skill checks and
+the executable's YAML parser validate routing, bundle bytes and skill metadata.
+Native build and all 39 focused skill/creation/template tests passed. Final
+verification passed all installed-skill workflows, all 20 canonical/bundled
+Markdown resources and the recursive 143-page executable help inventory.
 
 Query discovery follow-up (2026-10-28): the entrypoint now introduces
 survey → query → explore. `references/query.md` explains path ordering versus

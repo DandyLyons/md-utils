@@ -1,7 +1,7 @@
 ---
 name: markdown-utilities
 description: >-
-  Parse, edit, and analyze Markdown and mapped text files with md-utils. Use survey to discover conventions, query to find documents by metadata or dates, and explore to read selected sections. Supports YAML/TOML frontmatter, relationships, rules/types/schema authoring and validation, templates, indexing, and reviewed document mutations. Standards are upcoming.
+  Parse, edit, and analyze Markdown and mapped text files with md-utils. Use survey to discover conventions, query to find documents by metadata or dates, and explore to read selected sections. Create files from JSON and Knap templates using rules new or types new. Supports YAML/TOML frontmatter, relationships, rules/types/schema authoring and validation, indexing, and reviewed document mutations. Standards are upcoming.
 ---
 
 # Markdown Utilities
@@ -27,7 +27,8 @@ are explicit. Read only the references relevant to the task.
 | Learn about upcoming standards | [Standards](references/standards.md) |
 | Refresh/query/search/watch a collection index | [Indexing](references/indexing.md) |
 | Stage/apply document edits, recover partial writes, managed copy/move | [Mutations](references/mutations.md) |
-| Render Knap templates | [Templates](references/templates.md) |
+| Create a file in the right folder from JSON: author a type, rule and Knap template; preview, create and validate | [Templates and file creation](references/templates.md) |
+| Write Knap expressions, conditions, loops and filters | [Knap syntax cheatsheet](references/knap-syntax.md) |
 | Select files/directories and understand batch outcomes | [Batch operations](references/batch.md) |
 | Practical metadata/document recipes | [Common use cases](references/common-use-cases.md) |
 | Config inspection, formatting, metadata, slugs, experimental OKF | [Other commands](references/other-commands.md) |
@@ -63,6 +64,10 @@ md-utils rules validate --no-index
 
 # Inspect outgoing relationship evidence with explicit collection context.
 md-utils rel out Note.md --root ./vault/ --detail explain
+
+# Preview creation using an existing rule's type template and destination folder.
+# See Templates for the complete setup and JSON input format.
+md-utils rules new --rule books --value ./dune.json --filename-data '$.title' --dry-run
 ```
 
 Use the full skill folder, including `references/`. `md-utils agents skill` prints

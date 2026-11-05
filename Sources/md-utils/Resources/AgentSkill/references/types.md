@@ -237,6 +237,10 @@ never infer a branch's intended replacement merely because another branch failed
 
 ## Templates and new instances
 
+For a complete first-use walkthrough that connects a type, rule, Knap template,
+JSON input, destination and validation, read [Templates and file creation](templates.md).
+For expressions and filters, read the [Knap syntax cheatsheet](knap-syntax.md).
+
 Optional type creation metadata:
 
 ```yaml
