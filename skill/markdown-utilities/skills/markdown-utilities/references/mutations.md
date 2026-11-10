@@ -30,12 +30,14 @@ revision reviewed when authoring the edit, rather than silently refreshing it.
 
 ## Stage, preview, and apply
 
-Current limitation: general draft validation can report
-`relationship.context.unavailable` when named-relationship types are loaded, even
-for an unrelated title edit. See [#199](https://github.com/DandyLyons/md-utils/issues/199).
-Treat this as unavailable validation: do not remove contracts or bypass preservation
-to force the edit. Relationship Fix-Its have their separate reviewed workflow in
-[rules.md](rules.md).
+General draft validation evaluates relationship selectors and local constraints.
+An absent optional relationship does not block an unrelated edit, and required
+cardinality still applies. General drafts do not supply collection evidence:
+selected Wikilink targets or applicable collection policies can still report
+`relationship.context.unavailable`, even when target files exist. An unavailable
+before-edit baseline also blocks removal of the relationship. Do not remove
+contracts or bypass preservation to force the edit. Relationship Fix-Its have
+their separate reviewed workflow in [rules.md](rules.md).
 
 Stage explicit patch/replace intent with `index draft add <collection-relative-path>
 --resource <name> --revision <source-sha256> --patch-file <file>` (or `--replace-file`).

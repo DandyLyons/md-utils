@@ -48,6 +48,75 @@ struct MarkdownDraftTests {
     "---\n# keep comment for body-only edits\nuuid: \(uuid ?? persistentUUID)\nslug: \(slug)\ntitle: Old\nsubtitle: retained\n---\n# Book\n\nOriginal body.\r\n"
   }
 
+  private func addOptionalRelationshipType(_ root: Path) throws {
+    try (root + ".md-utils/types/").mkpath()
+    try (root + ".md-utils/types/person.mdtype.yaml").write("""
+      md-utils-type-schema: "2"
+      requires: [document-relationships]
+      name: Person
+      version: "1"
+      frontmatter: {}
+      body: {requirements: [], recommendations: []}
+      context: {requirements: [], recommendations: []}
+      relationships:
+        spouse:
+          select: [spouse]
+          target: {type: person.mdtype.yaml}
+      """)
+  }
+
+  @Test
+  func `unrelated optional relationship type permits read only preview and title application`() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    try addOptionalRelationshipType(root)
+    let draft = try await stage(root)
+    let service = MarkdownDraftService(projectRoot: root.string)
+    let before = try snapshot(root)
+    let preview = try await service.preview(draft.id)
+    #expect(preview.succeeded)
+    #expect(try await service.apply(dryRun: true, report: { _ in }))
+    #expect(try snapshot(root) == before)
+    #expect(!(root + ".md-utils/index.sqlite").exists)
+    #expect(!(root + ".md-utils/mutations/").exists)
+    #expect(try await service.apply(report: { _ in }))
+    #expect(try (root + "books/one.md").read(.utf8) == preview.proposedSource)
+    #expect(try (root + "books/one.md").read(.utf8).contains("title: New"))
+  }
+
+  @Test
+  func `selected relationship targets remain unavailable and never authorize draft writes`() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    try addOptionalRelationshipType(root)
+    let original = source().replacingOccurrences(of: "title: Old", with: "title: Old\nspouse: '[[Other]]'")
+    try (root + "books/one.md").write(original)
+    try (root + "Other.md").write("# Other\n")
+    let draft = try await stage(root)
+    let service = MarkdownDraftService(projectRoot: root.string)
+    let before = try snapshot(root)
+    let preview = try await service.preview(draft.id)
+    #expect(preview.failureCode == "record.invalid")
+    #expect(preview.diagnostics.contains { $0.code == "relationship.context.unavailable" })
+    #expect(try snapshot(root) == before)
+    #expect(!(try await service.apply(report: { _ in })))
+    #expect(try (root + "books/one.md").read(.utf8) == original)
+  }
+
+  @Test
+  func `relationship definition changes after preview require restaging`() async throws {
+    let root = try fixture(); defer { try? root.delete() }
+    try addOptionalRelationshipType(root)
+    let draft = try await stage(root)
+    let service = MarkdownDraftService(projectRoot: root.string)
+    #expect(try await service.preview(draft.id).succeeded)
+    let definition = root + ".md-utils/types/person.mdtype.yaml"
+    try definition.write(try definition.read(.utf8).replacingOccurrences(
+      of: "select: [spouse]", with: "select: [spouse]\n    cardinality: {min: 1}",
+    ))
+    #expect(!(try await service.apply(report: { _ in })))
+    #expect(try service.draft(draft.id).failureCode == "draft.configuration-changed")
+    #expect(try (root + "books/one.md").read(.utf8) == source())
+  }
+
   private func request(_ json: String = #"{"frontmatter":{"set":{"title":"New"}}}"#,
     operation: MarkdownMutationOperation = .patch,
   ) throws -> MarkdownMutationRequest { try .init(operation: operation, data: Data(json.utf8)) }
@@ -313,6 +382,7 @@ struct MarkdownDraftTests {
 
   @Test func finalSourceCheckRejectsChangesAfterPlanning() async throws {
     let root = try fixture(); defer { try? root.delete() }
+    try addOptionalRelationshipType(root)
     let draft = try await stage(root)
     var service = MarkdownDraftService(projectRoot: root.string)
     let changed = source() + "Changed immediately before persistence."

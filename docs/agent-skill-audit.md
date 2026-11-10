@@ -112,8 +112,12 @@ dependencies. Local evidence: `tmp/discovery-skill-full-tests.log`,
 - A mixed-feature workflow exposed general draft validation failing with an
   unrelated optional named-relationship type loaded. Reproduced with one self-bound
   Person definition, recorded in the executable examples, documented in mutations.md,
-  and deferred as a runtime fix to [#199](https://github.com/DandyLyons/md-utils/issues/199).
-  The audit does not bypass contracts to make this workflow pass.
+  and tracked in [#199](https://github.com/DandyLyons/md-utils/issues/199).
+  The fix evaluates empty optional selectors and local constraints without
+  requiring collection evidence. The executable example now verifies title-edit
+  preview/application, plus refusal without source changes when an asserted target
+  requires unavailable collection evidence. General drafts still do not assess
+  target resolution or collection policies; contracts are never bypassed.
 
 ## Repeatable verification
 
@@ -157,8 +161,17 @@ standards specification are explicit exclusions, not invented guidance.
 Native audit results: 123 command help pages inventoried; 16 routed Markdown files;
 complete export and refusal checks passed. Focused runs passed 7 agent/apply/transfer
 tests, 15 agent/interactive-authoring tests, and 17 durable-draft tests (agent tests
-overlap between runs). End-to-end documented workflows passed, with #199 retained
-as an expected unavailable result. Linux smoke changes await CI execution.
+overlap between runs). At the original audit, end-to-end documented workflows
+passed with #199 retained as an expected unavailable result. Linux smoke changes
+await CI execution.
+
+The #199 follow-up (2026-11-10) replaced that expectation with a successful
+optional-relationship title edit and a separate asserted-target refusal. Native
+build and all **1,989 tests** passed, including `IndexWatchTests`. Skill verification
+passed for all 20 synchronized files, 143 executable help pages, installed export,
+and all example workflows. The focused mutation reference changed; entrypoint
+routing and command syntax did not. Local logs are in `tmp/issue-199-*.log`.
+Linux remains CI-only and WASM verification remains deferred by project policy.
 
 For future command groups, extend the matrix and installed routing. For changed
 semantics, update the focused reference and a representative executable case when

@@ -11,6 +11,8 @@ md-utils is a Swift package for parsing and manipulating Markdown files. It cons
 
 ## Project Brief
 
+- **General mutation relationship boundary (#199)**: Shared validation evaluates relationship-bearing types and rule dependencies with the relationship evaluator. Empty optional selectors no longer block unrelated edits; local constraints, existing conformance, and unavailable baseline refusal remain enforced. Draft/REST planning still supplies no collection snapshot, so target resolution and collection policies remain unavailable. Regressions cover Core validation, read-only draft previews, final source checks, definition changes, and HTTP writes. See `docs/resource-mutations.md` and the skill's `references/mutations.md`.
+
 - **Template skill discovery (2026-11-05)**: The agent skill routes JSON-driven `rules new` / `types new` creation to `references/templates.md`, with a full config/type/rule/Knap/input walkthrough and report, bulk and body-mode scenarios. `references/knap-syntax.md` contains the language cheatsheet and upstream links. `scripts/verify-agent-template-examples.py` extracts executable examples and checks creation, validation, defaults, refusals and syntax; the full skill example harness invokes it. Canonical and bundled references must stay synchronized.
 
 - **File-list encoding (#189)**: Relationships, query, and survey share strict UTF-8 parsing. Line lists accept LF or CRLF and one optional initial BOM. NUL lists preserve U+FEFF as path data at every position. See `docs/relationship-query-design.md` for the encoding inventory.

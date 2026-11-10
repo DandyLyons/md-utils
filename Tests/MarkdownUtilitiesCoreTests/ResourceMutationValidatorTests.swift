@@ -3,6 +3,86 @@ import Testing
 
 @Suite("Resource mutation validation")
 struct ResourceMutationValidatorTests {
+  private func relationshipValidator(minimum: Int = 0) throws -> ResourceMutationValidator {
+    var relationship = MarkdownRelationshipDefinition(select: [.key("spouse")], target: "person.mdtype.yaml")
+    relationship.minimum = minimum
+    let person = MarkdownTypeDefinition(
+      typeSchemaVersion: "2", name: .init(rawValue: "Person"), version: "1",
+      requires: ["document-relationships"], relationships: ["spouse": relationship],
+    )
+    let types = try MarkdownTypeRegistry(
+      definitions: [definition("books", heading: "Book"), person],
+      typeResourceBindings: ["person.mdtype.yaml": person.name],
+    )
+    let rules = try MarkdownRuleCompiler(typeRegistry: types).compile([
+      .init(name: "people", applicability: .init(allTypes: [person.name]),
+        checks: [.init(id: "person", predicate: .typeConformance(person.name))],
+      ),
+    ])
+    return ResourceMutationValidator(types: types, rules: rules)
+  }
+
+  @Test
+  func `absent optional relationships allow edits and preserve type selected rules`() async throws {
+    let mutation = try proposal(.patch(frontmatter: ["title": .set(.string("New"))], body: nil))
+    let result = try await relationshipValidator().validate(mutation, destination: .init(rule: "people"))
+    #expect(result.isValid)
+    #expect(result.lostConformance.isEmpty)
+    let person = try #require(result.changes.first { $0.name == "Person" })
+    #expect(person.previouslyPassed && person.passes)
+    let rule = try #require(result.changes.first { $0.name == "people" })
+    #expect(rule.previouslySelected && rule.selected && rule.passes)
+  }
+
+  @Test
+  func `required relationship cardinality still rejects the destination`() async throws {
+    let mutation = try proposal(.patch(frontmatter: ["title": .set(.string("New"))], body: nil))
+    let result = try await relationshipValidator(minimum: 1).validate(
+      mutation, destination: .init(type: .init(rawValue: "Person")),
+    )
+    #expect(!result.isValid)
+    #expect(result.diagnostics.contains { $0.code == "relationship.cardinality" })
+  }
+
+  @Test
+  func `collection policies remain unavailable even with no local relationship values`() async throws {
+    let types = try relationshipValidator().types
+    let rules = try MarkdownRuleCompiler(typeRegistry: types).compile([
+      .init(
+        name: "reciprocal", typeBindings: ["person.mdtype.yaml": .init(rawValue: "Person")],
+        ruleSchemaVersion: "1", relationshipPolicies: [
+          .init(id: "spouse", scope: .selected, kind: .reciprocity(.init(type: "person.mdtype.yaml", name: "spouse"))),
+        ],
+      ),
+    ])
+    let validator = ResourceMutationValidator(types: types, rules: rules)
+    let mutation = try proposal(.patch(frontmatter: ["title": .set(.string("New"))], body: nil))
+    let result = try await validator.validate(mutation, destination: .init(type: .init(rawValue: "books")))
+    #expect(!result.isValid)
+    #expect(result.diagnostics.contains {
+      $0.code == "relationship.context.unavailable" && $0.location == "relationshipPolicies"
+    })
+  }
+
+  @Test(arguments: [false, true])
+  func `relationship targets require evidence before and after an edit`(removing: Bool) async throws {
+    let original = MarkdownRecord(
+      identity: .init(rawValue: "17"),
+      content: "---\ntitle: Original\n" + (removing ? "spouse: '[[Other]]'\n" : "") + "---\n# Book\n",
+      context: .init(path: try MarkdownRecordPath("books/17.md")), revision: .init(rawValue: "revision"),
+    )
+    let source = try ResourceMutationSource(record: original, expectedRevision: .init(rawValue: "revision"))
+    let mutation = try MarkdownResourceCodec(configuration: .init(frontmatterFields: ["spouse"], bodyWritable: false))
+      .plan(.patch(frontmatter: ["spouse": removing ? .remove : .set(.string("[[Other]]"))], body: nil), source: source)
+    for policy in [ResourceMutationValidationPolicy.preserveExistingConformance, .endpointOnly] {
+      let result = try await relationshipValidator().validate(
+        mutation, destination: .init(type: .init(rawValue: "books")), policy: policy,
+      )
+      #expect(!result.isValid)
+      #expect(result.diagnostics.contains { $0.code == "relationship.context.unavailable" })
+    }
+  }
+
   private func definition(_ name: String, heading: String) -> MarkdownTypeDefinition {
     MarkdownTypeDefinition(name: .init(rawValue: name), version: "1",
       frontmatter: .init(presence: .required, schemas: [.inline(.object([

@@ -517,9 +517,26 @@ struct MarkdownMutationTests {
     }
   }
 
-  @Test func httpWriteAndNamedLookup() async throws {
+  @Test(arguments: [false, true])
+  func httpWriteAndNamedLookup(withOptionalRelationship: Bool) async throws {
     guard #available(macOS 14.0, *) else { return }
     let root = try fixture(); defer { try? root.delete() }
+    if withOptionalRelationship {
+      try (root + ".md-utils/types/").mkpath()
+      try (root + ".md-utils/types/person.mdtype.yaml").write("""
+        md-utils-type-schema: "2"
+        requires: [document-relationships]
+        name: Person
+        version: "1"
+        frontmatter: {}
+        body: {requirements: [], recommendations: []}
+        context: {requirements: [], recommendations: []}
+        relationships:
+          spouse:
+            select: [spouse]
+            target: {type: person.mdtype.yaml}
+        """)
+    }
     let repository = try IndexedMarkdownRepository(projectRoot: root.string)
     try await repository.refresh()
     let router = Router()
@@ -548,8 +565,17 @@ struct MarkdownMutationTests {
       #expect(updated.record?.frontmatter?["title"] == .string("Replaced"))
       #expect(updated.path == created.path)
       let current = try #require(updated.revision)
+      let patched = try await client.execute(uri: "/books/by/uuid/\(uuid)", method: .patch,
+        headers: [.contentType: "application/json", revisionName: MarkdownRevisionHeader.encode(current)],
+        body: ByteBuffer(string: #"{"frontmatter":{"set":{"title":"Patched"}}}"#),
+      ) { response in
+        #expect(response.status.code == 200)
+        return try JSONDecoder().decode(MarkdownMutationReceipt.self, from: Data(response.body.readableBytesView))
+      }
+      #expect(patched.record?.frontmatter?["title"] == .string("Patched"))
+      let patchedRevision = try #require(patched.revision)
       try await client.execute(uri: "/books/_mutations/delete/by-path?path=books%2FDune.md", method: .delete,
-        headers: [revisionName: MarkdownRevisionHeader.encode(current)]) { response in
+        headers: [revisionName: MarkdownRevisionHeader.encode(patchedRevision)]) { response in
         #expect(response.status.code == 200)
       }
       try await client.execute(uri: "/books/dune", method: .get) { response in #expect(response.status.code == 404) }

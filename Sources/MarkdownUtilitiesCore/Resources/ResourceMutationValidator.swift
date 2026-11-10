@@ -49,6 +49,9 @@ public struct ResourceMutationValidation: Sendable {
 
 /// Assesses before/after source against one immutable collection registry snapshot.
 /// No cache, persistence, HTTP, or automatic repair is involved.
+/// Relationship selectors and local constraints are evaluated, including optional
+/// absence. Target resolution and collection policies remain unavailable without
+/// collection evidence; an unknown baseline never authorizes a mutation.
 public struct ResourceMutationValidator: Sendable {
   public let types: MarkdownTypeRegistry
   public let rules: MarkdownRuleRegistry
@@ -90,17 +93,23 @@ public struct ResourceMutationValidator: Sendable {
     // Failure to establish the baseline must not silently weaken preservation.
     diagnostics.append(contentsOf: before?.parseDiagnostics ?? [])
     var changes: [ResourceConformanceChange] = []
-    let typeChecker = MarkdownTypeChecker(registry: types)
     for definition in types.definitions {
       try Task.checkCancellation()
-      let old = try before.map { try typeChecker.assess($0, as: definition.name) }
-      let new = try typeChecker.assess(after, as: definition.name)
+      let old: MarkdownTypeAssessment?
+      if let before { old = try await assess(before, as: definition) }
+      else { old = nil }
+      let new = try await assess(after, as: definition)
       let change = ResourceConformanceChange(kind: .type, name: definition.name.rawValue,
         previouslyPassed: old?.conforms ?? false, passes: new.conforms,
         previouslySelected: old?.conforms ?? false, selected: new.conforms, diagnostics: new.diagnostics)
       changes.append(change)
       diagnostics.append(contentsOf: evaluationErrors(old?.diagnostics ?? []))
       diagnostics.append(contentsOf: evaluationErrors(new.diagnostics))
+      // Unavailable outcomes can also arise from bounded evaluation, whose
+      // diagnostics need not use the "unavailable" suffix.
+      if old?.outcome == .unavailable || new.outcome == .unavailable {
+        diagnostics.append(failure("evaluation", definition.name.rawValue))
+      }
       if definition.name == destination.type || (policy == .preserveExistingConformance && change.previouslyPassed) {
         diagnostics.append(contentsOf: new.diagnostics)
         if !new.conforms { diagnostics.append(failure("type", definition.name.rawValue)) }
@@ -110,8 +119,10 @@ public struct ResourceMutationValidator: Sendable {
     for definition in rules.definitions {
       try Task.checkCancellation()
       guard let rule = rules.rule(named: definition.name) else { continue }
-      let old = try before.map { try ruleChecker.assess($0, against: rule) }
-      let new = try ruleChecker.assess(after, against: rule)
+      let old: MarkdownRuleAssessment?
+      if let before { old = try await ruleChecker.assess(before, against: rule, collection: nil) }
+      else { old = nil }
+      let new = try await ruleChecker.assess(after, against: rule, collection: nil)
       let change = ResourceConformanceChange(kind: .rule, name: definition.name,
         previouslyPassed: old.map { $0.applicable && $0.passes } ?? false,
         passes: new.applicable && new.passes,
@@ -141,6 +152,19 @@ public struct ResourceMutationValidator: Sendable {
     }
     return ResourceMutationValidation(proposal: proposal, policy: policy,
       diagnostics: unique(diagnostics), changes: changes)
+  }
+
+  private func assess(
+    _ record: AnalyzedMarkdownRecord,
+    as definition: MarkdownTypeDefinition,
+  ) async throws -> MarkdownTypeAssessment {
+    let checker = MarkdownTypeChecker(registry: types)
+    if definition.relationships.isEmpty {
+      return try checker.assess(record, as: definition.name)
+    }
+    // The relationship evaluator can prove local absence/cardinality without a
+    // collection. It fails closed when selected references need target evidence.
+    return try await checker.assess(record.record, as: definition.name)
   }
 
   private func failure(_ kind: String, _ name: String) -> MarkdownDiagnostic {

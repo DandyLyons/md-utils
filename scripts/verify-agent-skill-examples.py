@@ -208,14 +208,31 @@ run("index", "apply", draft_id)
 assert "title: New" in note.read_text()
 run("index", "draft", "discard", draft_id)
 
-# Record the audit's known relationship-context limitation without weakening contracts.
+# An unrelated optional relationship must allow an actual title edit, not only a no-op.
 shutil.copyfile(fixture.parent / ".md-utils/types/person.mdtype.yaml",
                 fixture / ".md-utils/types/person.mdtype.yaml")
+(fixture / "edit.json").write_text('{"frontmatter":{"set":{"title":"Updated with relationships loaded"}}}')
+baseline = note.read_bytes()
+draft = json.loads(run("index", "draft", "add", "notes/one.md", "--resource", "notes",
+                       "--revision", hashlib.sha256(baseline).hexdigest(), "--patch-file", "edit.json"))
+run("index", "apply", draft["id"], "--dry-run", "--format", "jsonl")
+assert note.read_bytes() == baseline
+run("index", "apply", draft["id"])
+assert "title: Updated with relationships loaded" in note.read_text()
+run("index", "draft", "discard", draft["id"])
+
+# Selected targets still need collection evidence; even an existing target cannot
+# authorize a general draft write through the current per-record planner.
+note.write_text(note.read_text().replace("---\n", "---\nspouse: '[[Other]]'\n", 1))
+(fixture / "Other.md").write_text("# Other\n")
+(fixture / "edit.json").write_text('{"frontmatter":{"set":{"title":"Must remain unapplied"}}}')
 baseline = note.read_bytes()
 draft = json.loads(run("index", "draft", "add", "notes/one.md", "--resource", "notes",
                        "--revision", hashlib.sha256(baseline).hexdigest(), "--patch-file", "edit.json"))
 diagnostics = run("index", "apply", draft["id"], "--dry-run", "--format", "jsonl", expected=1)
 assert "relationship.context.unavailable" in diagnostics
+assert note.read_bytes() == baseline
+run("index", "apply", draft["id"], expected=1)
 assert note.read_bytes() == baseline
 run("index", "draft", "discard", draft["id"])
 

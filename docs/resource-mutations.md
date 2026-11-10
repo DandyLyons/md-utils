@@ -152,6 +152,16 @@ silently reduce the set being protected. Supply complete registries compiled wit
 the same type definitions, schemas, and runtime capabilities. Both assessments use
 the same immutable registries and record context.
 
+Relationship-bearing types use the relationship evaluator for both versions of
+the record, including rule selection and type checks. Empty optional selectors
+can pass without collection evidence; local cardinality and value constraints
+still apply. General mutation planning (offline drafts and REST writes) does not
+supply a collection snapshot. Selected references that require target resolution
+and applicable collection policies therefore remain unavailable and fail closed,
+even if target files exist. Removing a reference does not erase an unavailable
+baseline. Full collection-aware mutation planning is outside this supported
+boundary; relationship Fix-Its retain their separate evidence-bound workflow.
+
 `endpointOnly` is an explicit per-mutation override. For example, a `/books/` edit may
 remove a Story-required heading only in this mode, provided Book still passes.
 `lostConformance` reports the lost checks and their diagnostics. `lostMembership`
